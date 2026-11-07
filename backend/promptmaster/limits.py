@@ -36,6 +36,8 @@ import re
 #: One item someone else wrote, ticked by the user: a calendar entry, an email, a
 #: document's text. Enough to read it; twenty of them stay well under Vercel's body limit.
 MAX_THIRD_PARTY_ITEM_CHARS = 8_000
+#: How many a project, or a start, holds at once.
+MAX_THIRD_PARTY = 20
 
 #: The brief fields — objective, audience, constraints, output format — are
 #: the user's own words about their project, and on 5 Oct a 4,000-character cap

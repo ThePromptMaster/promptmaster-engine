@@ -9,10 +9,11 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
-from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
+from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS, MAX_THIRD_PARTY
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
-from promptmaster.schemas import GuideAnswer, GuideQuestion, PMInput, SavedSource, SetupSuggestion, WebUse
+from promptmaster.schemas import GuideAnswer, GuideQuestion, PMInput, SavedSource, SetupSuggestion, ThirdPartyItem, WebUse
+from promptmaster.project_context import brought_titles
 from promptmaster import web_search
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
@@ -96,6 +97,9 @@ class GuideNextRequest(BaseModel):
     web_access: Literal["on", "off"] = "off"
     #: What this intake's searches have found so far; a new search's sources follow them.
     sources: list[SavedSource] = Field(default=[], max_length=60)
+    #: Items from the user's accounts this start carries (7 Nov): titles are read,
+    #: never text, and never by the search (`brought_titles`).
+    third_party: list[ThirdPartyItem] = Field(default=[], max_length=MAX_THIRD_PARTY)
 
 
 class GuideNextResponse(WebUse):
@@ -138,6 +142,7 @@ async def api_guide_next_question(
         material=req.material,
         limit=req.max_questions,
         found=found,
+        brought=brought_titles(req.third_party),
     )
     return GuideNextResponse(enough=enough, question=question, reason=reason, **web.model_dump())
 
@@ -211,6 +216,9 @@ class FrontDoorRequest(BaseModel):
     #: The last turn answers an "Ask me questions" question (31 Oct): the reply
     #: acknowledges it and asks nothing, as the next question comes separately.
     questions: bool = False
+    #: Items from the user's accounts this start carries (7 Nov): titles are read,
+    #: never text, and never by the search (`brought_titles`).
+    third_party: list[ThirdPartyItem] = Field(default=[], max_length=MAX_THIRD_PARTY)
 
 
 @router.post("/front-door")
@@ -221,7 +229,7 @@ async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depen
     try:
         return await front_door_turn(
             client, req.model or None, req.turns, req.brief, req.edited, req.material, req.web_access, req.sources,
-            questions=req.questions,
+            questions=req.questions, third_party=req.third_party,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

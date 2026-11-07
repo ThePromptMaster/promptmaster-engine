@@ -348,7 +348,12 @@ GUIDE_NEXT_SYSTEM = (
 
 
 def build_guide_next_prompt(
-    objective: str, answered: list[dict[str, str]], material: str = "", limit: int = MAX_GUIDE_QUESTIONS, found: str = ""
+    objective: str,
+    answered: list[dict[str, str]],
+    material: str = "",
+    limit: int = MAX_GUIDE_QUESTIONS,
+    found: str = "",
+    brought: str = "",
 ) -> str:
     so_far = "\n".join(
         f"- Q: {a.get('question', '').strip()}\n  A: {a.get('answer', '').strip() or '(skipped)'}" for a in answered
@@ -356,7 +361,8 @@ def build_guide_next_prompt(
     return (
         f"Objective: {objective}\n\n"
         f"{material_block(material)}"
-        f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
+        + (f"{brought}\n\n" if brought else "")
+        + f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
         + (f"{found}\nUse what they say to make the question and its example answers current; "
            "do not ask what they already settle.\n\n" if found else "")
         # The simple start (Sean, 18 Oct, email 7): a short intake asks only what matters most.
@@ -395,6 +401,7 @@ async def suggest_next_guide_question(
     material: str = "",
     limit: int = MAX_GUIDE_QUESTIONS,
     found: str = "",
+    brought: str = "",
 ) -> tuple[bool, GuideQuestion | None, str]:
     """The next question, or that there is enough. One small call.
 
@@ -406,7 +413,7 @@ async def suggest_next_guide_question(
         return True, None, "That is enough to set this up."
     try:
         result, _usage = await client.generate_json(
-            prompt=build_guide_next_prompt(objective, answered, material, limit, found),
+            prompt=build_guide_next_prompt(objective, answered, material, limit, found, brought),
             system=GUIDE_NEXT_SYSTEM,
             temperature=0.3,
             max_tokens=400,

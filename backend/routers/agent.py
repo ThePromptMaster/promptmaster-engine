@@ -36,7 +36,7 @@ from promptmaster.agent import (
     triage_findings,
     write_code,
 )
-from promptmaster.web_search import MAX_RESULTS as MAX_WEB_RESULTS, WebSearchResult, search_web
+from promptmaster.web_search import MAX_RESULTS as MAX_WEB_RESULTS, WebSearchResult, decide_work_search, own_words, search_web
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
@@ -127,6 +127,8 @@ async def api_reason(req: ReasonRequest, client: OpenRouterClient = Depends(get_
             client, req.model or None, req.inputs, req.web_access,
             task=f"{req.action_key.replace('_', ' ')}: {req.params}"[:2_000],
             current="",
+            # The planner wrote the params, having seen the items' titles.
+            task_if_held=req.action_key.replace("_", " "),
         )
         text, usage = await perform_reason(
             client, req.model or None, inputs, req.state, req.action_key, req.params
@@ -264,10 +266,17 @@ class WebSearchRequest(BaseModel):
     web_access: Literal["on", "off"] = "off"
     max_results: int = Field(default=MAX_WEB_RESULTS, ge=1, le=10)
     model: str = ""
+    #: Who wrote the query: the user, in the Web sources box, or Go's planner.
+    asked_by: Literal["user", "go"] = "go"
+    #: The stage Go is on, by its label: what a query is written for while the
+    #: project holds items other people wrote.
+    stage: str = Field(default="", max_length=200)
 
 
 class WebSearchResponse(WebSearchResult):
     model_used: str = ""
+    #: What was searched for, when it was not the query sent (L-200).
+    query_used: str = ""
 
 
 @router.post("/web-search")
@@ -277,13 +286,24 @@ async def api_web_search(req: WebSearchRequest, client: OpenRouterClient = Depen
     plugin; nothing stored here. Refused unless the project's switch is on."""
     if req.web_access != "on":
         raise HTTPException(status_code=403, detail="Web access is off for this project. Turn it on to search the web.")
-    if req.inputs.third_party:
-        raise HTTPException(status_code=403, detail="This project holds material other people wrote, so it does not search the web.")
+    model = req.model or None
+    inputs, query, purpose = own_words(req.inputs), req.query, req.purpose
     try:
-        result = await search_web(client, req.model or None, req.inputs, req.query, req.purpose, req.max_results)
+        if req.inputs.third_party and req.asked_by == "go":
+            # Go's planner saw the items' titles and the draft, so its query is not
+            # used while the project holds them (7 Nov, the middle option; L-200):
+            # one is written here from the user's own words.
+            purpose = f"Public facts the stage \"{req.stage}\" needs" if req.stage.strip() else "Public facts the project needs"
+            written = await decide_work_search(client, model, inputs, purpose)
+            if not written:
+                return WebSearchResponse(summary="No web search was needed for this project's own question.", model_used=_model_used(req.model, client))
+            query = written
+        result = await search_web(client, model, inputs, query, purpose, req.max_results)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
-    return WebSearchResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+    return WebSearchResponse(
+        **result.model_dump(), model_used=_model_used(req.model, client), query_used=query if query != req.query else ""
+    )
 
 
 class VerifySourcesRequest(BaseModel):
@@ -440,6 +460,7 @@ async def api_expert_package(req: ExpertPackageRequest, client: OpenRouterClient
             client, req.model or None, req.inputs, req.web_access,
             task=req.issue,
             current="",
+            task_if_held=f"An expert's judgment for {req.stage_label or 'this project'}",
         )
         result = await prepare_expert_package(client, req.model or None, inputs, req.issue, req.stage_label, req.documents)
     except OpenRouterError as e:

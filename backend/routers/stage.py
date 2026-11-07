@@ -96,6 +96,8 @@ async def api_generate_stage_artifact(
             req.inputs,
             req.web_access,
             task="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint, req.instruction) if t.strip()),
+            # Go writes instructions too, having read the items: the stage's own words then.
+            task_if_held="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint) if t.strip()),
             current=req.existing_content,
         )
         result = await generate_stage_artifact(
