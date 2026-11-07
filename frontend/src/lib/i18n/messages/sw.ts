@@ -183,7 +183,7 @@ export const sw: Messages = {
   'attach.input': 'Ambatisha faili',
   'attach.reading': 'Inasoma…',
   'attach.button': 'Ambatisha maelezo ya mradi, data au picha',
-  'attach.hint': 'PDF, Word, maandishi, lahajedwali, CSV au picha. Maandishi ya maelezo ya mradi husomwa kabla usanidi haujapendekezwa.',
+  'attach.hint': 'PDF, Word, maandishi, barua pepe zilizohifadhiwa, mialiko ya kalenda, lahajedwali, CSV au picha. Maandishi ya maelezo ya mradi husomwa kabla usanidi haujapendekezwa.',
   'attach.attached': 'Imeambatishwa',
   'attach.chars': 'Herufi {count} za maandishi · zinaingia katika muktadha wa mradi',
   'attach.remove': 'Ondoa',

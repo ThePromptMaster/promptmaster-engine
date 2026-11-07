@@ -184,7 +184,7 @@ export const ar: Messages = {
   'attach.input': 'إرفاق ملفات',
   'attach.reading': 'جارٍ القراءة…',
   'attach.button': 'أرفق موجزًا أو بيانات أو صورًا',
-  'attach.hint': 'PDF أو Word أو نصوص أو جداول بيانات أو CSV أو صور. يُقرأ نص الموجز قبل اقتراح الإعداد.',
+  'attach.hint': 'PDF أو Word أو نصوص أو رسائل بريد محفوظة أو دعوات تقويم أو جداول بيانات أو CSV أو صور. يُقرأ نص الموجز قبل اقتراح الإعداد.',
   'attach.attached': 'مرفق',
   'attach.chars': '{count} حرفًا من النص · يُضاف إلى سياق المشروع',
   'attach.remove': 'إزالة',

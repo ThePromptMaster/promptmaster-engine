@@ -176,6 +176,22 @@ describe('11 Oct, survey brief: the ways a word limit is written', () => {
 });
 
 describe('"one page" is estimated in code (L-73, 11 Oct: onboarding plan)', () => {
+  it('reads a hoped-for page as no limit, and the firm figure beside it as one', () => {
+    const pages = (text: string) => parseRequirements([text]).filter((r) => r.kind === 'pages').map((r) => r.max);
+    expect(pages('One page if it can be, two pages at most.')).toEqual([2]);
+    expect(pages('Ideally one page.')).toEqual([]);
+    expect(pages('Roughly one page.')).toEqual([]);
+    expect(pages('One page or so.')).toEqual([]);
+    expect(pages('A one-page plan.')).toEqual([1]);
+  });
+
+  it('judges a page on the figure it shows, so an estimate does not fail by two words', () => {
+    const [r] = parseRequirements(['A one-page plan.']).filter((x) => x.kind === 'pages');
+    const words = (n: number) => Array.from({ length: n }, () => 'word').join(' ');
+    expect(measure(r, words(552), true)).toMatchObject({ satisfied: true });
+    expect(measure(r, words(590), true)).toMatchObject({ satisfied: false });
+  });
+
   it('reads one-page and page limits', async () => {
     const { parseRequirements } = await import('./measurable');
     expect(parseRequirements(['A one-page onboarding plan with six sections.']).filter((r) => r.kind === 'pages').map((r) => r.max)).toEqual([1]);

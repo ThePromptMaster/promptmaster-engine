@@ -191,7 +191,7 @@ export const zh: Messages = {
   'attach.input': '附加文件',
   'attach.reading': '正在读取…',
   'attach.button': '附加简介、数据或图片',
-  'attach.hint': 'PDF、Word、文本、电子表格、CSV 或图片。简介的文本会在推荐设置之前被读取。',
+  'attach.hint': 'PDF、Word、文本、已保存的邮件、日历邀请、电子表格、CSV 或图片。简介的文本会在推荐设置之前被读取。',
   'attach.attached': '已附加',
   'attach.chars': '{count} 个字符的文本 · 将加入项目背景',
   'attach.remove': '移除',

@@ -78,7 +78,7 @@ export const hi: Record<keyof typeof en, string> = {
   "ex.suggestNote": "एक छोटा AI कॉल। यह बीटा है, इसलिए गोपनीय सामग्री और निजी जानकारी शामिल न करें।",
   "ex.suggestAttach": "एजेंडा, नोट्स या कोई दस्तावेज़, अगर इससे मदद मिले।",
   "ex.suggestAttachButton": "दस्तावेज़ जोड़ें",
-  "ex.suggestSummary": "यह ऐसा लगता है: {summary}",
+  "ex.suggestSummary": "{summary}",
   "ex.suggestTitle": "काम जो आप शुरू कर सकते हैं",
   "ex.suggestStart": "इसे शुरू करें",
   "ex.suggestExample": "पहले उदाहरण देखें",
