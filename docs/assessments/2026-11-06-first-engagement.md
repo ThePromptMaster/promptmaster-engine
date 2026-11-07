@@ -10,7 +10,7 @@ words: they couldn't tell what the product does, and "Go" read like a typo on th
 
 ## What shipped for it
 
-- Four business examples, public at `/examples`: try one on invented material with no account.
+- Five business examples, public at `/examples`: try one on invented material with no account. The meeting briefing came on 7 Nov.
 - A landing page that names the work (memos, deal screens, analyses, board decks), and says what
   Go does the first time it appears.
 - A small Prompty bubble that offers an example or a start on the user's own work.
@@ -69,7 +69,8 @@ Accepting every major finding costs more each round (about $0.30 on Sonnet), and
 
 ## Not yet
 
-**Accounts and connections were taken out of this update.** The full research is in
+**Reading anyone's accounts is not in this update.** GitHub and Yahoo sign-in shipped on 7 Nov, and
+so did suggestions from what people type or attach. The full research is in
 `2026-11-07-accounts-and-connections.md`. In short:
 
 - **Gmail and all of Drive** are Google "restricted" scopes: verification plus a yearly paid
@@ -80,7 +81,7 @@ Accepting every major finding costs more each round (about $0.30 on Sonnet), and
   verification, and some work accounts will be blocked. That matters because PE firms are often
   on Microsoft 365.
 - **Yahoo Mail** needs a commercial agreement for IMAP, and I found no first-party MCP.
-- **Other sign-ins:** Supabase supports custom OIDC providers, so Yahoo sign-in is possible
-  without Yahoo Mail.
+- **Other sign-ins:** Yahoo sign-in works without Yahoo Mail, through a Supabase custom OIDC
+  provider, and is live.
 
 More external tools and MCP stay after that, as agreed on the call.
