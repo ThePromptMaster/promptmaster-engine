@@ -323,3 +323,13 @@ def test_shape_logs_names_not_values():
 def test_picked_ref_values_are_capped():
     item = PickedItem(id="x", toolkit="gmail", kind="email", ref={"mime": "a" * 1000})
     assert len(item.ref["mime"]) == 300
+
+
+def test_dates_read_as_dates_and_keep_their_offset():
+    from promptmaster.connections import human_when
+
+    assert human_when("2026-11-05T15:00:00Z") == "5 Nov 2026, 15:00 UTC+00:00"
+    assert human_when("2026-11-10T09:30:00-05:00") == "10 Nov 2026, 09:30 UTC-05:00"
+    assert human_when("2026-11-10") == "10 Nov 2026"
+    assert human_when("Thu, 6 Nov 2026 09:00:00 +0100") == "6 Nov 2026, 09:00 UTC+01:00"
+    assert human_when("next Tuesday") == "next Tuesday"
