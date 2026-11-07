@@ -203,6 +203,7 @@ export function ExampleQuestionnaire() {
         disabled={suggesting}
         documentsOnly
         hint={t('ex.suggestAttach')}
+        buttonLabel={t('ex.suggestAttachButton')}
       />
       {hasSomething && (
         <>

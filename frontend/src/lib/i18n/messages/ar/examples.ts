@@ -73,6 +73,7 @@ export const ar: Record<keyof typeof en, string> = {
   "ex.suggesting": "جارٍ التفكير…",
   "ex.suggestNote": "استدعاء سريع واحد للذكاء الاصطناعي. هذه نسخة تجريبية، فلا تضمّن مواد سرية أو بيانات شخصية.",
   "ex.suggestAttach": "جدول أعمال أو ملاحظات أو مستند، إن كان ذلك مفيدًا.",
+  "ex.suggestAttachButton": "إرفاق مستند",
   "ex.suggestSummary": "ما يبدو عليه الأمر: {summary}",
   "ex.suggestTitle": "عمل يمكنك البدء به",
   "ex.suggestStart": "ابدأ هذا",

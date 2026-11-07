@@ -32,6 +32,7 @@ export function StartAttachments({
   disabled = false,
   documentsOnly = false,
   hint,
+  buttonLabel,
 }: {
   files: PreparedFile[];
   images: StartImage[];
@@ -41,6 +42,7 @@ export function StartAttachments({
   /** Where only a document's words are used, so a picture or data file would be ignored. */
   documentsOnly?: boolean;
   hint?: string;
+  buttonLabel?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const t = useT();
@@ -110,7 +112,7 @@ export function StartAttachments({
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">attach_file</span>
-          {busy ? t('attach.reading') : t('attach.button')}
+          {busy ? t('attach.reading') : (buttonLabel ?? t('attach.button'))}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
           {hint ?? t('attach.hint')}

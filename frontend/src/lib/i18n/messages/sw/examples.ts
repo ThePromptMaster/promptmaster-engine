@@ -73,6 +73,7 @@ export const sw: Record<keyof typeof en, string> = {
   "ex.suggesting": "Inafikiria…",
   "ex.suggestNote": "Mwito mmoja wa haraka wa AI. Hii ni beta, kwa hivyo usiweke nyenzo za siri wala data binafsi.",
   "ex.suggestAttach": "Ajenda, maelezo au hati, ikiwa itasaidia.",
+  "ex.suggestAttachButton": "Ambatisha hati",
   "ex.suggestSummary": "Inaonekana hivi: {summary}",
   "ex.suggestTitle": "Kazi unayoweza kuanza",
   "ex.suggestStart": "Anza hii",

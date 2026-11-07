@@ -73,6 +73,7 @@ export const zh: Record<keyof typeof en, string> = {
   "ex.suggesting": "正在思考…",
   "ex.suggestNote": "一次快速的 AI 调用。这是测试版，请勿包含机密材料或个人数据。",
   "ex.suggestAttach": "如有帮助，可附上议程、笔记或文档。",
+  "ex.suggestAttachButton": "附加文档",
   "ex.suggestSummary": "看起来是：{summary}",
   "ex.suggestTitle": "你可以开始的工作",
   "ex.suggestStart": "开始这项",
