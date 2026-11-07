@@ -50,6 +50,7 @@ export const sw: Record<keyof typeof en, string> = {
   "prompty.name": "Prompty",
   "prompty.hello": "Ungependa kuona mfano, au kuanza na mradi wako mwenyewe?",
   "prompty.example": "Nionyeshe mfano",
+  "prompty.allExamples": "Tazama mifano yote",
   "prompty.mine": "Nisaidie kuanza wangu",
   "prompty.explore": "Nitachunguza mwenyewe",
   "prompty.start": "Ungependa tupange mbinu yako pamoja, au upate rasimu ya kwanza?",
