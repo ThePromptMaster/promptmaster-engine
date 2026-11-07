@@ -26,6 +26,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Literal
 
 import httpx
@@ -315,6 +316,28 @@ def _when(value: Any) -> str:
     if text.isdigit() and len(text) >= 12:
         return datetime.fromtimestamp(int(text) / 1000, tz=timezone.utc).isoformat(timespec="minutes")
     return text[:40]
+
+
+def human_when(value: str) -> str:
+    """'5 Nov 2026, 15:00 UTC+00:00' for text a person and a model read. Keeps the sender's own offset;
+    anything that isn't a date is left as it came."""
+    text = (value or "").strip()
+    if not text:
+        return ""
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            day = datetime.strptime(text, "%Y-%m-%d")
+            return f"{day.day} {day:%b %Y}"
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            moment = parsedate_to_datetime(text)
+        except (TypeError, ValueError, IndexError):
+            return text
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    offset = moment.strftime("%z")
+    return f"{moment.day} {moment:%b %Y, %H:%M} UTC{offset[:3]}:{offset[3:]}"
 
 
 def _person(value: Any) -> str:
@@ -641,7 +664,7 @@ async def _read_gmail(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
     subject = _first(record, "subject", "preview.subject") or _header(record, "Subject") or item.title
     sender = _person(_first(record, "sender", "from") or _header(record, "From"))
     to = _first(record, "to") or _header(record, "To")
-    when = _when(_first(record, "messageTimestamp", "date", "internalDate") or _header(record, "Date"))
+    when = human_when(_when(_first(record, "messageTimestamp", "date", "internalDate") or _header(record, "Date")))
     body = clean_text(_gmail_body(record))
     if not body:
         _log_empty(tool, data)
@@ -657,8 +680,8 @@ async def _read_gmail(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
 
 def _event_text(r: dict[str, Any], fallback_title: str) -> tuple[str, str, str]:
     title = _short(_first(r, "summary", "subject", "title") or fallback_title)
-    start = _when(_first(r, "start", "start_time"))
-    end = _when(_first(r, "end", "end_time"))
+    start = human_when(_when(_first(r, "start", "start_time")))
+    end = human_when(_when(_first(r, "end", "end_time")))
     where = _short(_first(r, "location.displayName", "location"), 200)
     organizer = _short(_person(_first(r, "organizer")), 200)
     attendees = ", ".join(_people(_first(r, "attendees")))
@@ -685,7 +708,7 @@ async def _read_outlook_mail(c: Composio, sid: str, item: PickedItem) -> Connect
     data = await c.execute(sid, tool, {"message_id": item.id, "select": ["subject", "from", "toRecipients", "receivedDateTime", "body"]})
     r = find_object(data, ("subject", "body", "id")) or {}
     sender = _person(_first(r, "from", "sender"))
-    when = _when(_first(r, "receivedDateTime", "sentDateTime"))
+    when = human_when(_when(_first(r, "receivedDateTime", "sentDateTime")))
     to = ", ".join(_people(_first(r, "toRecipients")))
     subject = _short(_first(r, "subject") or item.title)
     body = clean_text(str(_first(r, "body.content", "bodyPreview") or ""))
