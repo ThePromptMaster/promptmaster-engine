@@ -2,6 +2,10 @@
 
 import os
 from contextlib import asynccontextmanager
+
+from fastapi import HTTPException
+
+from promptmaster.composio_client import Composio, NotConfigured, build_composio
 from promptmaster.llm_client import OpenRouterClient
 
 _client: OpenRouterClient | None = None
@@ -51,3 +55,11 @@ def get_client() -> OpenRouterClient:
     if _client is None:
         raise RuntimeError("OpenRouterClient not initialized")
     return _client
+
+
+def get_composio() -> Composio:
+    """FastAPI dependency: the Composio client, or a 503 that says connections aren't set up here."""
+    try:
+        return build_composio()
+    except NotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))

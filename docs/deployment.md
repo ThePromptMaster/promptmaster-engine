@@ -79,6 +79,8 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | `WORKER_SHARED_SECRET` | Yes | **Must match the frontend's.** |
 | `AUTH_ENFORCED` | No | Defaults to `true`. Set `false` only during a deploy-ordering emergency; it lets unauthenticated requests through, logging `UNAUTHENTICATED_REQUEST`. |
 | `SIMULATE_FAILURE_USER_IDS` | No | Comma-separated Supabase user ids that may send a stage check with `simulate: "empty"` and get back exactly what a real empty reply at the token limit returns, with no model call (`backend/simulation.py`; 4 Nov). **Unset means no one.** Read per call, but Vercel needs a redeploy to see a change. The page shows the switch only to `ADMIN_USER_IDS` as well. Production: john@ and Sean (see the admin allowlist). |
+| `COMPOSIO_API_KEY` | For connected accounts | Composio project key for Gmail, Google Calendar, Google Drive, Outlook and OneDrive (`promptmaster/composio_client.py`; 7 Nov). Permissions: Connected accounts read and write, Session management, Session tool execution. Unset, `/api/connections` answers 503 and nothing else changes. Read on first use, so a change needs a redeploy. |
+| `COMPOSIO_MODE` | No | `mock` serves scripted accounts and contents for E2E. **Refused when `VERCEL_ENV=production`.** |
 
 ### Local development
 
