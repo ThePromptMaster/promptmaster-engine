@@ -80,11 +80,7 @@ describe('the examples', () => {
 });
 
 describe('what a real run produced (6 Nov, production)', () => {
-  // A result is copied from a production run, so a new example has none until it has run there.
-  const NOT_RUN_YET: readonly string[] = ['meeting_briefing'];
-  const RUN = EXAMPLES.filter((e) => !NOT_RUN_YET.includes(e.key));
-
-  it.each(RUN.map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
+  it.each(EXAMPLES.map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
     const result = resultOf(example);
     expect(result).toBeDefined();
     expect(result!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -94,7 +90,7 @@ describe('what a real run produced (6 Nov, production)', () => {
   });
 
   it('is the work, with nothing a model said to the user left in it', () => {
-    for (const example of RUN) {
+    for (const example of EXAMPLES) {
       expect(resultOf(example)!.text).not.toMatch(/Notes for you|Kept out of the document|\[\[mock/i);
     }
   });
@@ -103,6 +99,11 @@ describe('what a real run produced (6 Nov, production)', () => {
     expect(resultOf({ key: 'deal_screening' })!.text).toMatch(/Tamarack/);
     expect(resultOf({ key: 'slide_deck' })!.text).toMatch(/15\.1 months/);
     expect(deckFromMarkdown(resultOf({ key: 'slide_deck' })!.text).slides.length).toBeGreaterThanOrEqual(5);
+    const briefing = resultOf({ key: 'meeting_briefing' })!.text;
+    expect(briefing).toMatch(/1 November 2026/);
+    expect(briefing).toMatch(/7\.45%/);
+    expect(briefing).toMatch(/caps any price rise at 4%/);
+    expect(briefing).toMatch(/\$210,000/);
   });
 });
 

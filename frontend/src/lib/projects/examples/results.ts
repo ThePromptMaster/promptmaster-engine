@@ -18,6 +18,79 @@ export interface FinishedResult {
 }
 
 export const FINISHED_RESULTS: Partial<Record<ExampleKey, FinishedResult>> = {
+  meeting_briefing: {
+    date: '2026-11-07',
+    minutes: 13,
+    costUsd: 2.12,
+    text: `## Bottom line
+
+If neither party gave written notice by 1 November 2026 (to confirm before the call), the contract has renewed for 12 months under Clause 4.1. On that renewal, Clause 4.2 caps any price rise at 4% unless we agree otherwise in writing. Cascadia would need our written agreement for its three-year term and for any increase above the cap. We would not need theirs.
+
+On-time delivery is "running at 91% for the contract year" (Marcus), against the 96% minimum in Clause 7.2. Assumption: if the year ends at 91% and the amount invoiced equals FY2026 spend, the 2026 credit would be about $210,000. That is a separate 2026 claim, not an offset against 2027 price, and it must be claimed in writing (Clause 7.3). The 2027 cap is worth $168,000 at FY2026 volumes.
+
+Marcus says "we can still walk." That looks wrong, because the notice date appears to have been 1 November. State our position on price and term. Do not accept the three-year term or any rise above 4% in the room. Nothing is signed in the room.
+
+## Who is in the room and what each side wants
+
+| | People | What they want |
+|---|---|---|
+| Alder & Finch | Dana Okafor (VP Procurement), Marcus Bell (Finance Director) | A clear position on price and term, service on the table, and agreed next steps. Nothing signed in the room. |
+| Cascadia | Lena Voss (Account Director), Tomas Reyes (Commercial Lead) | A three-year renewal with 2027 increases from 1 January, and "your answer by the meeting" (Lena, 3 November) |
+
+Lena's agenda puts service after term and price. Assessment: service is our strongest point, so raise it alongside price.
+
+## The numbers
+
+These are worked by hand from the supplied figures.
+
+| Item | Working | Result | Status |
+|---|---|---|---|
+| FY2026 spend | $3.4M + $0.8M | $4.2M | Marcus's figure. The sum checks. |
+| Lena's increase | 6% × $4.2M | $252,000 a year | Marcus's figure. The sum checks. |
+| Quote Q-2291 increase | (8.5% × $3.4M) + (3% × $0.8M) = $289,000 + $24,000 | $313,000 a year; $313,000 ÷ $4.2M = 7.45% | Assumption: 2027 volumes match FY2026 |
+| Contract cap (Clause 4.2) | 4% × $4.2M | $168,000 a year | Assumption: same volumes |
+| Quote above the cap | $313,000 − $168,000 | $145,000 a year | Assumption: same volumes |
+| Lena's 6% above the cap | 6% × $4.2M = $252,000; 4% × $4.2M = $168,000; $252,000 − $168,000 | $84,000 a year above the cap | Based on FY2026 spend from Marcus's notes |
+| Service shortfall (Clause 7.2) | 96% − 91% = 5 full points | 5% credit rate | Assumption: the year ends at 91%. Only full points count, so a final figure above 91% but at or below 92% gives 4%. |
+| Possible service credit | 5% × $4.2M | about $210,000 (91% case only) | Assumption: the contract year matches FY2026 and the amount invoiced equals FY2026 spend |
+| Credit claim deadline (Clause 7.3) | 31 Dec 2026 + 90 days (31 + 28 + 31) | 31 March 2027 | Assumption: the contract year ends 31 December |
+| Renewal notice deadline (Clause 4.1) | 31 Dec back 30 days = 1 Dec; back a further 30 days = 1 Nov | 1 November 2026 | Worked from Clause 4.1 |
+
+## Where the papers disagree
+
+1. **Size of the increase.** Lena's email says "6% across the board." Her quote Q-2291 says corrugated +8.5% and labels +3%, which is about 7.45% ($313,000) on FY2026 volumes, not 6% ($252,000). Marcus used 6%.
+2. **Notice date.** Marcus thinks it is "the end of November." Clause 4.1 requires notice by 1 November, 18 days before the meeting. Unless notice was given, walking away for 2027 is not available on Clauses 4.1 and 4.2 alone. The termination clauses are not in the material.
+3. **Cascadia's deadline.** "We need your answer by the meeting" has no basis in the contract extracts. It is Cascadia's deadline, not ours.
+4. **What the price is tied to.** The link between price and a three-year term comes from the quote ("valid for a three-year term"), not the contract.
+5. **Document dates.** The quote is dated 30 October 2026, two days before the deadline, and the email 3 November, two days after it. Speculative: Cascadia could argue something sent before 1 November was notice, which would put the renewal and the cap in dispute. The material does not show Cascadia making this claim.
+
+Nothing in the material supports "fibre costs have moved against everyone" or "capacity is tight."
+
+## Our position and what to ask
+
+| Ask | Why | Hold out for |
+|---|---|---|
+| Whether Cascadia considers any notice was given under Clause 4.1 | The cap rests on no notice (item 5 above) | Not yet established. Whether notice was given by 1 November 2026 (60 days before the 31 December 2026 end of term, not "the end of November" as Marcus thinks) is settled by our own written records, not by Cascadia's word. Treat the renewal and cap as conditional until those records are checked. |
+| 2027 at no more than 4% | Clause 4.2 cap | 4% at most. Labels at their quoted 3%, already below the cap. |
+| Recognition of the 2026 service shortfall | 91% against a 96% minimum | Acknowledgement now. File the written claim after year-end, before 31 March 2027. Do not trade it for price. |
+| A written service recovery plan for 2027 | Assessment: 91% weakens the claim that a longer term protects supply | A firm on-time commitment before any longer term is discussed |
+| Any multi-year deal kept separate and on our terms | The three-year term is Cascadia's main aim | Nothing agreed in the room. Any longer term needs prices at or below the cap and stronger service terms. |
+| Clarify the quote | The email and the quote disagree | Written prices by product line |
+
+Conclusion: on the extracts supplied, the contract gives us the stronger position on price and service. That holds on two conditions. First, no written notice was given by 1 November; if it was, there is no renewal and no cap, and 2027 terms are open. Second, the credit estimate depends on final delivery performance and the contract-year dates.
+
+## What we still do not know
+
+- Whether either party gave written notice by 1 November 2026. Next step: check this before the call, including anything sent with or before the 30 October quote.
+- The final on-time delivery figure and the contract year's start and end dates.
+- The amounts actually invoiced for the contract year, as distinct from FY2026 spend.
+- Whether credits were owed in earlier years. Speculative: those claims would likely be out of time under Clause 7.3. No earlier figures are supplied.
+- Expected 2027 volumes.
+- Any evidence for Cascadia's claims about costs and capacity.
+- The rest of the contract, including termination and dispute clauses. Next step: obtain the full contract before the call.
+
+Confidence: high on what the clauses say. Medium on the worked figures, which rest on the labelled assumptions.`,
+  },
   deal_screening: {
     date: '2026-11-06',
     minutes: 7,
