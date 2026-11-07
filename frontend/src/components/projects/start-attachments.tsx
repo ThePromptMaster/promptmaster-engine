@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 
 import { prepareFiles, type PreparedFile } from '@/lib/data/attachments';
+import { DOCUMENT_EXTENSIONS } from '@/lib/data/extract-text';
 import { normalizeImage } from '@/lib/data/normalize-image';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { formatNumber } from '@/lib/i18n/format';
@@ -29,12 +30,19 @@ export function StartAttachments({
   onFiles,
   onImages,
   disabled = false,
+  documentsOnly = false,
+  hint,
+  buttonLabel,
 }: {
   files: PreparedFile[];
   images: StartImage[];
   onFiles: (files: PreparedFile[]) => void;
   onImages: (images: StartImage[]) => void;
   disabled?: boolean;
+  /** Where only a document's words are used, so a picture or data file would be ignored. */
+  documentsOnly?: boolean;
+  hint?: string;
+  buttonLabel?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const t = useT();
@@ -92,7 +100,7 @@ export function StartAttachments({
           ref={input}
           type="file"
           multiple
-          accept={[...PICKABLE_EXTENSIONS].join(',')}
+          accept={(documentsOnly ? DOCUMENT_EXTENSIONS : PICKABLE_EXTENSIONS).join(',')}
           aria-label={t('attach.input')}
           className="sr-only"
           onChange={(e) => void pick(e.target.files)}
@@ -104,10 +112,10 @@ export function StartAttachments({
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">attach_file</span>
-          {busy ? t('attach.reading') : t('attach.button')}
+          {busy ? t('attach.reading') : (buttonLabel ?? t('attach.button'))}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {t('attach.hint')}
+          {hint ?? t('attach.hint')}
         </span>
       </div>
 
