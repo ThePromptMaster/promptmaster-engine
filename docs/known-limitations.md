@@ -3401,3 +3401,19 @@ setup outside the code (the assessment above).
 The own-work section repeats the beta notice's rule, because an agenda or an email thread often holds
 personal data. That is copy, not a control: nothing checks what is attached. Counsel reviewing the
 notice (contract section 9) is what settles it, and the client has that item.
+
+### L-197 — A page limit is judged on the figure shown, and a hoped-for page is no limit (2026-11-07)
+
+Go stopped a production run at "at most 1 page, about 1 page": 552 words against an estimate of 550. A
+page is now judged on the estimate as displayed, to one decimal, so up to about 577 words is 1 page.
+"One page if it can be" and "ideally one page" no longer set a limit; only a firm figure does. A hedge
+this does not recognise still reads as firm. A word limit is unchanged, because words can be counted.
+
+### L-198 — A final review can keep finding things after you say yes (2026-11-07)
+
+On the meeting briefing's production run, accepting a major finding and then "Apply both fixes" sent Go
+back through the briefing and the review. The next review raised new wording items, and the repeat-question
+guard stopped the run rather than ask again. That cost $0.86 of the run's $2.12, and the person finishes
+with "Finish anyway", typing a reason, because the approval was given on an earlier version. Nothing was
+lost and the text was better, but it reads as an ending in a wall of text. L-192 records the same pull on
+the memo and analysis. A tester who keeps the approved version finishes cleanly.
