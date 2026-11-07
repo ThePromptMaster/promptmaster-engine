@@ -1,7 +1,7 @@
 import { EXAMPLE_CARDS, type ExampleKey } from './cards';
 
 export const WORK_ANSWERS = ['investing', 'consulting', 'finance', 'research', 'other'] as const;
-export const NEED_ANSWERS = ['memo', 'slides', 'compare', 'numbers'] as const;
+export const NEED_ANSWERS = ['memo', 'slides', 'compare', 'numbers', 'meeting'] as const;
 export type WorkAnswer = (typeof WORK_ANSWERS)[number];
 export type NeedAnswer = (typeof NEED_ANSWERS)[number];
 
@@ -18,6 +18,7 @@ const FOR_NEED: Record<NeedAnswer, Partial<Record<ExampleKey, number>>> = {
   slides: { slide_deck: 4 },
   compare: { deal_screening: 3, business_analysis: 1 },
   numbers: { business_analysis: 3, investment_memo: 1 },
+  meeting: { meeting_briefing: 5 },
 };
 
 /**

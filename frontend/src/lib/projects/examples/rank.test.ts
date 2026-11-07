@@ -17,6 +17,7 @@ describe('rankExamples', () => {
     expect(rankExamples('investing', 'memo')[0]).toBe('investment_memo');
     expect(rankExamples('consulting', 'slides')[0]).toBe('slide_deck');
     expect(rankExamples('finance', 'numbers')[0]).toBe('business_analysis');
+    expect(rankExamples('investing', 'meeting')[0]).toBe('meeting_briefing');
   });
 
   it('always offers every example, never fewer', () => {
