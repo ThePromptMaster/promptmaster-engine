@@ -163,7 +163,9 @@ async def api_chat_message(
         model = req.model or None
         saved = req.inputs.sources
         web_query, new_sources, web_note, found = "", [], "", ""
-        if req.web_access == "on":
+        # Never with other people's words in the prompt (the client's call, 4 Nov).
+        web_access = "off" if req.inputs.third_party else req.web_access
+        if web_access == "on":
             try:
                 query = await decide_chat_search(
                     client, model, req.inputs, req.chat_history, req.user_message, req.active_iteration.output
@@ -183,7 +185,7 @@ async def api_chat_message(
             iterations=req.iteration_history,
             context=req.context,
             found=found,
-            web=chat_web_line(req.web_access),
+            web=chat_web_line(web_access),
             attached=attached_block(req.attachments),
         )
         reply = await generate(

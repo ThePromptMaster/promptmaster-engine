@@ -38,6 +38,7 @@ export function inputsFromProject(project: Project): PMInput {
     context: project.context ?? '',
     // Chapters are written to it too, not only the stages written in the browser.
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
+    ...(project.third_party?.length ? { third_party: project.third_party } : {}),
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,

@@ -1,7 +1,8 @@
 """Suggest work from what someone tells us (the client's call, 4 Nov).
 
-A thin shell over `promptmaster.personalization`. It reads no account and stores
-nothing. A check-like call, not a writer: it takes no `web_access`.
+A thin shell over `promptmaster.personalization`. It reads no account itself and
+stores nothing; items from a connected account (7 Nov) arrive already read and
+ticked, through `/api/connections/read`. A check-like call, not a writer: it takes no `web_access`.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.personalization import (
+    MAX_ITEMS,
     MAX_ITEMS_CHARS,
     SUGGEST_MODEL,
     CatalogEntry,
@@ -26,7 +28,7 @@ router = APIRouter(prefix="/api", tags=["personalize"])
 
 
 class SuggestWorkflowsRequest(BaseModel):
-    items: list[SharedItem] = Field(min_length=1, max_length=8)
+    items: list[SharedItem] = Field(min_length=1, max_length=MAX_ITEMS)
     catalog: list[CatalogEntry] = Field(default_factory=list, max_length=40)
     profile: dict[str, str] = Field(default_factory=dict, max_length=6)
     model: str = ""

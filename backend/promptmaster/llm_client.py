@@ -273,6 +273,18 @@ def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
     return {"max_tokens": max_tokens}
 
 
+def _data_policy() -> dict[str, Any]:
+    """Only providers that do not keep what they are sent (the client's call, 4 Nov).
+
+    OpenRouter's default allows providers that collect. The project holds people's
+    work, and may hold their mail. `OPENROUTER_DATA_COLLECTION=allow` is the way back
+    if a model turns out to have no such provider: read on each call, so no redeploy.
+    """
+    if os.environ.get("OPENROUTER_DATA_COLLECTION", "deny").strip().lower() == "allow":
+        return {}
+    return {"provider": {"data_collection": "deny"}}
+
+
 def _with_room_for_answer(payload: dict[str, Any]) -> dict[str, Any]:
     """The same request with twice the tokens and the reasoning held to low effort.
 
@@ -353,6 +365,7 @@ class OpenRouterClient:
             "messages": _with_language(messages),
             "temperature": temperature,
             **_token_budget(runs_on, max_tokens),
+            **_data_policy(),
         }
 
         if json_mode:
@@ -399,6 +412,7 @@ class OpenRouterClient:
             "messages": _with_language(messages),
             "temperature": temperature,
             **_token_budget(runs_on, max_tokens),
+            **_data_policy(),
         }
 
         if json_mode:
@@ -439,6 +453,7 @@ class OpenRouterClient:
             "messages": _with_language(messages),
             "temperature": 0.2,
             **_token_budget(runs_on, 2_000),
+            **_data_policy(),
             "plugins": [{"id": "web", "engine": "exa", "max_results": max(1, min(max_results, 10))}],
             # The provider's total, search included, for the meter.
             "usage": {"include": True},

@@ -646,10 +646,11 @@ export const api = {
 
   /**
    * Up to three pieces of work from what someone typed or attached (the client's call,
-   * 4 Nov). One model call; nothing is saved, and no account is read.
+   * 4 Nov), or (7 Nov) emails, meetings and files they ticked in a connected account,
+   * already read through `readConnections`. One model call; nothing is saved.
    */
   async suggestWorkflows(req: {
-    items: { kind: 'note' | 'file'; title: string; text: string }[];
+    items: { kind: 'note' | 'file' | 'email' | 'calendar_event'; source?: string; title: string; text: string }[];
     catalog: { key: string; title: string; description: string }[];
     profile?: Record<string, string>;
   }): Promise<{

@@ -7,7 +7,7 @@
  * Iteration does not (parent pointers, restore lineage, per-row ownership).
  */
 
-import type {
+import type { ThirdPartyItem,
   ModeType,
   LongFormState,
   ContinuitySnapshot,
@@ -144,6 +144,8 @@ export interface Project {
   sample_output?: string | null;
   /** The curated example this project is the sample of (`lib/projects/examples`); nothing drafts on its own there. */
   example_key?: string | null;
+  /** What other people wrote, ticked by the user for a briefing. Web access stays off while any is held. */
+  third_party?: ThirdPartyItem[];
 
   mode: ModeType;
   custom_name: string;

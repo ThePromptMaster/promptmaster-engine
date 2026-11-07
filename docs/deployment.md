@@ -73,6 +73,7 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | Variable | Required | Notes |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes | The only provider credential. Server-side only. |
+| `OPENROUTER_DATA_COLLECTION` | No | `deny` (the default) routes only to providers that do not keep what they are sent; `allow` lifts that if a model has no such provider. Read per call, but Vercel needs a redeploy to see a change. L-200. |
 | `ALLOWED_ORIGINS` | Yes | Comma-separated. **No hardcoded default — CORS fails closed if unset.** Must include the frontend's production origin, and any preview origin you want to work. |
 | `SUPABASE_URL` | Yes | Used to build the JWKS URL for asymmetric token verification. |
 | `SUPABASE_JWT_SECRET` | If the project signs HS256 | Legacy symmetric signing. Harmless to set alongside `SUPABASE_URL`. |
