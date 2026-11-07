@@ -3477,6 +3477,10 @@ security assessment, and costs this:
   disconnect now revokes at Google or Microsoft only with that provider's last account; until then it
   only removes the connection in Composio, and the settings page says so. A connection already broken
   by a revoke still shows as connected until Composio notices, and preview reports it as unreadable.
+- **A briefing's guess at related mail is narrow.** "Brief me for this" ticks an email only if it
+  shares two words with the meeting's title, or one word and someone invited. An address alone was
+  enough until production showed why not (7 Nov): a meeting organised from the person's own personal
+  address pre-ticked their unrelated personal mail. The person ticks anything else themselves.
 - **Limits.** The free plan allows 20,000 calls to Composio's apps a month, then stops until the
   next; Google's quota is shared with Composio's other customers. A preview is up to six calls.
 - **Shapes not documented.** Composio documents every tool's output as an opaque object, so the

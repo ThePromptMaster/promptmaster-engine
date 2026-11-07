@@ -53,7 +53,7 @@ describe('connected items', () => {
 
   it('finds the emails around a meeting: from someone invited, or sharing its title', () => {
     const items = [
-      preview({ id: 'a', who: 'Lee <lee@cascadia.example>', title: 'Quote attached' }),
+      preview({ id: 'a', who: 'Lee <lee@cascadia.example>', title: 'Pricing quote attached' }),
       preview({ id: 'b', who: 'Someone <x@else.example>', title: 'Re: Cascadia renewal terms' }),
       preview({ id: 'c', who: 'Me <me@example.com>', title: 'Lunch?' }),
       preview({ id: 'd', who: 'Newsletter <n@news.example>', title: 'Pricing tips' }),
@@ -72,8 +72,19 @@ describe('connected items', () => {
     expect(relatedTo(meeting, items, 'personal@gmail.example').map((i) => i.id)).toEqual(['board']);
   });
 
+  it('does not tick mail on an address alone: it may be the person’s own other address', () => {
+    // 7 Nov, production: a meeting organised from the person's personal address pre-ticked
+    // their unrelated personal mail, because that address was "invited".
+    const meeting = preview({ kind: 'calendar_event', toolkit: 'googlecalendar', title: 'Supplier pricing review', who: 'me.personal@gmail.example', people: ['me@work.example'] });
+    const items = [
+      preview({ id: 'about', who: 'Me <me.personal@gmail.example>', title: 'Supplier pricing notes', people: ['me@work.example'] }),
+      preview({ id: 'unrelated', who: 'Me <me.personal@gmail.example>', title: 'Visa paperwork', people: ['me@work.example'] }),
+    ];
+    expect(relatedTo(meeting, items, 'me@work.example').map((i) => i.id)).toEqual(['about']);
+  });
+
   it('leaves room for the meeting itself under the limit', () => {
-    const many = Array.from({ length: 40 }, (_, i) => preview({ id: `m${i}`, who: 'dana@northwind.example' }));
+    const many = Array.from({ length: 40 }, (_, i) => preview({ id: `m${i}`, who: 'dana@northwind.example', title: 'Cascadia renewal' }));
     expect(relatedTo(MEETING, many)).toHaveLength(MAX_TICKED - 1);
   });
 
