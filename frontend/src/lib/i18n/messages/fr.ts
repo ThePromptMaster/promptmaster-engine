@@ -191,7 +191,7 @@ export const fr: Messages = {
   "attach.input": "Joindre des fichiers",
   "attach.reading": "Lecture…",
   "attach.button": "Joindre un brief, des données ou des images",
-  "attach.hint": "PDF, Word, texte, tableurs, CSV ou images. Le texte d’un brief est lu avant de proposer la configuration.",
+  "attach.hint": "PDF, Word, texte, e-mails enregistrés, invitations d’agenda, tableurs, CSV ou images. Le texte d’un brief est lu avant de proposer la configuration.",
   "attach.attached": "Joint",
   "attach.chars": "{count} caractères de texte · vont dans le contexte du projet",
   "attach.remove": "Retirer",

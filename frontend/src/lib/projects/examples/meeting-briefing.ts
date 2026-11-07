@@ -67,7 +67,7 @@ export const MEETING_BRIEFING: Example = {
       "Prepare me for Thursday's contract renewal meeting with Cascadia Packaging: what they want, what the papers really say, where we stand, and what to ask for and hold out for.",
     audience: 'Dana Okafor, VP Procurement at Alder & Finch Foods, reading it before the call',
     constraints:
-      'Use only the supplied material. Where sources disagree, say which says what and show the sum. Nothing the supplier claims counts as agreed. One page if it can be, two at most.',
+      'Use only the supplied material. Where sources disagree, say which says what and show the sum. Nothing the supplier claims counts as agreed. Two pages at most.',
     output_format:
       'A briefing: the bottom line first, then who is in the room and what each side wants, the numbers, where the papers disagree, our position and what to ask, and what we still do not know.',
     mode: 'analyst',

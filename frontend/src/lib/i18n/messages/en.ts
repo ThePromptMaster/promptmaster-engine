@@ -207,7 +207,7 @@ export const en = {
   "attach.input": "Attach files",
   "attach.reading": "Reading…",
   "attach.button": "Attach a brief, data or images",
-  "attach.hint": "PDF, Word, text, spreadsheets, CSV or images. A brief's text is read before the setup is suggested.",
+  "attach.hint": "PDF, Word, text, saved emails, calendar invites, spreadsheets, CSV or images. A brief's text is read before the setup is suggested.",
   "attach.attached": "Attached",
   "attach.chars": "{count} characters of text · goes into the project context",
   "attach.remove": "Remove",

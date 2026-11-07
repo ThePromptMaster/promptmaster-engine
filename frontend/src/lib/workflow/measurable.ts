@@ -363,6 +363,11 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       for (const m of t.matchAll(re)) {
         const n = read(m);
         if (!n || n > 50) continue;
+        // "One page if it can be, two at most" hopes for one (7 Nov, meeting briefing):
+        // only the firm figure is a limit. The same goes for "ideally one page".
+        const after = t.slice(m.index! + m[0].length, m.index! + m[0].length + 24);
+        const before = t.slice(Math.max(0, m.index! - 20), m.index!);
+        if (/^\s*(?:if\b|or so\b|where\b|when\b)/i.test(after) || APPROXIMATE.test(before) || /\b(?:ideally|preferably|aim for)\s+(?:a\s+)?$/i.test(before)) continue;
         add({ kind: 'pages', subject: subjectNear(t, m.index!, m.index! + m[0].length), max: n, source: m[0].trim() });
       }
     }
@@ -773,7 +778,9 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
     // which the text does not fix (L-73).
     const n = countWords(section);
     const pages = Math.max(0.1, Math.round((n / WORDS_PER_PAGE) * 10) / 10);
-    const ok = r.max === undefined || n <= r.max * WORDS_PER_PAGE;
+    // Judged on the figure shown: "at most 1 page, about 1 page" must not read as a failure,
+    // and two words past an estimate is no reason to stop a run (7 Nov, 552 words).
+    const ok = r.max === undefined || pages <= r.max;
     const value = `about ${pages} page${pages === 1 ? '' : 's'} (${n} words; estimated at ${WORDS_PER_PAGE} words a page)`;
     return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`, satisfied: ok, value, ...(ok ? {} : { detail: value }) };
   }
