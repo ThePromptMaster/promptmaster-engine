@@ -92,6 +92,7 @@ Side chat:
 |---|---|---|---|---|
 | POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** Takes `attachments` (`{name, text?, image?, not_read?}`, up to 30, for the next message only; 60,000 characters of text, 1.5 MB per image) and `context.files` (what the project holds). Images go as model image parts; the prompt names any not read. |
 | POST | `/api/suggest-actions` | `suggestActions` | `conversation.py` | **Live** — given a chat reply and the stage, returns at most four actions `{label, kind: revise \| row_updates \| add_rows, …}`; "Do nothing" is added by the client. Prompt in `promptmaster/reply_actions.py` A fact offered from a pasted report or claim carries `reported: true`. |
+| POST | `/api/suggest-workflows` | `suggestWorkflows` | `personalize.py` | **Live** — from what someone typed or attached in the short questions, up to three pieces of work, each traced to an item it came from. One model call on Sonnet 5.5; saves nothing, reads no account. |
 | POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
 | POST | `/api/save-as-new-version` | `saveAsNewVersion` | `conversation.py` | **Live** |
 

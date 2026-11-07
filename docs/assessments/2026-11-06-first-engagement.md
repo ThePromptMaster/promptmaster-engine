@@ -59,7 +59,7 @@ Accepting every major finding costs more each round (about $0.30 on Sonnet), and
 
 | Idea | Why | Effort | Moves which number |
 |---|---|---|---|
-| Offer "Now do this on your own work" at the end of an example, with the same workflow ready | The moment the example has made its case is the moment nothing asks for the next step | 2–4 h | Own project after an example |
+| ~~Offer "Now do this on your own work" at the end of an example~~ | Shipped 7 Nov | | Own project after an example |
 | A plain recap at the end: what was done, what was checked, and the file to take away | A tester who leaves with a file has a reason to come back and someone to show it to | 4–6 h | Finished, return visits |
 | Recruit by the job on someone's desk, not by profession: "a memo or a deck due this month" | People with real work stay longer than people looking around. This is the cheapest test of all | The client | Own project started |
 | Ask each new tester for one sentence after a first run: "What did you expect that didn't happen?" | The funnel says where people stop, not why | 2–3 h | Explains the rest |
@@ -68,8 +68,8 @@ Accepting every major finding costs more each round (about $0.30 on Sonnet), and
 
 ## Not yet
 
-**Accounts and connections were taken out of this update.** What the research found, for when
-they come back:
+**Accounts and connections were taken out of this update.** The full research is in
+`2026-11-07-accounts-and-connections.md`. In short:
 
 - **Gmail and all of Drive** are Google "restricted" scopes: verification plus a yearly paid
   security audit. Until then, Testing mode allows at most 100 listed users.

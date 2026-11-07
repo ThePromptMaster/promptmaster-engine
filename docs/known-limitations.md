@@ -3226,8 +3226,8 @@ slide deck example on 6 Nov, a major finding set in the table and Resume pressed
 
 ### L-180 — Curated business examples (2026-11-06)
 
-Four examples (deal screening, investment memo, business analysis, slide deck) on invented
-material, public at `/examples`. Each is a workflow written by hand in the designer's form and
+Five examples (deal screening, investment memo, business analysis, slide deck, meeting briefing) on
+invented material, public at `/examples`. Each is a workflow written by hand in the designer's form and
 saved per user, unlisted, the way a designed workflow is, so no seed migration and nothing added
 to the picker. Costs of that choice:
 
@@ -3280,7 +3280,7 @@ person's first event to their last, so it misses reading time after the last pre
 small enough that one person moves them, and people who click an example choose to, so an example's
 rates are not comparable to own-work rates as an effect of the example.
 
-### L-185 — The questionnaire orders the examples, nothing more (2026-11-06)
+### L-185 — The questionnaire's taps order the examples, nothing more (2026-11-06)
 
 Three taps, offered on `/examples` and the empty project list, folded until asked for, for someone
 not sure which example is theirs. It only reorders the four examples (`examples/rank.ts`), with no
@@ -3366,3 +3366,38 @@ again, up to twice. A run can still stop on that error, and "Retrying is safe" i
 The costs: a pinned model is a choice made for the user, shown in the example's setup. A final review
 can find something new every round, so a tester who accepts every major finding keeps going until
 they stop accepting; each round costs about $0.30 on Sonnet.
+
+### L-193 — Suggestions come from what someone gives us, not from their accounts (2026-11-07)
+
+"Suggest work for me" reads what a person types or attaches, in one call on Sonnet 5.5, and saves
+nothing. It knows only that, so it cannot notice a meeting nobody mentioned. Reading email, files and
+calendar needs provider reviews and a decision from the client, set out in
+`docs/assessments/2026-11-07-accounts-and-connections.md`. A signed-out visitor pressing it becomes a
+guest, and the call runs on our key, as a guest's other calls do. An attachment is read up to 12,000
+characters and all of them to 28,000 together, and the page names any file that was cut. Whether a
+suggestion is good is a property of the run; the parser only guarantees that it traces to something
+shared and carries no link.
+
+### L-194 — An attached invite or email is labelled, not fenced (2026-11-07)
+
+`.ics` and `.eml` read as documents and open with a line saying they are other people's words, and
+the meeting briefing's instructions say the material is evidence, not instructions. In "Suggest work
+for me" they travel in a fenced block. Anywhere else they reach prompts as project context like any
+other document, so a hostile line in a saved email is defended only by that label and the model. The
+channel of their own (closed #534) comes with account connections. Other document types have no label
+at all. Only the plain text of an email is read: attachments inside it are not, and neither are
+images. Encodings other than UTF-8 in unlabelled 8-bit bodies may read wrongly.
+
+### L-195 — GitHub and Yahoo are sign-in only, and show what the deployment names (2026-11-07)
+
+`NEXT_PUBLIC_AUTH_PROVIDERS` decides the buttons and is read at build time, so changing it needs a
+deploy. Supabase can link a provider to an existing account with the same verified email, so which
+address someone used elsewhere decides whether they land in their old account. Yahoo is a custom OIDC
+provider, whose `email_verified` claim we rely on. Microsoft and LinkedIn are not offered: both need
+setup outside the code (the assessment above).
+
+### L-196 — The meeting briefing's sample invites real material under a notice that says not to (2026-11-07)
+
+The own-work section repeats the beta notice's rule, because an agenda or an email thread often holds
+personal data. That is copy, not a control: nothing checks what is attached. Counsel reviewing the
+notice (contract section 9) is what settles it, and the client has that item.
