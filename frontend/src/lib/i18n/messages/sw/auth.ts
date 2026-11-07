@@ -14,7 +14,7 @@ export const sw: Record<keyof typeof en, string> = {
   'auth.orUpper': 'AU',
   'auth.or': 'au',
   'auth.signInWith': 'Ingia kwa {provider}',
-  'auth.signInShares': 'Kuingia kunashiriki jina lako na barua pepe yako. PromptMaster haisomi barua zako wala faili zako.',
+  'auth.signInShares': 'Kuingia kunashiriki jina lako na barua pepe yako. PromptMaster husoma barua pepe, kalenda au faili zako ukiziunganisha tu, na kile tu unachochagua.',
   'auth.redirecting': 'Inaelekeza...',
   'auth.guest': 'Endelea bila akaunti',
   'auth.guestStarting': 'Inaanza…',

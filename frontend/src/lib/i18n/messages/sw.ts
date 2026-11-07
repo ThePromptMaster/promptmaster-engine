@@ -32,6 +32,7 @@ import { sw as startersArea } from './sw/starters';
 import { sw as assessArea } from './sw/assess';
 import { sw as quickArea } from './sw/quick';
 import { sw as examplesArea } from './sw/examples';
+import { sw as connArea } from './sw/conn';
 
 export const sw: Messages = {
   'header.account': 'Akaunti',
@@ -77,7 +78,7 @@ export const sw: Messages = {
   'beta.chip': 'Beta',
   'beta.show': 'Onyesha ilani ya beta',
   'beta.title': 'Hili ni toleo la awali la beta',
-  'beta.body': 'PromptMaster ni toleo la awali la beta, kwa hiyo matokeo yanahitaji kupitiwa kabla hujayatumia — haikusudiwi kutegemewa katika kazi nyeti za uzalishaji, na hakuna kitu hapa kinachochukua nafasi ya busara yako ya kitaaluma. Tafadhali usiweke taarifa nyeti: hakuna nyaraka za siri za wateja, data binafsi, wala vitambulisho vya kuingia.',
+  'beta.body': 'PromptMaster ni toleo la awali la beta, kwa hiyo matokeo yanahitaji kupitiwa kabla hujayatumia — haikusudiwi kutegemewa katika kazi nyeti za uzalishaji, na hakuna kitu hapa kinachochukua nafasi ya busara yako ya kitaaluma. Tafadhali usiweke taarifa nyeti: hakuna vitambulisho vya kuingia, wala nyaraka za siri za wateja usizoruhusiwa kushiriki na huduma ya nje. Ukiunganisha barua pepe, kalenda au faili zako, hakuna kinachosomwa hadi ubonyeze kitufe, na kile tu unachochagua ndicho hutumwa kwa modeli ya AI.',
   'beta.gotIt': 'Nimeelewa',
   'beta.feedback': 'Tuambie ilivyokwenda',
   'beta.hideFeedback': 'Ficha fomu ya maoni',
@@ -340,4 +341,5 @@ export const sw: Messages = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 };

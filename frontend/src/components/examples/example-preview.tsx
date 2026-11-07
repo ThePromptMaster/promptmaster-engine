@@ -238,6 +238,15 @@ export function ExamplePreview({ example }: { example: Example }) {
           <StartAttachments files={files} images={images} onFiles={setFiles} onImages={setImages} disabled={working !== null} />
         </div>
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('ex.ownNote')}</p>
+        {example.key === 'meeting_briefing' && (
+          <Link
+            href="/projects/from-accounts?for=briefing"
+            className="mt-2 flex w-fit inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
+            {t('conn.entryBriefing')}
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => void start('own')}

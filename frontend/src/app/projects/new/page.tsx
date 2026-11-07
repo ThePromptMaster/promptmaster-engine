@@ -808,6 +808,13 @@ export default function NewProjectPage() {
               onImages={setStartImages}
               disabled={working !== null}
             />
+            <Link
+              href="/projects/from-accounts"
+              className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
+              {t('conn.entry')}
+            </Link>
             {documentsCut(startFiles, INPUT_LIMITS.context).length > 0 && (
               <p role="note" data-start-cut className="mt-2 text-label text-[var(--on-surface-variant)]">
                 {t('start.docCut', { names: documentsCut(startFiles, INPUT_LIMITS.context).join(', ') })}

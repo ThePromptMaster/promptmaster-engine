@@ -43,6 +43,7 @@ import { en as startersArea } from './areas/starters';
 import { en as assessArea } from './areas/assess';
 import { en as quickArea } from './areas/quick';
 import { en as examplesArea } from './areas/examples';
+import { en as connArea } from './areas/conn';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -95,7 +96,7 @@ export const en = {
   'beta.show': 'Show the beta notice',
   'beta.title': 'This is an early beta',
   'beta.body':
-    'PromptMaster is an early beta, so outputs require review before you act on them — production-critical reliance is not intended, and nothing here replaces your own professional judgement. Please do not enter sensitive information: no confidential client material, personal data, or credentials.',
+    'PromptMaster is an early beta, so outputs require review before you act on them — production-critical reliance is not intended, and nothing here replaces your own professional judgement. Please do not enter sensitive information: no credentials, and no confidential client material you may not share with an outside service. If you connect your mail, calendar or files, nothing is read until you press a button, and only what you tick is sent to the AI model.',
   'beta.gotIt': 'Got it',
   'beta.feedback': 'Tell us how it went',
   'beta.hideFeedback': 'Hide feedback form',
@@ -363,6 +364,7 @@ export const en = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 } as const;
 
 /** A key as the dictionaries hold it. */

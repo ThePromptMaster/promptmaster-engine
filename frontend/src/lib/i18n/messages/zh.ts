@@ -32,6 +32,7 @@ import { zh as startersArea } from './zh/starters';
 import { zh as assessArea } from './zh/assess';
 import { zh as quickArea } from './zh/quick';
 import { zh as examplesArea } from './zh/examples';
+import { zh as connArea } from './zh/conn';
 
 /** Chinese (Simplified) for the base keys in `en.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Messages = {
@@ -82,7 +83,7 @@ export const zh: Messages = {
   'beta.show': '显示 Beta 提示',
   'beta.title': '这是早期 Beta 版',
   'beta.body':
-    'PromptMaster 是早期 Beta 版，因此在依据输出采取行动之前需要先审阅——它不适合用于对生产至关重要的场景，这里的任何内容都不能替代你自己的专业判断。请勿输入敏感信息：不要输入客户机密材料、个人数据或登录凭据。',
+    'PromptMaster 是早期 Beta 版，因此在依据输出采取行动之前需要先审阅——它不适合用于对生产至关重要的场景，这里的任何内容都不能替代你自己的专业判断。请勿输入敏感信息：不要输入登录凭据，也不要输入不能与外部服务共享的客户机密材料。如果你连接了邮箱、日历或文件，在你按下按钮之前不会读取任何内容，只有你勾选的内容才会发送给 AI 模型。',
   'beta.gotIt': '知道了',
   'beta.feedback': '告诉我们使用感受',
   'beta.hideFeedback': '隐藏反馈表',
@@ -347,4 +348,5 @@ export const zh: Messages = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 };

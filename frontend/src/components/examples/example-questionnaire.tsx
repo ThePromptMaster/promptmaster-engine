@@ -211,6 +211,13 @@ export function ExampleQuestionnaire() {
         hint={t('ex.suggestAttach')}
         buttonLabel={t('ex.suggestAttachButton')}
       />
+      <Link
+        href="/projects/from-accounts"
+        className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
+      >
+        <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
+        {t('conn.entry')}
+      </Link>
       {hasSomething && (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2">

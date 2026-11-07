@@ -55,6 +55,8 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         PM_LLM_MODE: 'mock',
+        // 7 Nov: scripted accounts; refused when VERCEL_ENV=production.
+        COMPOSIO_MODE: 'mock',
         ALLOWED_ORIGINS: BASE_URL,
         SUPABASE_URL: sb.API_URL,
         SUPABASE_JWT_SECRET: sb.JWT_SECRET,
