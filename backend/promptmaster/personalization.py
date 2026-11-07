@@ -44,7 +44,7 @@ _SYSTEM = (
     "the work cannot be named without them.\n"
     "\n"
     "Return JSON only:\n"
-    '{"work_summary": "one sentence to them, starting with You, on what they seem to be working on", "suggestions": [{"example_key": "a key from '
+    '{"work_summary": "one sentence to them on what they seem to be working on", "suggestions": [{"example_key": "a key from '
     'the list when one of those workflows fits, else empty", "title": "under 60 characters", "why": "one sentence '
     'to them saying what in the items led to it", "objective": "what the project should produce, in the first person, one or '
     'two sentences", "based_on": [1, 3]}]}\n'
