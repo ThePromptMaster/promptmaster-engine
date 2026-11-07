@@ -99,6 +99,7 @@ from routers.agent import router as agent_router
 from routers.conflicts import router as conflicts_router
 from routers.assess import router as assess_router
 from routers.personalize import router as personalize_router
+from routers.connections import router as connections_router
 
 # Auth is applied at include time, not per-endpoint, so a new route cannot be
 # added unprotected by omission. test_auth.py asserts this holds.
@@ -126,3 +127,4 @@ app.include_router(agent_router, dependencies=_protected)
 app.include_router(conflicts_router, dependencies=_protected)
 app.include_router(assess_router, dependencies=_protected)
 app.include_router(personalize_router, dependencies=_protected)
+app.include_router(connections_router, dependencies=_protected)
