@@ -352,6 +352,17 @@ def _json_reply(system: str, prompt: str) -> dict:
             for i, b in enumerate(blocks)
         ], "not_assessed": 0}
 
+    if system.startswith("You suggest work PromptMaster could do for this person"):
+        # One suggestion per item shared, so a browser test sees where each came from.
+        titles = re.findall(r"^\[T\d+\] \S+ · (.*)$", prompt, re.M)
+        return {
+            "work_summary": "Mock: what the shared items show.",
+            "suggestions": [
+                {"example_key": "", "title": f"Mock: work for {t}"[:60], "why": f"Mock: from {t}.", "objective": f"Mock: produce the work for {t}.", "based_on": [i]}
+                for i, t in enumerate(titles, 1)
+            ],
+        }
+
     if system.startswith("You help someone work out a project before PromptMaster creates it"):
         # The brief takes the user's first message as the objective and every
         # sentence with a figure as evidence — plus one figure the user never

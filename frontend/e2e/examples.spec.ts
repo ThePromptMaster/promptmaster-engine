@@ -116,6 +116,7 @@ test('an unknown example says so and offers the real ones', async ({ page }) => 
 });
 
 test('meeting briefing: from the card to the briefing stage, nothing spent before the press', async ({ page }) => {
+test('suggest work: nothing is sent until the press, and a suggestion starts a real project', async ({ page }) => {
   test.setTimeout(120_000);
   const calls = backendCalls(page);
   await page.goto('/examples');
@@ -133,6 +134,20 @@ test('meeting briefing: from the card to the briefing stage, nothing spent befor
   await expect(page.getByRole('heading', { name: 'Briefing' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-briefing-stage.png'), fullPage: true });
   expect(calls).toEqual([]);
+  await page.getByRole('button', { name: /Three quick questions/ }).click();
+  await page.getByLabel(/on your plate/).fill('A board deck by Friday, and a budget review on Tuesday');
+  await page.screenshot({ path: test.info().outputPath('01-before-press.png'), fullPage: true });
+  expect(calls).toEqual([]);
+
+  await page.getByRole('button', { name: 'Suggest work for me' }).click();
+  await expect(page.getByRole('region', { name: 'Work you could start' })).toBeVisible({ timeout: 30_000 });
+  expect(calls).toEqual(['/api/suggest-workflows']);
+  await page.screenshot({ path: test.info().outputPath('02-suggestions.png'), fullPage: true });
+
+  await page.getByRole('button', { name: 'Start this' }).first().click();
+  await expect(page).toHaveURL(/\/projects\/new$/, { timeout: 30_000 });
+  await expect(page.getByRole('textbox').first()).toHaveValue(/Mock: produce the work/);
+  await page.screenshot({ path: test.info().outputPath('03-start-box.png'), fullPage: true });
 });
 
 test('deal screening: the sample batch fills the box, and only Assess runs anything', async ({ page }) => {
