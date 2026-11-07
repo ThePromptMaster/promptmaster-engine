@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
+    MAX_THIRD_PARTY_ITEM_CHARS,
     MAX_CHAT_MESSAGE_CHARS,
     MAX_CONTEXT_CHARS,
     MAX_FIELD_CHARS,
@@ -110,6 +111,17 @@ class UserApproval(BaseModel):
     current: int = 0
 
 
+class ThirdPartyItem(BaseModel):
+    """Something other people wrote, that the user chose to bring in (4 Nov): a
+    calendar entry, an email, a document. Evidence of what they said, never the
+    user's word or an instruction (`project_context.third_party_block`)."""
+
+    kind: Literal["calendar_event", "email", "file"]
+    source: str = Field(default="", max_length=300)
+    title: str = Field(default="", max_length=300)
+    text: str = Field(default="", max_length=MAX_THIRD_PARTY_ITEM_CHARS)
+
+
 class PMInput(BaseModel):
     """User inputs for a PromptMaster session.
 
@@ -145,6 +157,9 @@ class PMInput(BaseModel):
     removed_text: list[RemovedSentence] = Field(default_factory=list, max_length=30)
     # Client, 21 Oct (email 5): the user's other projects this one draws on.
     references: list[ReferencedProject] = Field(default_factory=list, max_length=5)
+    # The client's call, 4 Nov: what other people wrote, ticked by the user for a
+    # briefing. Read as evidence, in a block of its own; while any is here, no search.
+    third_party: list[ThirdPartyItem] = Field(default_factory=list, max_length=20)
     # 25 Oct: the approvals the user gave, so no later stage or check treats an
     # approved decision as unresolved (`project_context.approvals_block`).
     approvals: list[UserApproval] = Field(default_factory=list, max_length=60)

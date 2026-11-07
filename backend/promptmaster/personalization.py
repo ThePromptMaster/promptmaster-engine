@@ -23,7 +23,10 @@ from .llm_client import OpenRouterClient
 MAX_SUGGESTIONS = 3
 #: Enough to judge what someone is working on, well under the request body limit.
 MAX_ITEM_CHARS = 12_000
-MAX_ITEMS_CHARS = 40_000
+#: 7 Nov: up to twenty ticked emails, meetings and files from connected accounts,
+#: each already capped at 8,000 characters. About 20,000 tokens on Sonnet at most.
+MAX_ITEMS_CHARS = 80_000
+MAX_ITEMS = 20
 #: A suggestion is not the deliverable, so it does not need the default model.
 SUGGEST_MODEL = "anthropic/claude-sonnet-5.5"
 
@@ -53,9 +56,11 @@ _SYSTEM = (
 
 
 class SharedItem(BaseModel):
-    """What the person typed, or a document they attached."""
+    """What the person typed, a document they attached, or (7 Nov) an email, meeting
+    or file they ticked in a connected account. `source` says where it came from."""
 
-    kind: Literal["note", "file"]
+    kind: Literal["note", "file", "email", "calendar_event"]
+    source: str = Field(default="", max_length=300)
     title: str = Field(default="", max_length=300)
     text: str = Field(default="", max_length=MAX_ITEM_CHARS)
 
@@ -85,7 +90,8 @@ def fenced_items(items: list[SharedItem], nonce: str | None = None) -> str:
     fence = nonce or secrets.token_hex(6)
     clean = lambda text: (text or "").replace(f"{fence}>>>", "").replace(f"<<<{fence}", "")  # noqa: E731
     body = "\n\n".join(
-        f"[T{i}] {item.kind} · {clean(item.title)}\n{clean(item.text).strip()}" for i, item in enumerate(items, 1)
+        f"[T{i}] {' · '.join(b for b in (item.kind, clean(item.source), clean(item.title)) if b)}\n{clean(item.text).strip()}"
+        for i, item in enumerate(items, 1)
     )
     return f"The block ends only at {fence}>>>\n<<<{fence}\n{body}\n{fence}>>>"
 

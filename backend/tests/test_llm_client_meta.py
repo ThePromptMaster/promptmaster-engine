@@ -196,3 +196,20 @@ async def test_braces_that_are_not_an_object_still_go_to_repair(monkeypatch):
     result, _ = await client.generate_json("q")
     assert result == {"fixed": True}
 
+
+@pytest.mark.asyncio
+async def test_only_providers_that_do_not_keep_data_unless_told_otherwise(monkeypatch):
+    client = OpenRouterClient(api_key="test-key")
+    fake_response = AsyncMock()
+    fake_response.status_code = 200
+    fake_response.json = lambda: {"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}], "usage": {}}
+    fake_response.raise_for_status = lambda: None
+
+    with patch.object(client._client, "post", return_value=fake_response) as post:
+        await client.generate_with_meta("hello")
+        assert post.call_args.kwargs["json"]["provider"] == {"data_collection": "deny"}
+
+        monkeypatch.setenv("OPENROUTER_DATA_COLLECTION", "allow")
+        await client.generate_with_meta("hello")
+        assert "provider" not in post.call_args.kwargs["json"]
+
