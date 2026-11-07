@@ -626,11 +626,14 @@ def _decode_b64(data: str) -> bytes:
     return base64.b64decode(padded)
 
 
-def _gmail_body(record: dict[str, Any]) -> str:
-    """The message text: Composio's `messageText` when present, else the MIME parts, plain preferred."""
-    direct = _first(record, "messageText", "message_text", "text", "body", "preview.body", "snippet")
-    if isinstance(direct, str) and direct.strip():
-        return direct
+def _gmail_body(record: dict[str, Any]) -> tuple[str, str]:
+    """The message as its reader saw it, and where that came from.
+
+    The HTML part first, read as visible text only (`html_to_text` drops what a
+    style hides); then the plain part; and only then Composio's own `messageText`,
+    which is its conversion of the HTML and keeps hidden text. Seen on production,
+    7 Nov: a `display:none` instruction arrived through `messageText`.
+    """
     plain: list[str] = []
     rich: list[str] = []
 
@@ -649,8 +652,15 @@ def _gmail_body(record: dict[str, Any]) -> str:
         for child in part.get("parts") or []:
             walk(child)
 
-    walk(record.get("payload") or record)
-    return "\n".join(plain) if plain else "\n".join(rich)
+    walk(record.get("payload") or {})
+    if any(r.strip() for r in rich):
+        return html_to_text("\n".join(rich)), "html"
+    if any(p.strip() for p in plain):
+        return "\n".join(plain), "plain"
+    direct = _first(record, "messageText", "message_text", "text", "body", "preview.body", "snippet")
+    if isinstance(direct, str) and direct.strip():
+        return direct, "converted"
+    return "", "none"
 
 
 def _source(label: str, *bits: str) -> str:
@@ -665,7 +675,10 @@ async def _read_gmail(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
     sender = _person(_first(record, "sender", "from") or _header(record, "From"))
     to = _first(record, "to") or _header(record, "To")
     when = human_when(_when(_first(record, "messageTimestamp", "date", "internalDate") or _header(record, "Date")))
-    body = clean_text(_gmail_body(record))
+    raw_body, came_from = _gmail_body(record)
+    # Which path, never what it said: on production this shows whether the parts came back.
+    logger.info("CONNECTIONS_GMAIL_BODY source=%s", came_from)
+    body = clean_text(raw_body)
     if not body:
         _log_empty(tool, data)
     head = "\n".join(line for line in (
