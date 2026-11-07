@@ -1,10 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { useBetaNoticeDismissed } from '@/components/shared/beta-notice';
+import { useAuth } from '@/hooks/use-auth';
 import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
+import { rankExamples } from '@/lib/projects/examples/rank';
+import { loadAnswers } from '@/lib/supabase/preferences';
+
+/** How many examples the bubble names; the rest are one link away. */
+const SHOWN_EXAMPLES = 3;
 
 /** A convenience in this browser: seen once, it stays closed until asked for. */
 export const PROMPTY_STORAGE_KEY = 'pm.prompty.v1';
@@ -33,6 +41,9 @@ function rememberSeen() {
  * it is a small Help button in the corner. It names no button that might not be on
  * the page, and it only links: nothing here creates or runs anything.
  *
+ * Off the start screen it names a few examples ("have a few examples pop up"), first
+ * the ones that suit this person's saved answers to the short questions.
+ *
  * The guided tour and the video are separate work, estimated and not built.
  */
 export function PromptyHelp({ place, autoOpen = true }: { place: 'landing' | 'list' | 'start'; autoOpen?: boolean }) {
@@ -42,6 +53,23 @@ export function PromptyHelp({ place, autoOpen = true }: { place: 'landing' | 'li
   // Once pressed, the press decides; until then, whether this is a first visit.
   const [chosen, setChosen] = useState<boolean | null>(null);
   const open = chosen ?? (autoOpen && firstVisit);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const [answers, setAnswers] = useState<{ work?: string; need?: string } | null>(null);
+
+  // Only once it is open: a closed bubble has no reason to ask for anything.
+  useEffect(() => {
+    if (!open || !userId) return;
+    let live = true;
+    loadAnswers(userId)
+      .then((saved) => {
+        if (live && saved) setAnswers(saved);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [open, userId]);
 
   function close() {
     rememberSeen();
@@ -75,10 +103,22 @@ export function PromptyHelp({ place, autoOpen = true }: { place: 'landing' | 'li
           </div>
           {place === 'start' && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('prompty.startHint')}</p>}
           <div className="mt-3 flex flex-col gap-2">
+            {place !== 'start' &&
+              rankExamples(answers?.work, answers?.need)
+                .slice(0, SHOWN_EXAMPLES)
+                .map((key) => {
+                  const card = EXAMPLE_CARDS.find((c) => c.key === key)!;
+                  return (
+                    <Link key={key} href={exampleHref(card.slug)} onClick={close} className={`${choice} flex items-center gap-2`}>
+                      <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--pm-primary)]">{card.icon}</span>
+                      {t(`ex.${key}.title` as MessageKey)}
+                    </Link>
+                  );
+                })}
             {place === 'landing' ? (
-              <a href="#examples" onClick={close} className={choice}>{t('prompty.example')}</a>
+              <a href="#examples" onClick={close} className={choice}>{t('prompty.allExamples')}</a>
             ) : (
-              <Link href="/examples" onClick={close} className={choice}>{t('prompty.example')}</Link>
+              <Link href="/examples" onClick={close} className={choice}>{t(place === 'start' ? 'prompty.example' : 'prompty.allExamples')}</Link>
             )}
             {place !== 'start' && (
               <Link href="/projects/new" onClick={close} className={choice}>{t('prompty.mine')}</Link>

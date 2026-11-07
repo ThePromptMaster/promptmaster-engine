@@ -115,11 +115,25 @@ test('an unknown example says so and offers the real ones', async ({ page }) => 
   await expect(page.getByRole('link', { name: /Business analysis/ })).toBeVisible();
 });
 
+test('meeting briefing: from the card to the briefing stage, nothing spent before the press', async ({ page }) => {
 test('suggest work: nothing is sent until the press, and a suggestion starts a real project', async ({ page }) => {
   test.setTimeout(120_000);
   const calls = backendCalls(page);
   await page.goto('/examples');
   await pressGotIt(page);
+  await page.getByRole('link', { name: /Meeting briefing/ }).click();
+  await expect(page).toHaveURL(/\/examples\/meeting-briefing$/);
+  await page.screenshot({ path: test.info().outputPath('01-preview.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'The meeting' })).toBeVisible();
+  expect(calls).toEqual([]);
+
+  await page.getByRole('checkbox', { name: 'I approve this as what the meeting is for' }).check();
+  await transitionBar(page).getByRole('button', { name: /^Continue to/ }).click();
+  await expect(page.getByRole('heading', { name: 'Briefing' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-briefing-stage.png'), fullPage: true });
+  expect(calls).toEqual([]);
   await page.getByRole('button', { name: /Three quick questions/ }).click();
   await page.getByLabel(/on your plate/).fill('A board deck by Friday, and a budget review on Tuesday');
   await page.screenshot({ path: test.info().outputPath('01-before-press.png'), fullPage: true });
@@ -228,7 +242,7 @@ test('Prompty offers a way in once, after the beta notice, and stays on as Help'
   const prompty = page.getByRole('dialog', { name: 'Prompty' });
   await expect(prompty).toContainText('Want to see an example, or start with your own project?');
   await page.screenshot({ path: test.info().outputPath('prompty-landing.png') });
-  await prompty.getByRole('link', { name: 'Show me an example' }).click();
+  await prompty.getByRole('link', { name: 'See all examples' }).click();
   await expect(page.locator('#examples')).toBeInViewport();
   await expect(prompty).toHaveCount(0);
 

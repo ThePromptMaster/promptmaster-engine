@@ -11,6 +11,7 @@ export const EXAMPLE_CARDS = [
   { key: 'investment_memo', slug: 'investment-memo', icon: 'request_quote' },
   { key: 'business_analysis', slug: 'business-analysis', icon: 'query_stats' },
   { key: 'slide_deck', slug: 'slide-deck', icon: 'co_present' },
+  { key: 'meeting_briefing', slug: 'meeting-briefing', icon: 'event_note' },
 ] as const;
 
 export type ExampleKey = (typeof EXAMPLE_CARDS)[number]['key'];
