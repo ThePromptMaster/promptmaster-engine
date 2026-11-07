@@ -18,7 +18,7 @@ export const sw: Record<keyof typeof en, string> = {
   'conn.reconnect': 'Unganisha upya',
   'conn.disconnect': 'Tenganisha',
   'conn.disconnecting': 'Inatenganisha…',
-  'conn.disconnectNote': 'Kutenganisha pia huondoa ufikiaji wa PromptMaster kwa Google au Microsoft.',
+  'conn.disconnectNote': 'Google hutoa ufikiaji mmoja kwa Gmail, Kalenda na Drive kwa pamoja, na Microsoft mmoja kwa Outlook na OneDrive, kwa hiyo ufikiaji wa PromptMaster huondolewa huko unapotenganisha ya mwisho kati yake.',
   'conn.guest': 'Fungua akaunti ili uunganishe barua pepe, kalenda au faili zako. Muunganisho wa mgeni ungebaki nyuma baada ya mgeni kuondoka.',
   'conn.guestAction': 'Fungua akaunti',
   'conn.notSetUp': 'Akaunti zilizounganishwa bado hazipatikani hapa.',

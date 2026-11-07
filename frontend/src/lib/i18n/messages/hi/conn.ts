@@ -18,7 +18,7 @@ export const hi: Record<keyof typeof en, string> = {
   'conn.reconnect': 'फिर से जोड़ें',
   'conn.disconnect': 'हटाएँ',
   'conn.disconnecting': 'हटा रहे हैं…',
-  'conn.disconnectNote': 'हटाने से Google या Microsoft पर PromptMaster की पहुँच भी वापस ले ली जाती है।',
+  'conn.disconnectNote': 'Google, Gmail, कैलेंडर और Drive के लिए एक साथ एक ही पहुँच देता है, और Microsoft, Outlook और OneDrive के लिए एक, इसलिए जब आप इनमें से आख़िरी को हटाते हैं तब वहाँ PromptMaster की पहुँच वापस ली जाती है।',
   'conn.guest': 'अपना मेल, कैलेंडर या फ़ाइलें जोड़ने के लिए खाता बनाएँ। मेहमान का कनेक्शन मेहमान के जाने के बाद भी पीछे छूट जाता।',
   'conn.guestAction': 'खाता बनाएँ',
   'conn.notSetUp': 'जुड़े हुए खाते अभी यहाँ उपलब्ध नहीं हैं।',

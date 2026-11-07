@@ -18,7 +18,7 @@ export const ar: Record<keyof typeof en, string> = {
   'conn.reconnect': 'إعادة الاتصال',
   'conn.disconnect': 'قطع الاتصال',
   'conn.disconnecting': 'جارٍ قطع الاتصال…',
-  'conn.disconnectNote': 'قطع الاتصال يسحب أيضًا وصول PromptMaster لدى Google أو Microsoft.',
+  'conn.disconnectNote': 'تمنح Google وصولًا واحدًا لـ Gmail والتقويم وDrive معًا، وتمنح Microsoft وصولًا واحدًا لـ Outlook وOneDrive، لذلك يُسحب وصول PromptMaster هناك عندما تقطع اتصال آخرها.',
   'conn.guest': 'أنشئ حسابًا لتربط بريدك أو تقويمك أو ملفاتك. اتصال الضيف سيبقى معلّقًا بعد رحيل الضيف.',
   'conn.guestAction': 'إنشاء حساب',
   'conn.notSetUp': 'الحسابات المتصلة غير متاحة هنا بعد.',

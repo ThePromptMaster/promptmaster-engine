@@ -23,6 +23,7 @@ from deps import get_composio
 from promptmaster.composio_client import Account, Composio, ComposioError
 from promptmaster.connections import (
     MAX_PICKED,
+    PROVIDER,
     TOOLKITS,
     ConnectedFile,
     ConnectedText,
@@ -86,6 +87,8 @@ class ConfirmRequest(BaseModel):
 
 class DeleteResponse(BaseModel):
     deleted: bool
+    # False while another account from the same provider is still connected: the grant is shared.
+    revoked: bool = True
 
 
 class PreviewRequest(BaseModel):
@@ -184,13 +187,22 @@ async def api_confirm(
 async def api_disconnect(
     account_id: str, user: AuthUser = Depends(connecting_user), composio: Composio = Depends(get_composio)
 ) -> DeleteResponse:
-    """Remove the connection and revoke the grant at Google or Microsoft."""
+    """Remove the connection; withdraw the grant at Google or Microsoft with that provider's last one.
+
+    Composio's Google toolkits share one grant, as its Microsoft ones do, so revoking
+    while a sibling is still connected would break the sibling too.
+    """
     account = await _owned(composio, user, account_id)
+    siblings = [
+        a for a in await _accounts(composio, user)
+        if a.id != account.id and a.status == "ACTIVE" and PROVIDER.get(a.toolkit) == PROVIDER.get(account.toolkit)
+    ]
+    revoke = not siblings
     try:
-        await composio.delete(account.id)
+        await composio.delete(account.id, revoke=revoke)
     except ComposioError:
         raise HTTPException(status_code=502, detail="The connection could not be removed just now. Try again in a minute.")
-    return DeleteResponse(deleted=True)
+    return DeleteResponse(deleted=True, revoked=revoke)
 
 
 @router.post("/preview")
