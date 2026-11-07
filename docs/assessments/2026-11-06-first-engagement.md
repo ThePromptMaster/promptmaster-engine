@@ -52,6 +52,7 @@ Run on production on 6 Nov with "Let Go run this":
 | Slide deck | Opus 5.5 | $2.59 | 22 min | n/a |
 | Investment memo | Sonnet 5.5 | $1.92 | 17 min | $5.23 |
 | Business analysis | Sonnet 5.5 | $1.42 | 24 min | $4.14 |
+| Meeting briefing (7 Nov) | Opus 5.5 | $2.12 | 13 min | n/a |
 
 Accepting every major finding costs more each round (about $0.30 on Sonnet), and a tester decides when to stop. Each finished result is on its example's preview page, so a visitor can read one without an account.
 
