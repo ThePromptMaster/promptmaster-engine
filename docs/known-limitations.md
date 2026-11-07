@@ -3472,6 +3472,11 @@ security assessment, and costs this:
   neither says something false. Google's user-data policy still binds us through Composio's terms.
 - **Not every account.** Composio offers no Yahoo. A Microsoft work account may need its IT admin to
   approve Composio's app. Guests cannot connect: the connection would outlive the guest.
+- **One grant per provider.** Composio's Gmail, Calendar and Drive are one Google app, so revoking
+  one revoked all three (seen on production, 7 Nov: Drive disconnected, Gmail answered 401). A
+  disconnect now revokes at Google or Microsoft only with that provider's last account; until then it
+  only removes the connection in Composio, and the settings page says so. A connection already broken
+  by a revoke still shows as connected until Composio notices, and preview reports it as unreadable.
 - **Limits.** The free plan allows 20,000 calls to Composio's apps a month, then stops until the
   next; Google's quota is shared with Composio's other customers. A preview is up to six calls.
 - **Shapes not documented.** Composio documents every tool's output as an opaque object, so the

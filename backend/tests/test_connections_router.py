@@ -52,9 +52,10 @@ class FakeComposio(MockComposio):
             raise ComposioError(f"{tool} failed")
         return composio_mock_data.result(tool, arguments)
 
-    async def delete(self, account_id: str) -> None:
+    async def delete(self, account_id: str, revoke: bool = True) -> None:
         self.calls.append(("delete", account_id))
-        await super().delete(account_id)
+        self.calls.append(("revoke", (account_id, revoke)))
+        await super().delete(account_id, revoke)
 
 
 @pytest.fixture
@@ -159,8 +160,20 @@ def test_disconnect_checks_ownership_first(fake):
     assert client.delete("/api/connections/theirs").status_code == 404
     assert ("delete", "theirs") not in fake.calls
     fake.add("mine", "gmail")
-    assert client.delete("/api/connections/mine").json() == {"deleted": True}
+    assert client.delete("/api/connections/mine").json() == {"deleted": True, "revoked": True}
     assert ("delete", "mine") in fake.calls
+
+
+def test_disconnect_revokes_only_with_the_providers_last_account(fake):
+    """7 Nov, production: Drive revoked the shared Google grant and Gmail answered 401."""
+    fake.add("g", "gmail")
+    fake.add("d", "googledrive")
+    fake.add("o", "outlook")
+    assert client.delete("/api/connections/d").json() == {"deleted": True, "revoked": False}
+    assert ("revoke", ("d", False)) in fake.calls
+    # Outlook is Microsoft's: Gmail still connected doesn't hold its grant back.
+    assert client.delete("/api/connections/o").json()["revoked"] is True
+    assert client.delete("/api/connections/g").json()["revoked"] is True
 
 
 @pytest.mark.asyncio
@@ -180,6 +193,11 @@ async def test_the_live_client_revokes_on_delete():
     await live.delete("acc_1")
     await live.close()
     assert sent == {"method": "DELETE", "url": "/api/v3.1/connected_accounts/acc_1", "params": {"revoke_on_delete": "true"}}
+    live = ComposioClient("key")
+    live._http.request = request  # type: ignore[method-assign]
+    await live.delete("acc_2", revoke=False)
+    await live.close()
+    assert sent["params"] == {"revoke_on_delete": "false"}
 
 
 # --- preview ---------------------------------------------------------------

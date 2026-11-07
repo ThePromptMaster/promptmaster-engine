@@ -61,6 +61,11 @@ TOOLKITS: dict[str, Toolkit] = {
     ONE_DRIVE: Toolkit(ONE_DRIVE, "OneDrive", "The names of your 20 most recent files; a file's text only when you tick it."),
 }
 
+#: Composio's Gmail, Calendar and Drive are one Google app, so revoking one revokes the
+#: grant for all three (seen on production, 7 Nov: Drive disconnected, Gmail answered 401).
+#: Outlook and OneDrive are one Microsoft app.
+PROVIDER = {GMAIL: "google", GOOGLE_CALENDAR: "google", GOOGLE_DRIVE: "google", OUTLOOK: "microsoft", ONE_DRIVE: "microsoft"}
+
 DAYS = 14
 MAX_EMAILS = 30
 MAX_EVENTS = 25

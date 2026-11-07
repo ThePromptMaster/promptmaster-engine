@@ -65,7 +65,7 @@ class Composio(Protocol):
     async def execute(self, session_id: str, tool: str, arguments: dict[str, Any]) -> Any: ...
     async def accounts(self, user_id: str) -> list[Account]: ...
     async def account(self, account_id: str) -> Account | None: ...
-    async def delete(self, account_id: str) -> None: ...
+    async def delete(self, account_id: str, revoke: bool = True) -> None: ...
 
 
 def _error_message(response: httpx.Response) -> str:
@@ -162,9 +162,9 @@ class ComposioClient:
             raise
         return to_account(body)
 
-    async def delete(self, account_id: str) -> None:
-        """Remove the connection and revoke the grant at Google or Microsoft too."""
-        await self._call("DELETE", f"/connected_accounts/{account_id}", params={"revoke_on_delete": "true"})
+    async def delete(self, account_id: str, revoke: bool = True) -> None:
+        """Remove the connection; with `revoke`, withdraw the grant at Google or Microsoft too."""
+        await self._call("DELETE", f"/connected_accounts/{account_id}", params={"revoke_on_delete": "true" if revoke else "false"})
 
 
 # ---------------------------------------------------------------------------
@@ -208,9 +208,10 @@ class MockComposio:
     async def account(self, account_id: str) -> Account | None:
         return self._accounts.get(account_id)
 
-    async def delete(self, account_id: str) -> None:
+    async def delete(self, account_id: str, revoke: bool = True) -> None:
         self._accounts.pop(account_id, None)
         self.deleted.append(account_id)
+        self.revoked = getattr(self, "revoked", []) + ([account_id] if revoke else [])
 
 
 # ---------------------------------------------------------------------------

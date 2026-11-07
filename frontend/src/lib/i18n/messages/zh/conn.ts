@@ -18,7 +18,7 @@ export const zh: Record<keyof typeof en, string> = {
   'conn.reconnect': '重新连接',
   'conn.disconnect': '断开连接',
   'conn.disconnecting': '正在断开…',
-  'conn.disconnectNote': '断开连接也会撤销 PromptMaster 在 Google 或 Microsoft 的访问权限。',
+  'conn.disconnectNote': 'Google 对 Gmail、日历和 Drive 只授予一份共同的访问权限，Microsoft 对 Outlook 和 OneDrive 也是如此，因此在你断开其中最后一个时，PromptMaster 在那里的访问权限才会被撤销。',
   'conn.guest': '创建账户后才能连接邮箱、日历或文件。访客的连接会在访客离开后被遗留下来。',
   'conn.guestAction': '创建账户',
   'conn.notSetUp': '这里暂时还不能连接账户。',
