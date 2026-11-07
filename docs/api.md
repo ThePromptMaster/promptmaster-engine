@@ -1,6 +1,6 @@
 # API boundaries
 
-There are **three** interfaces in this system, and confusing them is the fastest way
+There are **four** interfaces in this system, and confusing them is the fastest way
 to misdiagnose an outage.
 
 | Boundary | Caller | Callee | Credential |
@@ -9,6 +9,7 @@ to misdiagnose an outage.
 | Generation | Browser | FastAPI (`NEXT_PUBLIC_API_URL`) | The user's Supabase JWT, `Authorization: Bearer` |
 | Worker | Next.js `/api/jobs/drain` | FastAPI | `WORKER_SHARED_SECRET` + `X-PromptMaster-User` |
 | Worker | Next.js `/api/jobs/drain` | Supabase | `SUPABASE_SERVICE_ROLE_KEY`, via SECURITY DEFINER functions |
+| Connections | FastAPI `/api/connections/*` | Composio REST (`backend.composio.dev`) | `COMPOSIO_API_KEY`; Composio holds each person's Google and Microsoft connection, keyed by their Supabase user id |
 
 **The save path never touches FastAPI.** Project edits go browser → Supabase directly.
 If saving is broken, the backend is not the place to look.
@@ -93,6 +94,12 @@ Side chat:
 | POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** Takes `attachments` (`{name, text?, image?, not_read?}`, up to 30, for the next message only; 60,000 characters of text, 1.5 MB per image) and `context.files` (what the project holds). Images go as model image parts; the prompt names any not read. |
 | POST | `/api/suggest-actions` | `suggestActions` | `conversation.py` | **Live** — given a chat reply and the stage, returns at most four actions `{label, kind: revise \| row_updates \| add_rows, …}`; "Do nothing" is added by the client. Prompt in `promptmaster/reply_actions.py` A fact offered from a pasted report or claim carries `reported: true`. |
 | POST | `/api/suggest-workflows` | `suggestWorkflows` | `personalize.py` | **Live** — from what someone typed or attached in the short questions, up to three pieces of work, each traced to an item it came from. One model call on Sonnet 5.5; saves nothing, reads no account. |
+| GET | `/api/connections` | `listConnections` | `connections.py` | **Live (7 Nov)** — the caller's connected accounts (`ACTIVE` or `EXPIRED`) and what each kind reads. Guests get 403; no `COMPOSIO_API_KEY` gives 503. |
+| POST | `/api/connections/link` | `linkConnection` | `connections.py` | **Live** — Composio's consent link for one of `gmail`, `googlecalendar`, `googledrive`, `outlook`, `one_drive`. `callback_url` must be an `ALLOWED_ORIGINS` origin plus `/projects/connect`; 409 when that account is already connected. |
+| POST | `/api/connections/confirm` | `confirmConnection` | `connections.py` | **Live** — after the consent screen: 404 unless the connection is the caller's, else its status. |
+| DELETE | `/api/connections/{id}` | `disconnect` | `connections.py` | **Live** — ownership checked first; deletes with `revoke_on_delete=true`. |
+| POST | `/api/connections/preview` | `previewConnections` | `connections.py` | **Live** — metadata only (senders, subjects, dates, meeting titles, file names); no bodies, descriptions or file text. One toolkit failing is a `problems` entry, not an error. No model call. |
+| POST | `/api/connections/read` | `readConnections` | `connections.py` | **Live** — the text of up to 20 ticked items, hidden HTML and links removed, 8,000 characters each; PDFs and Office files come back as base64 for the browser to read; anything else is `skipped` with a reason. No model call. |
 | POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
 | POST | `/api/save-as-new-version` | `saveAsNewVersion` | `conversation.py` | **Live** |
 

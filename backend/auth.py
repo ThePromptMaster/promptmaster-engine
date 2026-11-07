@@ -39,6 +39,9 @@ class AuthUser:
     id: str
     email: str | None
     role: str
+    # Supabase marks a guest's token with is_anonymous. A guest may do most
+    # things, but not connect an account that would outlive them.
+    is_anonymous: bool = False
 
 
 def auth_enforced() -> bool:
@@ -182,6 +185,7 @@ def _to_user(claims: dict) -> AuthUser:
         id=str(claims.get("sub", "")),
         email=claims.get("email"),
         role=str(claims.get("role", "authenticated")),
+        is_anonymous=claims.get("is_anonymous") is True,
     )
 
 
