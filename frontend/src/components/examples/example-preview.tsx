@@ -237,6 +237,7 @@ export function ExamplePreview({ example }: { example: Example }) {
         <div className="mt-2">
           <StartAttachments files={files} images={images} onFiles={setFiles} onImages={setImages} disabled={working !== null} />
         </div>
+        <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('ex.ownNote')}</p>
         <button
           type="button"
           onClick={() => void start('own')}

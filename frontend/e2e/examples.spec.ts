@@ -115,6 +115,26 @@ test('an unknown example says so and offers the real ones', async ({ page }) => 
   await expect(page.getByRole('link', { name: /Business analysis/ })).toBeVisible();
 });
 
+test('meeting briefing: from the card to the briefing stage, nothing spent before the press', async ({ page }) => {
+  test.setTimeout(120_000);
+  const calls = backendCalls(page);
+  await page.goto('/examples');
+  await pressGotIt(page);
+  await page.getByRole('link', { name: /Meeting briefing/ }).click();
+  await expect(page).toHaveURL(/\/examples\/meeting-briefing$/);
+  await page.screenshot({ path: test.info().outputPath('01-preview.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'The meeting' })).toBeVisible();
+  expect(calls).toEqual([]);
+
+  await page.getByRole('checkbox', { name: 'I approve this as what the meeting is for' }).check();
+  await transitionBar(page).getByRole('button', { name: /^Continue to/ }).click();
+  await expect(page.getByRole('heading', { name: 'Briefing' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-briefing-stage.png'), fullPage: true });
+  expect(calls).toEqual([]);
+});
+
 test('deal screening: the sample batch fills the box, and only Assess runs anything', async ({ page }) => {
   test.setTimeout(120_000);
   const calls = backendCalls(page);
