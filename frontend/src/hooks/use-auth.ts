@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useProjectStore } from '@/stores/project-store';
 import { SignInTimeout, withTimeout } from '@/lib/auth/sign-in';
 import { nextFromLocation, rememberNext } from '@/lib/auth/next-path';
-import type { Session, User } from '@supabase/supabase-js';
+import { PROVIDER_SCOPES, type ProviderId } from '@/lib/auth/providers';
+import type { Provider, Session, User } from '@supabase/supabase-js';
 
 /**
  * Drop whatever the signed-out user was looking at.
@@ -85,12 +86,15 @@ export function useAuth() {
     return Boolean(data.session);
   }, [supabase]);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithProvider = useCallback(async (provider: ProviderId) => {
     rememberNext(nextFromLocation());
+    const scopes = PROVIDER_SCOPES[provider];
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      // A custom OIDC provider's id is `custom:<name>`, which the type does not list.
+      provider: provider as Provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        ...(scopes ? { scopes } : {}),
       },
     });
     if (error) throw error;
@@ -148,7 +152,7 @@ export function useAuth() {
     isGuest,
     signIn,
     signUp,
-    signInWithGoogle,
+    signInWithProvider,
     continueAsGuest,
     createAccountFromGuest,
     signOut,
