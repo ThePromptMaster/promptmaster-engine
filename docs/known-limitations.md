@@ -3413,7 +3413,7 @@ this does not recognise still reads as firm. A word limit is unchanged, because 
 
 On the meeting briefing's production run, accepting a major finding and then "Apply both fixes" sent Go
 back through the briefing and the review. The next review raised new wording items, and the repeat-question
-guard stopped the run rather than ask again. That cost $0.86 of the run's $2.12, and the person finishes
+guard stopped the run rather than ask again. That cost $0.74 of the run's $2.12, and the person finishes
 with "Finish anyway", typing a reason, because the approval was given on an earlier version. Nothing was
 lost and the text was better, but it reads as an ending in a wall of text. L-192 records the same pull on
 the memo and analysis. A tester who keeps the approved version finishes cleanly.
