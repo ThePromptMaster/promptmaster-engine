@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -8,9 +8,12 @@ import { api } from '@/lib/api/client';
 import { setRequestLanguage } from '@/lib/api/language';
 import { goSignedIn } from '@/lib/auth/sign-in';
 import {
+  MAX_HELD,
   MAX_TICKED,
   itemKey,
+  mergeThirdParty,
   relatedTo,
+  rememberStartItems,
   shortWhen,
   toPicked,
   toSharedItems,
@@ -29,7 +32,9 @@ import { EXAMPLES } from '@/lib/projects/examples';
 import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
 import { startExample } from '@/lib/projects/examples/start-example';
 import { rememberStartGoal } from '@/lib/projects/example-goals';
+import { getProject, updateProject } from '@/lib/supabase/projects';
 import { startLanguage } from '@/lib/workflow/languages';
+import { ProjectConflictError } from '@/types/project';
 
 import { ConnectedAccounts } from './connected-accounts';
 
@@ -62,9 +67,12 @@ function isText(x: ConnectedText | Skipped): x is ConnectedText {
  * 3. "Read what I ticked" fetches only those, and shows the exact text, which they
  *    may change or remove. What is sent is what is shown.
  * 4. Suggestions (one model call), or a briefing project holding the text as other
- *    people's words, with web search off.
+ *    people's words. A search there is written from the person's own words only (L-200).
+ *
+ * `into` (7 Nov): opened from a project's "From your accounts" panel, the ticked
+ * items are added to that project instead, up to what it has room for.
  */
-export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
+export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; into?: string }) {
   const t = useT();
   const locale = useLocale();
   const { user } = useAuth();
@@ -77,11 +85,29 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
   const [skipped, setSkipped] = useState<Skipped[]>([]);
   const [meeting, setMeeting] = useState<PreviewItem | null>(null);
   const [result, setResult] = useState<{ work_summary: string; suggestions: Suggestion[] } | null>(null);
-  const [sentTitles, setSentTitles] = useState<string[]>([]);
+  // What the suggestions were made from, as sent: "based on" points into it.
+  const [sent, setSent] = useState<ConnectedText[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // The project the items go into, when opened from one.
+  // Translated at render: an effect that used `t` would run again on every language change.
+  const [target, setTarget] = useState<{ title: string; held: number } | { gone: true } | { failed: string } | null>(null);
+
+  useEffect(() => {
+    if (!into) return;
+    let live = true;
+    getProject(into)
+      .then((p) => live && setTarget(p ? { title: p.title, held: p.third_party?.length ?? 0 } : { gone: true }))
+      .catch((e: unknown) => live && setTarget({ failed: e instanceof Error ? e.message : '' }));
+    return () => {
+      live = false;
+    };
+  }, [into]);
+  const project = target && 'title' in target ? target : null;
+  const targetProblem = !target ? null : 'gone' in target ? t('conn.intoGone') : 'failed' in target ? t('conn.failed', { why: target.failed }) : null;
 
   const active = (accounts ?? []).filter((a) => a.status === 'ACTIVE');
-  const full = ticked.size >= MAX_TICKED;
+  const cap = into ? Math.max(0, Math.min(MAX_TICKED, MAX_HELD - (project?.held ?? 0))) : MAX_TICKED;
+  const full = ticked.size >= cap;
   const why = (e: unknown) => t('conn.failed', { why: e instanceof Error ? e.message : '' });
 
   async function look() {
@@ -104,7 +130,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
     setTicked((held) => {
       const next = new Set(held);
       if (next.has(key)) next.delete(key);
-      else if (next.size < MAX_TICKED) next.add(key);
+      else if (next.size < cap) next.add(key);
       return next;
     });
   }
@@ -117,7 +143,9 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
       const picked = items.filter((i) => keys.has(itemKey(i)) && i.readable);
       const back = await api.readConnections(picked.map(toPicked));
       const fromFiles = await Promise.all(back.files.map((f) => fileToText(f, t('conn.fileUnread'))));
-      const texts = [...back.items, ...fromFiles.filter(isText)];
+      // When it was sent or happens comes from the list it was ticked in.
+      const when = new Map(picked.map((p) => [itemKey(p), p.when]));
+      const texts = [...back.items, ...fromFiles.filter(isText)].map((x) => ({ ...x, when: when.get(itemKey(x)) || undefined }));
       // In the order they were listed, so the meeting leads a briefing.
       const order = new Map(picked.map((p, i) => [itemKey(p), i]));
       texts.sort((a, b) => (order.get(itemKey(a)) ?? 0) - (order.get(itemKey(b)) ?? 0));
@@ -149,7 +177,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
           description: t(`ex.${c.key}.blurb` as MessageKey).slice(0, 400),
         })),
       });
-      setSentTitles(chosen.map((c) => c.title));
+      setSent(chosen);
       setResult(back);
       setPhase('suggestions');
     } catch (e) {
@@ -185,12 +213,45 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
     }
   }
 
+  /** "Start this" keeps what the suggestion came from (7 Nov): every ticked item if it names none. */
   function startFrom(s: Suggestion) {
+    const from = s.based_on.map((n) => sent[n - 1]).filter((x): x is ConnectedText => !!x);
     rememberStartGoal(s.objective);
+    rememberStartItems(toThirdParty(from.length ? from : sent));
     goSignedIn('/projects/new');
   }
 
-  const returnTo = briefing ? '/projects/from-accounts?for=briefing' : '/projects/from-accounts';
+  /** Into the project it was opened from: merged with what it holds, re-read once if it moved on. */
+  async function addToProject() {
+    if (!into) return;
+    setPhase('starting');
+    setError(null);
+    try {
+      const added = toThirdParty(chosen);
+      for (let attempt = 0; ; attempt++) {
+        const current = await getProject(into);
+        if (!current) throw new Error(t('conn.intoGone'));
+        const { items: merged } = mergeThirdParty(current.third_party ?? [], added);
+        try {
+          await updateProject(into, { third_party: merged }, current.revision);
+          break;
+        } catch (e) {
+          if (e instanceof ProjectConflictError && e.reason === 'stale' && attempt === 0) continue;
+          throw e;
+        }
+      }
+      goSignedIn(`/projects/${into}`);
+    } catch (e) {
+      setError(why(e));
+      setPhase('review');
+    }
+  }
+
+  const returnTo = into
+    ? `/projects/from-accounts?into=${encodeURIComponent(into)}`
+    : briefing
+    ? '/projects/from-accounts?for=briefing'
+    : '/projects/from-accounts';
 
   const section = (heading: string, kind: PreviewItem['kind']) => {
     const rows = items.filter((i) => i.kind === kind);
@@ -220,7 +281,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
                     <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">{sub}</span>
                     {!item.readable && <span className="block text-label text-[var(--on-surface-variant)]">{item.note || t('conn.fileUnread')}</span>}
                   </label>
-                  {kind === 'calendar_event' && (
+                  {kind === 'calendar_event' && !into && (
                     <button
                       type="button"
                       onClick={() => briefMe(item)}
@@ -240,8 +301,17 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="text-display text-[var(--on-surface)]">{briefing ? t('conn.entryBriefing') : t('conn.flowTitle')}</h1>
-      <p className="mt-3 text-body text-[var(--on-surface-variant)]">{t('conn.flowLead')}</p>
+      <h1 className="text-display text-[var(--on-surface)]">
+        {into ? t('conn.intoTitle') : briefing ? t('conn.entryBriefing') : t('conn.flowTitle')}
+      </h1>
+      <p className="mt-3 text-body text-[var(--on-surface-variant)]">
+        {into ? (project ? (cap ? t('conn.intoLead', { title: project.title, count: cap }) : t('conn.intoFull', { max: MAX_HELD })) : '') : t('conn.flowLead')}
+      </p>
+      {into && (
+        <Link href={`/projects/${into}`} className="mt-2 inline-block text-label font-medium text-[var(--pm-primary)] hover:underline">
+          {t('conn.intoBack')}
+        </Link>
+      )}
 
       {(accounts === null || active.length === 0) && (
         <section className="mt-6">
@@ -253,7 +323,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
 
       {active.length > 0 && (phase === 'idle' || phase === 'looking') && (
         <div className="mt-6 flex flex-wrap items-center gap-4">
-          <button type="button" onClick={() => void look()} disabled={phase === 'looking'} className={primary}>
+          <button type="button" onClick={() => void look()} disabled={phase === 'looking' || (!!into && (!project || cap === 0))} className={primary}>
             {phase === 'looking' ? t('conn.looking') : t('conn.look')}
           </button>
           <Link href="/projects/settings" className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.manage')}</Link>
@@ -274,7 +344,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
             </button>
             <span role="status" className="text-label text-[var(--on-surface-variant)]">
               {t('conn.ticked', { count: ticked.size })}
-              {full ? ` ${t('conn.tickMax', { max: MAX_TICKED })}` : ''}
+              {full ? ` ${t('conn.tickMax', { max: cap })}` : ''}
             </span>
           </div>
         </>
@@ -322,9 +392,13 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
               </ul>
             </section>
           )}
-          {meeting && <p className="mt-5 text-label text-[var(--on-surface-variant)]">{t('conn.webOff')}</p>}
+          {(meeting || into) && <p className="mt-5 text-label text-[var(--on-surface-variant)]">{t('conn.webOff')}</p>}
           <div className="mt-5 flex flex-wrap gap-3">
-            {meeting ? (
+            {into ? (
+              <button type="button" onClick={() => void addToProject()} disabled={!chosen.length || phase !== 'review'} className={primary}>
+                {phase === 'starting' ? t('conn.adding') : t('conn.addN', { count: chosen.length })}
+              </button>
+            ) : meeting ? (
               <button type="button" onClick={() => void startBriefing()} disabled={!chosen.length || phase !== 'review'} className={primary}>
                 {phase === 'starting' ? t('conn.starting') : t('conn.startBriefing')}
               </button>
@@ -363,7 +437,7 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
                     <p dir="auto" className="text-title text-[var(--on-surface)]">{s.title}</p>
                     {s.why && <p dir="auto" className="mt-1 text-body text-[var(--on-surface-variant)]">{s.why}</p>}
                     <p dir="auto" className="mt-1 text-label text-[var(--on-surface-variant)]">
-                      {t('conn.basedOn', { titles: s.based_on.map((n) => sentTitles[n - 1]).filter(Boolean).join(', ') })}
+                      {t('conn.basedOn', { titles: s.based_on.map((n) => sent[n - 1]?.title).filter(Boolean).join(', ') })}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <button type="button" onClick={() => startFrom(s)} className={secondary}>{t('conn.startThis')}</button>
@@ -380,8 +454,8 @@ export function ConnectFlow({ briefing = false }: { briefing?: boolean }) {
         </>
       )}
 
-      {error && (
-        <p role="alert" className="mt-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3 text-body text-[var(--pm-error)]">{error}</p>
+      {(error || targetProblem) && (
+        <p role="alert" className="mt-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3 text-body text-[var(--pm-error)]">{error || targetProblem}</p>
       )}
     </main>
   );

@@ -56,6 +56,8 @@ export interface ConnectedText {
   source: string;
   title: string;
   text: string;
+  /** From the preview the person ticked it in; the read itself does not say. */
+  when?: string;
 }
 
 /** A PDF or Office file, for this browser to read (`lib/data/extract-text.ts`). */
@@ -87,9 +89,77 @@ export function toPicked(item: PreviewItem): { id: string; toolkit: ToolkitSlug;
   return { id: item.id, toolkit: item.toolkit, kind: item.kind, title: item.title, ref: item.ref };
 }
 
-/** For a briefing project: exactly what was shown, nothing else on the item. */
+/** For a project: exactly what was shown, nothing else on the item. */
 export function toThirdParty(items: readonly ConnectedText[]): ThirdPartyItem[] {
-  return items.map(({ kind, source, title, text }) => ({ kind, source, title, text }));
+  return items.map(({ kind, source, title, text, when }) => ({ kind, source, title, text, ...(when ? { when } : {}) }));
+}
+
+/** How many a project holds at once: the backend's `MAX_THIRD_PARTY`. */
+export const MAX_HELD = 20;
+
+function sameItem(a: ThirdPartyItem, b: ThirdPartyItem): boolean {
+  return a.kind === b.kind && a.source === b.source && a.title === b.title && a.text === b.text;
+}
+
+/**
+ * What a project holds once `added` joins `held`: in order, an item already held
+ * once only, and never more than `MAX_HELD`. `left` is what did not fit.
+ */
+export function mergeThirdParty(
+  held: readonly ThirdPartyItem[],
+  added: readonly ThirdPartyItem[]
+): { items: ThirdPartyItem[]; left: ThirdPartyItem[] } {
+  const items = [...held];
+  const left: ThirdPartyItem[] = [];
+  for (const item of added) {
+    if (items.some((h) => sameItem(h, item))) continue;
+    if (items.length >= MAX_HELD) left.push(item);
+    else items.push(item);
+  }
+  return { items, left };
+}
+
+/**
+ * Items "Start this" carries to the start screen (7 Nov). In this tab's storage, as the
+ * goal is (`rememberStartGoal`): they are someone's mail, and a URL ends up in logs.
+ */
+const START_ITEMS_KEY = 'pm.start.items';
+
+function isItem(x: unknown): x is ThirdPartyItem {
+  const o = x as Record<string, unknown> | null;
+  return (
+    !!o &&
+    (o.kind === 'calendar_event' || o.kind === 'email' || o.kind === 'file') &&
+    typeof o.title === 'string' &&
+    typeof o.text === 'string' &&
+    typeof o.source === 'string' &&
+    (o.when === undefined || typeof o.when === 'string')
+  );
+}
+
+export function rememberStartItems(items: readonly ThirdPartyItem[]): void {
+  try {
+    if (items.length) sessionStorage.setItem(START_ITEMS_KEY, JSON.stringify(items.slice(0, MAX_HELD)));
+    else sessionStorage.removeItem(START_ITEMS_KEY);
+  } catch {
+    // Storage blocked or full: the start goes ahead without them.
+  }
+}
+
+export function takeStartItems(): ThirdPartyItem[] {
+  try {
+    const raw = sessionStorage.getItem(START_ITEMS_KEY);
+    sessionStorage.removeItem(START_ITEMS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isItem).slice(0, MAX_HELD) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** For the start conversation: titles only, never the text (`brought_titles` on the server). */
+export function titlesOnly(items: readonly ThirdPartyItem[]): ThirdPartyItem[] {
+  return items.map(({ kind, title, when }) => ({ kind, source: '', title, text: '', ...(when ? { when } : {}) }));
 }
 
 /** For `suggestWorkflows`: the same, in its item shape. */

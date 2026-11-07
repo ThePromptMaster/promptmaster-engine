@@ -2,8 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { cleanText } from './read-file';
 import {
+  MAX_HELD,
   MAX_TICKED,
   itemKey,
+  mergeThirdParty,
+  rememberStartItems,
+  takeStartItems,
+  titlesOnly,
   rememberReturn,
   relatedTo,
   shortWhen,
@@ -115,5 +120,35 @@ describe('cleaning a file read in the browser', () => {
     const long = cleanText('word '.repeat(5000));
     expect(long.length).toBeLessThanOrEqual(8000);
     expect(long.endsWith('allows]')).toBe(true);
+  });
+});
+
+describe('what a project holds from the accounts (7 Nov)', () => {
+  const a = { kind: 'email' as const, source: 'Gmail · Dana', title: 'Pricing', text: 'One.' };
+  const b = { kind: 'file' as const, source: 'Drive', title: 'Plan', text: 'Two.', when: '2026-11-03' };
+
+  it('adds in order, once each, and never past the limit', () => {
+    expect(mergeThirdParty([a], [a, b])).toEqual({ items: [a, b], left: [] });
+    const many = Array.from({ length: MAX_HELD }, (_x, i) => ({ ...a, title: `t${i}` }));
+    expect(mergeThirdParty(many, [b])).toEqual({ items: many, left: [b] });
+  });
+
+  it('keeps when it was sent, and the start conversation gets titles only', () => {
+    expect(toThirdParty([{ id: '1', toolkit: 'googledrive', kind: 'file', source: 'Drive', title: 'Plan', text: 'Two.', when: '2026-11-03' }])).toEqual([b]);
+    expect(titlesOnly([a, b])).toEqual([
+      { kind: 'email', source: '', title: 'Pricing', text: '' },
+      { kind: 'file', source: '', title: 'Plan', text: '', when: '2026-11-03' },
+    ]);
+  });
+
+  it('hands the start screen what "Start this" carried, once, and only items', () => {
+    sessionStorage.clear();
+    rememberStartItems([a, b]);
+    expect(takeStartItems()).toEqual([a, b]);
+    expect(takeStartItems()).toEqual([]);
+    sessionStorage.setItem('pm.start.items', JSON.stringify([a, { kind: 'script', title: 'x', text: 'y', source: '' }, 'junk']));
+    expect(takeStartItems()).toEqual([a]);
+    sessionStorage.setItem('pm.start.items', '{not json');
+    expect(takeStartItems()).toEqual([]);
   });
 });

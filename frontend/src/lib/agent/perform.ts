@@ -710,13 +710,30 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const asked = typeof params.query === 'string' ? params.query.trim().slice(0, 400) : '';
       const query = asked.length >= 2 ? asked : `${ctx.stage.label}: ${ctx.project.objective}`.slice(0, 400);
       const found = await api.agentWebSearch(
-        { inputs: inputsFrom(ctx.project), query, purpose: (ctx.step.rationale || ctx.stage.label).slice(0, MAX_PURPOSE), web_access: 'on', model: ctx.project.model },
+        {
+          inputs: inputsFrom(ctx.project),
+          query,
+          purpose: (ctx.step.rationale || ctx.stage.label).slice(0, MAX_PURPOSE),
+          web_access: 'on',
+          model: ctx.project.model,
+          asked_by: 'go',
+          stage: ctx.stage.label.slice(0, 200),
+        },
         ctx.signal
       );
+      // While the project holds account items the server writes the query itself, from
+      // the person's own words (L-200), and may find nothing worth searching.
+      const searched = found.query_used || query;
       if (!found.sources.length) {
-        return done(key, { status: 'failed', toolsUsed: ['web'], changes: {}, output: `Searched the web for "${query}": no sources came back, so nothing was saved.` });
+        const unsearched = !!ctx.project.third_party?.length && !found.query_used && !!found.summary;
+        return done(key, {
+          status: 'failed',
+          toolsUsed: ['web'],
+          changes: {},
+          output: unsearched ? found.summary : `Searched the web for "${searched}": no sources came back, so nothing was saved.`,
+        });
       }
-      const saved = await saveSources(ctx.project, found.sources, { query, stageId: ctx.stage.id, agentRunId: ctx.run.id });
+      const saved = await saveSources(ctx.project, found.sources, { query: searched, stageId: ctx.stage.id, agentRunId: ctx.run.id });
       await ctx.refresh?.();
       const names = found.sources.map((s) => s.title || s.url).join('; ');
       // Sources saved are a change to the project: the record says so, and
@@ -724,7 +741,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // done. No change to the project" after five sources were saved).
       return done(key, {
         status: 'succeeded', toolsUsed: ['web'], changes: saved.length ? { source_ids: saved.map((s) => s.id) } : {},
-        output: `Searched the web for "${query}". ${saved.length ? `Saved ${saved.length} new source${saved.length === 1 ? '' : 's'}` : 'Every source found was already saved'}: ${names}.\n\n${found.summary}`.slice(0, MAX_OUTPUT),
+        output: `Searched the web for "${searched}". ${saved.length ? `Saved ${saved.length} new source${saved.length === 1 ? '' : 's'}` : 'Every source found was already saved'}: ${names}.\n\n${found.summary}`.slice(0, MAX_OUTPUT),
       });
     }
 

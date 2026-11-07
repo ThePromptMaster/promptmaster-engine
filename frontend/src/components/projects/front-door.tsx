@@ -10,7 +10,8 @@ import { MarkdownOutput } from '@/components/shared/markdown-output';
 import type { NewSource } from '@/lib/supabase/sources';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
-import type { GuideQuestion } from '@/types';
+import type { GuideQuestion, ThirdPartyItem } from '@/types';
+import { titlesOnly } from '@/lib/connections/items';
 import { GuideQuestionCard } from './guide-question-card';
 
 export interface DraftBrief {
@@ -111,6 +112,7 @@ export function FrontDoor({
   busyLabel,
   maxQuestions,
   foldWhy = false,
+  carried = [],
 }: {
   opening: string;
   /** `said`: the user's own turns, to tell what they said from what the brief's drafter assumed. */
@@ -132,6 +134,8 @@ export function FrontDoor({
   maxQuestions?: number;
   /** A question's reason behind "Why this question?" rather than printed under it. */
   foldWhy?: boolean;
+  /** Items "Start this" carried from the person's accounts: the conversation sees their titles only (7 Nov). */
+  carried?: ThirdPartyItem[];
 }) {
   const t = useT();
   const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
@@ -168,6 +172,7 @@ export function FrontDoor({
         brief,
         edited,
         ...(material.trim() ? { material } : {}),
+        ...(carried.length ? { third_party: titlesOnly(carried) } : {}),
         web_access: 'on',
         sources: sourcesFound(from),
         // The next question comes as a card; a reply asking its own put two in a row (31 Oct).
@@ -219,6 +224,7 @@ export function FrontDoor({
         objective: (brief.objective || opening || from.find((x) => x.role === 'user')?.content || '').trim().slice(0, INPUT_LIMITS.objective),
         answered: asked,
         ...(read ? { material: read } : {}),
+        ...(carried.length ? { third_party: titlesOnly(carried) } : {}),
         ...(maxQuestions !== undefined ? { max_questions: maxQuestions } : {}),
         // A new project has Web access on (22 Oct), as the conversation does.
         web_access: 'on',

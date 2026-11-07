@@ -6,7 +6,8 @@ import { dismissBetaNotice, serviceSelect } from './helpers';
 /**
  * Connected accounts (the client's call, 7 Nov), against scripted accounts
  * (COMPOSIO_MODE=mock): connect, look without reading, tick, read the exact
- * text, suggest, brief for a meeting, disconnect. Nothing reaches a model
+ * text, suggest, start from a suggestion with its items, brief for a meeting, see,
+ * remove and add what the project holds, disconnect. Nothing reaches a model
  * before a press that says it will, and an email's hidden instruction and its
  * links never reach the screen, let alone a prompt.
  */
@@ -75,13 +76,31 @@ test('connect, look, tick, read, suggest, brief and disconnect', async ({ page }
   expect(seen.filter((c) => c === 'POST /api/suggest-workflows')).toHaveLength(1);
   await shot('05-suggestions.png');
 
+  // "Start this" keeps the item the suggestion came from (7 Nov), whichever way the project starts.
+  await page.getByRole('button', { name: 'Start this' }).first().click();
+  await page.waitForURL('**/projects/new');
+  const carried = page.getByRole('region', { name: 'From your accounts' });
+  await expect(carried.getByText('Updated price list')).toBeVisible();
+  await expect(carried.getByText('2027 operating plan')).toHaveCount(0);
+  await shot('05b-start-carries.png');
+  await page.getByRole('button', { name: /Get a first draft/ }).click();
+  await page.waitForURL(/\/projects\/[0-9a-f-]{36}$/);
+  const startedId = page.url().split('/').pop()!;
+  const [started] = (await serviceSelect('projects', `id=eq.${startedId}&select=third_party,context`)) as {
+    third_party: { title: string; text: string }[];
+    context: string;
+  }[];
+  expect(started.third_party.map((i) => i.title)).toEqual(['Updated price list']);
+  expect(started.third_party[0].text).toMatch(/19\.10/);
+  expect(started.context).not.toMatch(/19\.10/);
+
   // Brief for a meeting: it and the email from someone invited, as other people's words.
-  await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Back' }).click();
+  await page.goto('/projects/from-accounts');
+  await page.getByRole('button', { name: "Show what's there" }).click();
   await page.getByRole('listitem').filter({ hasText: 'Q3 board meeting' }).getByRole('button', { name: 'Brief me for this' }).click();
   await expect(page.getByRole('textbox', { name: 'Q3 board meeting' })).toHaveValue(/Agenda: Q3 results/);
   await expect(page.getByRole('textbox', { name: 'Board pack for Thursday' })).toBeVisible();
-  await expect(page.getByText('Web search stays off', { exact: false })).toBeVisible();
+  await expect(page.getByText('written from your brief, never from these', { exact: false })).toBeVisible();
   await shot('06-briefing-text.png');
   await page.getByRole('button', { name: 'Start the briefing' }).click();
   await page.waitForURL(/\/projects\/[0-9a-f-]{36}$/);
@@ -92,7 +111,8 @@ test('connect, look, tick, read, suggest, brief and disconnect', async ({ page }
     objective: string;
     context: string;
   }[];
-  expect(project.web_access).toBe('off');
+  // Web access keeps the project's default: a search is written from the person's own words (L-200).
+  expect(project.web_access).toBe('on');
   expect(project.context).toBe('');
   expect(project.third_party.map((i) => [i.kind, i.title])).toEqual([
     ['calendar_event', 'Q3 board meeting'],
@@ -100,6 +120,34 @@ test('connect, look, tick, read, suggest, brief and disconnect', async ({ page }
   ]);
   expect(project.objective).toContain('Q3 board meeting');
   await shot('07-briefing-project.png');
+
+  // The project's "From your accounts" panel: [T1]…, the exact text, Remove.
+  const held = page.getByRole('region', { name: 'From your accounts' });
+  await expect(held.getByText('2 of 20')).toBeVisible();
+  await held.getByRole('button', { name: 'Show text' }).first().click();
+  await expect(held.getByText(/Agenda: Q3 results/)).toBeVisible();
+  await shot('07b-panel.png');
+  await held.getByRole('listitem').filter({ hasText: 'Board pack for Thursday' }).getByRole('button', { name: 'Remove' }).click();
+  await expect(held.getByText('1 of 20')).toBeVisible();
+  await expect
+    .poll(async () => ((await serviceSelect('projects', `id=eq.${id}&select=third_party`)) as { third_party: unknown[] }[])[0].third_party.length)
+    .toBe(1);
+
+  // Add from my accounts: back into this project, and back to it.
+  await held.getByRole('button', { name: 'Add from my accounts' }).click();
+  await page.waitForURL(`**/projects/from-accounts?into=${id}`);
+  await expect(page.getByText(/It has room for 19 more/)).toBeVisible();
+  await page.getByRole('button', { name: "Show what's there" }).click();
+  await expect(page.getByRole('button', { name: 'Brief me for this' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: /Updated price list/ }).check();
+  await page.getByRole('button', { name: 'Read what I ticked' }).click();
+  await page.getByRole('button', { name: 'Add 1 to this project' }).click();
+  await page.waitForURL(`**/projects/${id}`);
+  await expect(page.getByRole('region', { name: 'From your accounts' }).getByText('2 of 20')).toBeVisible();
+  const [after] = (await serviceSelect('projects', `id=eq.${id}&select=third_party`)) as { third_party: { title: string; when?: string }[] }[];
+  expect(after.third_party.map((i) => i.title)).toEqual(['Q3 board meeting', 'Updated price list']);
+  expect(after.third_party[1].when).toBeTruthy();
+  await shot('07c-added.png');
 
   // Disconnect: the row goes back to Connect, and the others stay connected.
   await page.goto('/projects/settings');

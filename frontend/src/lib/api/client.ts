@@ -34,6 +34,7 @@ import type {
   EvaluateStageArtifactResponse,
   GenerateStageArtifactRequest,
   GenerateStageArtifactResponse,
+  ThirdPartyItem,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import type { WorkMatch } from '@/lib/workflow/lookup';
@@ -717,6 +718,8 @@ export const api = {
     sources?: { url: string; title: string; excerpt: string }[];
     /** The last turn answers an "Ask me questions" question: the reply asks none (31 Oct). */
     questions?: boolean;
+    /** Items "Start this" carried from the person's accounts: titles only (7 Nov). */
+    third_party?: ThirdPartyItem[];
   }): Promise<{
     reply: string;
     draft?: string;
@@ -758,6 +761,8 @@ export const api = {
     web_access?: 'on' | 'off';
     /** What this intake's searches found so far; a new search's sources follow them. */
     sources?: { url: string; title: string; excerpt: string }[];
+    /** Items "Start this" carried from the person's accounts: titles only (7 Nov). */
+    third_party?: ThirdPartyItem[];
   }): Promise<{
     enough: boolean;
     question: GuideQuestion | null;
@@ -984,9 +989,20 @@ export const api = {
    * own sources, for the browser to save. Refused (403) unless `web_access` is "on".
    */
   async agentWebSearch(
-    req: { inputs: PMInput; query: string; purpose?: string; web_access: 'on' | 'off'; max_results?: number; model?: string },
+    req: {
+      inputs: PMInput;
+      query: string;
+      purpose?: string;
+      web_access: 'on' | 'off';
+      max_results?: number;
+      model?: string;
+      /** Who wrote the query. Go's is rewritten from the person's own words while the project holds account items (L-200). */
+      asked_by?: 'user' | 'go';
+      /** The stage Go is on, by its label. */
+      stage?: string;
+    },
     signal?: AbortSignal
-  ): Promise<{ summary: string; sources: { url: string; title: string; excerpt: string }[]; model_used: string }> {
+  ): Promise<{ summary: string; sources: { url: string; title: string; excerpt: string }[]; model_used: string; query_used?: string }> {
     return apiFetch('/api/agent/web-search', { method: 'POST', body: JSON.stringify(req), signal });
   },
 

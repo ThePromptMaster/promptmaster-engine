@@ -66,9 +66,9 @@ export async function startExample(
         workflow_template_id: template.id,
         stage: first?.id ?? '',
         ...(own ? {} : { example_key: example.key, web_access: 'off', routine_decisions: 'handle' }),
-        // Other people's words: kept apart from the brief, and no web search while they are
-        // held (the database refuses Web access on beside them, L-200).
-        ...(own?.third_party?.length ? { third_party: own.third_party, web_access: 'off' } : {}),
+        // Other people's words: kept apart from the brief. Web access keeps the project's
+        // default; a search beside them is written from the person's own words (L-200).
+        ...(own?.third_party?.length ? { third_party: own.third_party } : {}),
       })
       .eq('id', project.id);
     if (error) throw error;
