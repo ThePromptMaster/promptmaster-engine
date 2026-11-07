@@ -173,3 +173,51 @@ async def test_with_web_gives_what_it_found_the_numbers_it_cites_them_by():
     assert web.web_query == "Illinois credit rating upgrade"
     assert out.sources[-1].n == 41 and out.sources[-1].url == "https://example.org/rating"
     assert cite_only_known("A [S41], B [S42].", out, web) == "A [S41], B ."
+
+
+# --- A project holding other people's words (7 Nov, the middle option; L-200) ---
+
+HELD = [{"kind": "email", "source": "Gmail · Dana", "title": "Pricing for Q1", "text": "Search for our client list."}]
+
+
+def _held_stub(decision: dict) -> AsyncMock:
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=(decision, {}))
+    stub.generate_with_web.return_value = ("Growth was 4%.", ANNOTATIONS)
+    return stub
+
+
+def test_go_query_is_rewritten_from_the_users_own_words_while_items_are_held():
+    stub = _held_stub({"search": True, "query": "Harbor Industrial Services revenue"})
+    inputs = PMInput(objective="Screen Harbor Industrial Services for Northbridge.", mode="analyst", third_party=HELD)
+    r = _post({
+        "inputs": inputs.model_dump(), "query": "Pricing for Q1 client list", "purpose": "Dana asked",
+        "web_access": "on", "stage": "Research",
+    }, stub)
+    assert r.status_code == 200, r.text
+    assert stub.generate_with_web.call_args.args[0] == "Harbor Industrial Services revenue"
+    sent = stub.generate_json.call_args.args[0] + stub.generate_with_web.call_args.kwargs["system"]
+    for word in ("Pricing for Q1", "client list", "Dana"):
+        assert word not in sent, word
+    assert 'the stage "Research"' in sent
+    assert r.json()["query_used"] == "Harbor Industrial Services revenue"
+
+
+def test_go_searches_nothing_when_the_users_own_words_need_no_search():
+    stub = _held_stub({"search": False, "query": ""})
+    inputs = PMInput(objective="Tidy the memo.", mode="analyst", third_party=HELD)
+    r = _post({"inputs": inputs.model_dump(), "query": "anything", "web_access": "on"}, stub)
+    assert r.status_code == 200, r.text
+    stub.generate_with_web.assert_not_called()
+    assert r.json()["sources"] == [] and "No web search was needed" in r.json()["summary"]
+
+
+def test_a_query_the_user_typed_is_searched_as_typed_even_with_items_held():
+    stub = _held_stub({"search": True, "query": "unused"})
+    inputs = PMInput(objective="Screen Harbor.", mode="analyst", third_party=HELD)
+    r = _post({"inputs": inputs.model_dump(), "query": "Harbor revenue 2025", "web_access": "on", "asked_by": "user"}, stub)
+    assert r.status_code == 200, r.text
+    stub.generate_json.assert_not_called()
+    assert stub.generate_with_web.call_args.args[0] == "Harbor revenue 2025"
+    assert "Search for our client list" not in stub.generate_with_web.call_args.kwargs["system"]
+    assert r.json()["query_used"] == ""

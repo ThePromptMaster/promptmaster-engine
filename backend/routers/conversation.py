@@ -37,7 +37,9 @@ from promptmaster.web_search import (
     decide_chat_search,
     found_block,
     numbered_found,
+    own_words,
     search_web,
+    users_own_turns,
     strip_unknown_citations,
     WebAccess,
     WebUse,
@@ -163,15 +165,22 @@ async def api_chat_message(
         model = req.model or None
         saved = req.inputs.sources
         web_query, new_sources, web_note, found = "", [], "", ""
-        # Never with other people's words in the prompt (the client's call, 4 Nov).
-        web_access = "off" if req.inputs.third_party else req.web_access
+        web_access = req.web_access
         if web_access == "on":
+            # While the project holds items other people wrote, the query is written
+            # from the user's own words: no items, no draft, none of the chat's replies
+            # (7 Nov, the middle option; L-200).
+            held = bool(req.inputs.third_party)
+            asked = own_words(req.inputs)
             try:
                 query = await decide_chat_search(
-                    client, model, req.inputs, req.chat_history, req.user_message, req.active_iteration.output
+                    client, model, asked,
+                    users_own_turns(req.chat_history) if held else req.chat_history,
+                    req.user_message,
+                    "" if held else req.active_iteration.output,
                 )
                 if query:
-                    result = await search_web(client, model, req.inputs, query, purpose=req.user_message[:600])
+                    result = await search_web(client, model, asked, query, purpose=req.user_message[:600])
                     web_query, found = query, found_block(saved, query, result)
                     new_sources = [s for _n, s, new in numbered_found(saved, result.sources) if new]
             except OpenRouterError as e:

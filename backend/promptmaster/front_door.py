@@ -17,8 +17,8 @@ import re
 from pydantic import BaseModel, Field
 
 from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
-from .schemas import ChatMessage, PMInput, SavedSource
-from .project_context import highest_source_number
+from .schemas import ChatMessage, PMInput, SavedSource, ThirdPartyItem
+from .project_context import brought_titles, highest_source_number
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .catchphrases import without_repeated_catchphrases
 from .source_access import links_rule
@@ -124,12 +124,14 @@ def build_front_door_prompt(
     found: str = "",
     web_access: str = "off",
     questions: bool = False,
+    brought: str = "",
 ) -> tuple[str, str]:
     convo = "\n".join(f"{'USER' if t.role == 'user' else 'YOU'}: {t.content.strip()}" for t in turns[-MAX_TURNS:])
     owned = [f for f in BRIEF_FIELDS if f in (edited or [])]
     user = (
         f"THE CONVERSATION SO FAR:\n{convo}\n\n"
         + (f"WHAT THE USER ATTACHED (their own material; it counts as something they said):\n{material.strip()[:MAX_MATERIAL]}\n\n" if material.strip() else "")
+        + (f"{brought}\n\n" if brought else "")
         + f"THE DRAFT BRIEF SO FAR (update it; keep what still holds):\n{brief.model_dump_json()}\n\n"
         + (f"THE USER EDITED THESE PARTS OF THE BRIEF THEMSELVES — keep them as written: {', '.join(owned)}\n\n" if owned else "")
         + (f"{web}\n\n" if web else "")
@@ -254,6 +256,7 @@ async def _answer(
     web_access: str,
     found: str,
     questions: bool = False,
+    brought: str = "",
 ) -> tuple[dict, str, bool]:
     """The turn's JSON, asked for again rather than lost (Sean, 23 Oct: a full
     brief with pricing results came back as "Tell me more about what you want
@@ -271,7 +274,7 @@ async def _answer(
     for i, (results, extra) in enumerate(tries):
         system, user = build_front_door_prompt(
             turns, brief, edited, material, web=chat_web_line(web_access), found=results, web_access=web_access,
-            questions=questions,
+            questions=questions, brought=brought,
         )
         try:
             # A long brief plus a block of results did not fit 2,000 tokens (23 Oct).
@@ -302,6 +305,7 @@ async def front_door_turn(
     web_access: str = "off",
     sources: list[SavedSource] | None = None,
     questions: bool = False,
+    third_party: list[ThirdPartyItem] | None = None,
 ) -> FrontDoorTurn:
     web_query, new_sources, web_note, found = "", [], "", ""
     saved = sources or []
@@ -326,7 +330,9 @@ async def front_door_turn(
         except (OpenRouterError, ValueError, AttributeError) as e:
             logger.warning("front door web search failed: %s", e)
             web_note = "The web search failed, so this reply uses only what you have said."
-    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found, questions)
+    result, prose, dropped = await _answer(
+        client, model, turns, brief, edited, material, web_access, found, questions, brought_titles(third_party or [])
+    )
     if dropped:
         new_sources, web_note = [], "The search results could not be used in this reply, so it uses only what you have said."
     turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)

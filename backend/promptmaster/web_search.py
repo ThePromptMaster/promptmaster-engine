@@ -269,6 +269,33 @@ WebAccess = Literal["on", "off"]
 WEB_FAILED_NOTE = "The web search failed, so this was written from what the project holds."
 
 
+async def decide_work_search(
+    client: OpenRouterClient, model: str | None, inputs: PMInput, task: str, current: str = ""
+) -> str | None:
+    """The words to search for before a piece of work, or None when it needs no search."""
+    system, user = build_work_decision_prompt(inputs, task, current)
+    data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
+    if not isinstance(data, dict):
+        return None
+    query = " ".join(str(data.get("query") or "").split())[:400]
+    return query if data.get("search") is True and len(query) >= 2 else None
+
+
+def own_words(inputs: PMInput) -> PMInput:
+    """The project as the user gave it: without the items other people wrote.
+
+    A search query leaves PromptMaster, so while a project holds account items
+    (L-200) the call that writes one sees only the user's own words. The
+    writer still reads the items, fenced.
+    """
+    return inputs.model_copy(update={"third_party": []}) if inputs.third_party else inputs
+
+
+def users_own_turns(chat_history: list[ChatMessage]) -> list[ChatMessage]:
+    """The chat as the user wrote it: an assistant reply may quote the items."""
+    return [m for m in chat_history if m.role == "user"]
+
+
 async def with_web(
     client: OpenRouterClient,
     model: str | None,
@@ -276,6 +303,7 @@ async def with_web(
     web_access: str | None,
     task: str,
     current: str = "",
+    task_if_held: str | None = None,
 ) -> tuple[PMInput, WebUse]:
     """Search the web for a piece of work when it needs it, while Web access is on.
 
@@ -284,18 +312,23 @@ async def with_web(
     saved source — no builder changes. Off, or not needed, the inputs come back
     as they were. A failed decision or search never costs the work: it is done
     from the project, and `web_note` says so.
+
+    While the project holds items other people wrote (7 Nov, the middle
+    option), the query is written from the user's own words only: no items, no
+    draft (it may quote them), and `task_if_held` in place of a task a model
+    wrote. The items come back with the inputs, for the writer.
     """
-    # Never with other people's words in the prompt: injected text must not be able
-    # to send a search (the client's call, 4 Nov).
-    if web_access != "on" or inputs.third_party:
+    if web_access != "on":
         return inputs, WebUse()
+    held = bool(inputs.third_party)
+    asked = own_words(inputs)
+    if held:
+        task, current = (task if task_if_held is None else task_if_held), ""
     try:
-        system, user = build_work_decision_prompt(inputs, task, current)
-        data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
-        query = " ".join(str(data.get("query") or "").split())[:400] if isinstance(data, dict) else ""
-        if not (isinstance(data, dict) and data.get("search") is True and len(query) >= 2):
+        query = await decide_work_search(client, model, asked, task, current)
+        if not query:
             return inputs, WebUse()
-        result = await search_web(client, model, inputs, query, purpose=task[:600])
+        result = await search_web(client, model, asked, query, purpose=task[:600])
     except OpenRouterError as e:
         logger.warning("web search for a writer failed: %s", e)
         return inputs, WebUse(web_note=WEB_FAILED_NOTE)

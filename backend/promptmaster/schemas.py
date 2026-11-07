@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
+    MAX_THIRD_PARTY,
     MAX_THIRD_PARTY_ITEM_CHARS,
     MAX_CHAT_MESSAGE_CHARS,
     MAX_CONTEXT_CHARS,
@@ -120,6 +121,8 @@ class ThirdPartyItem(BaseModel):
     source: str = Field(default="", max_length=300)
     title: str = Field(default="", max_length=300)
     text: str = Field(default="", max_length=MAX_THIRD_PARTY_ITEM_CHARS)
+    #: When it was sent, happens or was last changed, as the account gave it (7 Nov).
+    when: str = Field(default="", max_length=80)
 
 
 class PMInput(BaseModel):
@@ -159,7 +162,7 @@ class PMInput(BaseModel):
     references: list[ReferencedProject] = Field(default_factory=list, max_length=5)
     # The client's call, 4 Nov: what other people wrote, ticked by the user for a
     # briefing. Read as evidence, in a block of its own; while any is here, no search.
-    third_party: list[ThirdPartyItem] = Field(default_factory=list, max_length=20)
+    third_party: list[ThirdPartyItem] = Field(default_factory=list, max_length=MAX_THIRD_PARTY)
     # 25 Oct: the approvals the user gave, so no later stage or check treats an
     # approved decision as unresolved (`project_context.approvals_block`).
     approvals: list[UserApproval] = Field(default_factory=list, max_length=60)

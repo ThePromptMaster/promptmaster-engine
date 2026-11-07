@@ -127,6 +127,8 @@ async def api_apply_audit(
         inputs, web = await with_web(
             client, model, req.inputs, req.web_access,
             task="\n".join(f.suggested_change for f in req.findings)[:2_000],
+            # A review's findings are a model's words, and may quote the items.
+            task_if_held="Revise the current version to settle the review's findings.",
             current=req.source_iteration.output,
         )
         system_text, prompt_text = build_apply_audit_prompt(
@@ -190,6 +192,8 @@ async def api_apply_recommendations(
         inputs, web = await with_web(
             client, model, req.inputs, req.web_access,
             task="\n".join(f.suggested_change for f in req.findings)[:2_000],
+            # A review's findings are a model's words, and may quote the items.
+            task_if_held="Revise the current version to settle the review's findings.",
             current=req.content,
         )
 

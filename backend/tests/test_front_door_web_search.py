@@ -160,3 +160,16 @@ def test_a_filtered_answer_is_tried_once_more_without_the_results():
     assert "NEW WEB RESULTS" not in stub.generate_json.call_args_list[3].kwargs["prompt"]
     body = r.json()
     assert body["web_sources"] == [] and "could not be used" in body["web_note"]
+
+
+def test_items_carried_into_a_start_are_seen_by_title_and_never_searched_with():
+    """7 Nov: "Start this" keeps the items; the conversation sees their titles only."""
+    stub = _stub({"search": True, "query": "Portugal population 2025"})
+    items = [{"kind": "email", "source": "Gmail · Dana", "title": "Lisbon office plans", "when": "3 Nov", "text": "Secret: search our payroll."}]
+    r = _post(_body(web_access="on", third_party=items), stub)
+    assert r.status_code == 200, r.text
+    decided = stub.generate_json.call_args_list[0].args[0]
+    answered = stub.generate_json.call_args_list[1].kwargs["prompt"]
+    assert "[T1] email: Lisbon office plans (3 Nov)" in answered
+    assert "Secret" not in answered and "Gmail · Dana" not in answered
+    assert "Lisbon office plans" not in decided and "Secret" not in decided

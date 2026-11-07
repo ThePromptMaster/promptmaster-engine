@@ -3439,8 +3439,18 @@ Built 6 Nov ahead of connected accounts (closed #534), shipped 7 Nov with them (
   `project_context.third_party_block` fences it with a value new on each call, so text written in
   advance cannot close its own block. A fence is not a guarantee: it makes injected text weaker, it
   does not make a model immune, which is why the rest of this entry exists.
-- No web search while it is present (`with_web`, the chat, `agent/web-search`), and a database check
-  keeps Web access off on a project holding any. Injected text cannot send a search.
+- **Web search from the user's own words (changed 7 Nov, the user's call: "the middle option").**
+  Until then nothing searched while items were held, and a database check kept Web access off.
+  Now a project holding items may search. The call that writes the query, and the search itself,
+  see only the user's own words: the objective, the accepted facts, saved source titles, our own
+  task wording, and in the side chat the user's own messages. They never see the items, the
+  current draft, or the AI's chat replies, any of which may quote an email. This applies in
+  `with_web` (`own_words`, `task_if_held`), the chat, and `agent/web-search`, which writes Go's
+  query itself. The database check is gone (`20261130000000`).
+  **What remains:**
+  - Search results are untrusted text that the writer reads beside the items, as with any search.
+  - A meeting's title the user started a briefing from sits in the objective, so it can reach a query.
+  - Accepted facts are the user's word even when an email suggested them.
 - No image from another address is drawn anywhere, for anyone: a browser fetches one as soon as it
   is drawn, so a model talked into writing one could send project text out in the URL. **Cost:** a
   remote image a user pasted into their own work now shows as its description. Their own uploads

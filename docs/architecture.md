@@ -335,6 +335,16 @@ Web access (2026-10-20): each project has a `web_access` switch (`on` by default
   saves them with `keepFound` (`lib/workflow/web-found.ts`) before the version that cites them,
   and adds them to the store; `WebFoundNotice` shows the search on the stage, and the version's
   change summary records it. What is excluded is in L-100.
+- A project holding items other people wrote (`PMInput.third_party`, from a connected account)
+  searches too, since 2026-11-07, but the query is written from the user's own words only. Every
+  call that writes a query or runs a search gets `web_search.own_words(inputs)`, without the items:
+  - `with_web` drops the draft, and a caller whose task a model wrote (audit findings, Go's
+    params, a stage instruction) gives `task_if_held` in its place.
+  - The side chat decides on the user's own turns only.
+  - `agent/web-search` writes Go's query itself (`asked_by: "go"`, with the `stage` label), since
+    the planner saw the items' titles and the draft. A query typed in the Web sources panel
+    (`asked_by: "user"`) goes as typed.
+  - The writer still reads the items, fenced (L-200).
 
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
