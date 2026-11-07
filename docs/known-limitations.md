@@ -3450,6 +3450,9 @@ Built 6 Nov ahead of connected accounts (closed #534), shipped 7 Nov with them (
   **What remains:**
   - Search results are untrusted text that the writer reads beside the items, as with any search.
   - A meeting's title the user started a briefing from sits in the objective, so it can reach a query.
+  - So can a suggestion's objective. "Start this" puts it in the goal box, and the suggester wrote it
+    from the items. Seen on production on 7 Nov: the supplier's name from an email was in it. The
+    person sees it in the box, and can edit it, before anything starts.
   - Accepted facts are the user's word even when an email suggested them.
 - No image from another address is drawn anywhere, for anyone: a browser fetches one as soon as it
   is drawn, so a model talked into writing one could send project text out in the URL. **Cost:** a
