@@ -129,9 +129,9 @@ function ownAddresses(emails: readonly PreviewItem[], signedInAs: string): Set<s
 }
 
 /**
- * The emails worth ticking for a meeting's briefing: from or to someone invited
- * (the person's own addresses aside), or sharing two words of the meeting's title.
- * A starting point the person can untick, never more than the limit allows.
+ * The emails worth ticking for a meeting's briefing: sharing two words of the meeting's
+ * title, or one word and someone invited (the person's own addresses aside). A narrow
+ * starting point the person can add to or untick, never more than the limit allows.
  */
 export function relatedTo(meeting: PreviewItem, items: readonly PreviewItem[], ownAddress = ''): PreviewItem[] {
   const emails = items.filter((item) => item.kind === 'email');
@@ -140,10 +140,12 @@ export function relatedTo(meeting: PreviewItem, items: readonly PreviewItem[], o
   const titleWords = words(meeting.title);
   return emails
     .filter((item) => {
-      const theirs = addresses([item.who, ...item.people].join(' '));
-      if ([...theirs].some((a) => invited.has(a))) return true;
-      const shared = [...words(item.title)].filter((w) => titleWords.has(w));
-      return shared.length >= 2 || (titleWords.size === 1 && shared.length === 1);
+      const shared = [...words(item.title)].filter((w) => titleWords.has(w)).length;
+      const byPerson = [...addresses([item.who, ...item.people].join(' '))].some((a) => invited.has(a));
+      // An address alone is not enough: it may be the person's own other address, and on
+      // production (7 Nov) that pre-ticked their unrelated personal mail. A ticked email
+      // goes to a model, so the guess stays narrow and the person ticks the rest.
+      return shared >= 2 || (byPerson && shared >= 1);
     })
     .slice(0, MAX_TICKED - 1);
 }
