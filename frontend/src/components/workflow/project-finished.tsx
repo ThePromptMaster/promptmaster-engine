@@ -14,6 +14,7 @@ import { deliverableNouns } from '@/lib/workflow/labels';
 import { asksForChangeLog, missingParts } from '@/lib/workflow/requested-parts';
 import { internalMentions } from '@/lib/workflow/reader-text';
 import type { Evaluation } from '@/types/project';
+import { OwnWorkOffer } from '@/components/examples/own-work-offer';
 import { EvaluationScores } from './evaluation-scores';
 
 interface Props {
@@ -233,6 +234,8 @@ export function ProjectFinished({ bundle, completion, evaluation, limitation, on
         {t('pnl.exportNote')}
         {markdown && onNewVersion ? t('pnl.newVersionNote', { noun }) : ''}
       </p>
+
+      <OwnWorkOffer exampleKey={project.example_key} />
 
       {reading && markdown && (
         <div className="mt-6 rounded-xl bg-[var(--surface-container-lowest)] px-6 py-5">

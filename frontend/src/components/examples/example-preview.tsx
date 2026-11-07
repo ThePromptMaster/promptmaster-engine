@@ -221,7 +221,7 @@ export function ExamplePreview({ example }: { example: Example }) {
         <p className="mt-2 text-body text-[var(--on-surface-variant)]">{t('ex.creditBody')}</p>
       </section>
 
-      <section className="mt-8 rounded-2xl bg-[var(--surface-container-low)] p-5">
+      <section id="own" className="scroll-mt-20 mt-8 rounded-2xl bg-[var(--surface-container-low)] p-5">
         <h2 className="text-headline text-[var(--on-surface)]">{t('ex.ownTitle')}</h2>
         <p className="mt-2 text-body text-[var(--on-surface-variant)]">{t('ex.ownLead')}</p>
         <label htmlFor="example-own" className="mt-4 block text-label font-semibold text-[var(--on-surface)]">{t('ex.ownLabel')}</label>
