@@ -3417,3 +3417,11 @@ guard stopped the run rather than ask again. That cost $0.74 of the run's $2.12,
 with "Finish anyway", typing a reason, because the approval was given on an earlier version. Nothing was
 lost and the text was better, but it reads as an ending in a wall of text. L-192 records the same pull on
 the memo and analysis. A tester who keeps the approved version finishes cleanly.
+
+### L-199 — The 30-day purge of deleted projects has never run on production (2026-11-07)
+
+`purge_deleted_projects` is scheduled only when `pg_cron` is installed, and it is not installed on
+production (`pg_extension` has no row for it, read 7 Nov). So a project someone moved to Recently
+deleted stays stored indefinitely unless they delete it for good there. Switching it on would
+permanently remove every project deleted more than 30 days ago, on its first run, so it waits on the
+client's decision. The privacy draft carries a bracketed line that depends on this.
