@@ -32,6 +32,7 @@ import { fr as startersArea } from './areas/starters';
 import { fr as assessArea } from './areas/assess';
 import { fr as quickArea } from './areas/quick';
 import { fr as examplesArea } from './areas/examples';
+import { fr as connArea } from './areas/conn';
 
 export const fr: Messages = {
   'header.account': 'Compte',
@@ -81,7 +82,7 @@ export const fr: Messages = {
   'beta.show': "Afficher l'avertissement bêta",
   'beta.title': "Ceci est une version bêta précoce",
   'beta.body':
-    "PromptMaster est une version bêta précoce : les résultats doivent être relus avant d’agir — ils ne sont pas destinés à un usage critique en production, et rien ici ne remplace votre propre jugement professionnel. N’y saisissez pas d’informations sensibles : ni documents confidentiels de clients, ni données personnelles, ni identifiants.",
+    "PromptMaster est une version bêta précoce : les résultats doivent être relus avant d’agir — ils ne sont pas destinés à un usage critique en production, et rien ici ne remplace votre propre jugement professionnel. N’y saisissez pas d’informations sensibles : ni identifiants, ni documents confidentiels de clients que vous ne pouvez pas confier à un service extérieur. Si vous connectez votre messagerie, votre agenda ou vos fichiers, rien n’est lu avant que vous appuyiez sur un bouton, et seul ce que vous cochez est envoyé au modèle d’IA.",
   'beta.gotIt': 'Compris',
   'beta.feedback': 'Dites-nous comment ça s’est passé',
   'beta.hideFeedback': 'Masquer le formulaire',
@@ -347,4 +348,5 @@ export const fr: Messages = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 };

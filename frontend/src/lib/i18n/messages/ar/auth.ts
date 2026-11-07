@@ -15,7 +15,7 @@ export const ar: Record<keyof typeof en, string> = {
   'auth.orUpper': 'أو',
   'auth.or': 'أو',
   'auth.signInWith': 'تسجيل الدخول باستخدام {provider}',
-  'auth.signInShares': 'عند تسجيل الدخول تتم مشاركة اسمك وبريدك الإلكتروني. لا يقرأ PromptMaster رسائلك أو ملفاتك.',
+  'auth.signInShares': 'عند تسجيل الدخول تتم مشاركة اسمك وبريدك الإلكتروني. لا يقرأ PromptMaster بريدك أو تقويمك أو ملفاتك إلا إذا ربطتها، ولا يقرأ إلا ما تختاره.',
   'auth.redirecting': 'جارٍ إعادة التوجيه...',
   'auth.guest': 'المتابعة دون حساب',
   'auth.guestStarting': 'جارٍ البدء…',

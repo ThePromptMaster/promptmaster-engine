@@ -56,6 +56,13 @@ Two consequences worth internalising before changing anything:
 Do not add a Supabase data client or a session store to the backend. Doing so moves
 user isolation out of the database and into code, and quietly makes the above false.
 
+**Connected accounts (7 Nov) keep this true.** Composio holds each person's Google and
+Microsoft connection, keyed by their Supabase user id; the backend calls Composio on
+their behalf (`promptmaster/composio_client.py`), as it calls OpenRouter, and stores
+nothing it reads. Because the backend now acts for a user against a service that holds
+their data, `routers/connections.py` *does* check ownership: every connection id is
+confirmed to be the caller's before it is used.
+
 ### The one exception, and why it is not one
 
 The job worker (`frontend/src/app/api/jobs/drain/route.ts`) *does* hold

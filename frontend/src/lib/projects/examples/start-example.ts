@@ -8,6 +8,7 @@ import { appendVersion, createArtifact } from '@/lib/supabase/versions';
 import { appendWorkflowEvent, publishUserTemplate } from '@/lib/supabase/workflow';
 import { validateTemplate } from '@/lib/workflow/validate';
 import type { LanguageCode } from '@/lib/workflow/languages';
+import type { ThirdPartyItem } from '@/types';
 
 import { PREPARED_OPERATION } from './cards';
 import { exampleWorkflow, type Example } from './index';
@@ -30,7 +31,15 @@ export async function startExample(
   userId: string,
   { language, own }: {
     language: LanguageCode;
-    own?: { title: string; objective: string; context: string; files: PreparedFile[]; images: StartImage[] };
+    own?: {
+      title: string;
+      objective: string;
+      context: string;
+      files: PreparedFile[];
+      images: StartImage[];
+      /** Emails, meetings and files ticked in a connected account (7 Nov): other people's words. */
+      third_party?: ThirdPartyItem[];
+    };
   }
 ): Promise<string> {
   const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
@@ -57,6 +66,9 @@ export async function startExample(
         workflow_template_id: template.id,
         stage: first?.id ?? '',
         ...(own ? {} : { example_key: example.key, web_access: 'off', routine_decisions: 'handle' }),
+        // Other people's words: kept apart from the brief, and no web search while they are
+        // held (the database refuses Web access on beside them, L-200).
+        ...(own?.third_party?.length ? { third_party: own.third_party, web_access: 'off' } : {}),
       })
       .eq('id', project.id);
     if (error) throw error;

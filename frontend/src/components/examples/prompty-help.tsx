@@ -123,6 +123,9 @@ export function PromptyHelp({ place, autoOpen = true }: { place: 'landing' | 'li
             {place !== 'start' && (
               <Link href="/projects/new" onClick={close} className={choice}>{t('prompty.mine')}</Link>
             )}
+            {place !== 'landing' && (
+              <Link href="/projects/from-accounts" onClick={close} className={choice}>{t('conn.entry')}</Link>
+            )}
             <button type="button" onClick={close} className={choice}>{t('prompty.explore')}</button>
           </div>
         </div>

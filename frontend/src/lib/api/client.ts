@@ -60,6 +60,15 @@ import {
 import { languageHeaders } from './language';
 import { thinkingHeaders } from './thinking';
 import { EvaluationDidNotRun } from '@/lib/workflow/evaluation-failure';
+import type {
+  ConnectedFile,
+  ConnectedText,
+  Connection,
+  PreviewItem,
+  Skipped,
+  ToolkitSlug,
+  toPicked,
+} from '@/lib/connections/items';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -659,6 +668,39 @@ export const api = {
     model_used: string;
   }> {
     return apiFetch('/api/suggest-workflows', { method: 'POST', body: JSON.stringify(req) });
+  },
+
+  /**
+   * Connected accounts through Composio (the client's call, 7 Nov). Composio holds
+   * each connection; nothing here calls a model. `backend/routers/connections.py`.
+   */
+  async listConnections(): Promise<{ accounts: Connection[]; toolkits: { slug: ToolkitSlug; label: string; reads: string }[] }> {
+    return apiFetch('/api/connections');
+  },
+
+  /** Composio's consent link for one account; the person approves on Google's or Microsoft's own screen. */
+  async linkConnection(toolkit: ToolkitSlug, callbackUrl: string): Promise<{ redirect_url: string }> {
+    return apiFetch('/api/connections/link', { method: 'POST', body: JSON.stringify({ toolkit, callback_url: callbackUrl }) });
+  },
+
+  /** After the consent screen: the connection exists and is the caller's. */
+  async confirmConnection(connectedAccountId: string): Promise<Connection> {
+    return apiFetch('/api/connections/confirm', { method: 'POST', body: JSON.stringify({ connected_account_id: connectedAccountId }) });
+  },
+
+  /** Remove a connection and revoke the grant at Google or Microsoft. */
+  async disconnect(connectionId: string): Promise<{ deleted: boolean }> {
+    return apiFetch(`/api/connections/${encodeURIComponent(connectionId)}`, { method: 'DELETE' });
+  },
+
+  /** What is in the connected accounts, without contents. */
+  async previewConnections(toolkits: ToolkitSlug[] = []): Promise<{ items: PreviewItem[]; problems: { toolkit: ToolkitSlug; message: string }[] }> {
+    return apiFetch('/api/connections/preview', { method: 'POST', body: JSON.stringify({ toolkits }) });
+  },
+
+  /** The text of what was ticked, cleaned; PDFs and Office files come back for this browser to read. */
+  async readConnections(items: ReturnType<typeof toPicked>[]): Promise<{ items: ConnectedText[]; files: ConnectedFile[]; skipped: Skipped[] }> {
+    return apiFetch('/api/connections/read', { method: 'POST', body: JSON.stringify({ items }) });
   },
 
   /** One turn of the conversational front door: a reply and the draft brief (6 Oct, email 8). Saves nothing. */

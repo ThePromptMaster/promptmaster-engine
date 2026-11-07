@@ -56,7 +56,7 @@ From the 4 Nov call: opt-in access to someone's email and files, so PromptMaster
 | Nango | [Yours for production Gmail](https://nango.dev/docs/api-integrations/google-mail/how-to-register-your-own-gmail-api-oauth-app) | Transits | [$50/mo + $0.29 per connection](https://nango.dev/pricing) |
 | Vercel Connect | [Yours](https://vercel.com/docs/connect) | [Short-lived tokens only](https://vercel.com/docs/connect/concepts/authentication) | [$3 per 1,000 requests](https://vercel.com/docs/connect/pricing) |
 
-Google's policies don't mention shared apps, so whether they are allowed is unsettled. Its data policy requires requests to ["accurately represent the identity of the application"](https://developers.google.com/terms/api-services-user-data-policy), which sits awkwardly with one. We found no case of a shared client being cut off. **Decision, 6 Nov: our own app, testers first.** Private equity testers shouldn't see a vendor's name on Google's screen with their mail passing through that vendor.
+Google's policies don't mention shared apps, so whether they are allowed is unsettled. Its data policy requires requests to ["accurately represent the identity of the application"](https://developers.google.com/terms/api-services-user-data-policy), which sits awkwardly with one. We found no case of a shared client being cut off. **Decision, 6 Nov: our own app, testers first.** *Replaced 7 Nov: Composio's own apps, for every signed-in user (L-201).* Private equity testers shouldn't see a vendor's name on Google's screen with their mail passing through that vendor.
 
 ## MCP the other way round
 

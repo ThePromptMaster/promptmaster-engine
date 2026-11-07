@@ -32,6 +32,7 @@ import { ar as startersArea } from './ar/starters';
 import { ar as assessArea } from './ar/assess';
 import { ar as quickArea } from './ar/quick';
 import { ar as examplesArea } from './ar/examples';
+import { ar as connArea } from './ar/conn';
 
 /** Arabic (Sean, 24 Oct: "Arabic and Swahili"). Shown right-to-left. */
 export const ar: Messages = {
@@ -78,7 +79,7 @@ export const ar: Messages = {
   'beta.chip': 'تجريبي',
   'beta.show': 'إظهار إشعار النسخة التجريبية',
   'beta.title': 'هذه نسخة تجريبية مبكرة',
-  'beta.body': 'PromptMaster نسخة تجريبية مبكرة، لذا تتطلب مخرجاته المراجعة قبل أن تتصرف بناءً عليها — فهو غير مُعدّ للاعتماد عليه في المهام الحرجة، ولا شيء هنا يحل محل حكمك المهني. يُرجى عدم إدخال معلومات حساسة: لا مواد سرية لعملاء، ولا بيانات شخصية، ولا بيانات اعتماد.',
+  'beta.body': 'PromptMaster نسخة تجريبية مبكرة، لذا تتطلب مخرجاته المراجعة قبل أن تتصرف بناءً عليها — فهو غير مُعدّ للاعتماد عليه في المهام الحرجة، ولا شيء هنا يحل محل حكمك المهني. يُرجى عدم إدخال معلومات حساسة: لا بيانات اعتماد، ولا مواد سرية لعملاء لا يجوز لك مشاركتها مع خدمة خارجية. إذا ربطت بريدك أو تقويمك أو ملفاتك، فلا يُقرأ شيء حتى تضغط زرًا، ولا يُرسل إلى نموذج الذكاء الاصطناعي إلا ما تحدده.',
   'beta.gotIt': 'فهمت',
   'beta.feedback': 'أخبرنا كيف سارت الأمور',
   'beta.hideFeedback': 'إخفاء نموذج الملاحظات',
@@ -340,4 +341,5 @@ export const ar: Messages = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 };

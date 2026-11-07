@@ -32,6 +32,7 @@ import { es as startersArea } from './areas/starters';
 import { es as assessArea } from './areas/assess';
 import { es as quickArea } from './areas/quick';
 import { es as examplesArea } from './areas/examples';
+import { es as connArea } from './areas/conn';
 
 export const es: Messages = {
   'header.account': 'Cuenta',
@@ -81,7 +82,7 @@ export const es: Messages = {
   'beta.show': 'Mostrar el aviso de beta',
   'beta.title': 'Esto es una beta temprana',
   'beta.body':
-    'PromptMaster es una beta temprana, así que los resultados deben revisarse antes de actuar sobre ellos: no está pensado para usos críticos en producción, y nada de lo que hay aquí sustituye tu propio criterio profesional. Por favor, no introduzcas información sensible: ni material confidencial de clientes, ni datos personales, ni credenciales.',
+    'PromptMaster es una beta temprana, así que los resultados deben revisarse antes de actuar sobre ellos: no está pensado para usos críticos en producción, y nada de lo que hay aquí sustituye tu propio criterio profesional. Por favor, no introduzcas información sensible: ni credenciales, ni material confidencial de clientes que no puedas compartir con un servicio externo. Si conectas tu correo, tu calendario o tus archivos, no se lee nada hasta que pulsas un botón, y solo lo que marcas se envía al modelo de IA.',
   'beta.gotIt': 'Entendido',
   'beta.feedback': 'Cuéntanos qué tal',
   'beta.hideFeedback': 'Ocultar el formulario',
@@ -347,4 +348,5 @@ export const es: Messages = {
   ...assessArea,
   ...quickArea,
   ...examplesArea,
+  ...connArea,
 };

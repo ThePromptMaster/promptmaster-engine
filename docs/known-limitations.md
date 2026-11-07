@@ -3376,15 +3376,17 @@ calendar needs provider reviews and a decision from the client, set out in
 guest, and the call runs on our key, as a guest's other calls do. An attachment is read up to 12,000
 characters and all of them to 28,000 together, and the page names any file that was cut. Whether a
 suggestion is good is a property of the run; the parser only guarantees that it traces to something
-shared and carries no link.
+shared and carries no link. Later on 7 Nov, connected accounts (L-201) became a second source: the
+emails, meetings and files a person ticks, read and shown before they are sent.
 
 ### L-194 — An attached invite or email is labelled, not fenced (2026-11-07)
 
 `.ics` and `.eml` read as documents and open with a line saying they are other people's words, and
 the meeting briefing's instructions say the material is evidence, not instructions. In "Suggest work
 for me" they travel in a fenced block. Anywhere else they reach prompts as project context like any
-other document, so a hostile line in a saved email is defended only by that label and the model. The
-channel of their own (closed #534) comes with account connections. Other document types have no label
+other document, so a hostile line in a saved email is defended only by that label and the model. Items
+from a connected account use the channel of their own (L-200); a saved `.eml` attached as a
+document still does not. Other document types have no label
 at all. Only the plain text of an email is read: attachments inside it are not, and neither are
 images. Encodings other than UTF-8 in unlabelled 8-bit bodies may read wrongly.
 
@@ -3400,7 +3402,9 @@ setup outside the code (the assessment above).
 
 The own-work section repeats the beta notice's rule, because an agenda or an email thread often holds
 personal data. That is copy, not a control: nothing checks what is attached. Counsel reviewing the
-notice (contract section 9) is what settles it, and the client has that item.
+notice (contract section 9) is what settles it, and the client has that item. On 7 Nov the notice was
+reworded for connected accounts (L-201): it still says not to enter sensitive information, as FR-22
+requires, and now names credentials and confidential client material, not personal data.
 
 ### L-197 — A page limit is judged on the figure shown, and a hoped-for page is no limit (2026-11-07)
 
@@ -3448,4 +3452,35 @@ Built 6 Nov ahead of connected accounts (closed #534), shipped 7 Nov with them (
   Setting `allow` undoes it; the value is read per call, but Vercel needs a redeploy to see a change.
 - Links in generated text stay clickable. A project holding third-party text should not offer them;
   that comes with the briefing itself, where such a project first exists.
+
+### L-201 — Connected accounts go through Composio, and shipped before the privacy policy (2026-11-07)
+
+Gmail, Google Calendar, Google Drive, Outlook and OneDrive connect through Composio's own Google and
+Microsoft apps (the user's call, 7 Nov, reversing the 6 Nov "our own app" decision in
+`docs/assessments/2026-11-07-accounts-and-connections.md`). That skips Google's review and the yearly
+security assessment, and costs this:
+
+- **Their name, their scope.** Google's and Microsoft's screens say "Composio". Composio's Gmail app
+  asks for full mailbox access (`https://mail.google.com/`), and its scopes are fixed. PromptMaster
+  only reads, and only on a press: a preview with no contents, then the text of what was ticked,
+  shown before it is sent. The settings page says this before anyone connects.
+- **A fourth company holds the mail.** What is read passes through Composio, which keeps request and
+  response payloads for up to a year; its zero retention covers its own apps only on Enterprise.
+  OpenRouter is told to keep nothing (L-200).
+- **Ahead of the paperwork.** Open to every signed-in user while `/privacy` is a 404 and counsel has
+  reviewed nothing, by the user's decision. The beta notice and the sign-in line were reworded so
+  neither says something false. Google's user-data policy still binds us through Composio's terms.
+- **Not every account.** Composio offers no Yahoo. A Microsoft work account may need its IT admin to
+  approve Composio's app. Guests cannot connect: the connection would outlive the guest.
+- **Limits.** The free plan allows 20,000 calls to Composio's apps a month, then stops until the
+  next; Google's quota is shared with Composio's other customers. A preview is up to six calls.
+- **Shapes not documented.** Composio documents every tool's output as an opaque object, so the
+  parsers accept its names and the providers' own, and log field names (never values) under
+  `CONNECTIONS_SHAPE` when a result parses to nothing. The first production connection confirms them.
+- **Files.** Google Docs, Sheets and Slides, plain text, PDF and Office files are read; anything else,
+  or anything over 2.5 MB, says so and asks for an attachment instead. PDFs and Office files are read in
+  the browser, as attachments are.
+- **What a briefing holds is not shown in the project.** The ticked text is in `projects.third_party`
+  and in every prompt, but no panel in the workspace lists it yet; it was shown, exactly, before the
+  project was made.
 

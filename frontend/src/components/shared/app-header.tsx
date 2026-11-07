@@ -236,6 +236,18 @@ export function AppHeader() {
               </button>
               {language && <LanguagePicker />}
 
+              <Link
+                href="/projects/settings"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-start text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">
+                  link
+                </span>
+                {t('conn.headerItem')}
+              </Link>
+
               {confirmGuestOut && (
                 <div role="alert" className="mx-2 mt-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-2.5">
                   <p className="text-label text-[var(--on-surface)]">
