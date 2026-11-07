@@ -7,9 +7,12 @@ import { useRouter } from 'next/navigation';
 import { StartAttachments } from '@/components/projects/start-attachments';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api/client';
+import { setRequestLanguage } from '@/lib/api/language';
 import { guestErrorMessage } from '@/lib/auth/guest';
 import { goSignedIn } from '@/lib/auth/sign-in';
 import { documentsOf, type PreparedFile } from '@/lib/data/attachments';
+import { startLanguage } from '@/lib/workflow/languages';
+import { getLocale } from '@/lib/i18n/store';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
@@ -80,6 +83,8 @@ export function ExampleQuestionnaire() {
     setSuggesting(true);
     setFailed(null);
     setSuggested(null);
+    // Nothing else sets it here: no project is open, and this page has no picker.
+    setRequestLanguage(startLanguage(getLocale()));
     try {
       if (!user) {
         try {
@@ -120,6 +125,7 @@ export function ExampleQuestionnaire() {
     } catch (e) {
       setFailed(t('ex.suggestFailed', { why: e instanceof Error && e.message ? e.message : t('ex.failedUnknown') }));
     } finally {
+      setRequestLanguage('en');
       setSuggesting(false);
     }
   }

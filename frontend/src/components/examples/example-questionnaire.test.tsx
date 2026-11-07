@@ -16,6 +16,9 @@ vi.mock('@/hooks/use-auth', () => ({ useAuth: () => ({ user, continueAsGuest }) 
 const suggestWorkflows = vi.fn();
 vi.mock('@/lib/api/client', () => ({ api: { suggestWorkflows: (...args: unknown[]) => suggestWorkflows(...args) } }));
 
+const setRequestLanguage = vi.fn();
+vi.mock('@/lib/api/language', () => ({ setRequestLanguage: (code: string) => setRequestLanguage(code) }));
+
 const goSignedIn = vi.fn();
 vi.mock('@/lib/auth/sign-in', () => ({ goSignedIn: (to: string) => goSignedIn(to) }));
 
@@ -115,6 +118,9 @@ describe('the questionnaire', () => {
       expect(sent.catalog.map((c: { key: string }) => c.key)).toContain('slide_deck');
       expect(continueAsGuest).not.toHaveBeenCalled();
       expect(await screen.findByText('Board deck for Friday')).toBeInTheDocument();
+      // Set for the call, and cleared after it.
+      expect(setRequestLanguage).toHaveBeenCalledTimes(2);
+      expect(setRequestLanguage).toHaveBeenLastCalledWith('en');
       expect(screen.getByRole('link', { name: 'See the example first' })).toHaveAttribute('href', '/examples/slide-deck');
     });
 
