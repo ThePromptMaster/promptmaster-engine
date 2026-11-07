@@ -11,11 +11,12 @@
  */
 
 import { installPdfShims } from './browser-shims';
+import { emlText, icsText } from './mail-text';
 import { extensionOf } from './preview';
 import { tr } from '@/lib/i18n/store';
 
 /** Attachments whose words, not rows, are what matters. */
-export const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.md', '.txt'] as const;
+export const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.md', '.txt', '.ics', '.eml'] as const;
 
 export function isDocument(name: string): boolean {
   return (DOCUMENT_EXTENSIONS as readonly string[]).includes(extensionOf(name));
@@ -79,7 +80,15 @@ export async function extractText(name: string, data: ArrayBuffer): Promise<{ te
   const ext = extensionOf(name);
   try {
     const raw =
-      ext === '.pdf' ? await pdfText(data) : ext === '.docx' ? await docxText(data) : new TextDecoder().decode(data);
+      ext === '.pdf'
+        ? await pdfText(data)
+        : ext === '.docx'
+          ? await docxText(data)
+          : ext === '.ics'
+            ? icsText(new TextDecoder().decode(data))
+            : ext === '.eml'
+              ? emlText(new TextDecoder().decode(data))
+              : new TextDecoder().decode(data);
     const text = tidyText(raw);
     if (!text) {
       return {

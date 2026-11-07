@@ -16,7 +16,7 @@ export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
  * (lib/data/extract-text.ts) and offered as project context; the file itself
  * is kept like any other.
  */
-export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.md'] as const;
+export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.md', '.ics', '.eml'] as const;
 /**
  * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
  * placed in the work, never shown to a model: a prompt gets each one's name,
