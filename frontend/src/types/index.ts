@@ -8,6 +8,8 @@ export interface ThirdPartyItem {
   source: string;
   title: string;
   text: string;
+  /** When it was sent, happens or last changed, as the account gave it (7 Nov). */
+  when?: string;
 }
 
 export interface PMInput {

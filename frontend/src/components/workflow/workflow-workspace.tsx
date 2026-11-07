@@ -86,6 +86,8 @@ import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } 
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
+import { ProjectThirdParty } from './project-third-party';
+import { goSignedIn } from '@/lib/auth/sign-in';
 import { ProjectReaderPane } from './project-reader-pane';
 import { addReference } from '@/lib/supabase/references';
 import { MAX_REFERENCES } from '@/lib/workflow/references';
@@ -2733,6 +2735,19 @@ export function WorkflowWorkspace({
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
             {/* On every stage: the other projects this one draws on (client, 21 Oct, email 5). */}
             <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} onOpenBeside={openBeside} />
+            {/* On every stage: what the project holds from the person's accounts (7 Nov). */}
+            <ProjectThirdParty
+              project={project}
+              readOnly={!isEditable || project.status === 'finalized'}
+              onSave={async (items) => {
+                onPatchProject({ third_party: items });
+                await flushProject();
+              }}
+              onAdd={async () => {
+                await flushProject();
+                goSignedIn(`/projects/from-accounts?into=${encodeURIComponent(project.id)}`);
+              }}
+            />
             {/* On every stage: the switch and the sources every stage cites (20 Oct). */}
             <WebSources
               project={project}

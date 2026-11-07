@@ -39,6 +39,9 @@ import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { ExampleCards } from '@/components/examples/example-cards';
 import { PromptyHelp } from '@/components/examples/prompty-help';
 import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
+import { takeStartItems } from '@/lib/connections/items';
+import { CarriedItems } from '@/components/personalize/carried-items';
+import type { ThirdPartyItem } from '@/types';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
@@ -149,6 +152,10 @@ export default function NewProjectPage() {
   // Held until Start: a project's files are stored under its id (5 Oct, email 8).
   const [startFiles, setStartFiles] = useState<PreparedFile[]>([]);
   const [startImages, setStartImages] = useState<StartImage[]>([]);
+  // What "Start this" carried from the person's accounts (7 Nov): saved with the
+  // project as other people's words; the conversation sees their titles only.
+  const [startItems, setStartItems] = useState<ThirdPartyItem[]>([]);
+  const dropItem = (index: number) => setStartItems((held) => held.filter((_x, i) => i !== index));
   const material = materialFrom(startFiles, INPUT_LIMITS.context);
   /** The ask split into objective and context, with any attached documents' words after it. */
   const withDocuments = (text: string) => {
@@ -221,6 +228,8 @@ export default function NewProjectPage() {
       ? typed.slice(0, INPUT_LIMITS.objective)
       : takeStartGoal().slice(0, INPUT_LIMITS.objective) || goalFromSearch(window.location.search, INPUT_LIMITS.objective);
     if (goal) setObjective((current) => current || goal);
+    const carried = takeStartItems();
+    if (carried.length) setStartItems(carried);
   }, []);
 
   // An unfinished setup from an earlier visit: offered, never applied unasked.
@@ -553,6 +562,7 @@ export default function NewProjectPage() {
         .update({
           workflow_template_id: selected.id,
           stage: selected.stages[0]?.id ?? '',
+          ...(startItems.length ? { third_party: startItems } : {}),
         })
         .eq('id', project.id);
       if (pinError) throw pinError;
@@ -808,6 +818,7 @@ export default function NewProjectPage() {
               onImages={setStartImages}
               disabled={working !== null}
             />
+            <CarriedItems items={startItems} onRemove={dropItem} disabled={working !== null} />
             <Link
               href="/projects/from-accounts"
               className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
@@ -956,15 +967,19 @@ export default function NewProjectPage() {
             initialState={frontDoorState}
             onStateChange={setFrontDoorState}
             material={material}
+            carried={startItems}
             busyLabel={working === 'setup' ? t('start.workingTheSetup') : working === 'creating' ? t('start.creatingProject') : null}
             attach={
-              <StartAttachments
-                files={startFiles}
-                images={startImages}
-                onFiles={setStartFiles}
-                onImages={setStartImages}
-                disabled={working !== null}
-              />
+              <>
+                <StartAttachments
+                  files={startFiles}
+                  images={startImages}
+                  onFiles={setStartFiles}
+                  onImages={setStartImages}
+                  disabled={working !== null}
+                />
+                <CarriedItems items={startItems} onRemove={dropItem} disabled={working !== null} />
+              </>
             }
           />
         </>

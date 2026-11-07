@@ -52,7 +52,7 @@ export function WebSources({
     setError(null);
     setNote(null);
     try {
-      const found = await api.agentWebSearch({ inputs: inputsFrom(project), query: q, web_access: 'on', model: project.model });
+      const found = await api.agentWebSearch({ inputs: inputsFrom(project), query: q, web_access: 'on', model: project.model, asked_by: 'user' });
       const saved = await saveSources(project, found.sources, { query: q, stageId });
       await onChanged();
       setQuery('');

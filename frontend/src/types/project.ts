@@ -431,6 +431,7 @@ export type ProjectPatch = Partial<
     | 'manual_check_versions'
     | 'routine_decisions'
     | 'web_access'
+    | 'third_party'
     | 'thinking'
     | 'language'
     | 'accent'

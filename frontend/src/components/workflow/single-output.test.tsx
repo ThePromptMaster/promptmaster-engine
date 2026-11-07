@@ -43,6 +43,8 @@ const appendWorkflowEvent = vi.fn(
   }
 );
 
+// The workspace's "From your accounts" panel asks who is signed in.
+vi.mock('@/hooks/use-auth', () => ({ useAuth: () => ({ user: { id: 'u1' }, isGuest: false, loading: false }) }));
 vi.mock('@/lib/supabase/workflow', () => ({
   // No newer workflow version in these tests.
   getLatestTemplate: async () => null,

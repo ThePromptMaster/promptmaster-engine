@@ -3503,3 +3503,18 @@ security assessment, and costs this:
   and in every prompt, but no panel in the workspace lists it yet; it was shown, exactly, before the
   project was made.
 
+
+### L-202 — Account items in any project: added, carried and removed (2026-11-07)
+
+Before 7 Nov, only a meeting briefing could hold items from connected accounts. Now:
+- **"Start this" keeps the items** the suggestion came from, or every ticked item if it names none, whichever way the project starts.
+- **Every project has a "From your accounts" panel.** It lists the items as [T1]…, shows each one's exact text, and has Remove and "Add from my accounts" (at most 20).
+- **Web access** keeps the project's default beside them (L-200).
+
+What it does not do:
+- **Adding or removing items doesn't redo finished stages.** The next draft, check or chat answer uses what is held then. Redo a stage to bring them in.
+- **Items carried to the start screen live in that tab's storage**, like the goal. A reload of the start page loses them, as it loses attached files. A project already made keeps them.
+- **The start conversation and "Ask me questions" see titles only, never text.** The brief they draft becomes the user's word, and other people's words must not. So the conversation knows the items exist but not what they say. The project's stages read them in full, fenced.
+- **Go never fetches mail itself.** Items reach a project only by the person ticking them.
+- **Edited text is not tracked.** A ticked item's text can be edited before it is added, the same as before.
+
