@@ -554,7 +554,7 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
   });
 
   it('a finished document says what is still open in the real world (8 Nov)', () => {
-    render(<ProjectFinished bundle={bundle('One two three four five.')} completion={completion} openActions={['Book or confirm the trainer for both dates.']} onReopen={() => undefined} />);
+    render(<ProjectFinished bundle={bundle('One two three four five.')} completion={summary} openActions={['Book or confirm the trainer for both dates.']} onReopen={vi.fn()} />);
     expect(screen.getByRole('note')).toHaveTextContent('Document finished. Still open in the real world:');
     expect(screen.getByRole('note')).toHaveTextContent('Book or confirm the trainer for both dates.');
   });
