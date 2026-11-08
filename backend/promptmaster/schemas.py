@@ -127,6 +127,19 @@ class ThirdPartyItem(BaseModel):
     when: str = Field(default="", max_length=80)
 
 
+class AccountUse(BaseModel):
+    """What a writer searched the person's connected accounts for (8 Nov, L-203).
+
+    All empty when nothing was searched. The browser saves `account_items` to the
+    project, so what was read can be seen, removed, and read by later stages.
+    """
+    #: The words searched for, or "" when no search was made.
+    account_query: str = ""
+    account_items: list[ThirdPartyItem] = Field(default_factory=list)
+    #: Set when a search failed, or found files only the accounts page can open.
+    account_note: str = ""
+
+
 class PMInput(BaseModel):
     """User inputs for a PromptMaster session.
 
@@ -749,7 +762,7 @@ class StageItem(BaseModel):
     id: str
 
 
-class GenerateStageArtifactResponse(WebUse):
+class GenerateStageArtifactResponse(WebUse, AccountUse):
     """Prose stages fill `content`; list stages fill `items`."""
     content: str = Field(default="")
     items: list[StageItem] = Field(default_factory=list)

@@ -1,12 +1,11 @@
 """Reading a person's own mail, calendar and files, through Composio (7 Nov).
 
-Two steps, so nothing reaches a model that the person did not pick:
+Two steps. `account_search` (8 Nov, L-203) decides what goes through them:
 
 1. **Preview** lists what is there: senders, subjects, dates, meeting titles,
    file names. No body, no description, no file text.
-2. **Read** fetches the full text of the items the person ticked, cleans it
-   (hidden HTML, invisible characters and links removed) and caps it. The
-   browser shows that exact text before it is used anywhere.
+2. **Read** fetches the full text of chosen items, cleans it (hidden HTML,
+   invisible characters and links removed) and caps it.
 
 Composio documents every tool's output as an opaque `data` object, so the
 parsers below accept both Composio's own field names and the provider's native
@@ -27,7 +26,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Literal
+from typing import Any, Awaitable, Callable, Literal
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
@@ -54,11 +53,11 @@ class Toolkit:
 
 
 TOOLKITS: dict[str, Toolkit] = {
-    GMAIL: Toolkit(GMAIL, "Gmail", "Sender, subject and date of the last 14 days of mail; the full text of an email only when you tick it."),
-    GOOGLE_CALENDAR: Toolkit(GOOGLE_CALENDAR, "Google Calendar", "Your meetings for the next 14 days; a meeting's description only when you tick it."),
-    GOOGLE_DRIVE: Toolkit(GOOGLE_DRIVE, "Google Drive", "The names of your 20 most recently changed files; a file's text only when you tick it."),
-    OUTLOOK: Toolkit(OUTLOOK, "Outlook", "Sender, subject and date of the last 14 days of mail and your meetings for the next 14 days; full text only when you tick it."),
-    ONE_DRIVE: Toolkit(ONE_DRIVE, "OneDrive", "The names of your 20 most recent files; a file's text only when you tick it."),
+    GMAIL: Toolkit(GMAIL, "Gmail", "Searches all of your mail and reads the emails that match."),
+    GOOGLE_CALENDAR: Toolkit(GOOGLE_CALENDAR, "Google Calendar", "Searches all of your meetings and reads the ones that match."),
+    GOOGLE_DRIVE: Toolkit(GOOGLE_DRIVE, "Google Drive", "Searches all of your files and reads the ones that match."),
+    OUTLOOK: Toolkit(OUTLOOK, "Outlook", "Searches all of your mail and meetings and reads the ones that match."),
+    ONE_DRIVE: Toolkit(ONE_DRIVE, "OneDrive", "Searches all of your files and reads the ones that match."),
 }
 
 #: Composio's Gmail, Calendar and Drive are one Google app, so revoking one revokes the
@@ -66,10 +65,10 @@ TOOLKITS: dict[str, Toolkit] = {
 #: Outlook and OneDrive are one Microsoft app.
 PROVIDER = {GMAIL: "google", GOOGLE_CALENDAR: "google", GOOGLE_DRIVE: "google", OUTLOOK: "microsoft", ONE_DRIVE: "microsoft"}
 
-DAYS = 14
-MAX_EMAILS = 30
+#: How many of each kind a list or a search brings back. Not how far back it looks.
+MAX_EMAILS = 25
 MAX_EVENTS = 25
-MAX_FILES = 20
+MAX_FILES = 25
 MAX_PICKED = 20
 MAX_TEXT_CHARS = 8_000
 MAX_ATTENDEES = 20
@@ -124,7 +123,7 @@ class PreviewItem(BaseModel):
 
 
 class PickedItem(BaseModel):
-    """An item the person ticked, sent back to be read."""
+    """An item to read, as a preview or a search described it."""
 
     id: str = Field(min_length=1, max_length=300)
     toolkit: str = Field(max_length=40)
@@ -139,7 +138,7 @@ class PickedItem(BaseModel):
 
 
 class ConnectedText(BaseModel):
-    """The text of one ticked item. The same shape as `ThirdPartyItem`."""
+    """The text of one item that was read. The same shape as `ThirdPartyItem`."""
 
     id: str
     toolkit: str
@@ -147,6 +146,7 @@ class ConnectedText(BaseModel):
     source: str
     title: str
     text: str
+    when: str = ""
 
 
 class ConnectedFile(BaseModel):
@@ -158,6 +158,7 @@ class ConnectedFile(BaseModel):
     title: str
     mime: str
     data_base64: str
+    when: str = ""
 
 
 class Skipped(BaseModel):
@@ -368,8 +369,18 @@ def _people(values: Any) -> list[str]:
     return out
 
 
+def _no_rows(data: Any) -> bool:
+    """An answer that is only an empty list, however wrapped: nothing matched, nothing to learn."""
+    if isinstance(data, list):
+        return not data
+    if isinstance(data, dict):
+        inner = [v for v in data.values() if isinstance(v, (list, dict))]
+        return bool(inner) and all(_no_rows(v) for v in inner)
+    return False
+
+
 def _log_empty(tool: str, data: Any) -> None:
-    if data:
+    if data and not _no_rows(data):
         logger.warning("CONNECTIONS_SHAPE tool=%s shape=%s", tool, shape(data))
 
 
@@ -399,9 +410,9 @@ def gmail_items(data: Any) -> list[PreviewItem]:
     return out
 
 
-def google_event_items(data: Any) -> list[PreviewItem]:
+def google_event_items(data: Any, limit: int = MAX_EVENTS) -> list[PreviewItem]:
     out = []
-    for r in find_records(data, ("id", "event_id", "eventId"))[:MAX_EVENTS]:
+    for r in find_records(data, ("id", "event_id", "eventId"))[:limit]:
         eid = str(_first(r, "id", "event_id", "eventId") or "")
         if not eid or r.get("status") == "cancelled":
             continue
@@ -501,10 +512,36 @@ def onedrive_items(data: Any) -> list[PreviewItem]:
     return out
 
 
+DRIVE_FIELDS = "files(id,name,mimeType,modifiedTime,owners(displayName,emailAddress))"
+NOT_TRASH_OR_FOLDER = "trashed = false and mimeType != 'application/vnd.google-apps.folder'"
+OUTLOOK_MAIL_FIELDS = ["id", "subject", "from", "toRecipients", "receivedDateTime"]
+
+
+async def gather_tools(calls: list[tuple[str, Awaitable[Any], Callable[[Any], list[PreviewItem]]]]) -> list[PreviewItem]:
+    """Several tools of one account. One failing costs its part; all failing is the account's failure."""
+    results = await asyncio.gather(*(call for _tool, call, _parse in calls), return_exceptions=True)
+    items: list[PreviewItem] = []
+    failures: list[ComposioError] = []
+    for (tool, _call, parse), data in zip(calls, results):
+        if isinstance(data, ComposioError):
+            logger.warning("CONNECTIONS_TOOL_FAILED tool=%s error=%s", tool, data)
+            failures.append(data)
+        elif isinstance(data, BaseException):
+            raise data
+        else:
+            found = parse(data)
+            if not found:
+                _log_empty(tool, data)
+            items.extend(found)
+    if failures and len(failures) == len(calls):
+        raise failures[0]
+    return items
+
+
 async def _gmail_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
     tool = "GMAIL_FETCH_EMAILS"
     data = await c.execute(sid, tool, {
-        "user_id": "me", "query": f"newer_than:{DAYS}d -in:chats", "max_results": MAX_EMAILS,
+        "user_id": "me", "query": "-in:chats", "max_results": MAX_EMAILS,
         "verbose": False, "include_payload": False,
     })
     items = gmail_items(data)
@@ -516,7 +553,7 @@ async def _gmail_preview(c: Composio, sid: str, now: datetime) -> list[PreviewIt
 async def _google_calendar_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
     tool = "GOOGLECALENDAR_EVENTS_LIST"
     data = await c.execute(sid, tool, {
-        "calendarId": "primary", "timeMin": _iso(now), "timeMax": _iso(now + timedelta(days=DAYS)),
+        "calendarId": "primary", "timeMin": _iso(now),
         "singleEvents": True, "orderBy": "startTime", "maxResults": MAX_EVENTS,
     })
     items = google_event_items(data)
@@ -528,9 +565,9 @@ async def _google_calendar_preview(c: Composio, sid: str, now: datetime) -> list
 async def _drive_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
     tool = "GOOGLEDRIVE_FIND_FILE"
     data = await c.execute(sid, tool, {
-        "q": "trashed = false and mimeType != 'application/vnd.google-apps.folder'",
+        "q": NOT_TRASH_OR_FOLDER,
         "orderBy": "modifiedTime desc", "pageSize": MAX_FILES, "corpora": "user",
-        "fields": "files(id,name,mimeType,modifiedTime,owners(displayName,emailAddress))",
+        "fields": DRIVE_FIELDS,
     })
     items = drive_items(data)
     if not items:
@@ -539,33 +576,17 @@ async def _drive_preview(c: Composio, sid: str, now: datetime) -> list[PreviewIt
 
 
 async def _outlook_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
-    mail_tool, event_tool = "OUTLOOK_LIST_MESSAGES", "OUTLOOK_GET_CALENDAR_VIEW"
-    mail, events = await asyncio.gather(
-        c.execute(sid, mail_tool, {
-            "top": MAX_EMAILS, "select": ["id", "subject", "from", "toRecipients", "receivedDateTime"],
-            "received_date_time_ge": _iso(now - timedelta(days=DAYS)), "orderby": ["receivedDateTime desc"],
-        }),
-        c.execute(sid, event_tool, {
-            "start_datetime": _iso(now), "end_datetime": _iso(now + timedelta(days=DAYS)), "top": MAX_EVENTS,
+    return await gather_tools([
+        ("OUTLOOK_LIST_MESSAGES", c.execute(sid, "OUTLOOK_LIST_MESSAGES", {
+            "top": MAX_EMAILS, "select": OUTLOOK_MAIL_FIELDS, "orderby": ["receivedDateTime desc"],
+        }), outlook_mail_items),
+        # A calendar view has to have an end: a year out is as far as anyone plans a meeting here.
+        ("OUTLOOK_GET_CALENDAR_VIEW", c.execute(sid, "OUTLOOK_GET_CALENDAR_VIEW", {
+            "start_datetime": _iso(now), "end_datetime": _iso(now + timedelta(days=365)), "top": MAX_EVENTS,
             "select": ["id", "subject", "start", "end", "organizer", "attendees", "location", "isCancelled"],
             "orderby": "start/dateTime asc",
-        }),
-        return_exceptions=True,
-    )
-    items: list[PreviewItem] = []
-    for tool, data, parse in ((mail_tool, mail, outlook_mail_items), (event_tool, events, outlook_event_items)):
-        if isinstance(data, BaseException):
-            if not isinstance(data, ComposioError):
-                raise data
-            logger.warning("CONNECTIONS_TOOL_FAILED tool=%s error=%s", tool, data)
-            continue
-        found = parse(data)
-        if not found:
-            _log_empty(tool, data)
-        items.extend(found)
-    if isinstance(mail, ComposioError) and isinstance(events, ComposioError):
-        raise mail
-    return items
+        }), outlook_event_items),
+    ])
 
 
 async def _onedrive_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
@@ -599,14 +620,15 @@ def ordered(items: list[PreviewItem]) -> list[PreviewItem]:
     return meetings + mail + files
 
 
-async def preview(c: Composio, user_id: str, toolkits: list[str], now: datetime | None = None) -> tuple[list[PreviewItem], list[Problem]]:
-    """What is in each connected account, without its contents. One toolkit failing doesn't stop the others."""
-    now = now or datetime.now(timezone.utc)
-    wanted = [t for t in toolkits if t in PREVIEWS]
+async def across_accounts(
+    c: Composio, user_id: str, toolkits: list[str], run: Callable[[str, str], Awaitable[list[PreviewItem]]]
+) -> tuple[list[PreviewItem], list[Problem]]:
+    """`run(toolkit, session)` for each account, together. One failing doesn't stop the others."""
+    wanted = [t for t in toolkits if t in TOOLKITS]
     if not wanted:
         return [], []
     session = await c.create_session(user_id, wanted)
-    results = await asyncio.gather(*(PREVIEWS[t](c, session, now) for t in wanted), return_exceptions=True)
+    results = await asyncio.gather(*(run(t, session) for t in wanted), return_exceptions=True)
     items: list[PreviewItem] = []
     problems: list[Problem] = []
     for toolkit, result in zip(wanted, results):
@@ -620,8 +642,14 @@ async def preview(c: Composio, user_id: str, toolkits: list[str], now: datetime 
     return ordered(items), problems
 
 
+async def preview(c: Composio, user_id: str, toolkits: list[str], now: datetime | None = None) -> tuple[list[PreviewItem], list[Problem]]:
+    """The newest of each kind and the next meetings, without their contents."""
+    at = now or datetime.now(timezone.utc)
+    return await across_accounts(c, user_id, toolkits, lambda t, session: PREVIEWS[t](c, session, at))
+
+
 # ---------------------------------------------------------------------------
-# Reading what was ticked.
+# Reading what was chosen.
 # ---------------------------------------------------------------------------
 
 
@@ -855,7 +883,7 @@ _VALID = {(GMAIL, "email"), (OUTLOOK, "email"), (GOOGLE_CALENDAR, "calendar_even
 
 
 async def read(c: Composio, user_id: str, picked: list[PickedItem]) -> tuple[list[ConnectedText], list[ConnectedFile], list[Skipped]]:
-    """The full text of each ticked item. An item that can't be read is listed with the reason, not dropped silently."""
+    """The full text of each item. An item that can't be read is listed with the reason, not dropped silently."""
     picked = picked[:MAX_PICKED]
     valid = [p for p in picked if (p.toolkit, p.kind) in _VALID]
     skipped = [Skipped(id=p.id, title=p.title, reason="This isn't something PromptMaster reads.") for p in picked if p not in valid]

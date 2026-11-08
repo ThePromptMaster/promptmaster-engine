@@ -11,7 +11,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from deps import get_client
+from deps import account_owner, get_client, optional_composio
+from promptmaster.account_search import allowed_links, chat_accounts_line, with_accounts
 from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.project_context import highest_source_number
 from promptmaster.conversation import (
@@ -20,13 +21,15 @@ from promptmaster.conversation import (
     build_chat_reply_prompt,
     build_save_as_new_version_prompt,
 )
+from promptmaster.composio_client import Composio
 from promptmaster.engine import generate
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.page_context import MAX_ATTACHMENTS, ChatAttachment, ChatContext, scrub_button_mentions
-from promptmaster.schemas import ChatMessage, Iteration, PMInput
+from promptmaster.schemas import AccountUse, ChatMessage, Iteration, PMInput
+from promptmaster.source_access import without_foreign_links
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
 from promptmaster.revision_facts import RevisionFactsRequest, RevisionFactsResponse, revision_facts
@@ -70,11 +73,14 @@ class ChatMessageRequest(BaseModel):
     #: The project's "Web access" switch, as the browser read it (22 Oct).
     #: On, the chat may search the web for a question that needs it.
     web_access: Literal["on", "off"] = "off"
+    #: The project's "Search my accounts" switch (8 Nov, L-203), sent only when the
+    #: person has an account connected. Go never sends it.
+    account_search: Literal["on", "off"] = "off"
     #: What the user attached to this message (5 Nov).
     attachments: list[ChatAttachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
 
-class ChatMessageResponse(BaseModel):
+class ChatMessageResponse(AccountUse):
     assistant_message: ChatMessage
     #: What the chat searched the web for, or "" when it did not search.
     web_query: str = ""
@@ -139,6 +145,7 @@ class SuggestActionsResponse(BaseModel):
 
 # --- Helpers ---
 
+
 def _asked(chat_history: list[ChatMessage]) -> str:
     """What the user asked for in the discussion, latest last: a revision's task."""
     return "\n".join(m.content[:600] for m in chat_history if m.role == "user")[-2_000:]
@@ -154,24 +161,31 @@ def _now_iso() -> str:
 async def api_chat_message(
     req: ChatMessageRequest,
     client: OpenRouterClient = Depends(get_client),
+    composio: Composio | None = Depends(optional_composio),
+    owner: str | None = Depends(account_owner),
 ) -> ChatMessageResponse:
     """Pure chat reply — 1 LLM call, no eval, no iteration created.
 
     While Web access is on (22 Oct), one more call decides whether the question
-    needs the web, and a third searches when it does. A failed decision or
+    needs the web, and a third searches when it does. While the project may search
+    the person's accounts (8 Nov), the same happens there first. A failed decision or
     search never costs the reply: it is answered from the project, and says so.
     """
     try:
         model = req.model or None
         saved = req.inputs.sources
+        inputs, accounts = await with_accounts(
+            client, composio, owner, req.inputs, req.account_search,
+            task=req.user_message, turns=users_own_turns(req.chat_history),
+        )
         web_query, new_sources, web_note, found = "", [], "", ""
         web_access = req.web_access
         if web_access == "on":
             # While the project holds items other people wrote, the query is written
             # from the user's own words: no items, no draft, none of the chat's replies
             # (7 Nov, the middle option; L-200).
-            held = bool(req.inputs.third_party)
-            asked = own_words(req.inputs)
+            held = bool(inputs.third_party)
+            asked = own_words(inputs)
             try:
                 query = await decide_chat_search(
                     client, model, asked,
@@ -187,14 +201,14 @@ async def api_chat_message(
                 logger.warning("chat web search failed: %s", e)
                 web_note = "The web search failed, so this answer uses only what the project holds."
         system_text, prompt_text = build_chat_reply_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             active_iteration=req.active_iteration,
             chat_history=req.chat_history,
             user_message=req.user_message,
             iterations=req.iteration_history,
             context=req.context,
             found=found,
-            web=chat_web_line(web_access),
+            web="\n\n".join(b for b in (chat_web_line(web_access), chat_accounts_line(req.account_search, accounts)) if b),
             attached=attached_block(req.attachments),
         )
         reply = await generate(
@@ -223,7 +237,15 @@ async def api_chat_message(
         msg.content = without_repeated_catchphrases(
             msg.content, [m.content for m in req.chat_history if m.role == "assistant"], chat=True
         ) or msg.content
-        return ChatMessageResponse(assistant_message=msg, web_query=web_query, web_sources=new_sources, web_note=web_note)
+        if inputs.third_party:
+            said = [
+                req.user_message, req.active_iteration.output, *[m.content for m in users_own_turns(req.chat_history)],
+                *[a.text for a in req.attachments], *[s.url for s in new_sources],
+            ]
+            msg.content = without_foreign_links(msg.content, allowed_links(inputs, said))
+        return ChatMessageResponse(
+            assistant_message=msg, web_query=web_query, web_sources=new_sources, web_note=web_note, **dict(accounts)
+        )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
