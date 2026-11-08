@@ -205,6 +205,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ol.removedFrom': 'रूपरेखा से हटाया गया',
   'ol.putBackLabel': '“{name}” को रूपरेखा में वापस रखें',
   'ol.putBack': 'वापस रखें',
+  'ol.trayNote': '“{putBack}” से यह भाग और उसका पाठ योजना में लौट आता है। “{discard}” से वे योजना से निकल जाते हैं।',
   'ol.discardLabel': '“{name}” को स्थायी रूप से हटाएँ',
   'ol.staleTitle_one': '{count} खंड रूपरेखा {versions} के आधार पर लिखा गया था',
   'ol.staleTitle_other': '{count} खंड रूपरेखा {versions} के आधार पर लिखे गए थे',

@@ -205,6 +205,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ol.removedFrom': 'أُزيل من المخطط',
   'ol.putBackLabel': 'إعادة «{name}» إلى المخطط',
   'ol.putBack': 'إعادته',
+  'ol.trayNote': '«{putBack}» يعيد القسم ونصه إلى الخطة. «{discard}» يزيلهما من الخطة.',
   'ol.discardLabel': 'تجاهل «{name}» نهائيًا',
   'ol.staleTitle_one': '{count} قسم كُتب على أساس المخطط {versions}',
   'ol.staleTitle_other': 'أقسام كُتبت على أساس المخطط {versions} (العدد: {count})',

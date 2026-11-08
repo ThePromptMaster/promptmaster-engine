@@ -6,7 +6,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import type { EvaluationResult } from '@/types';
 
-import { blocksCompletion, shownOutstanding, type CompletionSummary, type OutstandingShow } from '@/lib/workflow/engine';
+import { blocksCompletion, shownOutstanding, type CompletionSummary, type OutstandingShow, openMajorFindings } from '@/lib/workflow/engine';
 import { executableNext, type ObjectiveAssessment } from '@/lib/workflow/objective';
 import { readablePerformed } from '@/lib/agent/labels';
 import type { BlockKind } from '@/lib/workflow/types';
@@ -316,7 +316,9 @@ export function CompletionDialog({
   // me to finish … despite the unresolved finding").
   const open = (summary.outstanding ?? []).filter((i) => i.kind !== 'unmet_blocking' || !summary.leftOpenStages.some((s) => s.id === i.stageId));
   // Optional rows are listed, and finishing past them needs no reason (C3).
-  const needsReason = !early && !stated && open.some(blocksCompletion);
+  // A major finding asks why whichever table it sits in (8 Nov: "resolution of
+  // blocking findings or an explicit, reasoned exception").
+  const needsReason = !early && !stated && (open.some(blocksCompletion) || openMajorFindings(open).length > 0);
   const rows: [string, number][] = [
     [t('ssp.row.completed'), summary.completed],
     [t('ssp.row.skipped'), summary.skipped],

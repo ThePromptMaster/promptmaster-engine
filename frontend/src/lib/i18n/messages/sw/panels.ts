@@ -205,6 +205,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ol.removedFrom': 'imeondolewa kwenye muhtasari',
   'ol.putBackLabel': 'Rudisha “{name}” kwenye muhtasari',
   'ol.putBack': 'Irudishe',
+  'ol.trayNote': '{putBack} inarejesha sehemu na maandishi yake kwenye mpango. {discard} inaviondoa kwenye mpango.',
   'ol.discardLabel': 'Tupa “{name}” kabisa',
   'ol.staleTitle_one': 'Sehemu {count} iliandikwa kwa kufuata muhtasari {versions}',
   'ol.staleTitle_other': 'Sehemu {count} ziliandikwa kwa kufuata muhtasari {versions}',

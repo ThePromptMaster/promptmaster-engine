@@ -21,6 +21,8 @@ export const ar: Record<keyof typeof en, string> = {
   'stage.evaluate': 'تقييم هذه المرحلة',
   'stage.oneCheck': '· فحص واحد بالذكاء الاصطناعي',
   'stage.regenerate': 'إعادة التوليد',
+  'stage.regenerateNote': 'يعيد هذا كتابة القسم من الخطة والحقائق الحالية. يُحفظ النص الحالي أولًا كإصدار.',
+  'stage.reviseNote': 'يعيد هذا كتابة القسم وفق الملاحظات أعلاه. يُحفظ النص الحالي أولًا كإصدار.',
   'stage.changeSection': 'غيّر هذا القسم',
   'stage.changeSectionHelp': 'اذكر ما يجب تغييره. يُحفظ النص الحالي أولًا كإصدار، ثم يُعاد كتابة هذا القسم فقط.',
   'stage.changeSectionSend': 'أعد كتابة هذا القسم',

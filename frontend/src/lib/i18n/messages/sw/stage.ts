@@ -20,6 +20,8 @@ export const sw: Record<keyof typeof en, string> = {
   'stage.evaluate': 'Tathmini hatua hii',
   'stage.oneCheck': '· ukaguzi mmoja wa AI',
   'stage.regenerate': 'Tengeneza upya',
+  'stage.regenerateNote': 'Hii inaandika sehemu upya kutoka kwenye mpango na ukweli wa sasa. Maandishi ya sasa yanahifadhiwa kwanza kama toleo.',
+  'stage.reviseNote': 'Hii inaandika upya sehemu kwa kutumia hoja zilizo hapo juu. Maandishi ya sasa yanahifadhiwa kwanza kama toleo.',
   'stage.changeSection': 'Badilisha sehemu hii',
   'stage.changeSectionHelp': 'Sema cha kubadilisha. Maandishi ya sasa yanahifadhiwa kwanza kama toleo, na sehemu hii pekee inaandikwa upya.',
   'stage.changeSectionSend': 'Andika upya sehemu hii',

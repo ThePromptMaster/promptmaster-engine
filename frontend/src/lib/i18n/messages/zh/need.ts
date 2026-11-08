@@ -26,6 +26,7 @@ export const zh: Record<keyof typeof en, string> = {
   'need.policyAsk': '这是一项常规批准，但你的常规决定被设置为“询问我”。',
   'need.approval': '需要你的批准：“{label}”。',
   'need.approveResume': '批准并继续',
+  'need.majorReason': '仍有重大问题未解决，批准后它仍未解决。请说明原因，原因将与你的批准一起记录。',
   'need.suggestSkip': '我建议跳过{stage}：{reason} 你之后可以重新打开它。',
   'need.roundDone': '这一轮已完成。{reason} 从{stage}开始下一轮，或者到此为止。',
   'need.nextRound': '从{stage}开始下一轮',

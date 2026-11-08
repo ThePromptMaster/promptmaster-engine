@@ -34,7 +34,7 @@ import {
   type ProjectJob,
 } from '@/lib/supabase/jobs';
 import { appendVersion } from '@/lib/supabase/versions';
-import { PENDING_JOB_STATUSES, enqueueDraftJobs, enqueueRevisionJobs, jobBySection as latestJobBySection, pendingJobs as pendingOf, revisedCount as revisedCountOf, writtenSections } from '@/lib/jobs/sections';
+import { PENDING_JOB_STATUSES, enqueueDraftJobs, enqueueRevisionJobs, jobBySection as latestJobBySection, manuscriptSnapshot, pendingJobs as pendingOf, revisedCount as revisedCountOf, writtenSections } from '@/lib/jobs/sections';
 import type { OutlineSection } from '@/types';
 import type { Artifact } from '@/types/project';
 import type { StageRendererProps } from './types';
@@ -212,6 +212,11 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const regenerate = (section: OutlineSection, index: number) =>
     run(async () => {
       if (!artifactId) throw new Error('This stage has no artifact to draft into.');
+      // What it says it does: the text as it stood is kept first.
+      const snapshot = manuscriptSnapshot(outline, `regenerating ${section.title}`, project.mode);
+      await (appendManuscriptVersion
+        ? appendManuscriptVersion(snapshot)
+        : appendVersion({ id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact, snapshot));
       // A new revision means a new idempotency key, which is what makes this an
       // explicit user request rather than a no-op.
       await enqueueSectionJob({
@@ -470,6 +475,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                     : () => regenerate(section, index)
               }
               regenerateLabel={revise ? t('stage.revise') : t('stage.regenerate')}
+              regenerateNote={revise ? t('stage.reviseNote') : t('stage.regenerateNote')}
               onChange={readOnly ? undefined : (instruction) => changeSection(section, index, instruction)}
               onRetry={readOnly ? undefined : () => retry(section, index)}
               busy={busy}
@@ -489,6 +495,8 @@ interface SectionRowProps {
   onToggle: () => void;
   onRegenerate?: () => void;
   regenerateLabel?: string;
+  /** What pressing it does, said before it happens. */
+  regenerateNote?: string;
   /** Rewrite this section to what the user typed. */
   onChange?: (instruction: string) => void;
   onRetry?: () => void;
@@ -503,12 +511,14 @@ function SectionRow({
   onToggle,
   onRegenerate,
   regenerateLabel,
+  regenerateNote,
   onChange,
   onRetry,
   busy,
 }: SectionRowProps) {
   const t = useT();
   const [changing, setChanging] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [instruction, setInstruction] = useState('');
   // The job row is the authority on "in flight"; the artifact is the authority
   // on "written". Neither is inferred from the other.
@@ -559,8 +569,9 @@ function SectionRow({
                 {onRegenerate && (
                   <button
                     type="button"
-                    onClick={onRegenerate}
+                    onClick={() => setConfirming((v) => !v)}
                     disabled={busy || inFlight}
+                    aria-expanded={confirming}
                     className="text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
                   >
                     {regenerateLabel ?? t('stage.regenerate')}
@@ -569,6 +580,24 @@ function SectionRow({
               </span>
             )}
           </div>
+
+          {confirming && onRegenerate && (
+            <div className="mt-2">
+              <p className="text-label text-[var(--on-surface-variant)]">{regenerateNote}</p>
+              <button
+                type="button"
+                data-confirm-regenerate
+                disabled={busy || inFlight}
+                onClick={() => {
+                  onRegenerate();
+                  setConfirming(false);
+                }}
+                className="mt-2 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+              >
+                {regenerateLabel ?? t('stage.regenerate')}
+              </button>
+            </div>
+          )}
 
           {changing && onChange && (
             <div className="mt-2">

@@ -4,6 +4,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { describeNeed, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
+import { isMajorRow } from '@/lib/workflow/engine';
 
 /**
  * "I need you to do this before I can continue" — with that exact action
@@ -42,10 +43,16 @@ export function NeedsYouCard({
   // give a targeted correction for the failed validation").
   const [note, setNote] = useState('');
   const canTell = need.kind === 'repair_stuck' && !need.byHand;
+  // An approval with a major finding still open asks why, and the reason is recorded (8 Nov).
+  const [why, setWhy] = useState('');
+  const needsWhy = need.kind === 'tick_criterion' && (need.openRows ?? []).some(isMajorRow);
+  const approves = (option?: StuckOption) => need.kind === 'tick_criterion' && (!option || option === 'resume');
+  const waitingForWhy = (option?: StuckOption) => needsWhy && approves(option) && !why.trim();
+  const noteFor = (option?: StuckOption) => (option === 'retry' ? note.trim() : needsWhy && approves(option) ? why.trim() : '') || undefined;
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);
-    onAction(option, option === 'retry' && note.trim() ? note.trim() : undefined)
+    onAction(option, noteFor(option))
       .catch((e: unknown) => setError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
       .finally(() => setBusy(false));
   };
@@ -69,13 +76,27 @@ export function NeedsYouCard({
           />
         </label>
       )}
+      {needsWhy && (
+        <label className="mt-3 block">
+          <span className="text-label text-[var(--on-surface-variant)]">{t('need.majorReason')}</span>
+          <textarea
+            data-approve-why
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+            disabled={busy}
+            rows={2}
+            maxLength={1000}
+            className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
+          />
+        </label>
+      )}
       {options ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {options.map((o, i) => (
             <button
               key={o.id}
               onClick={() => run(o.id)}
-              disabled={busy}
+              disabled={busy || waitingForWhy(o.id)}
               className={
                 i === 0
                   ? 'rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50'
@@ -91,7 +112,7 @@ export function NeedsYouCard({
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
             onClick={() => run()}
-            disabled={busy}
+            disabled={busy || waitingForWhy()}
             className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
           >
             {busy ? t('nyc.working') : action}

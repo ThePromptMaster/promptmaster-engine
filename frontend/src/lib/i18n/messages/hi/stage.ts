@@ -21,6 +21,8 @@ export const hi: Record<keyof typeof en, string> = {
   'stage.evaluate': 'इस चरण का मूल्यांकन करें',
   'stage.oneCheck': '· एक AI जाँच',
   'stage.regenerate': 'फिर से बनाएँ',
+  'stage.regenerateNote': 'इससे यह भाग योजना और मौजूदा तथ्यों के आधार पर फिर से लिखा जाएगा। मौजूदा पाठ पहले एक संस्करण के रूप में रखा जाता है।',
+  'stage.reviseNote': 'इससे यह भाग ऊपर की समस्याओं के आधार पर फिर से लिखा जाएगा। मौजूदा पाठ पहले एक संस्करण के रूप में रखा जाता है।',
   'stage.changeSection': 'यह भाग बदलें',
   'stage.changeSectionHelp': 'बताएँ कि क्या बदलना है। मौजूदा पाठ पहले एक संस्करण के रूप में रखा जाता है, और केवल यह भाग फिर से लिखा जाता है।',
   'stage.changeSectionSend': 'यह भाग फिर से लिखें',
