@@ -85,3 +85,18 @@ export function planFromScreen(
     move: { action_key: 'revise_stage', params: { instruction: screen.instruction }, rationale: instead, expected_outcome: screen.instruction },
   };
 }
+
+/** At most this many undecided major findings are read per stage in a run. */
+export const MAX_FINDINGS_SCREENED = 6;
+
+/** A finding put as the question it would be if it were asked: whether to make the change. */
+export function findingAsQuestion(row: object): string {
+  const field = (key: string) => {
+    const value = (row as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const finding = field('finding');
+  const change = field('suggested_change');
+  return `A check on this project found: "${finding}"${change ? ` Suggested change: "${change}"` : ''} Should this change be made?`;
+}
+
