@@ -111,6 +111,17 @@ def reporting_date_line(inputs: PMInput) -> str:
     )
 
 
+#: 7 Nov (Sean, training event): confirmation "in writing" was the app's own suggestion, and
+#: Go later treated it as necessary. Northline: an earlier suggestion of six more attendees
+#: was reread as six on top of a new total of 28.
+SUGGESTIONS_RULE = (
+    "Only what is listed here, in the objective or in the constraints is a requirement. A practice a draft or "
+    "review suggested (getting something in writing, adding a sign-off) stays a suggestion, labelled as one, "
+    "and is never a condition of proceeding. An earlier suggestion keeps the meaning it had when it was made: "
+    "say it is earlier, and do not recalculate it on a later base unless a fact above says it applies to that base."
+)
+
+
 def facts_block(inputs: PMInput) -> str:
     """The accepted facts as a block, or "" when there are none. Never cut: they
     are bounded where they are sent, and a fact silently dropped is the stale
@@ -124,9 +135,10 @@ def facts_block(inputs: PMInput) -> str:
         about = f" ({f.subject.strip()})" if f.subject.strip() else ""
         src = f" — {f.source.strip()}" if f.source.strip() else ""
         replaces = f' (replaces "{" ".join(f.replaces.split())}", which is no longer true)' if f.replaces.strip() else ""
-        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}")
+        assumed = " (assumed by PromptMaster, not stated by the user)" if f.origin == "model_assumed" else ""
+        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{assumed}")
     current = reporting_date_line(inputs)
-    return f"{FACTS_HEADER}\n" + "\n".join(lines) + (f"\n{current}" if current else "")
+    return f"{FACTS_HEADER}\n" + "\n".join(lines) + f"\n{SUGGESTIONS_RULE}" + (f"\n{current}" if current else "")
 
 
 SOURCES_HEADER = (

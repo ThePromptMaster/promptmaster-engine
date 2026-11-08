@@ -100,7 +100,7 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
       // A correction to a figure only the brief stated names it in its own
       // words, with no earlier fact to point at (18 Oct, Ridgeway).
       const replaced = (f.supersedes ? byId.get(f.supersedes)?.statement : undefined) ?? namedReplaced(f.statement);
-      return { statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f), ...(replaced ? { replaces: replaced } : {}) };
+      return { statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f), ...(replaced ? { replaces: replaced } : {}), ...(f.origin === 'model_assumed' ? { origin: 'model_assumed' } : {}) };
     });
 }
 

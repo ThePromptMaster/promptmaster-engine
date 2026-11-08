@@ -131,7 +131,9 @@ export function issuesFrom(result: CheckResult, rows: readonly AcceptedRow[], la
       return `Accepted finding ${f.id}${row?.stage_label ? ` (${row.stage_label})` : ''} is not carried into ${label}: ${what}${f.quote ? ` — the text still says "${f.quote}"` : ''}${f.note ? ` (${f.note})` : ''}`;
     });
   const contradictions = result.contradictions.map(
-    (c) => `${label} contradicts itself: "${c.rule_quote}" against "${c.conflicts_quote}" — ${c.problem}${c.fix ? ` Fix: ${c.fix}` : ''}`
+    (c) => (c.conflicts_quote
+      ? `${label} contradicts itself: "${c.rule_quote}" against "${c.conflicts_quote}" — ${c.problem}`
+      : `${label}: "${c.rule_quote}" — ${c.problem}`) + (c.fix ? ` Fix: ${c.fix}` : '')
   );
   return [...missing, ...contradictions];
 }
