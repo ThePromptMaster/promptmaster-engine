@@ -20,12 +20,20 @@ from __future__ import annotations
 
 import re
 
+#: 7 Nov, production: a package saved with "= **$45,000**? see below" and "Correction
+#: to the total line above:" in it. Work it out first; the document holds the result.
+NO_WORKING_RULE = (
+    "NO WORKING IN THE TEXT. Work out every figure before you write it and state the right one once. "
+    "Never leave your own working or second thoughts in the document: no \"see below\", no question "
+    "mark after a figure, no \"correction to the line above\", no wrong table followed by a right one."
+)
+
 READER_TEXT_RULE = (
     "WRITTEN FOR ITS READER. The work is the finished document, not a record of how it was made. "
     "Do not mention PromptMaster, stages, versions or drafts (\"v3\", \"version 2\", \"the previous draft\"), "
     "reviews or review rounds, the instructions you were given, or what changed since an earlier version — "
     "unless the brief or the user asks for a change log, revision history or similar record; then that "
-    "record goes in its own clearly headed section and nowhere else."
+    "record goes in its own clearly headed section and nowhere else. " + NO_WORKING_RULE
 )
 
 #: The line after which the writer's note to the user goes. Taken off in code.

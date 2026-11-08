@@ -1,5 +1,6 @@
 'use client';
 
+import { strayWorkingText } from '@/lib/workflow/working-text';
 import { withinMessage, type MessageAttachment } from '@/lib/data/attachments';
 import { withRunRecord } from '@/lib/workflow/chat-run-record';
 import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
@@ -121,6 +122,8 @@ export interface ChatProposal {
   removedUnasked?: string[];
   /** Personal details it added that nobody supplied, when the project says not to invent them. */
   addedClaims?: AddedClaim[];
+  /** The model's own working left in the revision ("see below", "correction to the line above"). */
+  workingNotes?: string[];
   /**
    * A revision pasted back from outside PromptMaster that started from an
    * older version: only its edits were applied, keeping what changed since.
@@ -408,6 +411,7 @@ export function useStageChat({
           ...(kept.restored.length ? { putBack: kept.restored, withoutPutBack: revised } : {}),
           ...(kept.reported.length ? { removedUnasked: kept.reported } : {}),
           ...(claims.length ? { addedClaims: claims } : {}),
+          ...(strayWorkingText(kept.text).length ? { workingNotes: strayWorkingText(kept.text) } : {}),
         },
       };
     },
