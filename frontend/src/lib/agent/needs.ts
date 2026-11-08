@@ -370,13 +370,13 @@ const REPAIRABLE: ReadonlySet<string> = new Set(['prose', 'list', 'review', 'lon
  * the rest, then spent three steps re-finishing the last stage before it
  * asked). Checked only once nothing is left to repair.
  */
-export function unrepairableStale(template: WorkflowTemplate, state: WorkflowState): string | null {
+export function unrepairableStale(template: WorkflowTemplate, state: WorkflowState, outlineToo = false): string | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
   const reworking = ['in_progress', 'not_started'].includes(state.stages[state.current_stage_id]?.status ?? 'not_started');
   const ahead = !loops && !reworking;
   for (const [index, stage] of template.stages.entries()) {
-    if (state.stages[stage.id]?.status !== 'stale' || REPAIRABLE.has(stage.renderer)) continue;
+    if (state.stages[stage.id]?.status !== 'stale' || REPAIRABLE.has(stage.renderer) || (outlineToo && stage.renderer === 'outline')) continue;
     if (here >= 0 && index > here && !ahead) continue;
     return stage.id;
   }
@@ -404,7 +404,9 @@ export function staleRepair(
    */
   carried: { deliverableId: string; rows: readonly string[] } | null = null,
   /** Per long-form stage: sections cut off at the length limit (8 Nov). Finished before anything else. */
-  cut: Readonly<Record<string, readonly string[]>> = {}
+  cut: Readonly<Record<string, readonly string[]>> = {},
+  /** Under "handle them for me" a reopened chapter plan is Go's too, keeping its chapters (8 Nov). */
+  outlineToo = false
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -454,7 +456,7 @@ export function staleRepair(
       continue;
     }
     // L-64 (9 Oct): a reopened manuscript is repaired by revising its sections.
-    if (!REPAIRABLE.has(stage.renderer)) continue;
+    if (!REPAIRABLE.has(stage.renderer) && !(outlineToo && stage.renderer === 'outline')) continue;
     return {
       key: 'recheck_stage',
       rationale: `${stage.label} was reopened: ${(st.stale?.reason ?? 'something it relied on changed').replace(/[.\s]+$/, '')}. Repairing it keeps the project consistent.`,

@@ -19,8 +19,9 @@ import { jobsSpent } from '@/lib/supabase/project-cost';
 import { addStepCost } from '@/lib/supabase/model-usage';
 import { MAX_OBJECTIVE_FIXES, objectiveFixes } from './objective-fixes';
 import { generateOutlineDraft } from '@/lib/outline/actions';
-import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
-import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
+import { countNamedSections, parseOutlineDocument, coerceOutlineDocument } from '@/lib/outline/model';
+import { approvedOutlineVersionId, carryOutlineApproval, commitOutlineVersion } from '@/lib/supabase/outline';
+import { materialiseOutlineInto } from '@/lib/outline/actions';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
@@ -1182,6 +1183,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
       const st = target ? ctx.state.stages[target.id] : undefined;
       if (target?.renderer === 'long_form' && params.cut) return finishCutChapters(ctx, key, target);
+      if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, st.stale?.reason ?? 'something it relied on changed');
       // L-63 (9 Oct): a finished stage whose measured requirement fails
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
@@ -2638,6 +2640,55 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
   } catch {
     // The document stands; the task list is a convenience beside it.
   }
+}
+
+/**
+ * A reopened chapter plan, brought up to date with its chapters kept (7 Nov,
+ * production: a sponsor's change updated six of seven stages, and the documents
+ * were rewritten against the old plan). The user's approval carries to the new
+ * version under "handle them for me". If the chapters themselves have to change,
+ * that is the user's to decide.
+ */
+async function repairOutline(ctx: PerformContext, key: string, target: StageDefinition, why: string): Promise<StepOutcome> {
+  const bundle = ctx.bundles[target.id];
+  const head = bundle?.versions.at(-1);
+  if (!bundle?.artifact || !head) return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: `${target.label} has no saved plan to update.` });
+  const doc = coerceOutlineDocument(JSON.parse(head.content));
+  const items = doc.items.map(({ id, title, abstract }) => ({ id, title, abstract }));
+  const res = await api.reviseOutline({ inputs: inputsFrom(ctx.project), items, reason: why, model: ctx.project.model || undefined }, ctx.signal);
+  if (res.restructure) {
+    return done(key, { status: 'failed', toolsUsed: ['model'], changes: {}, output: `${target.label} needs a change Go leaves to you: ${res.restructure} Nothing was saved.` });
+  }
+  const byId = new Map(res.items.map((i) => [i.id, i]));
+  const next = { ...doc, items: doc.items.map((i) => ({ ...i, title: byId.get(i.id)?.title ?? i.title, abstract: byId.get(i.id)?.abstract ?? i.abstract })) };
+  const created = await commitOutlineVersion(bundle.artifact, next, {
+    sourceOperation: 'agent_revise',
+    instruction: `Update the plan: ${why}`.slice(0, 1_000),
+    changeSummary: `Updated after a change, with every chapter kept: ${why}`.slice(0, 500),
+    model: ctx.project.model,
+    mode: modeForStage(ctx.project, target),
+  });
+  const events = await listWorkflowEvents(ctx.project.id);
+  const approved = approvedOutlineVersionId(events);
+  const handled = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+  if (approved && handled) await carryOutlineApproval({ projectId: ctx.project.id, userId: ctx.project.user_id, stageId: target.id, runId: ctx.run.id, version: created, carriedFrom: approved });
+  // The chapters take their headings and abstracts from the plan; what is written stays.
+  const drafting = manuscriptArtifactFor(ctx.template, ctx.template.stages.find((s) => s.renderer === 'long_form') ?? target, ctx.bundles);
+  if (drafting && approved && handled) await materialiseOutlineInto(next, drafting);
+  await ctx.refresh?.();
+  const closed = Boolean(approved && handled);
+  if (closed) {
+    await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+      type: 'stage_marked_complete', stage_id: target.id, actor: 'system', agent_run_id: ctx.run.id,
+      reason: `Repaired after a change: ${why}`,
+      payload: { evidence_version_id: created.id, repaired_after: why },
+    });
+    await ctx.afterStageEvent();
+  }
+  return done(key, {
+    status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id] },
+    output: `Updated ${target.label} after the change, with all ${next.items.length} chapters and what is written under them kept — saved as version ${created.version_number}${closed ? '; your approval carries to it' : '; your approval is still needed'}.`,
+  });
 }
 
 /**
