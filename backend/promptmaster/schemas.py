@@ -387,6 +387,13 @@ class OutlineSection(BaseModel):
     generated_at: str | None = None
 
 
+class OutlineItem(BaseModel):
+    """A chapter of a plan as it stands: what a regenerate or a repair must keep."""
+    id: str = Field(..., min_length=1, max_length=64)
+    title: str = Field(default="", max_length=500)
+    abstract: str = Field(default="", max_length=4_000)
+
+
 class LongFormState(BaseModel):
     """Tracks progress through long-form document generation."""
     state: Literal["outlining", "review_outline", "writing", "paused", "complete"]

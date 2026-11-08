@@ -140,6 +140,8 @@ export interface LongFormState {
   continuity_snapshot: ContinuitySnapshot | null;
   started_at: string;
   completed_at: string | null;
+  /** Written sections an approved plan dropped: kept, so "Put it back" returns their text (8 Nov). */
+  retired?: OutlineSection[];
 }
 
 export interface DetectLongFormResponse {

@@ -275,9 +275,14 @@ export function mergeRegeneratedOutline(
   // the template it came from. A model's outline carries no ids, so those
   // items are minted as before; a repeated id is minted too.
   const used = new Set<string>();
+  // A fresh item the model gave no id, but with a chapter's exact title, is that
+  // chapter: writing stays attached even when the model drops the ids (7 Nov).
+  const claimed = new Set(fresh.map((raw) => raw.id).filter((id): id is string => typeof id === 'string'));
+  const byTitle = new Map(doc.items.filter((i) => !claimed.has(i.id) && i.title.trim()).map((i) => [i.title.trim().toLowerCase(), i.id]));
   const items = fresh.map((raw) => {
     const given = typeof raw.id === 'string' && raw.id.trim() && !used.has(raw.id) ? raw.id : null;
-    const id = given ?? newItemId();
+    const sameTitle = byTitle.get((raw.title ?? '').trim().toLowerCase());
+    const id = given ?? (sameTitle && !used.has(sameTitle) ? sameTitle : newItemId());
     used.add(id);
     return newItem({ id, title: raw.title ?? '', abstract: raw.abstract ?? '' });
   });

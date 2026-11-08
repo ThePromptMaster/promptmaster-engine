@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { longFormFromOutline } from './long-form';
 
 import {
   applyItemRegeneration,
@@ -165,6 +166,27 @@ describe('regeneration', () => {
   });
 });
 
+describe('a regenerated plan keeps what is written (7 Nov, production)', () => {
+  it('a chapter with the same title keeps its id when the model gave none', () => {
+    const next = mergeRegeneratedOutline(doc(['A', 'B']), [{ title: 'a', abstract: 'new' }, { title: 'B', abstract: 'new' }, { title: 'C', abstract: '' }], ['i1', 'i2'], 'T');
+    expect(next.items.slice(0, 2).map((i) => i.id)).toEqual(['i1', 'i2']);
+    expect(next.orphans).toEqual([]);
+  });
+
+  it('a title is not taken from a chapter another item claimed by id', () => {
+    const next = mergeRegeneratedOutline(doc(['A', 'B']), [{ id: 'i1', title: 'B', abstract: '' }, { title: 'A', abstract: '' }], ['i1', 'i2'], 'T');
+    expect(next.items[0].id).toBe('i1');
+    expect(next.items[1].id).not.toBe('i2');
+    expect(next.items[1].id).not.toBe('i1');
+  });
+
+  it('two items with one title take it once', () => {
+    const next = mergeRegeneratedOutline(doc(['A']), [{ title: 'A', abstract: '' }, { title: 'A', abstract: '' }], ['i1'], 'T');
+    expect(next.items[0].id).toBe('i1');
+    expect(next.items[1].id).not.toBe('i1');
+  });
+});
+
 describe('copy-on-write versioning', () => {
   it('forks an approved outline and mutates an unapproved one in place', () => {
     expect(editModeFor(true)).toBe('fork');
@@ -270,5 +292,24 @@ describe('mergeRegeneratedOutline keeps an id that comes with a fresh item', () 
     const ids = doc.items.map((i) => i.id);
     expect(ids[1]).toBe('x');
     expect(new Set(ids).size).toBe(3);
+  });
+});
+
+describe('text an approved plan no longer places (8 Nov)', () => {
+  const section = (id: string, content: string) => ({ id, title: id, abstract: '', status: 'complete', content }) as never;
+  const existing = (over: object) => ({ state: 'complete', current_section_index: 0, outline: [section('a', 'Text of a.'), section('b', 'Text of b.')], continuity_snapshot: null, started_at: 't', completed_at: 't', ...over }) as never;
+  const docOf = (ids: string[]) => ({ schema: 1, items: ids.map((id) => ({ id, title: id, abstract: '' })), orphans: [], forked_from_version_id: null }) as never;
+
+  it('is kept when a section leaves the plan', () => {
+    const next = longFormFromOutline(docOf(['a']), existing({}));
+    expect(next.outline.map((s) => s.id)).toEqual(['a']);
+    expect(next.retired?.map((s) => s.content)).toEqual(['Text of b.']);
+  });
+
+  it('comes back with its text when the section is put back', () => {
+    const dropped = longFormFromOutline(docOf(['a']), existing({}));
+    const back = longFormFromOutline(docOf(['a', 'b']), dropped);
+    expect(back.outline[1]).toMatchObject({ id: 'b', content: 'Text of b.', status: 'complete' });
+    expect(back.retired).toBeUndefined();
   });
 });

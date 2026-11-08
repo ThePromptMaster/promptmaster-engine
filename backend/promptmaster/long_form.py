@@ -19,6 +19,7 @@ from .schemas import (
     ContinuitySnapshot,
     DetectLongFormResponse,
     GenerateSectionProseResponse,
+    OutlineItem,
     SectionContinuation,
     SectionRevisionBrief,
     GenerateSectionResponse,
@@ -105,7 +106,25 @@ def _later_stages_rule(later_stages: list[str] | None) -> str:
     )
 
 
-def build_outline_prompt(inputs: PMInput, suggested_section_count: int, later_stages: list[str] | None = None) -> tuple[str, str]:
+def _existing_chapters_rule(existing: list[OutlineItem] | None) -> str:
+    """7 Nov, production: regenerating a chapter plan gave all eight documents new
+    identities, and each one had to be put back by hand."""
+    if not existing:
+        return ""
+    lines = "\n".join(f"- id {i.id}: {i.title} — {i.abstract}" for i in existing)
+    return (
+        "EXISTING CHAPTERS, already written. Keep each one whose subject still belongs, with its id, changing "
+        "its title and abstract only as far as the work now needs. A chapter you add has an empty id.\n"
+        f"{lines}\n\n"
+    )
+
+
+def build_outline_prompt(
+    inputs: PMInput,
+    suggested_section_count: int,
+    later_stages: list[str] | None = None,
+    existing: list[OutlineItem] | None = None,
+) -> tuple[str, str]:
     """Build (system, user) prompts for outline generation."""
     user = (
         f"Objective: {inputs.objective}\n"
@@ -121,8 +140,9 @@ def build_outline_prompt(inputs: PMInput, suggested_section_count: int, later_st
         "own section, and anything else it asks to be written (a short outline, an appendix) is its own section too. "
         "Never put two chapters in one section.\n\n"
         f"{_later_stages_rule(later_stages)}"
+        f"{_existing_chapters_rule(existing)}"
         "Return JSON with one field:\n"
-        '- outline: array of {"title": string, "abstract": string}\n\n'
+        f"- outline: array of {'{\"id\": string, \"title\": string, \"abstract\": string}' if existing else '{\"title\": string, \"abstract\": string}'}\n\n"
         "Each abstract must be ONE short sentence (≤20 words) describing what that "
         "section will cover. Titles must be concrete and non-overlapping."
     )
@@ -135,9 +155,14 @@ async def generate_outline(
     inputs: PMInput,
     suggested_section_count: int,
     later_stages: list[str] | None = None,
+    existing: list[OutlineItem] | None = None,
 ) -> list[OutlineSection]:
-    """Generate an outline. Returns OutlineSection[] with auto-assigned ids and default fields."""
-    system, user = build_outline_prompt(inputs, suggested_section_count, later_stages)
+    """Generate an outline. Returns OutlineSection[] with auto-assigned ids and default fields.
+
+    With `existing`, a chapter the model kept comes back with its id, so what is
+    written under it stays attached. An id it invented or repeated is replaced.
+    """
+    system, user = build_outline_prompt(inputs, suggested_section_count, later_stages, existing)
     result, _usage = await client.generate_json(
         prompt=user,
         system=system,
@@ -149,12 +174,18 @@ async def generate_outline(
     if not isinstance(raw_outline, list):
         raise ValueError(f"generate_outline expected list, got {type(raw_outline).__name__}")
 
+    known = {i.id for i in existing or []}
+    used: set[str] = set()
     sections: list[OutlineSection] = []
     for raw in raw_outline:
         if not isinstance(raw, dict):
             continue
+        given = str(raw.get("id") or "").strip()
+        keep = given in known and given not in used
+        if keep:
+            used.add(given)
         sections.append(OutlineSection(
-            id=str(uuid.uuid4()),
+            id=given if keep else str(uuid.uuid4()),
             title=str(raw.get("title", "Untitled")),
             abstract=str(raw.get("abstract", "")),
         ))

@@ -542,6 +542,8 @@ export const api = {
     web_access?: 'on' | 'off';
     /** The stages after this plan, by label: what they do is not a section (5 Nov). */
     later_stages?: string[];
+    /** The chapters as they stand, when a plan is regenerated: the ones it keeps keep their ids. */
+    existing?: { id: string; title: string; abstract: string }[];
   }): Promise<GenerateOutlineResponse> {
     return apiFetch('/api/generate-outline', {
       method: 'POST',
