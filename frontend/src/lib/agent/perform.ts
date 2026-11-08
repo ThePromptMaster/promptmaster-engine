@@ -63,6 +63,7 @@ import { delegationSentences } from './delegation';
 import { touchesObjective } from './stop-audit';
 import { createTask, listTasks } from '@/lib/supabase/tasks';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
+import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
@@ -2596,6 +2597,12 @@ async function recheckManuscript(
   const wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline });
   if (wrote.status !== 'succeeded') return wrote;
   await ctx.refresh?.();
+  // "Repaired" is not taken on trust (8 Nov, production: "Repaired 14 sections"
+  // twice, and the pension clause's section number never changed). What was
+  // to change is looked for in what was written; if it isn't there the stage
+  // stays reopened and the step says what didn't land.
+  const notLanded = await chaptersNotLanded(ctx, fresh.id, target.label, why, superseded);
+  if (notLanded) return done(key, { ...wrote, status: 'failed', output: `${wrote.output} ${notLanded}` });
   const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
   // The chapters as the repair left them, not as this step found them: the
@@ -2639,6 +2646,40 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
     await ctx.refresh?.();
   } catch {
     // The document stands; the task list is a convenience beside it.
+  }
+}
+
+/** Whether the reason a manuscript was reopened names corrections, rather than only that something upstream moved. */
+const NAMES_A_CORRECTION = /\b(?:correct(?:ed|ion|ions)?|replace|cite|fix|fixes|left this to me)\b/i;
+
+/**
+ * What a chapter repair should have changed and didn't, in one sentence, or
+ * null. A superseded value still stated as current is found in code; a named
+ * correction is confirmed against the text by quote.
+ */
+async function chaptersNotLanded(
+  ctx: PerformContext,
+  artifactId: string,
+  label: string,
+  why: string,
+  superseded: readonly SupersededValue[]
+): Promise<string | null> {
+  const chapters = (await getArtifact(artifactId))?.long_form?.outline ?? [];
+  const whole = chapters.map((s) => s.content ?? '').join('\n\n');
+  const still = chapters.flatMap((s) => namedLeftovers(leftoverMentions(s.content ?? '', superseded, { derivedIn: whole })).map((l) => `${s.title}: ${l.text}`));
+  if (still.length) return `It still states old values, so ${label} stays reopened: ${still.slice(0, 4).join('; ')}.`;
+  if (!NAMES_A_CORRECTION.test(why) || !whole.trim()) return null;
+  try {
+    const res = await api.agentCheckDeliverable(
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content: whole, accepted: [{ id: 'correction', stage_label: 'Repair', finding: why, suggested_change: why }], tables: [], model: ctx.project.model || undefined },
+      ctx.signal
+    );
+    const miss = res.findings.find((f) => f.verdict === 'not_carried');
+    return miss ? `The correction is not in the text yet, so ${label} stays reopened: ${miss.note || why.slice(0, 200)}${miss.quote ? ` — it still says "${miss.quote}"` : ''}.` : null;
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e;
+    // A check that could not run concludes nothing, here as everywhere.
+    return null;
   }
 }
 
@@ -2999,14 +3040,22 @@ async function checkDeliverable(
       { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), ...(noteQuotes.length ? { note_quotes: noteQuotes } : {}), model: ctx.project.model },
       ctx.signal
     );
-    const issues = [...issuesFrom(res, rows, label), ...(claim ? [claim] : [])];
+    const issues = [...issuesFrom(res, rows, label), ...(claim ? [claim] : []), ...ownChecks(content, label)];
     const carried = res.findings.filter((f) => f.verdict === 'carried').length;
     const accepted = rows.length - res.findings.filter((f) => f.verdict === 'not_applicable').length;
     const part = res.total_chars && (res.read_chars ?? res.total_chars) < res.total_chars ? { read: { chars: res.read_chars ?? 0, total: res.total_chars } } : {};
     return { ...at, accepted, carried, issues, ...part, ...(issues.length && rounds >= MAX_CHECK_ROUNDS ? { bounded: true } : {}) };
   } catch {
-    return { ...at, accepted: rows.length, carried: 0, issues: claim ? [claim] : [], failed: true };
+    return { ...at, accepted: rows.length, carried: 0, issues: [...(claim ? [claim] : []), ...ownChecks(content, label)], failed: true };
   }
+}
+
+/** What code alone finds wrong in a finished text: sums that don't come out, the model's own working left in (8 Nov). */
+function ownChecks(content: string, label: string): string[] {
+  return [
+    ...arithmeticSlips(content).map((slip) => `${label}: arithmetic: ${slip}`),
+    ...strayWorkingText(content).map((line) => `${label}: the model's own working is still in the text: "${line}"`),
+  ];
 }
 
 /**
