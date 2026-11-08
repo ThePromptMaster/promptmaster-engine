@@ -35,6 +35,8 @@ class AcceptedFact(BaseModel):
     source: str = Field(default="", max_length=300)
     #: The statement this one superseded, when it did: a value no longer true.
     replaces: str = Field(default="", max_length=2_000)
+    #: "model_assumed" when PromptMaster supplied it rather than the user; absent otherwise (8 Nov).
+    origin: str = Field(default="", max_length=40)
 
 
 class WebSource(BaseModel):

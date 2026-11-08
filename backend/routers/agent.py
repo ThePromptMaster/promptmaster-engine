@@ -15,6 +15,7 @@ agent_run authorization the database checks (B1).
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -41,6 +42,7 @@ from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdic
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
+from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
@@ -50,6 +52,8 @@ from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import DataFileBrief, PMInput
 from routers._errors import llm_http_error
 from routers.stage import _model_used
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -466,6 +470,17 @@ async def api_expert_package(req: ExpertPackageRequest, client: OpenRouterClient
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return ExpertPackageResponse(**result.model_dump(), model_used=_model_used(req.model, client), **dict(web))
+
+
+@router.post("/screen-question", response_model=ScreenQuestionResponse)
+async def api_screen_question(req: ScreenQuestionRequest, client: OpenRouterClient = Depends(get_client)) -> ScreenQuestionResponse:
+    """Does the question Go wants to ask really need the user? 1 small LLM call;
+    commits nothing. Any failure answers "ask", so a decision is never taken away."""
+    try:
+        return await screen_question(client, req)
+    except Exception:  # noqa: BLE001 - the safe answer to any failure here is to ask
+        logger.warning("Question screen failed; the question will be asked", exc_info=True)
+        return ScreenQuestionResponse(reason="The screen could not run, so the question is asked.")
 
 
 @router.post("/check-answer")
