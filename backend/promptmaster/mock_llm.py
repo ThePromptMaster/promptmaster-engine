@@ -383,6 +383,16 @@ def _json_reply(system: str, prompt: str) -> dict:
             # "[[mock:draft]]" asks for a piece of writing: it comes back apart from the reply.
             **({"draft": "Hi team — lunch is on Wednesday at 1:00 p.m. Bring your own; coming is optional."} if "[[mock:draft]]" in said else {}),
         }
+    if system.startswith("You decide whether a piece of work needs a search of the person's own email"):
+        # Accounts (8 Nov): typed searches always search, and elsewhere only work that
+        # names "[[mock:accounts]]" does, so a run that never asked is unchanged.
+        typed = "always search" in system
+        asked = prompt.split("THE WORK TO DO NOW:", 1)[-1].split("Does this need", 1)[0]
+        wants = typed or "[[mock:accounts]]" in prompt
+        words = " ".join(w for w in re.findall(r"[\w']+", asked.replace("[[mock:accounts]]", ""))[:3])
+        return {"search": wants, "words": words if wants else ""}
+    if system.startswith("You choose which of a person's emails, meetings and files to open"):
+        return {"open": [1, 2, 3]}
     if system.startswith("You decide whether a piece of work for a PromptMaster project needs a search"):
         # Every writer may search (22 Oct). Scripted runs search only when the
         # work names "[[mock:web]]", so a run that never asked is unchanged.

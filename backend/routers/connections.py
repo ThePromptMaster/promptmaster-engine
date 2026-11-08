@@ -5,9 +5,9 @@ keyed by the caller's Supabase user id, and this stores nothing. Every route
 that takes a connection id checks it belongs to the caller before using it:
 Composio's callback parameters alone are not proof of ownership.
 
-Reads happen only when someone presses a button, and come in two steps
-(preview without contents, then the text of what was ticked). Nothing here
-calls a model. A check-like route, not a writer: no `web_access`.
+A search covers the whole account (8 Nov, L-203; `promptmaster.account_search`):
+two small model calls write it and choose what to open. The other routes call no
+model. Not a writer: no `web_access`.
 """
 
 from __future__ import annotations
@@ -19,9 +19,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import AuthUser, require_user
-from deps import get_composio
+from deps import get_client, get_composio
+from promptmaster.account_search import active_toolkits, search_accounts
 from promptmaster.composio_client import Account, Composio, ComposioError
 from promptmaster.connections import (
+    MAX_ATTENDEES,
     MAX_PICKED,
     PROVIDER,
     TOOLKITS,
@@ -34,6 +36,8 @@ from promptmaster.connections import (
     preview,
     read,
 )
+from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
+from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 
 router = APIRouter(prefix="/api/connections", tags=["connections"])
 
@@ -108,6 +112,22 @@ class ReadResponse(BaseModel):
     items: list[ConnectedText]
     files: list[ConnectedFile]
     skipped: list[Skipped]
+
+
+class SearchRequest(BaseModel):
+    #: What they typed. Empty means what is going on now.
+    words: str = Field(default="", max_length=MAX_CHAT_MESSAGE_CHARS)
+    #: A meeting to prepare for: it, and what the mailbox holds about it.
+    meeting: PickedItem | None = None
+    people: list[str] = Field(default_factory=list, max_length=MAX_ATTENDEES)
+
+
+class SearchResponse(ReadResponse):
+    #: The words searched for, or "" when nothing was typed.
+    query: str = ""
+    problems: list[Problem]
+    #: How many it found, whether or not they were opened.
+    matches: int = 0
 
 
 def _out(a: Account) -> ConnectionOut:
@@ -217,6 +237,28 @@ async def api_preview(
     except ComposioError:
         raise HTTPException(status_code=502, detail=UNREACHABLE)
     return PreviewResponse(items=items, problems=problems)
+
+
+@router.post("/search")
+async def api_search(
+    req: SearchRequest,
+    user: AuthUser = Depends(connecting_user),
+    composio: Composio = Depends(get_composio),
+    client: OpenRouterClient = Depends(get_client),
+) -> SearchResponse:
+    """Search the whole of every connected account and read the best matches."""
+    try:
+        toolkits = await active_toolkits(composio, user.id)
+        opened = await search_accounts(
+            client, composio, user.id, toolkits, words=req.words, meeting=req.meeting,
+            people=req.people, own_address=user.email or "",
+        )
+    except (ComposioError, OpenRouterError):
+        raise HTTPException(status_code=502, detail=UNREACHABLE)
+    return SearchResponse(
+        query=opened.said, items=opened.items, files=opened.files, skipped=opened.skipped,
+        problems=opened.problems, matches=opened.matches,
+    )
 
 
 @router.post("/read")

@@ -16,7 +16,10 @@ from promptmaster.web_search import WebAccess, strip_unknown_citations, with_web
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from deps import get_client
+from deps import account_owner, get_client, optional_composio
+from promptmaster.account_search import allowed_links, with_accounts
+from promptmaster.composio_client import Composio
+from promptmaster.source_access import without_foreign_links
 from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.reader_text import split_user_note
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
@@ -31,6 +34,7 @@ from promptmaster.schemas import (
     StageDescriptor,
     StageDigest,
     StageEvaluationResponse,
+    StageItem,
     StageItemSchema,
 )
 from promptmaster.dependent_claims import DependentClaimsRequest, DependentClaimsResponse, dependent_claims
@@ -71,6 +75,9 @@ class GenerateStageArtifactRequest(BaseModel):
     #: The project's Web access switch (22 Oct): on, the stage searches the
     #: web first when its work needs outside facts.
     web_access: WebAccess = "off"
+    #: The project's "Search my accounts" switch (8 Nov, L-203). Only a draft the
+    #: person asked for sends it, never Go, and outlines and chapters don't search.
+    account_search: Literal["on", "off"] = "off"
     #: On a check stage: what code counted on the written work it checks (4 Nov).
     measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
     #: One part of a long revision that reports on the rest: the whole document as
@@ -82,6 +89,8 @@ class GenerateStageArtifactRequest(BaseModel):
 async def api_generate_stage_artifact(
     req: GenerateStageArtifactRequest,
     client: OpenRouterClient = Depends(get_client),
+    composio: Composio | None = Depends(optional_composio),
+    owner: str | None = Depends(account_owner),
 ) -> GenerateStageArtifactResponse:
     """Draft one stage's artifact. 1 LLM call.
 
@@ -90,14 +99,16 @@ async def api_generate_stage_artifact(
     produce audience segments, and costs four calls where one will do.
     """
     try:
+        own_task = "\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint) if t.strip())
+        with_items, accounts = await with_accounts(client, composio, owner, req.inputs, req.account_search, task=own_task)
         inputs, web = await with_web(
             client,
             req.model or None,
-            req.inputs,
+            with_items,
             req.web_access,
             task="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint, req.instruction) if t.strip()),
             # Go writes instructions too, having read the items: the stage's own words then.
-            task_if_held="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint) if t.strip()),
+            task_if_held=own_task,
             current=req.existing_content,
         )
         result = await generate_stage_artifact(
@@ -123,7 +134,16 @@ async def api_generate_stage_artifact(
         # returned beside the work — never saved as the end of the document.
         result.content, result.note_to_user = split_user_note(result.content)
         result.content = without_repeated_catchphrases(result.content)
-    return result.model_copy(update=dict(web))
+    if inputs.third_party:
+        # In a project holding other people's words, links only from the person or a saved source (L-200).
+        allowed = allowed_links(inputs, [req.instruction, req.existing_content])
+        result.content = without_foreign_links(result.content, allowed)
+        result.note_to_user = without_foreign_links(result.note_to_user, allowed)
+        result.items = [
+            StageItem(**{k: without_foreign_links(v, allowed) if isinstance(v, str) else v for k, v in row.model_dump().items()})
+            for row in result.items
+        ]
+    return result.model_copy(update={**dict(web), **dict(accounts)})
 
 
 class EvaluateStageArtifactRequest(BaseModel):

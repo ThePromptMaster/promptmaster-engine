@@ -3,8 +3,9 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 
+from auth import AuthUser, require_user
 from promptmaster.composio_client import Composio, NotConfigured, build_composio
 from promptmaster.llm_client import OpenRouterClient
 
@@ -63,3 +64,18 @@ def get_composio() -> Composio:
         return build_composio()
     except NotConfigured as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+def optional_composio() -> Composio | None:
+    """The Composio client, or None on a server with no key: a writer then simply doesn't search accounts."""
+    try:
+        return build_composio()
+    except NotConfigured:
+        return None
+
+
+def account_owner(user: AuthUser | None = Depends(require_user)) -> str | None:
+    """The caller's id when their connected accounts may be searched. Never a guest's or a worker's."""
+    if user is None or user.is_anonymous or user.role == "worker":
+        return None
+    return user.id
