@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { planFromScreen, shouldScreen, type QuestionScreen } from './question-screen';
+import { findingAsQuestion, planFromScreen, shouldScreen, type QuestionScreen } from './question-screen';
 
 const screen = (over: Partial<QuestionScreen>): QuestionScreen => ({ verdict: 'business_decision', reason: 'Why.', instruction: '', target_stage: '', action: '', requirement_quote: '', ...over });
 const base = {
@@ -68,3 +68,11 @@ describe('what happens to a question once read (8 Nov)', () => {
     expect(planFromScreen(screen({ verdict: 'routine_repair', instruction: '  ' }), base)).toEqual({ kind: 'ask' });
   });
 });
+
+describe('a major finding read as the question it would be (8 Nov, production)', () => {
+  it('asks whether to make the change', () => {
+    expect(findingAsQuestion({ finding: 'Length is not verified.', suggested_change: 'Use one staffing table.' })).toBe('A check on this project found: "Length is not verified." Suggested change: "Use one staffing table." Should this change be made?');
+    expect(findingAsQuestion({ finding: 'A problem.' })).toBe('A check on this project found: "A problem." Should this change be made?');
+  });
+});
+

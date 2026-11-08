@@ -60,7 +60,7 @@ import { delegationSentences } from '@/lib/agent/delegation';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
-import { planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
+import { findingAsQuestion, MAX_FINDINGS_SCREENED, planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
 import { createTask } from '@/lib/supabase/tasks';
 import { approvalStandsThroughRepairs } from '@/lib/workflow/approvals';
 import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
@@ -371,6 +371,8 @@ export function useGoLoop(opts: Options) {
    * on, and re-reading the same three steps made it an instant dead end.
    */
   const sinceRef = useRef(0);
+  /** Major findings already read this session: a verdict is not paid for twice. */
+  const screenedFindingsRef = useRef(new Map<string, boolean>());
   /**
    * What the project was after each performed move since the last Go/Resume
    * (`stateFingerprint`). Three in a row the same is a run going round in
@@ -722,6 +724,30 @@ export function useGoLoop(opts: Options) {
           events: freshEvents, latestEvaluation: o.latestEvaluation,
         });
         if (signal.aborted) throw new Stopped();
+        // A "major" finding is often a routine correction, and major alone sent it
+        // to the user (8 Nov, production: "length is not verified" stopped a run).
+        // Read once each; anything not clearly routine stays theirs.
+        if (facts.review?.material.length && current.policy === 'autonomous' && o.project.routine_decisions === 'handle' && !facts.review.outcome) {
+          const moved: typeof facts.review.material = [];
+          for (const row of facts.review.material.slice(0, MAX_FINDINGS_SCREENED)) {
+            const key = `${o.stage.id}:${row.id}`;
+            let routineRow = screenedFindingsRef.current.get(key);
+            if (routineRow === undefined) {
+              const screen = await api.agentScreenQuestion({
+                inputs: inputsFrom(o.project), question: findingAsQuestion(row), stage_label: o.stage.label, earlier_stages: [], reserved_approvals: [],
+                delegation: delegationSentences(o.project), model: o.project.model,
+              }, signal).catch(() => null);
+              if (signal.aborted) throw new Stopped();
+              routineRow = screen?.verdict === 'routine_repair';
+              screenedFindingsRef.current.set(key, routineRow);
+            }
+            if (routineRow) moved.push(row);
+          }
+          if (moved.length) {
+            facts.review.routine = [...facts.review.routine, ...moved];
+            facts.review.material = facts.review.material.filter((r) => !moved.includes(r));
+          }
+        }
         // What the project has already decided, from its own records (1 Oct, item 20).
         const memory = await readMemory(o, [...priorStepsRef.current, ...stepsRef.current]);
 
