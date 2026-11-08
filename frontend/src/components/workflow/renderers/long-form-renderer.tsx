@@ -256,7 +256,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       // through the store when the workspace provides it, so it is in the
       // bundle at once; the raw write is only for a caller without one.
       await enqueueRevisionJobs({
-        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets, stageHint,
+        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets, stageHint, jobs,
         saveSnapshot: (snapshot) =>
           appendManuscriptVersion
             ? appendManuscriptVersion(snapshot)

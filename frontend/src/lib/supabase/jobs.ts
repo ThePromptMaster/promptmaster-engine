@@ -63,9 +63,11 @@ export function inputsFromProject(project: Project): PMInput {
 export function sectionJobKey(
   outlineVersionId: string | null,
   sectionId: string,
-  revision: number
+  revision: number,
+  /** Past a stopped job at this revision: a fresh row, or the retry collides with the dead one and quietly does nothing. */
+  retry = 0
 ): string {
-  return `draft:${outlineVersionId ?? 'none'}:${sectionId}:${revision}`;
+  return `draft:${outlineVersionId ?? 'none'}:${sectionId}:${revision}${retry ? `:retry${retry}` : ''}`;
 }
 
 export async function listProjectJobs(projectId: string): Promise<ProjectJob[]> {
@@ -88,6 +90,8 @@ export interface EnqueueSectionArgs {
   sectionIndex: number;
   /** Bumped by a user-requested regenerate; otherwise the section's own. */
   revision: number;
+  /** How many jobs at this revision already stopped for good. */
+  retry?: number;
   /** Revision and Editing stages: rewrite the section with these notes. */
   revise?: SectionRevisePayload;
   /** The stage's `entry_prompt_hint`, for the chapter prompt. */
@@ -141,7 +145,7 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
   const { data, error } = await supabase.rpc('enqueue_job', {
     p_project_id: args.project.id,
     p_kind: DRAFT_SECTION,
-    p_idempotency_key: sectionJobKey(args.outlineVersionId, args.sectionId, args.revision),
+    p_idempotency_key: sectionJobKey(args.outlineVersionId, args.sectionId, args.revision, args.retry),
     p_payload: payload,
     // Earlier sections first: section N+1's prompt depends on N's record, so
     // the queue order is a correctness property.
