@@ -1,3 +1,4 @@
+import type { QuestionScreen } from '@/lib/agent/question-screen';
 import type {
   PMInput,
   AssembledPrompt,
@@ -924,6 +925,14 @@ export const api = {
    * Whether the objective is met by what the project holds, before Go may say
    * so (6 Oct, email 13). Commits nothing.
    */
+  /** Does a question Go wants to ask need the user at all? Answers "ask" on any failure. */
+  async agentScreenQuestion(
+    req: { inputs: PMInput; question: string; stage_label: string; earlier_stages: string[]; reserved_approvals: string[]; delegation: string[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<QuestionScreen> {
+    return apiFetch('/api/agent/screen-question', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** L-65: is a claim the answer makes about the saved record borne out by it? Fails open. */
   async agentCheckAnswer(
     req: { question: string; answer: string; documents: { label: string; version?: number | null; text: string }[]; model?: string },

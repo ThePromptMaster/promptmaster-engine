@@ -60,9 +60,11 @@ import { delegationSentences } from '@/lib/agent/delegation';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
+import { planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
+import { createTask } from '@/lib/supabase/tasks';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -576,6 +578,46 @@ export function useGoLoop(opts: Options) {
     abortRef.current = controller;
     const { signal } = controller;
     setError(null);
+    /**
+     * Whether a question or a block needs the user at all (8 Nov). A real-world
+     * action is recorded here, so the caller only has a repair to carry out or a
+     * question to ask.
+     */
+    const screenStop = async (o: Options, stage: StageDefinition, question: string, allowed: readonly string[], expert: boolean): Promise<ScreenPlan> => {
+      const current = runRef.current!;
+      const routine = o.project.routine_decisions ?? 'ask';
+      const steps = [...priorStepsRef.current, ...stepsRef.current];
+      const recordedHere = stepsRef.current.filter((s) => s.stage_id === stage.id && s.action_key === ROUTINE_DEFAULT_STEP && s.params?.real_world === true).length;
+      if (!shouldScreen({ policy: current.policy, routine, question, recordedHere, expert })) return { kind: 'ask' };
+      const at = o.template.stages.findIndex((s) => s.id === stage.id);
+      const screen = await api.agentScreenQuestion({
+        inputs: inputsFrom(o.project), question, stage_label: stage.label,
+        earlier_stages: o.template.stages.slice(0, Math.max(at, 0)).map((s) => s.label),
+        reserved_approvals: stage.exit_criteria.filter((c) => c.check === 'manual' && c.authority !== 'delegable').map((c) => c.label),
+        delegation: delegationSentences(o.project), model: o.project.model,
+      }, signal).catch(() => null);
+      if (signal.aborted) throw new Stopped();
+      if (!screen) return { kind: 'ask' };
+      const made = steps.filter((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded').length;
+      const plan = planFromScreen(screen, { question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made });
+      if (plan.kind !== 'record') return plan;
+      const step = await startAgentStep({
+        runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+        stageId: stage.id, mode: modeForStage(o.project, stage), actionKey: ROUTINE_DEFAULT_STEP,
+        params: { question: question.slice(0, 1000), real_world: true },
+        rationale: `Instead of asking "${question.slice(0, 200)}": ${plan.reason || 'this is something to do outside the document.'}`,
+        expectedOutcome: 'Recorded as still to do, and the document carries on.', needsDecision: false, decisionQuestion: null,
+      });
+      upsertStep(step);
+      let output = `Recorded as still to do in the real world: ${plan.action}`;
+      try {
+        await createTask(o.project.id, o.project.user_id, { title: plan.action.slice(0, 240), detail: question.slice(0, 1000), stage: stage.id, origin: 'system' });
+      } catch (e) {
+        output = `Could not record it (${(e as Error).message}), so it is asked instead.`;
+      }
+      upsertStep(await finishAgentStep(step.id, { status: output.startsWith('Could not') ? 'failed' : 'succeeded', label: null, output }));
+      return output.startsWith('Could not') ? { kind: 'ask' } : plan;
+    };
     try {
       for (;;) {
         if (signal.aborted) throw new Stopped();
@@ -1038,6 +1080,14 @@ export function useGoLoop(opts: Options) {
             await setRunStatus('awaiting_decision', repeatPause(repeat, o.stage.label, question), { kind: 'answer_question', question, repeat: true });
             break;
           }
+          const screenPlan = await screenStop(o, o.stage, question, allowed, Boolean(choice.params?.expert_package) || needsExpert(question));
+          if (screenPlan.kind === 'record') {
+            await o.onRefresh?.();
+            continue;
+          }
+          if (screenPlan.kind === 'repair') {
+            Object.assign(choice, { ...screenPlan.move, needs_user_decision: false, decision_question: null });
+          } else {
           const { audit, instead } = auditStop({
             question, stageLabel: o.stage.label, nextStageLabel: nextId ? stageLabelFor(nextId) : null,
             allowed, canAdvance: stageEvaluation.canAdvance, policy: current.policy, routine,
@@ -1066,6 +1116,16 @@ export function useGoLoop(opts: Options) {
               if (pkg) choice.params = { ...choice.params, expert_package: packageMarkdown(pkg, o.project.title) };
             }
           }
+          }
+        }
+        // Marked stuck is a stop too, and gets the same reading (8 Nov).
+        if (!required && actionFor(choice.action_key)?.performer === 'block') {
+          const blockPlan = await screenStop(o, o.stage, String(choice.params?.reason ?? choice.rationale ?? ''), allowed, false);
+          if (blockPlan.kind === 'record') {
+            await o.onRefresh?.();
+            continue;
+          }
+          if (blockPlan.kind === 'repair') Object.assign(choice, { ...blockPlan.move, needs_user_decision: false, decision_question: null });
         }
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(
