@@ -181,3 +181,63 @@ describe('a figure worked out from current values may equal an old one (2 Nov, p
     expect(named[0].value.now).toBe('The minimum unspent reserve is $800, replacing $400.');
   });
 });
+
+describe('a superseded price is caught only where it applies (7 Nov, production, a rollout plan)', () => {
+  const fact = (id: string, statement: string, supersedes: string | null, retired: string | null = null): ProjectFact => ({
+    id, project_id: 'p', user_id: 'u', statement, subject: null, kind: 'fact', source_kind: 'user_edit', source_ref: {},
+    accepted_by: 'user', agent_run_id: null, supersedes, retired_at: retired, retired_reason: null, created_at: '2026-11-07T23:24:00Z',
+  });
+  const superseded = supersededFactValues([
+    fact('old', 'Data migration: $8,000 fixed.', null, '2026-11-07T23:24:00Z'),
+    fact('new', 'Data migration: $13,000 fixed, including data-quality assessment and all required cleansing.', 'old'),
+  ]);
+  // The lines the repair of the plan was refused for, as saved.
+  const plan = [
+    '| Training, 8 sessions × $1,000 | 8 × $1,000 = **$8,000** | Conditional booking after G2 |',
+    '| **Committed** | $43,000 + $8,000 = **$51,000** | |',
+    'The $8,000 training line now shows its working from current values.',
+  ].join('\n');
+
+  it('passes the worked-out training cost, bold or not', () => {
+    expect(superseded.map(describeValue)).toEqual(['$8000']);
+    expect(leftoverMentions(plan, superseded)).toEqual([]);
+    expect(derivedValues('8 × $1,000 = **$8,000**').has('8000')).toBe(true);
+    expect(derivedValues('8 × $1,000 = __$8,000__').has('8000')).toBe(true);
+  });
+
+  it('still catches the old migration price, labelled or in a sentence, beside the same training line', () => {
+    for (const line of ['Data migration: $8,000', '| Data migration | $8,000 | Fixed |', '| **Data migration** | **$8,000** | Fixed |', 'Migration costs $8,000.']) {
+      expect(leftoverValues(`${plan}\n${line}`, superseded).map(describeValue)).toEqual(['$8000']);
+    }
+  });
+
+  it('a row labelled as something else is not the migration price, even with nothing worked out', () => {
+    expect(leftoverValues('| Training | $8,000 |', superseded)).toEqual([]);
+    expect(leftoverValues('Training: $8,000 for the eight sessions.', superseded)).toEqual([]);
+  });
+
+  it('a sentence with no label of its own is read strictly', () => {
+    expect(leftoverValues('We spend $8,000 in Week 5.', superseded).map(describeValue)).toEqual(['$8000']);
+  });
+
+  it('an old figure with no label of its own is read strictly: a row called Price is still the old price', () => {
+    const s = supersededValues('TeamNotes launches November 12, 2026 at $12 per user per month', 'TeamNotes launches November 12, 2026 at $15 per user per month');
+    expect(leftoverValues('| Price | $12 |', s).map(describeValue)).toEqual(['$12']);
+  });
+
+  it('never exempts an operand, or a key in serialised rows', () => {
+    const labelled = supersededValues('Ticket price: $40', 'Ticket price: $30');
+    expect(leftoverValues('Revenue at 8 paid: 8 × $40 = $320.', labelled).map(describeValue)).toEqual(['$40']);
+    expect(leftoverValues('{"finding":"Keep the $40 ticket."}', labelled).map(describeValue)).toEqual(['$40']);
+    expect(leftoverValues('{"item":"Training: $40"}', labelled).map(describeValue)).toEqual(['$40']);
+  });
+
+  it('a multiplication sign is not taken for emphasis', () => {
+    expect([...derivedValues('2 * $4 * 5 = $40')]).toEqual(['40']);
+  });
+
+  it('the message quotes the line as it is written', () => {
+    const named = namedLeftovers(leftoverMentions('**Data migration:** $8,000 this year.', superseded));
+    expect(named[0].text).toContain('**Data migration:**');
+  });
+});

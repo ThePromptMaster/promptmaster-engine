@@ -209,6 +209,16 @@ const BOUND = /(?<![\p{L}\p{N}])\p{L}\s*(?:≤|≥|<=|>=|<|>)\s*/gu;
 const FIGURE = /^\(?\s*((?:[$€£]\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:usd|dollars?|eur|euros?|gbp|pounds?)\b)?)/i;
 
 /**
+ * Paired emphasis taken off, so "= **$8,000**" reads as a figure (7 Nov,
+ * production, a rollout plan: "8 × $1,000 = **$8,000**" for training was read
+ * as the old $8,000 migration price, and three repairs failed on it). A lone
+ * "*" is a multiplication sign and stays.
+ */
+function withoutEmphasis(text: string): string {
+  return text.replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2');
+}
+
+/**
  * The amounts and plain numbers a text works out as results — "$1,200 − $800
  * = $400", "c ≤ $40" — keyed by value alone, since a derived "40" and "$40"
  * are the same figure (2 Nov, Sean, photography workshop: the spendable $400
@@ -225,7 +235,8 @@ export function derivedValues(text: string): Set<string> {
     const v = valueMentions(m[1]).find((x) => x.kind === 'money' || x.kind === 'numbers');
     if (v) out.add(v.value);
   };
-  for (const piece of sentencesOf(text)) {
+  for (const raw of sentencesOf(text)) {
+    const piece = withoutEmphasis(raw);
     for (const m of piece.matchAll(RESULT)) {
       const left = piece.slice(0, m.index);
       if (/\d/.test(left) && OPERATOR.test(left)) add(piece.slice(m.index! + m[0].length));
@@ -271,6 +282,48 @@ function boundToSubject(piece: string, s: SupersededValue, subject: readonly str
     }
   }
   return false;
+}
+
+/** "Data migration" in "Data migration: $8,000 fixed.", as words; empty when the old figure had no label of its own. */
+function labelOfOldFigure(s: SupersededValue): string[] {
+  const said = answered(s.was);
+  const raw = valueMentions(said).find((m) => m.kind === 'money' && m.value === s.value)?.raw;
+  if (!raw) return [];
+  const clause = said.slice(0, said.indexOf(raw)).split(/[.;\n]/).at(-1) ?? '';
+  const label = /^\s*(.+?)\s*[:—–=]\s*$/u.exec(clause)?.[1] ?? '';
+  return labelWords(label);
+}
+
+function labelWords(label: string): string[] {
+  return [...new Set((label.match(/\p{L}{4,}/gu) ?? []).map(stem).filter((w) => !STOPWORDS.has(w)))];
+}
+
+/** What a table row or a "Label: value" line says it is about. */
+function pieceLabel(piece: string): string {
+  const cell = /^\s*\|\s*([^|]+?)\s*\|/.exec(piece)?.[1];
+  if (cell !== undefined) return cell;
+  return /^\s*(?:[-*+]\s+)?(\p{L}[^:|]{1,48}?):\s/u.exec(piece)?.[1] ?? '';
+}
+
+/**
+ * A line that labels itself as being about something else than the figure the
+ * fact replaced: "| Training | $8,000 |" is not the old "Data migration:
+ * $8,000". Money only, only when the old figure carried a label of its own, and
+ * never where the figure is an operand: "Revenue at 8 paid: 8 × $40 = $320" uses
+ * the old $40, whatever the line calls itself.
+ */
+function aboutSomethingElse(piece: string, s: SupersededValue): boolean {
+  if (s.kind !== 'money') return false;
+  const was = labelOfOldFigure(s);
+  const label = labelWords(pieceLabel(piece));
+  if (!was.length || !label.length || label.some((w) => was.some((x) => sameWord(w, x)))) return false;
+  const raws = valueMentions(piece).filter((m) => m.kind === 'money' && m.value === s.value).map((m) => m.raw);
+  return raws.length > 0 && raws.every((raw) => {
+    const at = piece.indexOf(raw);
+    const left = piece.slice(0, at).replace(/[\s(]+$/, '');
+    const right = piece.slice(at + raw.length).replace(/^[\s)]+/, '');
+    return !SIGN.test(left.slice(-1)) && !SIGN.test(right.charAt(0));
+  });
 }
 
 /** A piece as a message quotes it: no JSON key or quoting around it. */
@@ -343,20 +396,24 @@ export function leftoverMentions(
     return true;
   });
   const pieces = sentencesOf(kept.join('\n'));
+  // Rows of a table are serialised as JSON: a key before a colon is not a label.
+  const labelled = !/^\s*[[{]/.test(text);
   const out: LeftoverMention[] = [];
   for (const s of superseded) {
     const now = factValues(s.now)[s.kind].filter((v) => v !== s.value);
     const spanned = s.kind === 'dates' && new RegExp(RANGE.source, 'i').test(s.was);
     const coincident = (s.kind === 'money' || s.kind === 'numbers') && derived.has(s.value);
     const subject = coincident ? subjectWords(s.now) : [];
-    for (const p of pieces) {
+    for (const raw of pieces) {
+      const p = withoutEmphasis(raw);
       if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
       if (!found.includes(s.value) || now.some((v) => found.includes(v))) continue;
       // A figure the document works out is its own; only beside the fact's
       // own words is it the replaced one. A fact naming nothing is read strictly.
       if (coincident && subject.length && !boundToSubject(p, s, subject)) continue;
-      out.push({ value: s, sentence: quotable(p) });
+      if (labelled && aboutSomethingElse(p, s)) continue;
+      out.push({ value: s, sentence: quotable(raw) });
     }
   }
   return out;
