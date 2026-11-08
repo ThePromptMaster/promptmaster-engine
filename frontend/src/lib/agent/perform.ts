@@ -1184,7 +1184,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
       const st = target ? ctx.state.stages[target.id] : undefined;
       if (target?.renderer === 'long_form' && params.cut) return finishCutChapters(ctx, key, target);
-      if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, st.stale?.reason ?? 'something it relied on changed');
+      // What the user typed on the stuck card goes into the repair and is then
+      // looked for in what it wrote (`chaptersNotLanded`, the leftover checks).
+      const userNote = typeof params.user_note === 'string' ? params.user_note.trim() : '';
+      const withUserNote = (reason: string) => (userNote ? `${reason.replace(/[.\s]+$/, '')}. The user says what to fix: ${userNote}` : reason);
+      if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, withUserNote(st.stale?.reason ?? 'something it relied on changed'));
       // L-63 (9 Oct): a finished stage whose measured requirement fails
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
@@ -1204,11 +1208,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
       const superseded = supersededFactValues(ctx.project.facts);
-      const why = measuredRepair
+      const why = withUserNote(measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
         : carriedRepair
           ? `a review carried forward, as still unmet: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
-          : st?.stale?.reason ?? 'something it relied on changed';
+          : st?.stale?.reason ?? 'something it relied on changed');
       // L-64 (9 Oct): a manuscript is repaired by revising its sections with
       // the reason, each against its current saved record (C9).
       if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);

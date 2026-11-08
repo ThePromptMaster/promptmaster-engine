@@ -152,7 +152,7 @@ export function GoPanel({
       : go.run?.status === 'completed'
         ? t('go.nextNothing')
         : t('go.nextPress', { button });
-  const act = async (option?: StuckOption) => {
+  const act = async (option?: StuckOption, note?: string) => {
     if (!need) return;
     switch (need.kind) {
       case 'approve_outline':
@@ -244,7 +244,7 @@ export function GoPanel({
           needsActions?.openStage?.(need.stageId);
           return;
         }
-        await go.retryRepair(need.stageId);
+        await go.retryRepair(need.stageId, note);
         return;
       case 'decide_rows':
       case 'triage_findings':

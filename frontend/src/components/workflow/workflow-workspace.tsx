@@ -1629,6 +1629,7 @@ export function WorkflowWorkspace({
     drafting: generation.generating ? stage?.label : null,
     run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: goIsAsking(go.run.stop_reason) } : null,
     onCurrentStage: isCurrent,
+    repairFailed: !go.active && go.run?.needs?.kind === 'repair_stuck',
   });
   // A paused run holds the next move too: the page drafting Realign while Go
   // proposed skipping it, or Summary while Go waited for approval to draft it,
@@ -2464,7 +2465,7 @@ export function WorkflowWorkspace({
               {/* The recheck itself, from the stage that is waiting for it: the
                   same as "Apply and continue" — Go rechecks the changed stages
                   in order, before anything is asked of the final work. */}
-              {viewedStale && (
+              {viewedStale && !(go.run?.needs?.kind === 'repair_stuck') && (
                 <button
                   onClick={() => void continueWork()}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"

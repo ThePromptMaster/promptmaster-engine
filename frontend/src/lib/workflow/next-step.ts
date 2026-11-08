@@ -41,6 +41,8 @@ export interface NextActionInput {
   run: { status: string; ended_at: string | null; hasNeed: boolean; asking: boolean } | null;
   /** The open stage is the project's current one, where Go's own panel shows its card and Resume. */
   onCurrentStage: boolean;
+  /** Go's repairs of a stage failed and it is waiting on the user: its card is the way on. */
+  repairFailed?: boolean;
 }
 
 /**
@@ -60,6 +62,10 @@ export function nextAction(i: NextActionInput): NextAction | null {
   // A tester could not tell the AI was working: the only sign was far down the
   // page, below the brief and the facts, and looked like something to fill in.
   if (i.drafting) return { kind: 'working', label: tr('ns.drafting', { what: i.drafting }), why: '' };
+  // "Apply and continue" sat beside a failed repair (8 Nov, production), and
+  // would only have run the same repair again. Go's card says what failed and
+  // takes the correction; on any other stage this leads to it.
+  if (i.repairFailed) return i.onCurrentStage ? null : { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: tr('ns.goWaiting') };
   if (i.reopenedHere) {
     return {
       kind: 'apply_continue_reopened',
