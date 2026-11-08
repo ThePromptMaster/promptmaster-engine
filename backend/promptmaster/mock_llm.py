@@ -672,6 +672,9 @@ def _json_reply(system: str, prompt: str) -> dict:
         return {"is_long_form": True, "suggested_section_count": 3, "reason": "Mock: multi-section."}
     if system.startswith(long_form._OUTLINE_SYSTEM[:60]):
         return _outline(prompt)
+    if system.startswith(long_form._OUTLINE_REVISE_SYSTEM[:60]):
+        # Every chapter comes back as it was: the ids are read from the code's list.
+        return {"items": [], "restructure": ""}
     if system.startswith(long_form._RECORD_SYSTEM[:60]):
         return _section_record()
     if system.startswith(evaluator.EVALUATOR_SYSTEM[:60]):

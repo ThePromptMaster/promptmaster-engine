@@ -149,6 +149,55 @@ def build_outline_prompt(
     return _OUTLINE_SYSTEM, user
 
 
+_OUTLINE_REVISE_SYSTEM = (
+    "You update a chapter plan after something it was built on changed. The chapters already exist and "
+    "people may have written them, so the plan keeps its shape: every chapter stays, with its id. Change a "
+    "title or an abstract only as far as the change requires, and leave the rest word for word. Say what is "
+    "true now: no old figure stays beside its new one. Return JSON only."
+)
+
+
+def build_outline_revision_prompt(inputs: PMInput, items: list[OutlineItem], reason: str, governing: str = "") -> tuple[str, str]:
+    lines = "\n".join(f"- id {i.id}: {i.title} — {i.abstract}" for i in items)
+    user = (
+        f"Objective: {inputs.objective}\n"
+        f"Audience: {inputs.audience}\n"
+        f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}\n"
+        f"{_governing_block(governing)}"
+        f"WHAT CHANGED:\n{reason}\n\n"
+        f"THE CHAPTER PLAN AS IT STANDS:\n{lines}\n\n"
+        'Return {"items": [{"id": string, "title": string, "abstract": string}], "restructure": string}. '
+        "items holds every chapter above, with its id. Each abstract stays ONE short sentence. "
+        "restructure is empty unless the change means a chapter has to be added, removed or split: then say so, "
+        "in one sentence, and still return every chapter."
+    )
+    return _OUTLINE_REVISE_SYSTEM, user
+
+
+async def revise_outline(
+    client: OpenRouterClient,
+    model: str | None,
+    inputs: PMInput,
+    items: list[OutlineItem],
+    reason: str,
+    governing: str = "",
+) -> tuple[list[OutlineItem], str]:
+    """The plan's chapters with what changed carried in. Ids come from the plan, never the model."""
+    system, user = build_outline_revision_prompt(inputs, items, reason, governing)
+    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.2, max_tokens=4096, model=model)
+    returned = {str(r.get("id") or ""): r for r in (result.get("items") or []) if isinstance(r, dict)}
+    revised: list[OutlineItem] = []
+    for item in items:
+        r = returned.get(item.id, {})
+        revised.append(OutlineItem(
+            id=item.id,
+            title=str(r.get("title") or item.title).strip()[:500] or item.title,
+            abstract=str(r.get("abstract") or item.abstract).strip()[:4_000],
+        ))
+    return revised, str(result.get("restructure") or "").strip()[:400]
+
+
 async def generate_outline(
     client: OpenRouterClient,
     model: str | None,

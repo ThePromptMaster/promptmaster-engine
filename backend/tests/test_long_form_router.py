@@ -547,3 +547,32 @@ def test_a_first_outline_is_asked_for_as_before(client_for_app):
     assert "EXISTING CHAPTERS" not in prompt
     assert '{"title": string, "abstract": string}' in prompt
 
+
+def test_a_plan_is_revised_with_every_chapter_and_id_kept(client_for_app):
+    """7 Nov, production: a sponsor's change reopened the outline and Go could not repair it."""
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_json = AsyncMock(return_value=({"items": [
+        {"id": "s1", "title": "Brief", "abstract": "Now $58,000."},
+        {"id": "invented", "title": "New chapter", "abstract": "x"},
+    ], "restructure": ""}, {}))
+    r = api_client.post("/api/revise-outline", json={
+        "inputs": _basic_inputs_dict(),
+        "items": [{"id": "s1", "title": "Brief", "abstract": "Now $60,000."}, {"id": "s2", "title": "Plan", "abstract": "Stays."}],
+        "reason": "The budget moved to $58,000.",
+    })
+    assert r.status_code == 200
+    assert r.json()["items"] == [
+        {"id": "s1", "title": "Brief", "abstract": "Now $58,000."},
+        {"id": "s2", "title": "Plan", "abstract": "Stays."},
+    ]
+    prompt = mock_llm.generate_json.call_args.kwargs["prompt"]
+    assert "The budget moved to $58,000." in prompt and "id s2: Plan" in prompt
+
+
+def test_a_plan_that_must_change_shape_says_so(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_json = AsyncMock(return_value=({"items": [], "restructure": "A ninth document is needed."}, {}))
+    r = api_client.post("/api/revise-outline", json={"inputs": _basic_inputs_dict(), "items": [{"id": "s1", "title": "A", "abstract": "a"}], "reason": "x"})
+    assert r.json()["restructure"] == "A ninth document is needed."
+    assert r.json()["items"] == [{"id": "s1", "title": "A", "abstract": "a"}]
+

@@ -48,6 +48,7 @@ from promptmaster.long_form import (
     generate_outline,
     generate_section,
     generate_section_prose,
+    revise_outline,
 )
 from promptmaster.schemas import (
     ContinuitySnapshot,
@@ -230,6 +231,30 @@ async def api_generate_outline(
         return GenerateOutlineResponse(outline=outline, **dict(web))
     except (OpenRouterError, ValueError) as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+
+
+class ReviseOutlineRequest(BaseModel):
+    inputs: PMInput
+    items: list[OutlineItem] = Field(..., min_length=1, max_length=MAX_OUTLINE_SECTIONS)
+    reason: str = Field(..., min_length=1, max_length=MAX_INSTRUCTION_CHARS)
+    governing: str = Field(default="", max_length=20_000)
+    model: str = ModelField
+
+
+class ReviseOutlineResponse(BaseModel):
+    items: list[OutlineItem]
+    #: Set when the change means chapters have to be added or removed: the user's call.
+    restructure: str = ""
+
+
+@router.post("/revise-outline", response_model=ReviseOutlineResponse)
+async def api_revise_outline(req: ReviseOutlineRequest, client: OpenRouterClient = Depends(get_client)):
+    """Carry a change into a chapter plan, keeping every chapter and its id. 1 LLM call; saves nothing."""
+    try:
+        items, restructure = await revise_outline(client, req.model or None, req.inputs, req.items, req.reason, req.governing)
+    except (OpenRouterError, ValueError) as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return ReviseOutlineResponse(items=items, restructure=restructure)
 
 
 @router.post("/generate-section", response_model=GenerateSectionResponse)

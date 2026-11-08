@@ -674,3 +674,22 @@ describe('what the final check found unmet (8 Nov, production)', () => {
   });
 });
 
+describe('a reopened chapter plan under "handle them for me" (8 Nov, production)', () => {
+  const tpl = { stages: [
+    { id: 'plan', label: 'Chapter plan', renderer: 'outline', transitions: {} },
+    { id: 'docs', label: 'Documents', renderer: 'long_form', transitions: {} },
+  ] } as unknown as Parameters<typeof staleRepair>[0];
+  const state = { current_stage_id: 'docs', stages: { plan: { status: 'stale', stale: { reason: 'The budget changed.', since: 't' } }, docs: { status: 'stale', stale: { reason: 'x', since: 't' } } } } as unknown as Parameters<typeof staleRepair>[1];
+
+  it('is repaired before the chapters that follow it', () => {
+    const move = staleRepair(tpl, state, [], {}, new Set(), null, {}, true);
+    expect(move?.params).toEqual({ stage_id: 'plan', stale_since: 't' });
+  });
+
+  it('stays the user\'s otherwise: left out of the repairs, and named as theirs', () => {
+    expect(staleRepair(tpl, state, [], {}, new Set(), null, {}, false)?.params).toEqual({ stage_id: 'docs', stale_since: 't' });
+    expect(unrepairableStale(tpl as never, state as never)).toBe('plan');
+    expect(unrepairableStale(tpl as never, state as never, true)).toBeNull();
+  });
+});
+

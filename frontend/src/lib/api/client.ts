@@ -551,6 +551,14 @@ export const api = {
     });
   },
 
+  /** A change carried into a chapter plan, every chapter and id kept. One model call; saves nothing. */
+  async reviseOutline(
+    req: { inputs: PMInput; items: { id: string; title: string; abstract: string }[]; reason: string; governing?: string; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ items: { id: string; title: string; abstract: string }[]; restructure: string }> {
+    return apiFetch('/api/revise-outline', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async generateSection(req: {
     inputs: PMInput;
     outline: OutlineSection[];

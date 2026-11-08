@@ -133,6 +133,26 @@ export async function approveOutlineVersion(
   );
 }
 
+/**
+ * Carry the user's approval of a plan onto a version Go repaired after a change,
+ * with the same chapters (8 Nov). Recorded as the run's own act, naming the
+ * version it carries from. The database allows it only under an authorized
+ * autonomous run with routine decisions Go's to handle, after a user approved the
+ * plan once.
+ */
+export async function carryOutlineApproval(args: {
+  projectId: string; userId: string; stageId: string; runId: string; version: Pick<ArtifactVersion, 'id' | 'version_number' | 'artifact_id'>; carriedFrom: string;
+}): Promise<void> {
+  await appendWorkflowEvent(args.projectId, args.userId, {
+    type: 'outline_approved',
+    stage_id: args.stageId,
+    actor: 'system',
+    agent_run_id: args.runId,
+    reason: 'Your approval of this plan, carried onto the version Go updated after a change. The chapters are the same.',
+    payload: { outline_version_id: args.version.id, outline_version_number: args.version.version_number, artifact_id: args.version.artifact_id, carried_from_version_id: args.carriedFrom },
+  });
+}
+
 export interface OutlineApproval {
   outline_version_id: string;
   outline_version_number: number | null;

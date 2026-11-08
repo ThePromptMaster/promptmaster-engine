@@ -907,9 +907,10 @@ export function useGoLoop(opts: Options) {
           : null;
         // After a loop of repairs was withdrawn, the next choice is the
         // planner's, not the same repair forced again (13 Oct).
+        const outlineToo = current.policy === 'autonomous' && routine === 'handle';
         const repair = reconsider?.withdrawn.includes('recheck_stage')
           ? null
-          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])));
+          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])), outlineToo);
         if (repair) allowed.push('recheck_stage');
         // A reopened stage whose repairs are used up is the user's next
         // decision, said with what is unresolved (13 Oct, screenplay).
@@ -921,7 +922,7 @@ export function useGoLoop(opts: Options) {
         }
         // …and so is a reopened stage Go does not revise (a chapter plan),
         // once everything it can repair is repaired (2 Nov, production).
-        const byHand = repair ? null : unrepairableStale(o.template, o.state);
+        const byHand = repair ? null : unrepairableStale(o.template, o.state, outlineToo);
         if (byHand) {
           const stuck = { ...repairStuckNeed(o.state, byHand, [...priorStepsRef.current, ...stepsRef.current]), byHand: true };
           await setRunStatus('awaiting_decision', describeNeed(stuck, stageLabelFor).message, stuck);
