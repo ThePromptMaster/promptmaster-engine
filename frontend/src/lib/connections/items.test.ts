@@ -8,6 +8,8 @@ import {
   mergeThirdParty,
   rememberStartItems,
   takeStartItems,
+  toolkitFromSource,
+  toolkitLogoUrl,
   titlesOnly,
   rememberReturn,
   relatedTo,
@@ -150,5 +152,25 @@ describe('what a project holds from the accounts (7 Nov)', () => {
     expect(takeStartItems()).toEqual([a]);
     sessionStorage.setItem('pm.start.items', '{not json');
     expect(takeStartItems()).toEqual([]);
+  });
+});
+
+describe('which account an item came from', () => {
+  it('reads it off the source line the backend writes', () => {
+    expect(toolkitFromSource('Gmail · Dana Whitfield <dana@example.com> · 6 Nov 2026')).toBe('gmail');
+    expect(toolkitFromSource('Google Calendar · 10 Nov 2026, 14:00')).toBe('googlecalendar');
+    expect(toolkitFromSource('Google Drive')).toBe('googledrive');
+    expect(toolkitFromSource('Outlook calendar · 12 Nov 2026')).toBe('outlook');
+    expect(toolkitFromSource('OneDrive')).toBe('one_drive');
+  });
+
+  it('says nothing when the line names no account', () => {
+    expect(toolkitFromSource('')).toBeNull();
+    expect(toolkitFromSource(undefined)).toBeNull();
+    expect(toolkitFromSource('Gmailer · someone')).toBeNull();
+  });
+
+  it('points each logo at Composio', () => {
+    expect(toolkitLogoUrl('googledrive')).toBe('https://logos.composio.dev/api/googledrive');
   });
 });

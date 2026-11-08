@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api/client';
 import { setRequestLanguage } from '@/lib/api/language';
@@ -276,6 +277,7 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
                     onChange={() => toggle(item)}
                     className="mt-1"
                   />
+                  <ToolkitLogo slug={item.toolkit} size={18} className="mt-0.5 text-[var(--on-surface-variant)]" />
                   <label htmlFor={`item-${key}`} className="min-w-0 flex-1 cursor-pointer">
                     <span dir="auto" className="block truncate text-body text-[var(--on-surface)]">{item.title}</span>
                     <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">{sub}</span>
@@ -358,6 +360,7 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
             {chosen.map((item) => (
               <li key={itemKey(item)} className="rounded-xl bg-[var(--surface-container-low)] p-4">
                 <div className="flex items-start gap-2">
+                  <ToolkitLogo slug={item.toolkit} size={20} className="mt-0.5 text-[var(--on-surface-variant)]" />
                   <p dir="auto" className="min-w-0 flex-1 text-title text-[var(--on-surface)]">{item.title}</p>
                   <button
                     type="button"
