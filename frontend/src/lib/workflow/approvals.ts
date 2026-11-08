@@ -100,7 +100,8 @@ export function approvalsOnEarlierVersion(
       if (project.routine_decisions === 'handle' && c.authority === 'delegable') continue;
       const on = versions.find((v) => v.id === given[c.id]);
       if (!on || on.id === head.id || on.content === head.content) continue;
-      out.push({ stageId: stage.id, label: stage.short_label || stage.label, approval: c.label, version: on.version_number, current: head.version_number, since: versions.filter((v) => v.version_number > on.version_number).map((v) => (v.change_summary ?? '').split('\n')[0].slice(0, 160)).filter(Boolean) });
+      const since = versions.filter((v) => v.version_number > on.version_number).map((v) => (v.change_summary ?? '').split('\n')[0].slice(0, 160)).filter(Boolean);
+      out.push({ stageId: stage.id, label: stage.short_label || stage.label, approval: c.label, version: on.version_number, current: head.version_number, ...(since.length ? { since } : {}) });
     }
   }
   return out;

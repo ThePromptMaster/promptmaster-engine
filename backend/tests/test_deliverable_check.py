@@ -166,3 +166,22 @@ def test_quotes_the_note_makes_that_the_text_does_not_hold_are_put_to_the_check(
     assert "I'm approving it at 2:30, not 2." in user
     assert "A note may quote an earlier draft" in user
     assert "THE DOCUMENT'S OWN REVIEW NOTE QUOTES" not in build_prompt(INPUTS, "Book", "Text.", [])[1]
+
+
+def test_a_follow_through_gap_needs_only_its_own_passage():
+    raw = {"gaps": [
+        {"quote": "if pilot revenue holds at or above $8,000 a month, adopt B on a continuing basis.", "problem": "No basis for the threshold in the facts.", "fix": "Make it conditional."},
+        {"quote": "A sentence the memo does not hold.", "problem": "Invented."},
+        {"quote": "if pilot revenue holds at or above $8,000 a month, adopt B on a continuing basis.", "problem": ""},
+    ]}
+    got = parse(raw, INPUTS, MEMO, ACCEPTED).contradictions
+    assert [(c.rule_quote, c.conflicts_quote, c.problem) for c in got] == [
+        ("if pilot revenue holds at or above $8,000 a month, adopt B on a continuing basis.", "", "No basis for the threshold in the facts.")
+    ]
+
+
+def test_the_check_is_told_to_look_for_follow_through():
+    system, _user = build_prompt(INPUTS, "Final decision memo", MEMO, ACCEPTED)
+    for words in ("FOLLOW-THROUGH", "do not agree", "follow from its financial analysis", "no basis in the accepted facts", "recalculated on a new base"):
+        assert words in system
+

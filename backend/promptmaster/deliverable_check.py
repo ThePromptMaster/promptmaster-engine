@@ -88,7 +88,7 @@ class DeliverableCheck(BaseModel):
 
 
 _INSTRUCTION = (
-    "You check a finished deliverable for two things, and nothing else.\n"
+    "You check a finished deliverable for three things, and nothing else.\n"
     "1. ACCEPTED FINDINGS. Each was accepted earlier, so the deliverable was meant to make its suggested "
     "change. For each, by its id: \"carried\" when the deliverable now does what the suggested change asks "
     "(quote the passage that shows it); \"not_carried\" when the deliverable still has the problem or lacks "
@@ -109,10 +109,22 @@ _INSTRUCTION = (
     "what it conflicts with quoted verbatim (from the deliverable, or the fact's own words), the problem in one "
     "sentence, and the smallest fix. At most five, most material first. Never report style, tone, length, "
     "missing detail or a point a careful reader would not call contradictory. When in doubt, report nothing.\n"
+    # 7 Nov (Sean, training event and Northline): "check that the readiness verdict, email
+    # conditions and takeover checklist agree"; "whether operational instructions follow
+    # from the financial analysis and its assumptions".
+    "3. FOLLOW-THROUGH. What the deliverable tells someone to do, or states as settled, that its own analysis "
+    "or the accepted facts do not support. Only these: a readiness verdict, a condition for sending or proceeding, "
+    "and a checklist that do not agree (the plan is called ready once one thing happens while its own checklist "
+    "still requires others); an instruction to proceed or spend that does not follow from its financial analysis "
+    "or ignores an assumption that analysis rests on; a deadline or date it introduces with no basis in the "
+    "accepted facts; something stated as settled that the supplied facts leave uncertain, so that an instruction "
+    "resting on it should be conditional; an earlier suggestion recalculated on a new base with no update saying "
+    "it applies to that base. For each: the passage quoted verbatim, the problem in one sentence, and the smallest "
+    "fix. At most five, most material first. When in doubt, report nothing.\n"
     "Copy every quote exactly, one sentence or less. "
     "Return JSON: {\"findings\": [{\"id\": string, \"verdict\": \"carried\" | \"not_carried\" | \"not_applicable\", "
     "\"quote\": string, \"note\": string}], \"contradictions\": [{\"rule_quote\": string, \"conflicts_quote\": string, "
-    "\"problem\": string, \"fix\": string}]}"
+    "\"problem\": string, \"fix\": string}], \"gaps\": [{\"quote\": string, \"problem\": string, \"fix\": string}]}"
 )
 
 
@@ -211,6 +223,15 @@ def parse(
         if not problem or not _found(rule, content) or not _found(other, content, record, on_record) or _norm(rule) == _norm(other):
             continue
         contradictions.append(Contradiction(rule_quote=rule, conflicts_quote=other, problem=problem, fix=" ".join(str(item.get("fix") or "").split())[:400]))
+    # A follow-through gap has one passage to show: what it lacks is, by nature, not in the text.
+    for item in (raw.get("gaps") or [])[:MAX_CONTRADICTIONS]:
+        if not isinstance(item, dict):
+            continue
+        quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:400]
+        problem = " ".join(str(item.get("problem") or "").split())[:400]
+        if not problem or not _found(quote, content):
+            continue
+        contradictions.append(Contradiction(rule_quote=quote, conflicts_quote="", problem=problem, fix=" ".join(str(item.get("fix") or "").split())[:400]))
     return DeliverableCheck(findings=checks, contradictions=contradictions)
 
 
