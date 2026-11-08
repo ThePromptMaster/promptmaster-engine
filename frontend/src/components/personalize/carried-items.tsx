@@ -1,6 +1,7 @@
 'use client';
 
-import { shortWhen } from '@/lib/connections/items';
+import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
+import { shortWhen, toolkitFromSource } from '@/lib/connections/items';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { ThirdPartyItem } from '@/types';
 
@@ -29,7 +30,7 @@ export function CarriedItems({
       <ul className="mt-1 space-y-1">
         {items.map((item, i) => (
           <li key={`${i}-${item.title}`} className="flex items-center gap-2 text-label text-[var(--on-surface)]">
-            <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--on-surface-variant)]">{ICON[item.kind]}</span>
+            <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={ICON[item.kind]} size={16} className="text-[var(--on-surface-variant)]" />
             <span dir="auto" className="min-w-0 flex-1 truncate">
               {item.title}
               {item.when ? <span className="text-[var(--on-surface-variant)]"> · {shortWhen(item.when, locale)}</span> : null}

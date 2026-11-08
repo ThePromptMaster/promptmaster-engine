@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
+import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { api } from '@/lib/api/client';
 import { CONNECT_PATH, TOOLKITS, rememberReturn, type Connection, type ToolkitSlug } from '@/lib/connections/items';
@@ -108,7 +109,7 @@ export function ConnectedAccounts({
           const active = held?.status === 'ACTIVE';
           return (
             <li key={toolkit.slug} className="flex flex-wrap items-start gap-3 rounded-xl bg-[var(--surface-container-low)] p-4">
-              <span aria-hidden className="material-symbols-outlined mt-0.5 text-[22px] text-[var(--pm-primary)]">{toolkit.icon}</span>
+              <ToolkitLogo slug={toolkit.slug} size={24} className="mt-0.5 text-[var(--pm-primary)]" />
               <div className="min-w-0 flex-1">
                 <p className="text-title text-[var(--on-surface)]">
                   {toolkit.label}

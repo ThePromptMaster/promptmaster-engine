@@ -25,6 +25,26 @@ export function toolkitLabel(slug: string): string {
   return TOOLKITS.find((t) => t.slug === slug)?.label ?? slug;
 }
 
+/**
+ * Each account's own logo, as Composio serves it for that toolkit (8 Nov: the real
+ * marks, not glyphs). `icon` stays as the fallback when the logo can't be loaded.
+ */
+export const LOGO_BASE = 'https://logos.composio.dev/api/';
+
+export function toolkitLogoUrl(slug: ToolkitSlug): string {
+  return `${LOGO_BASE}${slug}`;
+}
+
+/**
+ * The account an item came from, read off its source line, which the backend starts
+ * with the account's name ("Gmail · …", "Outlook calendar · …"). Null when it doesn't.
+ */
+export function toolkitFromSource(source: string | undefined): ToolkitSlug | null {
+  const line = (source ?? '').trim();
+  const hit = TOOLKITS.find((t) => line === t.label || line.startsWith(`${t.label} `));
+  return hit?.slug ?? null;
+}
+
 export interface Connection {
   id: string;
   toolkit: ToolkitSlug;

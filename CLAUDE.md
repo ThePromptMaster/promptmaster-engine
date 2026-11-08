@@ -220,7 +220,7 @@ restriction". Backend: `RATE_LIMIT_PER_MINUTE` (60), `RATE_LIMIT_PER_HOUR`
 ## Conventions
 
 - **Never mention client/stakeholder names** in commits, code, or public-facing content
-- Material Symbols Outlined icons (not Lucide, not emojis); Inter font
+- Material Symbols Outlined icons (not Lucide, not emojis); Inter font. The one exception is a connected account's own logo (`components/personalize/toolkit-logo.tsx`), loaded from Composio with a Material icon as its fallback
 - Design system "Foundry Slate" / "Architectural Monolith": tonal surface separation, **no 1px borders for sections**, 2.75rem display headings, 720px content well, ambient shadows. Spec in `design-system/` (not committed).
 - CSS custom properties (`var(--pm-primary)`, `var(--surface-container-low)`), Tailwind v4 (`@plugin`, not `@import`, for plugins)
 - All components carry `'use client'`

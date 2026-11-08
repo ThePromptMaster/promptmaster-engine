@@ -62,6 +62,10 @@ their behalf (`promptmaster/composio_client.py`), as it calls OpenRouter, and st
 nothing it reads. Because the backend now acts for a user against a service that holds
 their data, `routers/connections.py` *does* check ownership: every connection id is
 confirmed to be the caller's before it is used.
+The browser shows each account's logo from Composio's logo service
+(`logos.composio.dev`, no referrer sent; `ToolkitLogo`), so Composio sees the viewer's
+IP address when those pages load. A Material icon stands in if the service is
+unreachable.
 
 ### The one exception, and why it is not one
 

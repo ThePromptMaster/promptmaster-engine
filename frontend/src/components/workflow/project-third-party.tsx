@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
+import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
-import { MAX_HELD, shortWhen } from '@/lib/connections/items';
+import { MAX_HELD, shortWhen, toolkitFromSource } from '@/lib/connections/items';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { ThirdPartyItem } from '@/types';
 import type { Project } from '@/types/project';
@@ -86,7 +87,7 @@ export function ProjectThirdParty({
                 return (
                   <li key={`${i}-${item.kind}-${item.title}`} className="text-body text-[var(--on-surface)]">
                     <span className="flex items-start gap-1.5">
-                      <span aria-hidden className="material-symbols-outlined mt-0.5 text-[16px] text-[var(--on-surface-variant)]">{ICON[item.kind]}</span>
+                      <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={ICON[item.kind]} size={16} className="mt-0.5 text-[var(--on-surface-variant)]" />
                       <span className="min-w-0">
                         <span className="font-semibold">[T{i + 1}] </span>
                         <span dir="auto">{item.title || t('conn.heldUntitled')}</span>
