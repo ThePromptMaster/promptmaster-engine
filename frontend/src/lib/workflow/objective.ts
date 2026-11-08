@@ -35,6 +35,8 @@ export interface ObjectiveAssessment {
   model_note?: string;
   /** Gaps the brief allows to remain, with its words that allow them (19 Oct, HARBOR). */
   limitations?: { item: string; allowed_by: string }[];
+  /** What the deliverable says people still have to do in the real world, in its own words (8 Nov). */
+  open_actions?: string[];
   /** A round check: nothing is left for the user; the next stage writes the deliverable. */
   ready_for_later_stage?: boolean;
   /**
@@ -127,6 +129,7 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       // 20 Oct (prod pass): recorded since #330, but not read back, so the
       // pause card never showed what was carried as a limitation.
       ...(Array.isArray(p.limitations) ? { limitations: p.limitations } : {}),
+      ...(Array.isArray(p.open_actions) ? { open_actions: p.open_actions } : {}),
       ...(p.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
       ...(p.next_task && typeof p.next_task === 'object' ? { next_task: p.next_task } : {}),
       ...(p.basis && typeof p.basis === 'object' ? { basis: p.basis } : {}),

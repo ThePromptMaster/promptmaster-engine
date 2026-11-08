@@ -58,6 +58,9 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { creditStop, OUT_OF_CREDITS } from './credit-stop';
+import { delegationSentences } from './delegation';
+import { touchesObjective } from './stop-audit';
+import { createTask, listTasks } from '@/lib/supabase/tasks';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
@@ -2165,6 +2168,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           ? { toolsUsed: [] as string[], changes: {} }
           : { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
         if (assessment.outcome === 'met') {
+          if (!kept) await recordOpenActions(ctx, assessment.open_actions ?? [], holder?.id ?? ctx.stage.id);
           const checked = `${describeBasis(basis)}${kept ? ' (The check already made on this version; nothing has changed since, so it was not repeated.)' : ''}`;
           // Met is not finished (Sean, 10 Oct, email 2: "Finished: the objective is
           // verified as met" beside "2 done · 3 to go"). What the workflow still
@@ -2269,7 +2273,20 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // A blocker the user can answer is asked, not only reported (13 Oct,
         // Sean, workshop): the answer is recorded as a fact and the judged
         // stage revised with it (`answer` in use-go-loop).
-        const asks = [...new Set(assessment.blockers.map((b) => b.ask?.trim()).filter((a): a is string => !!a))];
+        let asks = [...new Set(assessment.blockers.map((b) => b.ask?.trim()).filter((a): a is string => !!a))];
+        // A question about something outside the document is no reason to stop (8 Nov).
+        if (asks.length && ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+          const kept: string[] = [];
+          for (const ask of asks) {
+            const screen = touchesObjective(ask)
+              ? null
+              : await api.agentScreenQuestion({ inputs: inputsFrom(ctx.project), question: ask, stage_label: holder?.label ?? ctx.stage.label, earlier_stages: [], reserved_approvals: [], delegation: delegationSentences(ctx.project), model: ctx.project.model }, ctx.signal).catch(() => null);
+            if (screen?.verdict === 'real_world_action') await recordOpenActions(ctx, [screen.action], holder?.id ?? ctx.stage.id);
+            else kept.push(ask);
+          }
+          if (kept.length !== asks.length) assessment.blockers = assessment.blockers.filter((b) => !b.ask?.trim() || kept.includes(b.ask.trim()));
+          asks = kept;
+        }
         // A next task that can be done now, on a workflow that keeps its stages, is a fix to
         // those stages: not blocked by what only other work needs (6 Nov, production: "Can't
         // continue", about a contradiction in the memo that Go could fix).
@@ -2599,6 +2616,28 @@ async function recheckManuscript(
     ...wrote,
     output: `${wrote.output} ${target.label} was repaired (${why})${evaluation.canAdvance && (evidence || actor === 'user') ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
+}
+
+/**
+ * What the finished document says people still have to do, kept beside it as
+ * open tasks (8 Nov; "the training-event document should finish with the
+ * unresolved staffing action clearly recorded"). Best-effort: a task that can't
+ * be saved never stops a finished document from counting as finished.
+ */
+async function recordOpenActions(ctx: PerformContext, actions: readonly string[], stageId: string): Promise<void> {
+  if (!actions.length) return;
+  const key = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  try {
+    const have = new Set((await listTasks(ctx.project.id)).map((t) => key(t.title)));
+    for (const action of actions) {
+      if (have.has(key(action))) continue;
+      have.add(key(action));
+      await createTask(ctx.project.id, ctx.project.user_id, { title: action.slice(0, 240), stage: stageId, origin: 'system' });
+    }
+    await ctx.refresh?.();
+  } catch {
+    // The document stands; the task list is a convenience beside it.
+  }
 }
 
 /**

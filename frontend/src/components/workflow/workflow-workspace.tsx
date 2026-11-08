@@ -2626,6 +2626,7 @@ export function WorkflowWorkspace({
               completion={completion}
               evaluation={deliverableEvaluation}
               limitation={statedLimitation(lastFinish?.reason)}
+              openActions={recommendations.tasks.filter((task) => task.status === 'open' && task.origin === 'system').map((task) => task.title)}
               onReopen={() => void reopenProject()}
               onEdit={() => {
                 // Reopen, and land on the stage that holds the work itself.

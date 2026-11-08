@@ -298,6 +298,14 @@ _NEXT_ACTION_INSTRUCTION = (
     "requirement, deciding rows, attaching data — is not missing data. If it is "
     "needed and no listed move does it, choose request_user_decision. Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
+    # 7 Nov (Sean, training event): Go marked a finished handoff stuck until someone
+    # covered a shift. "Please separate completion of the requested document from
+    # readiness to execute its plan."
+    "THE DOCUMENT IS NOT THE EVENT. Something that has to happen outside the "
+    "document — someone confirming, booking, hiring, covering a shift, signing — is "
+    "never a reason to stop, to ask, or to mark a stage stuck. Have the document say "
+    "it is still to do and who should do it, then carry on and finish. Never ask "
+    "the user whether it has happened.\n\n"
     "BUTTONS. The state lists the buttons that are on the user's page now, "
     "under BUTTONS ON THIS PAGE NOW. You may name a button ONLY if it is in "
     "that list, in exactly those words, and when you do, also put those exact "

@@ -24,6 +24,8 @@ interface Props {
   evaluation?: Evaluation;
   /** What the project was finished with stated as a limitation (Go's repair limit), said beside the work. */
   limitation?: string | null;
+  /** What the document says people still have to do in the real world (8 Nov). */
+  openActions?: readonly string[];
   onReopen: () => void;
   /** Reopen the project and go to the stage that holds the work. */
   onEdit?: () => void;
@@ -37,7 +39,7 @@ interface Props {
  * it, copy it, save it as Markdown, Word or PDF, or reopen the project to
  * keep improving it. The stage-by-stage record stays below, as it was.
  */
-export function ProjectFinished({ bundle, completion, evaluation, limitation, onReopen, onEdit, onNewVersion }: Props) {
+export function ProjectFinished({ bundle, completion, evaluation, limitation, openActions = [], onReopen, onEdit, onNewVersion }: Props) {
   const t = useT();
   const locale = useLocale();
   const { project, template } = bundle;
@@ -119,6 +121,14 @@ export function ProjectFinished({ bundle, completion, evaluation, limitation, on
         <p role="note" data-stated-limitation className="mt-2 text-body text-[var(--on-surface)]">
           {t('ssp.statedLimitation', { text: limitation })}
         </p>
+      )}
+      {openActions.length > 0 && (
+        <div role="note" data-open-actions className="mt-3">
+          <p className="text-body text-[var(--on-surface)]">{t('pnl.stillOpenInWorld')}</p>
+          <ul className="mt-1 list-disc ps-5 text-body text-[var(--on-surface-variant)]">
+            {openActions.map((action) => <li key={action}>{action}</li>)}
+          </ul>
+        </div>
       )}
       {doc?.partial && (
         <p role="note" data-deliverable-partial className="mt-2 text-body text-[var(--on-surface-variant)]">
