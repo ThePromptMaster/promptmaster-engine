@@ -950,11 +950,12 @@ export function WorkflowWorkspace({
     }
   }, [stage, appendEvent, t]);
 
-  const markComplete = useCallback(async () => {
+  const markComplete = useCallback(async (evidence?: string) => {
     if (!stage) return;
     setTransitionError(null);
     try {
-      const evidenceId = await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion });
+      // The version just approved, when there is one: the page's copy hasn't caught up with it (8 Nov).
+      const evidenceId = evidence ?? await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion });
       await appendEvent({
         type: 'stage_marked_complete',
         stage_id: stage.id,
@@ -2072,7 +2073,7 @@ export function WorkflowWorkspace({
     const closing = explicitOutlineHere && reopenedHere;
     const reopenDrafting =
       closing && draftingStage && draftingStage.id !== state.current_stage_id && isDone(state.stages[draftingStage.id]?.status);
-    if (closing) await markComplete();
+    if (closing) await markComplete(version.id);
     if (reopenDrafting) await appendEvent({ type: 'stage_reopened', stage_id: draftingStage.id });
     await materialiseOutline(version, doc);
     if (closing && draftingStage) setViewingStageId(draftingStage.id === state.current_stage_id ? null : draftingStage.id);
