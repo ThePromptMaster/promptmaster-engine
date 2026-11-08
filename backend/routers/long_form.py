@@ -48,6 +48,7 @@ from promptmaster.long_form import (
     generate_outline,
     generate_section,
     generate_section_prose,
+    revise_outline,
 )
 from promptmaster.schemas import (
     ContinuitySnapshot,
