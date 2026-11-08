@@ -457,6 +457,7 @@ export const ar: Record<keyof typeof en, string> = {
   'cwd.saveNew': 'الحفظ بوصفه سير عمل جديدًا',
   'cwd.useThis': 'استخدام سير العمل هذا',
   'out.stale': '{label} تحتاج إلى إعادة تحقق — {reason}',
+  'out.repairTried': 'حاول Go إصلاحها ولم تُحسم بعد (المحاولات: {count}). النتيجة الأخيرة: {last}',
   'out.findings_one': '{label}: {count} ملاحظة لم تُقبل أو تُرفض بعد',
   'out.findings_other': '{label}: ملاحظات لم تُقبل أو تُرفض بعد (العدد: {count})',
   'out.optFindings_one': '{label}: {count} ملاحظة اختيارية لم تُقبل أو تُرفض بعد',

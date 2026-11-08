@@ -10,6 +10,8 @@ export const ar: Record<keyof typeof en, string> = {
   'acct.lookups_other': 'بحث في الأدبيات (عدد المرات: {count})',
   'acct.wrote': 'كتب أو راجع {stages}',
   'acct.repaired': 'أصلح {stages} بعد تغيير',
+  'acct.repairOpen': 'راجع {stages} بعد تغيير، لكنها لا تزال مُعادة الفتح',
+  'acct.repairFailed': 'لم يتمكن من إصلاح {stages}',
   'acct.fitted': 'راجع {stages} لاستيفاء متطلب يُقاس بالتعليمات البرمجية',
   'acct.returns_one': 'عاد {count} مرة لمزيد من العمل ({stages})',
   'acct.returns_other': 'عاد لمزيد من العمل (عدد المرات: {count}) ({stages})',
