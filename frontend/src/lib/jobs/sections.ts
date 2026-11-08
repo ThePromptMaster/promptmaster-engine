@@ -143,6 +143,8 @@ export interface RevisionJobsArgs {
   saveSnapshot: (version: NewVersion) => Promise<unknown>;
   /** The stage's `entry_prompt_hint`: how this workflow wants a section written. */
   stageHint?: string;
+  /** The project's jobs, so a retry past a stopped job is a new row rather than a silent no-op. */
+  jobs?: readonly ProjectJob[];
 }
 
 /**
@@ -163,6 +165,12 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
   };
   const queued: string[] = [];
   for (const { section, index } of targets) {
+    // A new revision means a new idempotency key: an explicit request, not a no-op.
+    const revision = (section.revision ?? 0) + 1;
+    // The same revision again after its job stopped for good: a repair that
+    // retried collided with the dead row, queued nothing, and still reported
+    // the section as written (8 Nov, production).
+    const retry = (args.jobs ?? []).filter((j) => j.payload?.section_id === section.id && j.payload?.revision === revision && isStoppedJob(j)).length;
     await enqueueSectionJob({
       project,
       artifactId,
@@ -171,8 +179,8 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
       outlineVersionId: approvedOutlineVersionId,
       sectionId: section.id,
       sectionIndex: index,
-      // A new revision means a new idempotency key: an explicit request, not a no-op.
-      revision: (section.revision ?? 0) + 1,
+      revision,
+      ...(retry ? { retry } : {}),
       revise: brief.records?.[section.id] ? { ...revise, record: brief.records[section.id] } : revise,
     });
     queued.push(section.id);

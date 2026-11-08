@@ -121,6 +121,19 @@ describe('enqueueing (B2a) — the same calls the buttons make', () => {
     expect(queued).toEqual(['c']);
   });
 
+  it('a retry past a stopped job at the same revision is a new row, not a collision', async () => {
+    enqueueSectionJob.mockClear();
+    enqueueSectionJob.mockImplementation(async () => 'job');
+    const brief = { stageLabel: 'Revision', instruction: 'x', findings: [] as never, sources: [] };
+    const base = { project, artifactId: 'art', stageId: 'revision', outline, approvedOutlineVersionId: 'ov', brief, saveSnapshot: async () => undefined };
+    await enqueueRevisionJobs({ ...base, jobs: [job('a', 'dead', 'revision', 2), job('a', 'failed', 'revision', 2), job('b', 'dead', 'revision', 2)] });
+    expect(enqueueSectionJob.mock.calls[0][0]).toMatchObject({ sectionId: 'a', revision: 2, retry: 2 });
+    enqueueSectionJob.mockClear();
+    await enqueueRevisionJobs({ ...base, jobs: [job('a', 'succeeded', 'revision', 1)] });
+    expect(enqueueSectionJob.mock.calls[0][0]).toMatchObject({ sectionId: 'a', revision: 2 });
+    expect((enqueueSectionJob.mock.calls[0][0] as { retry?: number }).retry).toBeUndefined();
+  });
+
   it('a revision saves the snapshot first, then queues a rewrite of each written section', async () => {
     enqueueSectionJob.mockClear();
     const order: string[] = [];

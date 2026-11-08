@@ -43,8 +43,12 @@ export function classifyWait(
   for (const id of sectionIds) {
     const section = outline.find((s) => s.id === id);
     const job = latest.get(id) ?? null;
+    // A rewrite that failed leaves the section `complete` with its old text:
+    // the job, not the status, says whether this pass wrote it (8 Nov,
+    // production). A job that died after its prose was saved did write it.
+    const notThisPass = (job?.status === 'failed' || job?.status === 'dead') && (section?.revision ?? 0) < Math.max(job?.payload?.revision ?? 0, 1);
     if (pendingIds.has(id)) pending.push(id);
-    else if (section?.status === 'complete') written.push(id);
+    else if (section?.status === 'complete' && !notThisPass) written.push(id);
     else if (isStoppedJob(job) || section?.status === 'error') {
       failed.push({
         sectionId: id,

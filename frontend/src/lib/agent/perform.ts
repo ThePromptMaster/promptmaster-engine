@@ -1011,6 +1011,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const ids = await enqueueRevisionJobs({
         project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
         approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint,
+        jobs: await listProjectJobs(ctx.project.id).catch(() => []),
         saveSnapshot: (v) => append(m.holderStageId, holderLabel, v, undefined, { writtenFor: ctx.stage.id }),
       });
       if (!ids.length) return done(key, { status: 'failed', output: 'No written section to revise.', toolsUsed: [], changes: {} });
@@ -2537,6 +2538,7 @@ async function recheckManuscript(
       ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
     },
     stageHint: target.entry_prompt_hint,
+    jobs: await listProjectJobs(ctx.project.id).catch(() => []),
     saveSnapshot: (v) => append(holderStageId, holderLabel, v, undefined, { writtenFor: target.id }),
   });
   const wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline });

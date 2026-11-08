@@ -17,6 +17,27 @@ describe('classifyWait: what stopped a job travels with the failure', () => {
   });
 });
 
+describe('classifyWait: a rewrite that failed did not write the section (8 Nov, production)', () => {
+  const written = (revision: number) => ({ ...section('a', 'complete'), revision }) as OutlineSection;
+  const jobAt = (status: ProjectJob['status'], revision: number) => ({ id: 'j', status, payload: { section_id: 'a', revision }, error_message: 'It failed.' }) as unknown as ProjectJob;
+
+  it('a section left complete by a job that failed at a later revision is a failure', () => {
+    const r = classifyWait([written(1)], [jobAt('dead', 2)], ['a']);
+    expect(r.written).toEqual([]);
+    expect(r.failed.map((f) => f.sectionId)).toEqual(['a']);
+  });
+
+  it('a job that died after its prose was saved did write it', () => {
+    const r = classifyWait([written(2)], [jobAt('failed', 2)], ['a']);
+    expect(r.written).toEqual(['a']);
+    expect(r.failed).toEqual([]);
+  });
+
+  it('a cancelled job stays as before: the section stands', () => {
+    expect(classifyWait([written(1)], [jobAt('cancelled', 2)], ['a']).written).toEqual(['a']);
+  });
+});
+
 describe('classifyWait: where the sections a step queued stand (B2b)', () => {
   it('settles when every targeted section is written', () => {
     const r = classifyWait([section('a', 'complete'), section('b', 'complete'), section('c', 'pending')], [job('a', 'succeeded'), job('b', 'succeeded')], ['a', 'b']);
