@@ -226,6 +226,8 @@ class AgentState(BaseModel):
     #: shortened "routine drafting, arithmetic, checking and corrections" to
     #: "drafting and arithmetic", and only the flag reached the planner).
     delegation: list[str] = Field(default_factory=list, max_length=6)
+    #: The deliverable's length against the brief's hedged target, counted in code (8 Nov).
+    length_note: str = Field(default="", max_length=300)
     #: What the stage's latest version changed. None for a first version.
     latest_change: AgentLatestChange | None = None
     #: Undecided rows on review stages other than this one, with their wording.
@@ -467,6 +469,12 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "tolerance — is routine: do not ask it. Make the choice, say it is an assumption the user can "
             "change, and carry on with the move that uses it. Ask only about the objective, an accepted "
             "requirement, an approval reserved to the user, or a choice with no defensible default."
+        )
+    if state.length_note:
+        facts.append(
+            f"THE DELIVERABLE'S LENGTH: {state.length_note}. Use this count, never an estimate of your own. "
+            "If it is over, shorten it yourself with revise_stage as a routine correction, keeping every required "
+            "part and figure. Do not ask."
         )
     if state.delegation:
         facts.append(

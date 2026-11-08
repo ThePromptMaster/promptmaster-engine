@@ -118,6 +118,8 @@ export interface AgentStateDigest {
   routine_decisions?: string;
   /** The user's own sentences on what may be done without asking, verbatim from the brief (4 Nov). */
   delegation?: string[];
+  /** The deliverable's length against the brief's hedged target, counted in code (`describeLengthTarget`). */
+  length_note?: string;
   /**
    * What the stage's latest version changed against the one before, worked
    * out in code (19 Oct: "I cannot see what the one applied finding changed").
@@ -185,6 +187,8 @@ export function buildAgentState(input: {
   routine?: string;
   /** The user's sentences on what may be done without asking (`delegationSentences`). */
   delegation?: string[];
+  /** The same, as the planner reads it. */
+  lengthNote?: string;
   /** The page's buttons (lib/workflow/stage-controls.ts). */
   controls?: readonly StageControl[];
   /** Stages Go may go back to from this one, when return_to_stage is offered (Q2). */
@@ -389,6 +393,7 @@ export function buildAgentState(input: {
     tools,
     ...(input.routine ? { routine_decisions: input.routine } : {}),
     ...(input.delegation?.length ? { delegation: input.delegation } : {}),
+    ...(input.lengthNote ? { length_note: input.lengthNote } : {}),
     ...(latestChange ? { latest_change: latestChange } : {}),
   };
 }

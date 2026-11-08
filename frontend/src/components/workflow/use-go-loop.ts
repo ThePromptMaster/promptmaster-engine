@@ -63,6 +63,7 @@ import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
 import { planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
 import { createTask } from '@/lib/supabase/tasks';
 import { approvalStandsThroughRepairs } from '@/lib/workflow/approvals';
+import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
@@ -1019,6 +1020,7 @@ export function useGoLoop(opts: Options) {
                   context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, delegation: delegationSentences(o.project), memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
                   returnTargets: goBackTo.length || !answerReturn?.mayGo ? goBackTo : answerReturn.stages,
                   answerReturn,
+                  lengthNote: holder?.id === o.stage!.id ? describeLengthTarget(wholeLengthTarget(o.project, o.bundles[o.stage!.id]?.versions.at(-1)?.content ?? '')) : '',
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
                   polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance) && !allowed.includes('revise_stage') ? polishedHere : undefined,
                 }),

@@ -1,3 +1,4 @@
+import { describeLengthTarget, wholeLengthTarget } from './measurable';
 import { describe, expect, it } from 'vitest';
 
 import { isPart, countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor, type MeasurableRequirement } from './measurable';
@@ -577,3 +578,33 @@ describe('a limit on the thing being written is a limit on all of it (6 Nov, pro
     expect(only('The executive update must be no more than 100 words.')[0].subject).toBe('executive update');
   });
 });
+
+describe('the whole document\'s hedged length, counted (8 Nov)', () => {
+  const body = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ');
+  const project = { objective: 'A handoff.', constraints: 'The attendee email must be under 150 words.', output_format: 'Operations handoff package of roughly 900–1,200 words. It must contain a budget.' };
+
+  it('counts the text against the range the brief hedges', () => {
+    const t = wholeLengthTarget(project, body(1556));
+    expect(t).toMatchObject({ said: 'roughly 900–1,200 words', max: 1200, count: 1556, over: true });
+    expect(describeLengthTarget(t)).toBe('1,556 words, counted in code; the brief asks for roughly 900–1,200 words, so it is over');
+  });
+
+  it('a little over is still on target', () => {
+    expect(wholeLengthTarget(project, body(1300))?.over).toBe(false);
+  });
+
+  it('a part\'s own length is not the whole\'s', () => {
+    expect(wholeLengthTarget({ output_format: 'about 300 words per section' }, body(5000))).toBeNull();
+    expect(wholeLengthTarget({ constraints: 'An email of roughly 200 words.' }, body(5000))).toBeNull();
+  });
+
+  it('a firm limit is not read here; it is measured elsewhere', () => {
+    expect(wholeLengthTarget({ output_format: 'At most 500 words.' }, body(600))).toBeNull();
+  });
+
+  it('nothing to count, nothing said', () => {
+    expect(wholeLengthTarget(project, '  ')).toBeNull();
+    expect(describeLengthTarget(null)).toBe('');
+  });
+});
+
