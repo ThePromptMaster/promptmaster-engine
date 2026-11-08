@@ -5,7 +5,7 @@
  * "Do whatever is best" typed into it by hand.
  */
 import { describe, expect, it } from 'vitest';
-import { drivenElsewhere, isDuplicateRun, refusalSetAside, routineConflictAnswer, LEASE_STALE_MS } from '@/components/workflow/use-go-loop';
+import { drivenElsewhere, isDuplicateRun, refusalSetAside, routineConflictAnswer, unmetIsRoutine, LEASE_STALE_MS } from '@/components/workflow/use-go-loop';
 import type { StepOutcome } from './perform';
 import { answerAsFact, DELEGATED_ANSWER } from '@/lib/workflow/answers';
 import { idChangeDefault } from '@/lib/workflow/id-changes';
@@ -83,6 +83,28 @@ describe('a refused revision under "handle them for me" is never a question (8 N
   it('leaves every other outcome alone', () => {
     const ok = { status: 'succeeded', label: null, toolsUsed: [], changes: {}, output: 'done' } as StepOutcome;
     expect(refusalSetAside(ok, { ...input, steps: answered })).toBe(ok);
+  });
+});
+
+describe('what the final check finds unmet is repaired without a button (8 Nov, production)', () => {
+  const unmet = { status: 'succeeded', label: null, toolsUsed: [], changes: {}, output: 'Not met', stop: { status: 'awaiting_decision', reason: 'x' }, needs: { kind: 'objective_check', stageId: 'final', finding: 'unmet', items: ['A'] } } as unknown as StepOutcome;
+  const template = { stages: [{ id: 'final', renderer: 'prose' }, { id: 'book', renderer: 'long_form' }] } as never;
+  const on = { policy: 'autonomous' as const, routine: 'handle', template, tried: [] as string[] };
+
+  it('carries on under "handle them for me" with tries left', () => {
+    const out = unmetIsRoutine(unmet, on);
+    expect(out.stop).toBeUndefined();
+    expect(out.needs).toBeUndefined();
+  });
+  it('shows the card once the tries are used, under "ask me", and on a manuscript', () => {
+    expect(unmetIsRoutine(unmet, { ...on, tried: ['final', 'final'] })).toBe(unmet);
+    expect(unmetIsRoutine(unmet, { ...on, routine: 'ask' })).toBe(unmet);
+    const book = { ...unmet, needs: { ...(unmet.needs as object), stageId: 'book' } } as unknown as StepOutcome;
+    expect(unmetIsRoutine(book, on)).toBe(book);
+  });
+  it('a stop for a limit or a question is left alone', () => {
+    const limit = { ...unmet, needs: { kind: 'objective_check', stageId: 'final', finding: 'repair_limit', items: [] } } as unknown as StepOutcome;
+    expect(unmetIsRoutine(limit, on)).toBe(limit);
   });
 });
 

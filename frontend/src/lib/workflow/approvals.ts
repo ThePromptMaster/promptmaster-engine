@@ -8,7 +8,7 @@
  * prompt was told: the final review and the objective check judged the work
  * as if nothing had been approved. Pure.
  */
-import type { Project } from '@/types/project';
+import type { ArtifactVersion, Project } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
 
@@ -47,6 +47,32 @@ export interface ApprovalOnEarlierVersion {
   approval: string;
   version: number;
   current: number;
+  /** What changed since it was given, one line per version (8 Nov). */
+  since?: string[];
+}
+
+/** How Go writes a version under the routine-decision policy. */
+const GO_ROUTINE_OPERATIONS: ReadonlySet<string> = new Set(['agent_revise', 'agent_apply', 'continuation']);
+
+/**
+ * The user's approval on this stage was given on an earlier version, and every
+ * version since is Go's own routine repair (8 Nov; "without requiring me to …
+ * repeatedly approve routine repairs"). It stays tied to the version it was
+ * given on and is shown as such; it is not asked for again.
+ */
+export function approvalStandsThroughRepairs(
+  project: Pick<Project, 'manual_checks' | 'manual_check_versions'>,
+  stage: Pick<WorkflowTemplate['stages'][number], 'exit_criteria'>,
+  versions: readonly Pick<ArtifactVersion, 'id' | 'source_operation'>[]
+): boolean {
+  const reserved = stage.exit_criteria.filter((c) => c.check === 'manual' && c.authority !== 'delegable');
+  if (!reserved.length) return false;
+  return reserved.every((c) => {
+    if (!project.manual_checks?.[c.id]) return false;
+    const at = versions.findIndex((v) => v.id === project.manual_check_versions?.[c.id]);
+    if (at < 0 || at === versions.length - 1) return false;
+    return versions.slice(at + 1).every((v) => GO_ROUTINE_OPERATIONS.has(v.source_operation));
+  });
 }
 
 /**
@@ -74,7 +100,7 @@ export function approvalsOnEarlierVersion(
       if (project.routine_decisions === 'handle' && c.authority === 'delegable') continue;
       const on = versions.find((v) => v.id === given[c.id]);
       if (!on || on.id === head.id || on.content === head.content) continue;
-      out.push({ stageId: stage.id, label: stage.short_label || stage.label, approval: c.label, version: on.version_number, current: head.version_number });
+      out.push({ stageId: stage.id, label: stage.short_label || stage.label, approval: c.label, version: on.version_number, current: head.version_number, since: versions.filter((v) => v.version_number > on.version_number).map((v) => (v.change_summary ?? '').split('\n')[0].slice(0, 160)).filter(Boolean) });
     }
   }
   return out;

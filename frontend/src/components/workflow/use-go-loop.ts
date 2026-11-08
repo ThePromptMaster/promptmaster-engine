@@ -44,7 +44,7 @@ import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DE
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser, REPAIR_TRIES } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -62,6 +62,8 @@ import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/exper
 import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
 import { planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
 import { createTask } from '@/lib/supabase/tasks';
+import { approvalStandsThroughRepairs } from '@/lib/workflow/approvals';
+import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
 import { MAX_RETURNS, allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
@@ -248,6 +250,23 @@ export function refusalSetAside(
   if (routineConflictAnswer({ outcome, ...input })) return outcome;
   const reason = outcome.output.replace(/ Should those items come back[\s\S]*$/, '');
   return { ...outcome, status: 'failed', blockKind: null, stop: undefined, needs: undefined, params: {}, output: reason, setAside: reason };
+}
+
+/**
+ * Under "handle them for me", an objective check that names what is unmet on a
+ * written document doesn't stop for a button: Go repairs it, up to the repair
+ * limit, and the check runs again. Past the limit the card is shown as before.
+ */
+export function unmetIsRoutine(
+  outcome: StepOutcome,
+  input: { policy: ExecutionPolicy; routine: string | null | undefined; template: Pick<WorkflowTemplate, 'stages'>; tried: readonly string[] }
+): StepOutcome {
+  const need = outcome.needs;
+  if (need?.kind !== 'objective_check' || need.finding !== 'unmet') return outcome;
+  if (input.policy !== 'autonomous' || input.routine !== 'handle') return outcome;
+  if (input.template.stages.find((s) => s.id === need.stageId)?.renderer !== 'prose') return outcome;
+  if (input.tried.filter((id) => id === need.stageId).length >= REPAIR_TRIES) return outcome;
+  return { ...outcome, stop: undefined, needs: undefined };
 }
 
 /**
@@ -475,6 +494,11 @@ export function useGoLoop(opts: Options) {
       // answer was already taken once. Nothing is saved, the IDs are named in
       // the run's account, and it doesn't count toward the two-failure stop (8 Nov).
       outcome = refusalSetAside(outcome, { policy: current.policy, routine: o.project.routine_decisions, stageId: o.stage.id, steps: stepsRef.current });
+      // …and what the final check found unmet is a routine repair: the next move makes it (8 Nov).
+      outcome = unmetIsRoutine(outcome, {
+        policy: current.policy, routine: o.project.routine_decisions, template: o.template,
+        tried: repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id))),
+      });
 
       // ...and that the change is in the project, read back rather than
       // reported (1 Oct, item 4).
@@ -599,7 +623,10 @@ export function useGoLoop(opts: Options) {
       if (signal.aborted) throw new Stopped();
       if (!screen) return { kind: 'ask' };
       const made = steps.filter((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded').length;
-      const plan = planFromScreen(screen, { question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made });
+      const plan = planFromScreen(screen, {
+        question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made,
+        approvalStands: approvalStandsThroughRepairs(o.project, stage, o.bundles[stage.id]?.versions ?? []),
+      });
       if (plan.kind !== 'record') return plan;
       const step = await startAgentStep({
         runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
@@ -842,7 +869,12 @@ export function useGoLoop(opts: Options) {
           const at = allowed.indexOf('mark_blocked');
           if (at >= 0) allowed.splice(at, 1);
         }
-        const carriedRows = Object.values(context.carriedForward ?? {}).flat();
+        // What the final check found unmet on this very version is repaired the
+        // same way, not put to the user as a button (8 Nov): it is routine, and
+        // the repair limit still applies.
+        const assessed = latestObjectiveAssessment(freshEvents);
+        const checkUnmet = holder && assessed && assessed.outcome !== 'met' && !assessed.blockers.length && assessed.basis?.version_id && assessed.basis.version_id === o.bundles[holder.id]?.versions.at(-1)?.id ? (assessed.unmet ?? []) : [];
+        const carriedRows = [...Object.values(context.carriedForward ?? {}).flat(), ...checkUnmet];
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }
           : null;
