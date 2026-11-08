@@ -262,11 +262,20 @@ async function runStep(args: StepArgs): Promise<StepOutcome> {
   return await runRecordStep(args, context);
 }
 
+/** What a section is written against, read now. A failed read costs the context, not the section. */
+async function writingContext(store: JobStore, payload: DraftSectionPayload) {
+  const read = await store.loadGoverning?.(payload).catch(() => null);
+  return {
+    inputs: read?.sources.length ? { ...payload.inputs, sources: read.sources } : payload.inputs,
+    ...(read?.governing ? { governing: read.governing } : {}),
+  };
+}
+
 async function runProseStep(args: StepArgs, context: SectionContext): Promise<StepOutcome> {
   const { job, payload, store, generator, worker } = args;
 
   const prose = await generator.generateSectionProse({
-    inputs: payload.inputs,
+    ...(await writingContext(store, payload)),
     outline: context.outline,
     section_index: payload.section_index,
     records: context.records,
@@ -326,7 +335,7 @@ async function runContinueStep(args: StepArgs, context: SectionContext, rounds: 
 
   const { kept, unfinished } = splitUnfinished(section.content);
   const reply = await generator.generateSectionProse({
-    inputs: payload.inputs,
+    ...(await writingContext(store, payload)),
     outline: context.outline,
     section_index: payload.section_index,
     records: context.records,

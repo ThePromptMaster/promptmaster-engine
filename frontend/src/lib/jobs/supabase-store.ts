@@ -18,6 +18,11 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { governingText } from './governing';
+import { sourcesForRequest } from '@/lib/workflow/sources';
+import type { StageDefinition } from '@/lib/workflow/types';
+import type { PMInput } from '@/types';
+import type { ProjectSource } from '@/types/project';
 import type {
   DraftCheckpoint,
   DraftSectionPayload,
@@ -176,6 +181,30 @@ export class SupabaseJobStore implements JobStore {
         prevContent.length > PREV_SECTION_TAIL_CHARS
           ? prevContent.slice(-PREV_SECTION_TAIL_CHARS)
           : prevContent,
+    };
+  }
+
+  async loadGoverning(payload: DraftSectionPayload): Promise<{ governing: string; sources: NonNullable<PMInput['sources']> }> {
+    const { data: project, error } = await this.supabase.from('projects').select('workflow_template_id').eq('id', payload.project_id).single();
+    if (error) throw error;
+    const [template, artifacts, sources] = await Promise.all([
+      this.supabase.from('workflow_templates').select('definition').eq('id', project.workflow_template_id).single(),
+      this.supabase.from('artifacts').select('stage_id, current_version_id').eq('project_id', payload.project_id).not('stage_id', 'is', null),
+      this.supabase.from('project_sources').select('*').eq('project_id', payload.project_id).order('seq', { ascending: true }),
+    ]);
+    if (template.error) throw template.error;
+    if (artifacts.error) throw artifacts.error;
+    const ids = (artifacts.data ?? []).map((a) => a.current_version_id).filter((id): id is string => Boolean(id));
+    const { data: versions, error: versionsError } = ids.length
+      ? await this.supabase.from('artifact_versions').select('id, content').in('id', ids)
+      : { data: [], error: null };
+    if (versionsError) throw versionsError;
+    const byVersion = new Map((versions ?? []).map((v) => [v.id, v.content as string]));
+    const contents = Object.fromEntries((artifacts.data ?? []).map((a) => [a.stage_id as string, byVersion.get(a.current_version_id as string) ?? '']));
+    const stages = ((template.data?.definition as { stages?: StageDefinition[] } | null)?.stages ?? []) as StageDefinition[];
+    return {
+      governing: governingText(stages, payload.stage_id, contents),
+      sources: sources.error ? [] : sourcesForRequest((sources.data ?? []) as unknown as ProjectSource[]),
     };
   }
 

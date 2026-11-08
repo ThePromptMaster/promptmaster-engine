@@ -293,6 +293,18 @@ def _section_system(stage_hint: str) -> str:
     return _SECTION_INSTRUCTION + "\n\n" + NOTATION_RULE + "\n\n" + READER_TEXT_RULE + (f"\n\nTHIS STAGE:\n{hint}" if hint else "")
 
 
+def _governing_block(governing: str) -> str:
+    """The earlier stages' current text (7 Nov, production). A document regenerated
+    from its outline alone came back with a schedule the Core plan did not hold."""
+    if not governing.strip():
+        return ""
+    return (
+        "THE CURRENT PLAN AND EARLIER STAGES (their latest saved versions, and they govern: where the outline, "
+        "the prior context or an earlier draft of this section disagrees with them, follow these):\n"
+        f"--- BEGIN ---\n{governing.strip()}\n--- END ---\n\n"
+    )
+
+
 def build_section_prompt(
     inputs: PMInput,
     outline: list[OutlineSection],
@@ -301,6 +313,7 @@ def build_section_prompt(
     prev_section_content: str,
     records: list[SectionRecord] | None = None,
     stage_hint: str = "",
+    governing: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts for one section's generation.
 
@@ -327,6 +340,7 @@ def build_section_prompt(
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
+        f"{_governing_block(governing)}"
         f"FULL OUTLINE:\n{outline_text}\n\n"
         f"PRIOR CONTEXT:\n{context_text}\n\n"
         f"IMMEDIATELY PREVIOUS SECTION (for tonal/stylistic anchoring; do NOT repeat):\n"
@@ -367,6 +381,7 @@ def build_section_revision_prompt(
     section_index: int,
     revision: SectionRevisionBrief,
     stage_hint: str = "",
+    governing: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts to rewrite one existing section.
 
@@ -383,6 +398,7 @@ def build_section_revision_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"{context_line(inputs)}\n"
+        f"{_governing_block(governing)}"
         f"FULL OUTLINE:\n{_format_outline_for_prompt(outline, section_index)}\n\n"
         f"STAGE: {revision.stage_label or 'Revision'}\n"
         f"STAGE BRIEF: {revision.instruction or 'Revise this section.'}\n\n"
@@ -407,6 +423,7 @@ def build_section_continuation_prompt(
     section_index: int,
     continuation: SectionContinuation,
     stage_hint: str = "",
+    governing: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts to carry on a section cut off at the length limit.
 
@@ -428,6 +445,7 @@ def build_section_continuation_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"{context_line(inputs)}"
+        f"{_governing_block(governing)}"
         f"FULL OUTLINE:\n{_format_outline_for_prompt(outline, section_index)}\n\n"
         f"SECTION {section_index + 1}: {target.title}\n"
         f"This section covers: {target.abstract}\n\n"
@@ -475,6 +493,7 @@ async def generate_section_prose(
     revision: SectionRevisionBrief | None = None,
     stage_hint: str = "",
     continuation: SectionContinuation | None = None,
+    governing: str = "",
 ) -> GenerateSectionProseResponse:
     """Write one section. One LLM call, and nothing else.
 
@@ -487,11 +506,11 @@ async def generate_section_prose(
     """
     if continuation is not None:
         system, user = build_section_continuation_prompt(
-            inputs=inputs, outline=outline, section_index=section_index, continuation=continuation, stage_hint=stage_hint
+            inputs=inputs, outline=outline, section_index=section_index, continuation=continuation, stage_hint=stage_hint, governing=governing
         )
     elif revision is not None:
         system, user = build_section_revision_prompt(
-            inputs=inputs, outline=outline, section_index=section_index, revision=revision, stage_hint=stage_hint
+            inputs=inputs, outline=outline, section_index=section_index, revision=revision, stage_hint=stage_hint, governing=governing
         )
     else:
         system, user = build_section_prompt(
@@ -502,6 +521,7 @@ async def generate_section_prose(
             prev_section_content=prev_section_content,
             records=records,
             stage_hint=stage_hint,
+            governing=governing,
         )
 
     content, _usage, finish_reason = await client.generate_with_meta(

@@ -173,6 +173,8 @@ export interface JobStore {
     extendSeconds?: number
   ): Promise<boolean>;
   completeJob(jobId: string, worker: string, result: Record<string, unknown>): Promise<boolean>;
+  /** What a section is written against, read when it is written. Optional: the test double has none. */
+  loadGoverning?(payload: DraftSectionPayload): Promise<{ governing: string; sources: NonNullable<PMInput['sources']> }>;
   failJob(
     jobId: string,
     worker: string,
@@ -215,6 +217,8 @@ export interface SectionGenerator {
     stage_hint?: string;
     /** Carry on a section cut off at the length limit; the reply is what comes next. */
     continuation?: SectionContinuationRequest;
+    /** The earlier stages' current text. */
+    governing?: string;
   }): Promise<{ content: string; finish_reason: string }>;
 
   extractSectionRecord(req: {

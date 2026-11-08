@@ -7,7 +7,7 @@
  * SECURITY DEFINER function that re-checks ownership for itself.
  */
 
-import { referencePayload } from '@/lib/workflow/references';
+import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { hintWithImages } from '@/lib/data/images';
 import { createClient } from '@/lib/supabase/client';
 import { DRAFT_SECTION, type DraftSectionPayload, type SectionRevisePayload } from '@/lib/jobs/types';
@@ -30,25 +30,12 @@ const JOB_COLUMNS =
   'id, kind, status, payload, attempts, max_attempts, error_code, error_message, created_at';
 
 export function inputsFromProject(project: Project): PMInput {
-  return {
-    objective: project.objective,
-    audience: project.audience,
-    constraints: project.constraints,
-    output_format: project.output_format,
-    context: project.context ?? '',
-    // Chapters are written to it too, not only the stages written in the browser.
-    ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
-    ...(project.third_party?.length ? { third_party: project.third_party } : {}),
-    mode: project.mode,
-    custom_name: project.custom_name,
-    custom_preamble: project.custom_preamble,
-    custom_tone: project.custom_tone,
-    session_facts: project.session_facts,
-    // The drain sends it as the language header: a chapter is written in the project's language.
-    language: project.language ?? 'en',
-    // A chapter written in the background draws on the same other projects.
-    ...(project.references?.some((r) => !r.deleted) ? { references: referencePayload(project.references) } : {}),
-  };
+  // What a stage written in the browser is given: the current facts, what the
+  // user removed, what they instructed (8 Nov, production: a chapter repair was
+  // told a correction was needed and shown none of it). Sources are read when
+  // the job runs: they are long, and this payload is polled while it waits.
+  const { sources: _sources, ...inputs } = inputsFrom(project);
+  return inputs;
 }
 
 /**

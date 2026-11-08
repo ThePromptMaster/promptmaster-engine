@@ -133,6 +133,8 @@ class GenerateSectionProseRequest(BaseModel):
     revision: SectionRevisionBrief | None = None
     #: Set when the section was cut off at the length limit: carry it on.
     continuation: SectionContinuation | None = None
+    #: The earlier stages' current text, read when the job runs: it governs.
+    governing: str = Field(default="", max_length=20_000)
     #: The long-form stage's own `entry_prompt_hint` — how this workflow wants
     #: a section written. It never reached the chapter prompt before 2026-10-03.
     stage_hint: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
@@ -333,6 +335,7 @@ async def api_generate_section_prose(
             revision=req.revision,
             stage_hint=req.stage_hint,
             continuation=req.continuation,
+            governing=req.governing,
         )
     except OpenRouterError as e:
         raise llm_http_error(

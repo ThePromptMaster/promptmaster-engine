@@ -155,6 +155,35 @@ def test_a_cut_off_section_is_carried_on_from_its_unfinished_sentence(client_for
     assert "How minds defend beliefs" in prompt
 
 
+@pytest.mark.parametrize("extra", [
+    {},
+    {"revision": {"stage_label": "Revision", "instruction": "Fix it.", "notes": "", "current_content": "Old text."}},
+    {"continuation": {"text_so_far": "Old text and", "unfinished": "Old text and"}},
+])
+def test_every_way_of_writing_a_section_sees_the_current_plan(client_for_app, extra):
+    """7 Nov, production: Regenerate wrote a schedule the Core plan did not hold."""
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("Text.", {}, "stop"))
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Body", "abstract": "b"}],
+        "section_index": 0,
+        "governing": "### Core plan\nNorth 4/4/4/4/4/4/3/3.",
+        **extra,
+    })
+    assert r.status_code == 200
+    prompt = mock_llm.generate_with_meta.call_args.kwargs["prompt"]
+    assert "North 4/4/4/4/4/4/3/3." in prompt
+    assert "they govern" in prompt
+
+
+def test_a_section_with_no_earlier_stages_says_nothing_about_them(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("Text.", {}, "stop"))
+    api_client.post("/api/generate-section-prose", json={"inputs": _basic_inputs_dict(), "outline": [{"id": "s1", "title": "Body", "abstract": "b"}], "section_index": 0})
+    assert "they govern" not in mock_llm.generate_with_meta.call_args.kwargs["prompt"]
+
+
 def test_a_section_that_was_already_complete_adds_nothing(client_for_app):
     api_client, mock_llm = client_for_app
     mock_llm.generate_with_meta = AsyncMock(return_value=("SECTION ALREADY COMPLETE", {}, "stop"))
