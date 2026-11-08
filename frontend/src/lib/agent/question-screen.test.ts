@@ -55,6 +55,12 @@ describe('what happens to a question once read (8 Nov)', () => {
     expect(planFromScreen(screen({ verdict: 'routine_repair', instruction: 'x' }), { ...base, allowed: [] })).toEqual({ kind: 'ask' });
   });
 
+  it('an approval already given is not asked again after routine repairs', () => {
+    const plan = planFromScreen(screen({ verdict: 'reserved_approval' }), { ...base, approvalStands: true, allowed: ['declare_objective_complete'] });
+    expect(plan.kind === 'repair' && plan.move.action_key).toBe('declare_objective_complete');
+    expect(planFromScreen(screen({ verdict: 'reserved_approval' }), { ...base, approvalStands: false, allowed: ['declare_objective_complete'] })).toEqual({ kind: 'ask' });
+  });
+
   it('everything else is asked', () => {
     for (const verdict of ['business_decision', 'reserved_approval', 'missing_input'] as const) {
       expect(planFromScreen(screen({ verdict }), base)).toEqual({ kind: 'ask' });

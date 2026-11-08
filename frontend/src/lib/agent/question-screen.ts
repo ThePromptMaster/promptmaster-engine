@@ -48,9 +48,21 @@ export function planFromScreen(
     stage: Pick<StageDefinition, 'transitions'>;
     allowed: readonly string[];
     returnsLeft: number;
+    /** The approval was given on an earlier version, and only Go's routine repairs came since. */
+    approvalStands?: boolean;
   }
 ): ScreenPlan {
   if (screen.verdict === 'real_world_action') return { kind: 'record', action: screen.action, reason: screen.reason };
+  if (screen.verdict === 'reserved_approval' && input.approvalStands && input.allowed.includes('declare_objective_complete')) {
+    return {
+      kind: 'repair',
+      move: {
+        action_key: 'declare_objective_complete', params: {},
+        rationale: 'Not asking for your approval again: it stands for the version you approved, and every version since is one of my routine repairs.',
+        expected_outcome: 'The objective judged on the current version, with your approval shown against the version it was given on.',
+      },
+    };
+  }
   if (screen.verdict !== 'routine_repair' || !screen.instruction.trim()) return { kind: 'ask' };
   const instead = `Instead of asking "${input.question.slice(0, 200)}": ${screen.reason || 'this is routine work, and routine decisions are mine to handle.'}`;
   if (screen.target_stage) {

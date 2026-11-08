@@ -442,7 +442,7 @@ export function staleRepair(
       };
     }
     if (st?.status !== 'stale') {
-      if (carried?.rows.length && stage.id === carried.deliverableId && isDone(st?.status) && stage.renderer === 'prose') {
+      if (carried?.rows.length && stage.id === carried.deliverableId && (isDone(st?.status) || open) && stage.renderer === 'prose') {
         const rows = carried.rows.slice(0, 8);
         return {
           key: 'recheck_stage',

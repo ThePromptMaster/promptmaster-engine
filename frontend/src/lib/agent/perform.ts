@@ -1196,7 +1196,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const measuredRepair = Boolean(params.measured) && (isDone(st?.status) || (st?.status === 'in_progress' && drafted)) && measuredFails.length > 0;
       // 12 Oct: findings a review carried forward as still unmet, under "handle them for me".
       const carriedRows = Array.isArray(params.carried) ? params.carried.filter((r): r is string => typeof r === 'string' && r.trim().length > 0) : [];
-      const carriedRepair = !measuredRepair && carriedRows.length > 0 && isDone(st?.status) && drafted;
+      const carriedRepair = !measuredRepair && carriedRows.length > 0 && (isDone(st?.status) || st?.status === 'in_progress') && drafted;
       if (!target || (st?.status !== 'stale' && !measuredRepair && !carriedRepair)) {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
@@ -2227,7 +2227,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           // Met on this text; an approval given on an earlier one still needs
           // saying, or "done" reads as approved (5 Nov).
           const earlier = approvalsOnEarlierVersion(ctx.project, ctx.template, ctx.bundles)
-            .map((a) => ` Your approval "${a.approval}" was given on ${a.label} v${a.version}; the current version is v${a.current}, so re-confirm it if it should stand.`)
+            .map((a) => ` Your approval "${a.approval}" was given on ${a.label} v${a.version}; the current version is v${a.current}, so re-confirm it if it should stand.${a.since?.length ? ` Changed since: ${a.since.slice(0, 3).join('; ')}.` : ''}`)
             .join('');
           return done(key, {
             ...judged, status: 'succeeded',

@@ -659,3 +659,18 @@ describe('chapters cut off mid-sentence are finished before anything else (8 Nov
   });
 });
 
+describe('what the final check found unmet (8 Nov, production)', () => {
+  const tpl = { stages: [{ id: 'final', label: 'Final', renderer: 'prose', transitions: {} }] } as unknown as Parameters<typeof staleRepair>[0];
+  const state = (status: string) => ({ current_stage_id: 'final', stages: { final: { status } } }) as unknown as Parameters<typeof staleRepair>[1];
+  const carried = { deliverableId: 'final', rows: ['Checklist item 7 contradicts the verdict.'] };
+
+  it('is repaired on a written stage still in progress, as on a finished one', () => {
+    expect(staleRepair(tpl, state('in_progress'), [], {}, new Set(['final']), carried)?.params).toMatchObject({ stage_id: 'final', carried: carried.rows });
+    expect(staleRepair(tpl, state('complete'), [], {}, new Set(['final']), carried)?.params).toMatchObject({ stage_id: 'final' });
+  });
+  it('not on a stage with nothing written, and not past the tries', () => {
+    expect(staleRepair(tpl, state('in_progress'), [], {}, new Set(), carried)).toBeNull();
+    expect(staleRepair(tpl, state('complete'), ['final', 'final'], {}, new Set(['final']), carried)).toBeNull();
+  });
+});
+
