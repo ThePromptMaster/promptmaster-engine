@@ -135,6 +135,39 @@ def test_generate_section_prose_returns_only_prose(client_for_app):
     assert r.json() == {"content": "Section prose.", "finish_reason": "stop"}
 
 
+def test_a_cut_off_section_is_carried_on_from_its_unfinished_sentence(client_for_app):
+    """8 Nov, production: chapters ended "Tet" and "treating a cons"."""
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("Tetlock showed this. The end.", {}, "stop"))
+
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Minds", "abstract": "How minds defend beliefs"}],
+        "section_index": 0,
+        "continuation": {"text_so_far": "Earlier text. In 2005, Tet", "unfinished": "In 2005, Tet"},
+    })
+    assert r.status_code == 200
+    assert r.json() == {"content": "Tetlock showed this. The end.", "finish_reason": "stop"}
+    prompt = mock_llm.generate_with_meta.call_args.kwargs["prompt"]
+    assert "Earlier text. In 2005, Tet" in prompt
+    assert 'unfinished: "In 2005, Tet"' in prompt
+    assert "Begin your reply with that sentence" in prompt
+    assert "How minds defend beliefs" in prompt
+
+
+def test_a_section_that_was_already_complete_adds_nothing(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("SECTION ALREADY COMPLETE", {}, "stop"))
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Body", "abstract": "b"}],
+        "section_index": 0,
+        "continuation": {"text_so_far": "It ends here without a stop"},
+    })
+    assert r.json() == {"content": "", "finish_reason": "stop"}
+    assert "It stops at the end of a sentence" in mock_llm.generate_with_meta.call_args.kwargs["prompt"]
+
+
 def test_generate_section_prose_rejects_out_of_range_index(client_for_app):
     api_client, _ = client_for_app
     r = api_client.post("/api/generate-section-prose", json={

@@ -483,6 +483,18 @@ class SectionRevisionBrief(BaseModel):
     record: str = Field(default="", max_length=200_000)
 
 
+class SectionContinuation(BaseModel):
+    """A section the model stopped writing at its length limit, to be carried on.
+
+    `text_so_far` is the end of the section as it stands (the model needs where
+    it stopped, not the whole chapter). `unfinished` is its last, incomplete
+    sentence, which the reply starts with so the join is exact even when the cut
+    fell in the middle of a word.
+    """
+    text_so_far: str = Field(..., max_length=40_000)
+    unfinished: str = Field(default="", max_length=4_000)
+
+
 class GenerateSectionProseResponse(BaseModel):
     """Response from the prose-only call (step 2 of a drafting job).
 

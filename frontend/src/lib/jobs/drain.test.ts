@@ -89,7 +89,8 @@ class FakeStore implements JobStore {
     section: OutlineSectionState,
     revision = 0,
     revise?: DraftSectionPayload['revise'],
-    stageHint?: string
+    stageHint?: string,
+    continueOnly = false
   ): void {
     const key = `draft:${OUTLINE_VERSION}:${section.id}:${revision}`;
     // on conflict do nothing — the idempotency guarantee.
@@ -108,6 +109,7 @@ class FakeStore implements JobStore {
       ...(revise ? { revise } : {}),
       ...(stageHint ? { stage_hint: stageHint } : {}),
     };
+    if (continueOnly) payload.continue_only = true;
     this.jobs.push({
       id: `job-${section.id}-${revision}`,
       user_id: USER,
@@ -299,6 +301,10 @@ class CountingGenerator implements SectionGenerator {
   recordCalls: string[] = [];
   /** Sections whose prose call should throw, and with what. */
   proseFailures = new Map<string, Error>();
+  /** Replies handed out first, in order, before the counting reply. */
+  scripted: { content: string; finish_reason: string }[] = [];
+  /** What each continuation call was shown. */
+  continuations: { text_so_far: string; unfinished: string }[] = [];
 
   constructor(private clock: Clock, private msPerCall = 5_000) {}
 
@@ -312,6 +318,7 @@ class CountingGenerator implements SectionGenerator {
     section_index: number;
     revision?: unknown;
     stage_hint?: string;
+    continuation?: { text_so_far: string; unfinished: string };
   }): Promise<{ content: string; finish_reason: string }> {
     const section = req.outline[req.section_index];
     if (req.revision) this.revisions.set(section.id, req.revision);
@@ -320,6 +327,9 @@ class CountingGenerator implements SectionGenerator {
     const failure = this.proseFailures.get(section.id);
     if (failure) throw failure;
     this.proseCalls.push(section.id);
+    if (req.continuation) this.continuations.push(req.continuation);
+    const next = this.scripted.shift();
+    if (next) return next;
     // Content is unique per call, so a duplicate write is detectable as content
     // rather than only as a count.
     return {
@@ -583,6 +593,96 @@ describe('FR-05: resumable ten-section drafting', () => {
 // ---------------------------------------------------------------------------
 // Concurrency
 // ---------------------------------------------------------------------------
+
+describe('a chapter cut off at the length limit (8 Nov, production)', () => {
+  function oneSection(msPerCall = 5_000) {
+    const clock = new Clock();
+    const store = new FakeStore(clock);
+    store.outline = tenSections().slice(0, 1);
+    const generator = new CountingGenerator(clock, msPerCall);
+    return { clock, store, generator };
+  }
+  const CUT = 'The first sentence is whole. In *Judgment* (2005), as the whole of that book reports at length, Tet';
+
+  it('carries the section on from its unfinished sentence, in one job', async () => {
+    const { clock, store, generator } = oneSection();
+    store.enqueue(0, store.outline[0]);
+    generator.scripted = [
+      { content: CUT, finish_reason: 'length' },
+      { content: 'In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it. The end.', finish_reason: 'stop' },
+    ];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(store.outline[0].content).toBe('The first sentence is whole. In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it. The end.');
+    expect(store.outline[0].finish_reason).toBe('stop');
+    expect(generator.continuations).toHaveLength(1);
+    expect(generator.continuations[0].unfinished).toBe('In *Judgment* (2005), as the whole of that book reports at length, Tet');
+    expect(generator.recordCalls).toEqual(['s0']);
+  });
+
+  it('stops after three continuations and leaves the section marked cut', async () => {
+    const { clock, store, generator } = oneSection();
+    store.enqueue(0, store.outline[0]);
+    generator.scripted = [CUT, 'More text that goes on, and on, without ever coming to the end of', 'Still more text that goes on and on and on, and still does not end', 'And yet more text that goes on and on and on without an ending of'].map((content) => ({ content, finish_reason: 'length' }));
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations).toHaveLength(3);
+    expect(store.outline[0].finish_reason).toBe('length');
+    expect(store.jobFor('s0').status).toBe('succeeded');
+  });
+
+  it('a revision that hands the cut text back is still cut, whatever the model says', async () => {
+    const { clock, store, generator } = oneSection();
+    Object.assign(store.outline[0], { status: 'complete', content: CUT, finish_reason: 'length', revision: 1 });
+    store.enqueue(0, store.outline[0], 2, { stage_label: 'Revision', instruction: 'x', notes: '' });
+    generator.scripted = [
+      { content: CUT, finish_reason: 'stop' },
+      { content: 'In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it.', finish_reason: 'stop' },
+    ];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations).toHaveLength(1);
+    expect(store.outline[0].content).toContain('Tetlock found it.');
+    expect(store.outline[0].finish_reason).toBe('stop');
+  });
+
+  it('a section marked stop by an old pass but cut is carried on when queued for it, and nothing else is rewritten', async () => {
+    const { clock, store, generator } = oneSection();
+    Object.assign(store.outline[0], { status: 'complete', content: CUT, finish_reason: 'stop', revision: 3 });
+    store.enqueue(0, store.outline[0], 4, undefined, undefined, true);
+    generator.scripted = [{ content: 'In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it.', finish_reason: 'stop' }];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.proseCalls).toEqual(['s0']);
+    expect(store.outline[0].content.startsWith('The first sentence is whole. ')).toBe(true);
+    expect(store.outline[0].content).toContain('Tetlock found it.');
+  });
+
+  it('when the model says the section was complete, the text stands and it stops counting as cut', async () => {
+    const { clock, store, generator } = oneSection();
+    Object.assign(store.outline[0], { status: 'complete', content: CUT, finish_reason: 'length', revision: 1 });
+    store.enqueue(0, store.outline[0], 2, undefined, undefined, true);
+    generator.scripted = [{ content: '', finish_reason: 'stop' }];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(store.outline[0].content).toBe(CUT);
+    expect(store.outline[0].finish_reason).toBe('stop');
+  });
+
+  it('a worker that died after saving a cut section still owes its continuation', async () => {
+    const { clock, store, generator } = oneSection();
+    store.enqueue(0, store.outline[0]);
+    Object.assign(store.outline[0], { status: 'complete', content: CUT, finish_reason: 'length', revision: 1 });
+    generator.scripted = [{ content: 'In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it.', finish_reason: 'stop' }];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations).toHaveLength(1);
+    expect(store.outline[0].finish_reason).toBe('stop');
+  });
+
+  it('a section that came back whole is not continued', async () => {
+    const { clock, store, generator } = oneSection();
+    store.enqueue(0, store.outline[0]);
+    generator.scripted = [{ content: 'A whole section that ended properly.', finish_reason: 'stop' }];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations).toHaveLength(0);
+    expect(generator.proseCalls).toEqual(['s0']);
+  });
+});
 
 describe('concurrent drains', () => {
   it('runs ten sections in order with no duplicated work across three drains', async () => {

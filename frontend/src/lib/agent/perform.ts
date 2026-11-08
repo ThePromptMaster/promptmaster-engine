@@ -12,7 +12,8 @@ import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib
 import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
-import { enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
+import { cutSections } from '@/lib/jobs/continuation';
+import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
 import { addStepCost } from '@/lib/supabase/model-usage';
@@ -131,7 +132,7 @@ export interface PerformContext {
   refresh?: () => unknown;
   /** Live progress for a long step ("2 of 5 sections written"). */
   onProgress?: (text: string) => void;
-  appendStageVersion?: (stageId: string, name: string, version: NewVersion, evaluation?: undefined, options?: { keepRecommendations?: readonly string[]; writtenFor?: string }) => Promise<unknown>;
+  appendStageVersion?: (stageId: string, name: string, version: NewVersion, evaluation?: undefined, options?: { keepRecommendations?: readonly string[]; writtenFor?: string; keepLaterStages?: boolean }) => Promise<unknown>;
   recordStageEvaluation?: (stageId: string, versionId: string, evaluation: NewEvaluation) => Promise<Evaluation>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
   setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
@@ -1156,6 +1157,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
       const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
       const st = target ? ctx.state.stages[target.id] : undefined;
+      if (target?.renderer === 'long_form' && params.cut) return finishCutChapters(ctx, key, target);
       // L-63 (9 Oct): a finished stage whose measured requirement fails
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
@@ -2566,6 +2568,43 @@ async function recheckManuscript(
     ...wrote,
     output: `${wrote.output} ${target.label} was repaired (${why})${evaluation.canAdvance && (evidence || actor === 'user') ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
+}
+
+/**
+ * Carry on the sections cut off at the length limit (8 Nov, production). Only
+ * what is missing is written, so the stages after it are not reopened: they
+ * read the same chapters, now with their endings.
+ */
+async function finishCutChapters(ctx: PerformContext, key: string, target: StageDefinition): Promise<StepOutcome> {
+  const holder = manuscriptArtifactFor(ctx.template, target, ctx.bundles);
+  const fresh = holder ? await getArtifact(holder.id) : null;
+  const outline = fresh?.long_form?.outline ?? [];
+  const events = await listWorkflowEvents(ctx.project.id);
+  const cut = cutSections(outline, events);
+  if (!fresh || !cut.length) return done(key, { status: 'failed', output: `${target.label} has no section cut off now.`, toolsUsed: [], changes: {} });
+  if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+  const append = ctx.appendStageVersion;
+  const ids = await enqueueContinueJobs({
+    project: ctx.project, artifactId: fresh.id, stageId: target.id,
+    approvedOutlineVersionId: approvedOutlineVersionId(events),
+    targets: cut.map((s) => ({ id: s.id, index: outline.indexOf(s), revision: s.revision })),
+    stageHint: target.entry_prompt_hint,
+    jobs: await listProjectJobs(ctx.project.id).catch(() => []),
+  });
+  const wrote = await waitForSections(ctx, key, ids, 'Finished', { artifactId: fresh.id, outline });
+  if (wrote.status !== 'succeeded') return wrote;
+  await ctx.refresh?.();
+  const after = await getArtifact(fresh.id);
+  const still = cutSections(after?.long_form?.outline ?? [], await listWorkflowEvents(ctx.project.id));
+  if (still.length) {
+    return done(key, { ...wrote, status: 'failed', output: `${wrote.output} Still cut off: ${still.map((s) => s.title).join('; ')}.` });
+  }
+  // The saved full draft follows the chapters; nothing after it is reopened.
+  await stageEvidence({
+    template: ctx.template, stage: target, bundles: await withCurrentLongForm(ctx.template, target, ctx.bundles), project: ctx.project,
+    appendStageVersion: (stageId, name, version) => append(stageId, name, version, undefined, { keepLaterStages: true }),
+  });
+  return done(key, { ...wrote, output: `${wrote.output} Every section of ${target.label} now ends on a complete sentence; nothing already written changed.` });
 }
 
 /** Rows that are a revision note ("What changed: …") rather than one of the stage's items. */

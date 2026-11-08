@@ -20,6 +20,7 @@
  * tab close discards a section that was already finished and already billed.
  */
 
+import { continuationTail, endsMidSentence, joinContinuation, MAX_CONTINUE_ROUNDS, splitUnfinished } from './continuation';
 import { classifyDrainError, classified, withPreserved } from './errors';
 import { drainLog } from './log';
 import { withoutRemoved } from '@/lib/workflow/removed-text';
@@ -221,7 +222,12 @@ async function runStep(args: StepArgs): Promise<StepOutcome> {
     return { done: true };
   }
 
+  if (checkpoint.step === 'continue') return await runContinueStep(args, context, checkpoint.rounds ?? 0);
+
   if (checkpoint.step === 'prose') {
+    // A section cut off at the limit, queued to be carried on: no new draft.
+    if (payload.continue_only && context.section.content) return await runContinueStep(args, context, 0);
+
     // The artifact, not the checkpoint, is the authority on whether prose
     // exists. A worker can die after write_long_form_section commits but before
     // checkpoint_job lands, and in that window the checkpoint still says
@@ -240,11 +246,14 @@ async function runStep(args: StepArgs): Promise<StepOutcome> {
     ) {
       return {
         done: false,
-        checkpoint: {
-          step: 'record',
-          prose_written: true,
-          finish_reason: context.section.finish_reason ?? 'stop',
-        },
+        // A worker that died after saving a cut section still owes its continuation.
+        checkpoint: context.section.finish_reason === 'length'
+          ? { step: 'continue', rounds: 0 }
+          : {
+              step: 'record',
+              prose_written: true,
+              finish_reason: context.section.finish_reason ?? 'stop',
+            },
       };
     }
     return await runProseStep(args, context);
@@ -273,6 +282,11 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
   // A sentence the user removed stays out of a chapter too (28 Oct), unless
   // this revision's instruction asks for it back.
   const kept = withoutRemoved(prose.content, payload.inputs.removed_text, payload.revise?.instruction ?? '');
+  // A pass over a cut section that hands the same cut text back is still cut,
+  // whatever the model's stop reason says (8 Nov, production).
+  const finishReason = prose.finish_reason !== 'length' && context.section?.finish_reason === 'length' && endsMidSentence(kept.text)
+    ? 'length'
+    : prose.finish_reason;
 
   // COMMIT. Everything above this line is redoable; everything below is not
   // worth redoing. This ordering is the entire mechanism behind "completed
@@ -282,15 +296,60 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
     worker,
     sectionId: payload.section_id,
     content: kept.text,
-    finishReason: prose.finish_reason,
+    finishReason,
     outlineVersionId: payload.outline_version_id,
   });
 
-  const next: DraftCheckpoint = {
-    step: 'record',
-    prose_written: true,
-    finish_reason: prose.finish_reason,
+  const next: DraftCheckpoint = finishReason === 'length'
+    ? { step: 'continue', rounds: 0 }
+    : { step: 'record', prose_written: true, finish_reason: finishReason };
+  await store.checkpointJob(job.id, worker, next, 120);
+  return { done: false, checkpoint: next };
+}
+
+/**
+ * Carry on a section the model stopped at its length limit, a round at a time,
+ * each committed like the prose it continues: a worker killed between rounds
+ * resumes from what was saved.
+ */
+async function runContinueStep(args: StepArgs, context: SectionContext, rounds: number): Promise<StepOutcome> {
+  const { job, payload, store, generator, worker } = args;
+  const section = context.section!;
+  const toRecord = async (finishReason: string): Promise<StepOutcome> => {
+    const next: DraftCheckpoint = { step: 'record', prose_written: true, finish_reason: finishReason };
+    await store.checkpointJob(job.id, worker, next, 120);
+    return { done: false, checkpoint: next };
   };
+  const cut = section.finish_reason === 'length' || Boolean(payload.continue_only && endsMidSentence(section.content));
+  // Finished, by an earlier round or an earlier worker; or as far as this job goes.
+  if (!cut || rounds >= MAX_CONTINUE_ROUNDS) return toRecord(section.finish_reason ?? 'stop');
+
+  const { kept, unfinished } = splitUnfinished(section.content);
+  const reply = await generator.generateSectionProse({
+    inputs: payload.inputs,
+    outline: context.outline,
+    section_index: payload.section_index,
+    records: context.records,
+    prev_section_content: '',
+    model: payload.model,
+    userId: job.user_id,
+    ...(payload.stage_hint ? { stage_hint: payload.stage_hint } : {}),
+    continuation: { text_so_far: continuationTail(section.content), unfinished },
+  });
+
+  // Nothing to add: the section was complete, and it stops being counted as cut.
+  const content = reply.content.trim() ? joinContinuation(kept, reply.content) : section.content;
+  const finishReason = reply.content.trim() ? reply.finish_reason : 'stop';
+  await store.writeSection({
+    artifactId: payload.artifact_id,
+    worker,
+    sectionId: payload.section_id,
+    content: withoutRemoved(content, payload.inputs.removed_text, '').text,
+    finishReason,
+    outlineVersionId: payload.outline_version_id,
+  });
+  if (finishReason !== 'length') return toRecord(finishReason);
+  const next: DraftCheckpoint = { step: 'continue', rounds: rounds + 1 };
   await store.checkpointJob(job.id, worker, next, 120);
   return { done: false, checkpoint: next };
 }
@@ -389,6 +448,7 @@ async function recordFailure(args: FailureArgs): Promise<void> {
 
 function normaliseCheckpoint(raw: Record<string, unknown> | null | undefined): DraftCheckpoint {
   const step = raw?.step;
+  if (step === 'continue') return { step: 'continue', rounds: typeof raw?.rounds === 'number' ? raw.rounds : 0 };
   if (step === 'record') {
     return {
       step: 'record',

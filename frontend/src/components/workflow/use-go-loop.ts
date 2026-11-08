@@ -774,7 +774,7 @@ export function useGoLoop(opts: Options) {
         // planner's, not the same repair forced again (13 Oct).
         const repair = reconsider?.withdrawn.includes('recheck_stage')
           ? null
-          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried);
+          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])));
         if (repair) allowed.push('recheck_stage');
         // A reopened stage whose repairs are used up is the user's next
         // decision, said with what is unresolved (13 Oct, screenplay).
