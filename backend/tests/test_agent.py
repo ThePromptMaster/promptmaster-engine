@@ -943,3 +943,11 @@ def test_the_users_delegation_reaches_the_planner_in_their_words():
     assert f"- {said}" in user
     assert "including a correction the brief or the supplied facts already settle" in user
     assert "Ask only for what they reserve to the user." in user
+
+
+def test_a_move_outside_the_list_is_marked_so_the_browser_can_say_what_is_waited_for():
+    from promptmaster.agent import parse_next_action
+    out = parse_next_action({"action_key": "advance_stage"}, ["revise_stage"])
+    assert out.action_key == "request_user_decision"
+    assert out.params == {"unplanned": "advance_stage"}
+

@@ -608,3 +608,16 @@ describe('the whole document\'s hedged length, counted (8 Nov)', () => {
   });
 });
 
+describe('a limit inside a plain list belongs to the item it closes (8 Nov, production)', () => {
+  it('holds the email to it, not the first thing listed', () => {
+    const reqs = parseRequirements(['Operations handoff package of roughly 900–1,200 words: delivery plan, staffing schedule, budget, attendee email (under 150 words), and handoff checklist for the person taking over']);
+    const limited = reqs.filter((r) => r.max === 150);
+    expect(limited.map((r) => r.subject)).toEqual(['email']);
+  });
+
+  it('an item with parts of its own still opens with what it is', () => {
+    const reqs = parseRequirements(['a decision memo (≤400 words), one fictional practice case with interview exercise, sample summary, and facilitator notes (≤900 words), a pilot evaluation plan (≤500 words)']);
+    expect(reqs.map((r) => r.subject)).toEqual(expect.arrayContaining(['memo', 'practice case', 'evaluation plan']));
+  });
+});
+
