@@ -67,6 +67,8 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.inventedLabel': '你未提供的细节',
   'chat.invented': '这处修改添加了你未提供的细节，而你要求不要编造：',
   'chat.inventedHelp': '如果需要某个细节，请在对话中告诉我真实的信息。',
+  'chat.workingLabel': '文中残留的演算',
+  'chat.working': '此修订仍包含模型自己的演算内容。请调整要求，或在使用前修正这些行：',
   'chat.takeOut': '删除这些内容',
   'chat.appending': '应用后会追加一个新版本。你正在阅读的版本会保留，并且可以恢复。',
   'chat.applyNew': '作为新版本应用',

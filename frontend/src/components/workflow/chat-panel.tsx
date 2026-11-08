@@ -762,6 +762,7 @@ export function ChatPanel({
             onTogglePutBack={chat.togglePutBack}
             removedUnasked={chat.proposal.removedUnasked}
             addedClaims={chat.proposal.addedClaims}
+            workingNotes={chat.proposal.workingNotes}
             revisedFrom={chat.proposal.revisedFrom}
             onRemoveClaims={() => {
               const p = chat.proposal;
@@ -1166,6 +1167,7 @@ export function ProposalCard({
   onTogglePutBack,
   removedUnasked = [],
   addedClaims = [],
+  workingNotes = [],
   onRemoveClaims,
   revisedFrom,
   onAccept,
@@ -1184,6 +1186,8 @@ export function ProposalCard({
   removedUnasked?: string[];
   /** Personal details the revision added that nobody supplied (14 Oct). */
   addedClaims?: AddedClaim[];
+  /** The model's own working left in the revision (7 Nov): "see below", "correction to the line above". */
+  workingNotes?: string[];
   onRemoveClaims?: () => void;
   /** What the revision changes, in one line (13 Oct). */
   summary?: string;
@@ -1264,6 +1268,17 @@ export function ProposalCard({
               {t('chat.alsoGone', { lines: describeLines(removedUnasked, 2) })}
             </p>
           )}
+        </div>
+      )}
+
+      {workingNotes.length > 0 && (
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label={t('chat.workingLabel')}>
+          <p className="text-label text-[var(--on-surface)]">{t('chat.working')}</p>
+          <ul className="mt-1 list-disc ps-5 text-label text-[var(--on-surface-variant)]">
+            {workingNotes.map((line) => (
+              <li key={line}>“{line}”</li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -67,6 +67,8 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.inventedLabel': 'Maelezo ambayo hukutoa',
   'chat.invented': 'Hili linaongeza maelezo ambayo hukutoa. Uliomba yasibuniwe yoyote:',
   'chat.inventedHelp': 'Ikiwa maelezo fulani yangesaidia, niambie halisi kwenye gumzo.',
+  'chat.workingLabel': 'Hesabu zilizobaki kwenye maandishi',
+  'chat.working': 'Marekebisho haya bado yana hesabu za mfumo. Rekebisha ombi, au sahihisha mistari hii kabla ya kuitegemea:',
   'chat.takeOut': 'Ondoa haya',
   'chat.appending': 'Kutumia kunaongeza toleo jipya. Lile unalosoma linahifadhiwa na linaweza kurejeshwa.',
   'chat.applyNew': 'Tumia kama toleo jipya',

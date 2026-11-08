@@ -95,3 +95,25 @@ describe('a repair whose figures equal an old value (2 Nov, photography workshop
     expect(out.output).toContain('Lines that record an old value as superseded are history and are kept');
   });
 });
+
+describe("a repair holding the model's own working (7 Nov, production)", () => {
+  const WORKING = `${NEW_PLAN}\nCorrection to the total line above: $900.`;
+
+  it('is told to take it out, and the clean text is saved', async () => {
+    generateStageArtifact.mockResolvedValueOnce({ content: WORKING, items: [], finish_reason: 'stop', model_used: 'm' });
+    generateStageArtifact.mockResolvedValue({ content: NEW_PLAN, items: [], finish_reason: 'stop', model_used: 'm' });
+    const { c, saved } = ctx();
+    await performStep(c);
+    expect(generateStageArtifact).toHaveBeenCalledTimes(2);
+    expect(generateStageArtifact.mock.calls[1][0].instruction).toContain('YOUR PREVIOUS ATTEMPT LEFT YOUR WORKING IN THE TEXT');
+    expect(saved.at(-1)?.content).not.toContain('Correction to the total');
+  });
+
+  it('is not saved at all when it comes back with the working still in it', async () => {
+    generateStageArtifact.mockResolvedValue({ content: WORKING, items: [], finish_reason: 'stop', model_used: 'm' });
+    const { c, saved } = ctx();
+    await expect(performStep(c)).rejects.toThrow(/still holds the model's working, so it was not saved/);
+    expect(saved).toHaveLength(0);
+  });
+});
+

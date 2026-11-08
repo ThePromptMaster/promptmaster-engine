@@ -58,6 +58,7 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { creditStop, OUT_OF_CREDITS } from './credit-stop';
+import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
@@ -584,7 +585,22 @@ async function searchLiterature(ctx: PerformContext, key: string, wanted: string
 const withAnswer = (instruction: string, answer?: string) =>
   answer ? `${instruction}\nThe user was asked which takes priority and answered: "${answer}". Follow that.` : instruction;
 
-export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
+/** Go never saves a version holding the model's own working: the step fails and the current version stands. */
+function refusingWorkingText(ctx: PerformContext): PerformContext {
+  const append = ctx.appendStageVersion;
+  if (!append) return ctx;
+  return {
+    ...ctx,
+    appendStageVersion: (stageId, name, version, evaluation, options) => {
+      const notes = version.source_operation?.startsWith('agent_') ? strayWorkingText(version.content) : [];
+      if (notes.length) throw new WorkingTextInSave(name, notes);
+      return append(stageId, name, version, evaluation, options);
+    },
+  };
+}
+
+export async function performStep(raw: PerformContext): Promise<StepOutcome> {
+  const ctx = refusingWorkingText(raw);
   const key = ctx.step.action_key;
   const params = ctx.step.params ?? {};
   // The stage's own mode (13 Oct): Critique is worked as Cold Critic unless the user keeps theirs.
@@ -1308,6 +1324,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (content && staleClaims.length) {
         ({ res, content } = await attempt(
           `${instruction} YOUR PREVIOUS ATTEMPT KEPT THESE SENTENCES WORD FOR WORD, though they no longer follow: ${staleClaims.map((c) => `"${c.quote}"`).join('; ')}. Rewrite or remove each.`
+        ));
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
+      }
+      // The model's own working in the text is taken out now; left in, the save is refused (7 Nov).
+      const stray = content ? strayWorkingText(content) : [];
+      if (content && stray.length) {
+        ({ res, content } = await attempt(
+          `${instruction} YOUR PREVIOUS ATTEMPT LEFT YOUR WORKING IN THE TEXT: ${describeWorkingText(stray)}. Give only the finished text: remove each, and state every correct figure once.`
         ));
         leftover = content ? leftoverIn(content) : [];
         staleClaims = content ? claimsStillIn(content, claims) : [];
