@@ -25,7 +25,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
-import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
+import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement, describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
@@ -2850,6 +2850,9 @@ async function judgeObjective(
   // Limits on each chapter or section, counted on this text, which a stage's own checks may not reach.
   const eachPart = holder ? eachPartMeasurements(ctx.project, content).filter((m) => !stageCounts.some((c) => c.id === m.id)) : [];
   const measured = [...stageCounts, ...eachPart].filter((m) => m.satisfied).map((m) => `${m.label} — ${m.value ?? 'met'}`);
+  // The hedged length of the whole text, counted, so "not verified" isn't left to an estimate (8 Nov).
+  const lengthLine = holder ? describeLengthTarget(wholeLengthTarget(ctx.project, content)) : '';
+  if (lengthLine) measured.push(`Length of the whole text — ${lengthLine}`);
   // The accepted findings and the text's own consistency, checked first: what
   // fails goes to the assessment as failed checks (1 Nov).
   const check = holder ? await checkDeliverable(ctx, holder, content, label, saved) : null;

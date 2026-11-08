@@ -890,3 +890,47 @@ function oneCountOfTheWhole(out: { requirement: MeasurableRequirement; whole: bo
     return [headings ? { ...e, requirement: { ...e.requirement, headings: true } } : e];
   });
 }
+
+// --- a hedged length for the whole document ---------------------------------
+
+const HEDGED_WORDS = /(?:\b(?:roughly|about|around|approximately|approx\.?)|~)\s*(\d[\d,]*)(?:\s*(?:–|—|-|to)\s*(\d[\d,]*))?[-\s]+words?\b/i;
+/** Near the figure, these make it the length of a part: "about 150 words per section", "an email of roughly 200 words". */
+const PART_OF_IT = /\b(?:per|each|every|e-?mail|summary|abstract|introduction|intro|chapter|section|paragraph|slide|letter|note|bio|caption)\b/i;
+const number = (raw: string) => Number(raw.replace(/,/g, ''));
+
+export interface LengthTarget {
+  /** As the brief said it: "roughly 900–1,200 words". */
+  said: string;
+  max: number;
+  /** Counted in code on the text. */
+  count: number;
+  over: boolean;
+}
+
+/**
+ * The length the brief hedges for the whole document, with the text counted
+ * (8 Nov; Sean, training event: "Go estimated its package was over the target
+ * and stopped to ask whether to shorten it"). Information for the planner and
+ * the objective check. L-141 stands: a hedged figure blocks nothing.
+ */
+export function wholeLengthTarget(project: { objective?: string | null; constraints?: string | null; output_format?: string | null }, text: string): LengthTarget | null {
+  if (!text.trim()) return null;
+  for (const source of [project.output_format, project.constraints, project.objective]) {
+    for (const sentence of (source ?? '').split(/(?<=[.;\n])\s+/)) {
+      const m = HEDGED_WORDS.exec(sentence);
+      if (!m) continue;
+      if (PART_OF_IT.test(sentence.slice(Math.max(0, m.index - 40), m.index + m[0].length + 20))) continue;
+      const max = number(m[2] ?? m[1]);
+      const count = countWords(text);
+      return { said: m[0].trim(), max, count, over: count > Math.ceil(max * (1 + RANGE_SLACK)) };
+    }
+  }
+  return null;
+}
+
+/** One line for the planner and the check. */
+export function describeLengthTarget(t: LengthTarget | null): string {
+  if (!t) return '';
+  return `${t.count.toLocaleString('en-US')} words, counted in code; the brief asks for ${t.said}${t.over ? ', so it is over' : ''}`;
+}
+

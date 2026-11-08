@@ -27,3 +27,15 @@ def test_the_planner_is_told_the_document_is_not_the_event():
     assert "THE DOCUMENT IS NOT THE EVENT" in agent._NEXT_ACTION_INSTRUCTION
     assert "Never ask the user whether it has happened" in agent._NEXT_ACTION_INSTRUCTION
 
+
+
+def test_the_planner_gets_the_count_and_is_told_to_shorten_without_asking():
+    from promptmaster.agent import AgentState, build_next_action_prompt
+
+    note = "1,556 words, counted in code; the brief asks for roughly 900–1,200 words, so it is over"
+    _, user = build_next_action_prompt(PMInput(objective="x", mode="analyst"), AgentState(stage_id="final", length_note=note), ["revise_stage"], "autonomous")
+    assert note in user
+    assert "never an estimate of your own" in user
+    assert "Do not ask." in user
+    _, without = build_next_action_prompt(PMInput(objective="x", mode="analyst"), AgentState(stage_id="final"), ["revise_stage"], "autonomous")
+    assert "THE DELIVERABLE'S LENGTH" not in without
