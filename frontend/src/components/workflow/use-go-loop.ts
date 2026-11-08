@@ -205,6 +205,13 @@ function answerToConflict(steps: readonly AgentStep[], stageId: string): string 
   return revisedSince ? undefined : text.trim() || undefined;
 }
 
+/** Whether the answer `answerToConflict` found is the default Go took itself. */
+function conflictAnswerIsRoutine(steps: readonly AgentStep[], stageId: string): boolean {
+  const asked = steps.map((s) => s.stage_id === stageId && s.params?.conflict_question === true).lastIndexOf(true);
+  if (asked < 0) return false;
+  return steps.slice(asked + 1).find((s) => s.action_key === USER_ANSWER_STEP || (s.action_key === ROUTINE_DEFAULT_STEP && typeof s.params?.conflict_answer === 'string'))?.action_key === ROUTINE_DEFAULT_STEP;
+}
+
 /**
  * Under autonomous + "handle them for me", a guard question that carries its
  * own record-keeping answer is not put to the user: Go takes that answer once
@@ -223,6 +230,22 @@ export function routineConflictAnswer(input: {
   if (input.policy !== 'autonomous' || input.routine !== 'handle') return null;
   const already = input.steps.some((s) => s.stage_id === input.stageId && s.action_key === ROUTINE_DEFAULT_STEP && typeof s.params?.conflict_answer === 'string');
   return already ? null : answer;
+}
+
+/**
+ * A guard's refusal that has already had its one routine answer: set aside
+ * rather than put to the user. The revision stays unsaved and the current
+ * version stands.
+ */
+export function refusalSetAside(
+  outcome: StepOutcome,
+  input: { policy: ExecutionPolicy; routine: string | null | undefined; stageId: string; steps: readonly AgentStep[] }
+): StepOutcome {
+  if (outcome.status !== 'blocked' || typeof outcome.params?.routine_answer !== 'string') return outcome;
+  if (input.policy !== 'autonomous' || input.routine !== 'handle') return outcome;
+  if (routineConflictAnswer({ outcome, ...input })) return outcome;
+  const reason = outcome.output.replace(/ Should those items come back[\s\S]*$/, '');
+  return { ...outcome, status: 'failed', blockKind: null, stop: undefined, needs: undefined, params: {}, output: reason, setAside: reason };
 }
 
 /**
@@ -424,6 +447,7 @@ export function useGoLoop(opts: Options) {
         loadEvents: async () => (o.loadEvents ? o.loadEvents() : latest.current.events), commitCriterion: o.commitCriterion, reopenApprovals: o.reopenApprovals, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
         conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
+        conflictAnswerRoutine: conflictAnswerIsRoutine(stepsRef.current, o.stage.id),
         derived: unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id) ?? undefined,
       };
 
@@ -445,6 +469,10 @@ export function useGoLoop(opts: Options) {
         };
       }
       if (signal.aborted) throw new Stopped();
+      // Under "handle them for me" a guard's refusal is never a question: its
+      // answer was already taken once. Nothing is saved, the IDs are named in
+      // the run's account, and it doesn't count toward the two-failure stop (8 Nov).
+      outcome = refusalSetAside(outcome, { policy: current.policy, routine: o.project.routine_decisions, stageId: o.stage.id, steps: stepsRef.current });
 
       // ...and that the change is in the project, read back rather than
       // reported (1 Oct, item 4).

@@ -55,6 +55,12 @@ export interface IdChanges {
   restored: string[];
   /** IDs of the current text that the revision writes in another form: [was, now]. */
   renamed: [string, string][];
+  /**
+   * The same ID in another spelling: P-1 for P1. Nothing about the item changed,
+   * so it is put back in code rather than refused (8 Nov, production: "would
+   * rename P-1 to P1" threw away a $1.40 revision of a register).
+   */
+  reformatted?: [string, string][];
   /** IDs kept, but given to a different item (13 Oct; Sean: the vacancy issue overwritten by an onboarding issue). */
   reused?: string[];
 }
@@ -86,6 +92,18 @@ function labels(line: string, id: string): boolean {
  * overlap with what they were. A status change or a reworded description
  * keeps most of them; a different issue does not.
  */
+/** Prefix, number and suffix: what an ID is, spelling aside. */
+function idParts(id: string): string {
+  const m = /^((?:[A-Z]{2,5}-)?[A-Z]{1,3})-?(\d{1,3})(?:-([A-Z]{1,2}))?$/.exec(id);
+  return m ? `${m[1]}|${Number(m[2])}|${m[3] ?? ''}` : id;
+}
+
+/** Whether the ID heads a line or fills a table cell: an item, not a mention in a sentence. */
+function labelsAnItem(text: string, id: string): boolean {
+  const cell = new RegExp(`\\|\\s*\\*{0,2}${id.replace(/[-]/g, '\\-')}\\*{0,2}\\s*\\|`);
+  return text.split('\n').some((l) => labels(l, id) || cell.test(l));
+}
+
 function reusedIds(head: string, generated: string, both: readonly string[]): string[] {
   return both.filter((id) => {
     const was = subjectOf(head, id);
@@ -99,19 +117,40 @@ function reusedIds(head: string, generated: string, both: readonly string[]): st
 export function idChanges(input: { head: string; generated: string; removed: ReadonlySet<string> }): IdChanges {
   const head = itemIds(input.head);
   const next = itemIds(input.generated);
-  const restored = [...input.removed].filter((id) => next.has(id));
+  // Brought back as an item: a sentence that mentions a removed ID restores nothing.
+  const restored = [...input.removed].filter((id) => next.has(id) && labelsAnItem(input.generated, id));
   const renamed: [string, string][] = [];
+  const reformatted: [string, string][] = [];
   for (const id of head) {
     if (next.has(id)) continue;
     const other = [...next].find((n) => !head.has(n) && base(n) === base(id));
-    if (other) renamed.push([id, other]);
+    if (!other) continue;
+    (idParts(other) === idParts(id) ? reformatted : renamed).push([id, other]);
   }
   const reused = reusedIds(input.head, input.generated, [...head].filter((id) => next.has(id)));
-  return { restored, renamed, reused };
+  return { restored, renamed, reused, ...(reformatted.length ? { reformatted } : {}) };
 }
 
 export function hasIdChanges(c: IdChanges): boolean {
   return c.restored.length > 0 || c.renamed.length > 0 || (c.reused?.length ?? 0) > 0;
+}
+
+/** The text with IDs the revision only respelled written as they were. */
+export function withIdFormsKept(text: string, c: IdChanges): string {
+  if (!c.reformatted?.length) return text;
+  const back = new Map(c.reformatted.map(([was, now]) => [now, was]));
+  return text.replace(ID, (m) => back.get(m) ?? m);
+}
+
+/**
+ * The record-keeping rule, sent with the first attempt rather than after a
+ * refused one: a revision of a register that renamed its IDs cost $1.40 each
+ * time and saved nothing (8 Nov, production).
+ */
+export function idRule(version: number, head: string, removed: ReadonlySet<string>): string {
+  if (!itemIds(head).size) return '';
+  const gone = [...removed].filter((id) => !itemIds(head).has(id));
+  return ` ${idChangeDefault(version)}${gone.length ? ` Do not bring back ${gone.slice(0, 40).join(', ')}.` : ''}`;
 }
 
 /**

@@ -64,7 +64,7 @@ import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, 
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
-import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
+import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, idRule, removedByUser, withIdFormsKept } from '@/lib/workflow/id-changes';
 import { recordFacts, recordPolicyFacts } from '@/lib/supabase/facts';
 import { chosenFrom, delegatedFact, delegatedQuestion, DELEGATED_RULE, isDelegatedWhy } from '@/lib/workflow/answers';
 import { checkGoal } from './code-check';
@@ -126,6 +126,8 @@ export interface PerformContext {
    * ahead, carrying the answer, instead of asking again.
    */
   conflictAnswer?: string;
+  /** That answer is the default Go took under "handle them for me", not the user's: the guards still apply to it. */
+  conflictAnswerRoutine?: boolean;
   /** A Derive/Prove result on this stage not yet saved (C4): a revision applies it. */
   derived?: { label: string; output: string };
   /** Re-read the project after a write that the store did not make itself. */
@@ -826,8 +828,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // The chapters as saved, not the page's copy of them (10 Oct, email 6.2).
       const fresh = await readManuscript(ctx, ctx.stage);
       if (!fresh) return manuscriptMissing(key, ctx.stage, ctx.template);
+      const stageVersions = ctx.bundles[ctx.stage.id]?.versions ?? [];
+      const keepIds = revising && stageVersions.length ? idRule(stageVersions.at(-1)!.version_number, head, removedByUser(stageVersions)) : '';
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(routineKept?.instruction ?? withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation((routineKept?.instruction ?? withAnswer(instruction, ctx.conflictAnswer)) + keepIds, ctx.derived) : ''),
         ctx.signal
       );
       await keepWeb(ctx, res, ctx.stage);
@@ -848,15 +852,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const split = rendererHoldsItems(ctx.stage.renderer) ? { body: whole.content, note: '' } : splitUserNote(whole.content);
       const noteLine = userNoteLine([res.note_to_user, split.note].filter(Boolean).join(' '));
       const checked = revising && !before ? await keptAndSupplied(ctx, head, split.body, instruction, []) : { content: split.body, notes: [] };
-      const content = checked.content;
+      let content = checked.content;
       // The user's own latest version outranks an older fact it changed: a
       // revision that would put the fact's value back is not saved, and the
       // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
       // invitation back into Thursday and called it verified).
       const headVersion = ctx.bundles[ctx.stage.id]?.versions.at(-1);
       // Nor one that brings back what the user removed, or renames an ID (12 Oct, Meridian).
-      if (revising && headVersion && !ctx.conflictAnswer) {
+      if (revising && headVersion && (!ctx.conflictAnswer || ctx.conflictAnswerRoutine)) {
         const ids = idChanges({ head, generated: content, removed: removedByUser(ctx.bundles[ctx.stage.id]?.versions ?? []) });
+        content = withIdFormsKept(content, ids);
         if (hasIdChanges(ids)) {
           const question = idChangeQuestion(ctx.stage.label, headVersion.version_number, ids);
           return done(key, {
@@ -1214,7 +1219,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // something; the repair must change each, checked in code below.
       const claims = before || measuredRepair ? [] : await dependentClaimsFor(ctx.project, target.label, head, ctx.signal);
       const leftToGo = isDelegatedWhy(why);
-      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + (leftToGo ? DELEGATED_RULE : '') + measuredLine + decidedLine + claimsInstruction(claims);
+      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + (leftToGo ? DELEGATED_RULE : '') + measuredLine + decidedLine + claimsInstruction(claims) + (headVersion ? idRule(headVersion.version_number, head, removedByUser(ctx.bundles[target.id]?.versions ?? [])) : '');
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
       // A head the model cut off is finished first, so the repair starts from
@@ -1362,8 +1367,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (whole.continued || checked.notes.length) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),
       // nor bring back what they removed, nor rename an ID (12 Oct, Meridian).
-      if (headVersion && !ctx.conflictAnswer) {
+      if (headVersion && (!ctx.conflictAnswer || ctx.conflictAnswerRoutine)) {
         const ids = idChanges({ head, generated: content, removed: removedByUser(ctx.bundles[target.id]?.versions ?? []) });
+        content = withIdFormsKept(content, ids);
         if (hasIdChanges(ids)) {
           const question = idChangeQuestion(target.label, headVersion.version_number, ids);
           // Marked, so the answer reaches the next repair: it was not, and the

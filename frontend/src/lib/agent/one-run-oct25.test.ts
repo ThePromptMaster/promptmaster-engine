@@ -5,7 +5,8 @@
  * "Do whatever is best" typed into it by hand.
  */
 import { describe, expect, it } from 'vitest';
-import { drivenElsewhere, isDuplicateRun, routineConflictAnswer, LEASE_STALE_MS } from '@/components/workflow/use-go-loop';
+import { drivenElsewhere, isDuplicateRun, refusalSetAside, routineConflictAnswer, LEASE_STALE_MS } from '@/components/workflow/use-go-loop';
+import type { StepOutcome } from './perform';
 import { answerAsFact, DELEGATED_ANSWER } from '@/lib/workflow/answers';
 import { idChangeDefault } from '@/lib/workflow/id-changes';
 import { ROUTINE_DEFAULT_STEP } from '@/lib/agent/actions';
@@ -49,6 +50,39 @@ describe('the ID question under "handle them for me"', () => {
   it('is asked when routine decisions are not handed over', () => {
     expect(routineConflictAnswer({ outcome, policy: 'autonomous', routine: 'ask', stageId: 'report', steps: [] })).toBeNull();
     expect(routineConflictAnswer({ outcome, policy: 'checkpoint', routine: 'handle', stageId: 'report', steps: [] })).toBeNull();
+  });
+});
+
+describe('a refused revision under "handle them for me" is never a question (8 Nov, production)', () => {
+  const refused = {
+    status: 'blocked', label: null, blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+    output: 'The revision of Register would rename P7 to P7-P. I have not saved it; v12 stays current. Should those items come back, or stay as your version has them? Answer, and I will revise accordingly.',
+    params: { conflict_question: true, routine_answer: idChangeDefault(12) },
+    stop: { status: 'awaiting_decision', reason: 'x' }, needs: { kind: 'answer_question', question: 'x' },
+  } as unknown as StepOutcome;
+  const answered = [{ id: 's', stage_id: 'report', action_key: ROUTINE_DEFAULT_STEP, params: { conflict_answer: 'keep' }, output: '', status: 'succeeded', idx: 0 } as unknown as AgentStep];
+  const input = { policy: 'autonomous' as const, routine: 'handle', stageId: 'report' };
+
+  it('the first refusal takes its routine answer as before', () => {
+    expect(refusalSetAside(refused, { ...input, steps: [] })).toBe(refused);
+  });
+
+  it('after that it is set aside: nothing asked, nothing saved, not a run-ending failure', () => {
+    const out = refusalSetAside(refused, { ...input, steps: answered });
+    expect(out.status).toBe('failed');
+    expect(out.stop).toBeUndefined();
+    expect(out.needs).toBeUndefined();
+    expect(out.setAside).toContain('would rename P7 to P7-P. I have not saved it; v12 stays current.');
+    expect(out.setAside).not.toContain('Should those items come back');
+  });
+
+  it('under "ask me" the user is asked', () => {
+    expect(refusalSetAside(refused, { ...input, routine: 'ask', steps: answered })).toBe(refused);
+  });
+
+  it('leaves every other outcome alone', () => {
+    const ok = { status: 'succeeded', label: null, toolsUsed: [], changes: {}, output: 'done' } as StepOutcome;
+    expect(refusalSetAside(ok, { ...input, steps: answered })).toBe(ok);
   });
 });
 
