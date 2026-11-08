@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idChanges, itemIds, removedByUser } from './id-changes';
+import { hasIdChanges, idChanges, idRule, itemIds, removedByUser, withIdFormsKept } from './id-changes';
 
 const NOV2 = '| D1 | Ops |\n| D2 | Finance |\n| D3 | Supplier |\n| D4 | IT |\nR-002: unfilled vacancies';
 const NOV9 = '| D1 | Ops |\n| D2 | Finance |\n| D4 | IT |\nR-002: unfilled vacancies — resolved';
@@ -65,3 +65,40 @@ describe('a prefixed ID, and an ID mentioned in prose (18 Oct, pilot)', () => {
     expect(idChanges({ head, generated, removed: new Set() }).reused).toEqual(['KES-T3']);
   });
 });
+
+describe('a revision that only respells an ID, or mentions a removed one (8 Nov, production)', () => {
+  it('P-1 and P1 are the same ID: put back in code, not refused', () => {
+    const head = '| P-1 | Prediction one |\n| R-002 | Risk |';
+    const generated = '| P1 | Prediction one |\n| R2 | Risk |\nSee P1 and R2.';
+    const c = idChanges({ head, generated, removed: new Set() });
+    expect(c.reformatted).toEqual([['P-1', 'P1'], ['R-002', 'R2']]);
+    expect(hasIdChanges(c)).toBe(false);
+    expect(withIdFormsKept(generated, c)).toBe('| P-1 | Prediction one |\n| R-002 | Risk |\nSee P-1 and R-002.');
+  });
+
+  it('a suffix is a different ID, and is still refused', () => {
+    const c = idChanges({ head: 'Proposal P7', generated: 'Proposal P7-P', removed: new Set() });
+    expect(c.renamed).toEqual([['P7', 'P7-P']]);
+    expect(hasIdChanges(c)).toBe(true);
+  });
+
+  it('a removed ID mentioned in a sentence restores nothing', () => {
+    const c = idChanges({ head: 'Sessions T1 and T6.', generated: 'Sessions T1 and T6, replacing T2 and T3.', removed: new Set(['T2', 'T3']) });
+    expect(c.restored).toEqual([]);
+  });
+
+  it('a removed ID back as a row, a list item or a cell is restored', () => {
+    const removed = new Set(['D3']);
+    expect(idChanges({ head: '', generated: '| D3 | Supplier |', removed }).restored).toEqual(['D3']);
+    expect(idChanges({ head: '', generated: '- D3: Supplier', removed }).restored).toEqual(['D3']);
+    expect(idChanges({ head: '', generated: '| Supplier | **D3** | Open |', removed }).restored).toEqual(['D3']);
+  });
+
+  it('the rule goes with the first attempt, and only where there are IDs', () => {
+    expect(idRule(4, 'No identifiers here at all.', new Set())).toBe('');
+    const rule = idRule(4, '| D1 | Ops |', new Set(['D3']));
+    expect(rule).toContain('Keep every item ID as v4 has it');
+    expect(rule).toContain('Do not bring back D3.');
+  });
+});
+
