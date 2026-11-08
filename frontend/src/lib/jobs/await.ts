@@ -22,7 +22,7 @@ export interface WaitResult {
   /** Targeted sections now complete. */
   written: string[];
   /** Targeted sections whose latest job stopped for good. */
-  failed: { sectionId: string; title: string; message: string }[];
+  failed: { sectionId: string; title: string; message: string; code?: string }[];
   /** Targeted sections still queued or running. */
   pending: string[];
   complete: number;
@@ -50,6 +50,7 @@ export function classifyWait(
         sectionId: id,
         title: section?.title ?? id,
         message: section?.error ?? job?.error_message ?? 'The section could not be written.',
+        ...(job?.error_code ? { code: job.error_code } : {}),
       });
     } else pending.push(id);
   }

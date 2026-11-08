@@ -118,3 +118,23 @@ describe('measureEvidence', () => {
     expect(measureEvidence({ code_runs: ['r1'] }, { key: 'research' }, prose, 'Calculated — 2.638.')).toMatchObject({ satisfied: true });
   });
 });
+
+describe('a sentence that says nothing was verified is not a claim that it was (8 Nov, production)', () => {
+  const nothing = { codeRuns: 0 };
+
+  it('reads none, nothing, neither, nobody and no one before the claim word as denying it', () => {
+    for (const s of [
+      'Each supports a claim only as far as its saved excerpt goes; none has been independently verified.',
+      'Nothing was verified against the original filing.',
+      'Neither figure was computed from the raw data.',
+      'Nobody was confirmed for the slot.',
+      'No one was confirmed for the slot.',
+    ]) {
+      expect(unsupportedClaims(s, nothing)).toEqual([]);
+    }
+  });
+
+  it('after the claim word they deny nothing: "we verified that none failed" is a claim', () => {
+    expect(unsupportedClaims('We verified that none failed.', nothing)).toHaveLength(1);
+  });
+});

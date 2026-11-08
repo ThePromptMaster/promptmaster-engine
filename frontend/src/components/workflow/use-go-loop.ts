@@ -59,6 +59,7 @@ import { buildAgentState } from '@/lib/agent/digest';
 import { delegationSentences } from '@/lib/agent/delegation';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
+import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
 import { allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
@@ -434,7 +435,7 @@ export function useGoLoop(opts: Options) {
         outcome = assertHonestOutcome(step.action_key, await performStep(ctx));
       } catch (e) {
         if (signal.aborted || (e as Error)?.name === 'AbortError') throw new Stopped();
-        outcome = {
+        outcome = isOutOfCredits(e) ? creditStop((e as Error).message) : {
           status: 'failed', label: null, toolsUsed: [], changes: {},
           // A refused revision tells the next plan what a retry must do; a
           // second failure in a row stops the run (MAX_CONSECUTIVE_FAILURES).
@@ -502,7 +503,7 @@ export function useGoLoop(opts: Options) {
       if (outcome.status === 'interrupted') {
         // The work goes on in the background; the run waits for the user to
         // say "keep waiting" rather than spinning here.
-        await setRunStatus('awaiting_decision', outcome.output.split('\n')[0], outcome.needs ?? null);
+        await setRunStatus(outcome.stop?.status ?? 'awaiting_decision', outcome.stop?.reason ?? outcome.output.split('\n')[0], outcome.needs ?? null);
         return 'stop';
       }
       const taken = routineConflictAnswer({

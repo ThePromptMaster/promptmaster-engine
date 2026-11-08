@@ -67,6 +67,13 @@ const GLOSSARY_HEADING = /^\s*#{1,6}\s+.*\b(?:glossary|definitions?|key terms|te
 /** Any of these in the sentence and it is not a claim that the thing was done. */
 const NOT_A_CLAIM =
   /\b(?:not|no|never|cannot|can't|isn't|wasn't|weren't|hasn't|haven't|hadn't|without|unverified|uncalculated|yet|would|could|should|will|must|might|may|need|needs|needed|pending|planned|plan|proposed?|next|if|once|until|unless|whether|before|reasoned|conditional|speculative|to be)\b/i;
+/**
+ * A word that says nothing was done, read only before the claim word: "none
+ * has been independently verified" denies it (8 Nov, production: a register's
+ * own caveat was flagged as a claim of verification), "we verified that none
+ * failed" makes it.
+ */
+const DENIED_BEFORE = /\b(?:none|nothing|neither|nobody|no one)\b/i;
 /** The sentence cites where its verification came from. */
 const CITES = /\[(?:S|R)\d+\]|\bdoi(?:\.org)?[:/]|\bhttps?:\/\/|\bOpenAlex\b|\b(?:you|the user|the client)\s+(?:confirmed|verified|supplied|provided)\b|\bconfirmed by (?:you|the user|the client)\b|\bsupplied (?:data|file|material)\b/i;
 /** The sentence names the run its figure came from. */
@@ -108,7 +115,7 @@ export function unsupportedClaims(text: string, evidence: RunEvidence): Unsuppor
     if (DEFINES.test(s) || GLOSSARY_ENTRY.test(s)) continue;
     const m = LABEL.exec(s) ?? STATED.exec(s);
     if (!m) continue;
-    if (NOT_A_CLAIM.test(s.replace(m[0], ' '))) continue;
+    if (NOT_A_CLAIM.test(s.replace(m[0], ' ')) || DENIED_BEFORE.test(s.slice(0, m.index))) continue;
     const word = m[1];
     const needs: UnsupportedClaim['needs'] = new RegExp(`^(?:${RUN_WORDS})$`, 'i').test(word) || BY_COMPUTING.test(s) ? 'run' : 'source';
     const backed = needs === 'run' ? evidence.codeRuns > 0 || NAMES_RUN.test(s) : CITES.test(s);

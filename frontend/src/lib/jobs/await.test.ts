@@ -9,6 +9,14 @@ const section = (id: string, status: OutlineSection['status'], error: string | n
 const job = (sectionId: string, status: ProjectJob['status'], error_message: string | null = null): ProjectJob =>
   ({ id: `j-${sectionId}-${status}`, status, payload: { section_id: sectionId }, error_message }) as unknown as ProjectJob;
 
+describe('classifyWait: what stopped a job travels with the failure', () => {
+  it('carries the error code, so credit running out is not read as a failed section', () => {
+    const dead = { ...job('b', 'dead', 'Out of model credits'), error_code: 'insufficient_credits' };
+    const r = classifyWait([section('b', 'error', 'Out of model credits')], [dead], ['b']);
+    expect(r.failed).toEqual([{ sectionId: 'b', title: 'B', message: 'Out of model credits', code: 'insufficient_credits' }]);
+  });
+});
+
 describe('classifyWait: where the sections a step queued stand (B2b)', () => {
   it('settles when every targeted section is written', () => {
     const r = classifyWait([section('a', 'complete'), section('b', 'complete'), section('c', 'pending')], [job('a', 'succeeded'), job('b', 'succeeded')], ['a', 'b']);

@@ -56,6 +56,7 @@ import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
+import { creditStop, OUT_OF_CREDITS } from './credit-stop';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
@@ -221,11 +222,14 @@ async function waitForSections(
   switch (r.outcome) {
     case 'done':
       return done(key, { status: 'succeeded', toolsUsed: ['model', 'jobs'], changes, output: wrote + standing });
-    case 'failed':
+    case 'failed': {
+      const noCredit = r.failed.find((f) => f.code === OUT_OF_CREDITS);
+      if (noCredit) return done(key, { ...creditStop(noCredit.message, changes), toolsUsed: ['model', 'jobs'] });
       return done(key, {
         status: 'failed', toolsUsed: ['model', 'jobs'], changes,
         output: `${wrote} ${r.failed.length} could not be written: ${r.failed.map((f) => `${f.title} — ${f.message}`).join('; ')}.${standing}`,
       });
+    }
     case 'paused':
       return done(key, {
         status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
