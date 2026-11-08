@@ -836,6 +836,12 @@ export function useGoLoop(opts: Options) {
         );
         const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
         const holder = deliverableDocument(o.template, o.bundles)?.stage;
+        // Once the deliverable is written it can't be "stuck" on anything but
+        // itself: what's left is the world's, and gets recorded (7 Nov).
+        if (current.policy === 'autonomous' && routine === 'handle' && holder?.id === o.stage.id && (o.bundles[o.stage.id]?.versions.length ?? 0) > 0) {
+          const at = allowed.indexOf('mark_blocked');
+          if (at >= 0) allowed.splice(at, 1);
+        }
         const carriedRows = Object.values(context.carriedForward ?? {}).flat();
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }

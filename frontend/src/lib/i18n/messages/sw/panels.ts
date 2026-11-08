@@ -469,6 +469,7 @@ export const sw: Record<keyof typeof en, string> = {
   'out.andMore': ' na {n} zaidi',
   'out.unmet': '{label}: {criteria}',
   'out.stuck': '{label} imekwama — {reason}',
+  'pnl.stillOpenInWorld': 'Hati imekamilika. Bado kufanyika katika hali halisi:',
   'out.cutSections': '{label} ina maandishi yaliyokatika katikati ya sentensi — {names}',
   'out.checkSays': '{label}: ukaguzi wa mwisho unasema {says}',
   'out.goWaiting': 'Go inakusubiri: {need}',

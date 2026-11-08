@@ -161,6 +161,9 @@ class ObjectiveAssessment(BaseModel):
     unmet: list[str] = Field(default_factory=list, max_length=MAX_CRITERIA + 30)
     #: Gaps the brief allows to remain: carried in the deliverable, never waited for.
     limitations: list[Limitation] = Field(default_factory=list, max_length=MAX_ITEMS)
+    #: What the deliverable itself says people still have to do in the real world,
+    #: in its own words (8 Nov): recorded beside the finished document, not waited for.
+    open_actions: list[str] = Field(default_factory=list, max_length=MAX_ITEMS)
     #: A round check: nothing in this round is left for the user, and the stage
     #: that writes the deliverable comes next (19 Oct, HARBOR).
     ready_for_later_stage: bool = False
@@ -261,6 +264,7 @@ def build_assessment_prompt(
         '"verdict": "met" | "not_met" | "not_checked", "basis": "for met: a sentence copied exactly from the deliverable that shows it; '
         'otherwise why"}],\n'
         '  "limitations": [{"item": "a gap the brief allows to remain", "allowed_by": "the brief\'s words that allow it, copied exactly"}],\n'
+        '  "open_actions": ["each thing the deliverable itself says people still have to do in the real world, copied exactly from it"],\n'
         '  "next_task": {"title": "a stage title of a few words", "kind": "write|list|check", '
         '"work": "what to produce, as an instruction", "needs": ["the need of each blocker above this task cannot be done without"]} or null\n'
         "}\n"
@@ -294,6 +298,12 @@ def build_assessment_prompt(
         '"performed" lists ONLY step ids from the RUN RECORD whose execution label shows work was done.\n'
         # 17 Oct (Sean, FIELDGUIDE): follow-up questions about the fictional
         # practice candidate were listed as the project's unfinished work.
+        # 7 Nov (Sean, training event): "Please separate completion of the requested
+        # document from readiness to execute its plan."
+        '"open_actions" are the real-world tasks the document records as still to do: confirming, booking, hiring, '
+        'sending, covering a shift. They do not make the document unfinished: a plan that says clearly what is still '
+        'to be arranged meets an objective to produce that plan. Never list one as a blocker or as unmet, and never '
+        'ask the user whether it has happened.\n'
         '"proposed_next" is the project\'s own open work. A next step written INSIDE fictional, sample, practice, '
         'training or exercise material (a role-play candidate\'s "next interview should test…", a case study\'s '
         'recommendations, a template\'s placeholders) is part of that material, not a step for this project: '
@@ -841,9 +851,23 @@ def parse_assessment(
         performed=performed[:MAX_ITEMS],
         proposed_next=proposed[:MAX_ITEMS],
         limitations=limitations[:MAX_ITEMS],
+        open_actions=_open_actions(result.get("open_actions"), content),
         ready_for_later_stage=ready,
         next_task=_next_task(result.get("next_task"), blockers) if outcome != "met" else None,
     )
+
+
+def _open_actions(raw: object, content: str) -> list[str]:
+    """Only what the deliverable really says, once each: a model's own idea of what is left is not on record."""
+    if not isinstance(raw, list):
+        return []
+    text = _norm(content)
+    out: list[str] = []
+    for item in raw:
+        action = " ".join(str(item).split())[:300]
+        if action and _norm(action) in text and _norm(action) not in (_norm(x) for x in out):
+            out.append(action)
+    return out[:MAX_ITEMS]
 
 
 def _in_data_files(text: str, files: list[DataFileBrief] | None) -> bool:
