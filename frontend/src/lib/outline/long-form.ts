@@ -48,7 +48,7 @@ export function longFormFromOutline(
   existing: LongFormState | null,
   now: string = new Date().toISOString()
 ): LongFormState {
-  const written = new Map((existing?.outline ?? []).map((s) => [s.id, s]));
+  const written = new Map([...(existing?.retired ?? []), ...(existing?.outline ?? [])].map((s) => [s.id, s]));
 
   const outline: OutlineSection[] = doc.items.map((item) => {
     const prior = written.get(item.id);
@@ -60,6 +60,10 @@ export function longFormFromOutline(
 
   const complete = outline.filter((s) => s.status === 'complete').length;
   const done = outline.length > 0 && complete === outline.length;
+  // Text an approved plan no longer has a place for is kept here, not lost:
+  // "Put it back" used to return a blank section (8 Nov).
+  const placed = new Set(doc.items.map((i) => i.id));
+  const retired = [...written.values()].filter((s) => !placed.has(s.id) && s.content?.trim());
 
   return {
     state: done ? 'complete' : existing?.state === 'writing' ? 'writing' : 'review_outline',
@@ -72,6 +76,7 @@ export function longFormFromOutline(
     continuity_snapshot: existing?.continuity_snapshot ?? null,
     started_at: existing?.started_at ?? now,
     completed_at: done ? (existing?.completed_at ?? now) : null,
+    ...(retired.length ? { retired } : {}),
   };
 }
 

@@ -55,6 +55,7 @@ from promptmaster.schemas import (
     ExtractSectionRecordResponse,
     GenerateOutlineResponse,
     GenerateSectionProseResponse,
+    OutlineItem,
     SectionContinuation,
     SectionRevisionBrief,
     GenerateSectionResponse,
@@ -97,6 +98,8 @@ class GenerateOutlineRequest(BaseModel):
         default=8, ge=MIN_SECTION_COUNT, le=MAX_SECTION_COUNT
     )
     model: str = ModelField
+    #: The chapters as they stand, when a plan is regenerated: kept ones keep their ids.
+    existing: list[OutlineItem] = Field(default=[], max_length=MAX_OUTLINE_SECTIONS)
     #: The project's Web access switch (22 Oct): on, this searches the web
     #: first when the work needs outside facts.
     web_access: WebAccess = "off"
@@ -222,6 +225,7 @@ async def api_generate_outline(
             inputs=inputs,
             suggested_section_count=req.suggested_section_count,
             later_stages=req.later_stages,
+            existing=req.existing,
         )
         return GenerateOutlineResponse(outline=outline, **dict(web))
     except (OpenRouterError, ValueError) as e:

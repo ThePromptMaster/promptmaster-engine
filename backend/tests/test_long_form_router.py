@@ -515,3 +515,35 @@ def test_strip_process_note_leaves_ordinary_prose_alone():
     assert strip_process_note("The proof holds. I followed the method and set aside nothing.") == "The proof holds. I followed the method and set aside nothing."
     assert strip_process_note("Followed the original objective and saved record; set aside unrequested improvement.\nBody.") == "Body."
     assert strip_process_note(text) == text
+
+
+def test_regenerating_a_plan_keeps_the_chapters_it_is_told_exist(client_for_app):
+    """7 Nov, production: all eight documents were detached by a regenerate."""
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_json = AsyncMock(return_value=({"outline": [
+        {"id": "s1", "title": "Brief, revised", "abstract": "Now $58,000."},
+        {"id": "s1", "title": "Duplicate", "abstract": "x"},
+        {"id": "made-up", "title": "New", "abstract": "y"},
+        {"title": "Also new", "abstract": "z"},
+    ]}, {}))
+    r = api_client.post("/api/generate-outline", json={
+        "inputs": _basic_inputs_dict(), "suggested_section_count": 4,
+        "existing": [{"id": "s1", "title": "Brief", "abstract": "Now $60,000."}, {"id": "s2", "title": "Plan", "abstract": "p"}],
+    })
+    assert r.status_code == 200
+    ids = [s["id"] for s in r.json()["outline"]]
+    assert ids[0] == "s1"
+    assert "s1" not in ids[1:] and "made-up" not in ids and "s2" not in ids
+    prompt = mock_llm.generate_json.call_args.kwargs["prompt"]
+    assert "id s1: Brief" in prompt
+    assert "Keep each one whose subject still belongs" in prompt
+
+
+def test_a_first_outline_is_asked_for_as_before(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_json = AsyncMock(return_value=({"outline": [{"title": "One", "abstract": "a"}]}, {}))
+    api_client.post("/api/generate-outline", json={"inputs": _basic_inputs_dict(), "suggested_section_count": 3})
+    prompt = mock_llm.generate_json.call_args.kwargs["prompt"]
+    assert "EXISTING CHAPTERS" not in prompt
+    assert '{"title": string, "abstract": string}' in prompt
+

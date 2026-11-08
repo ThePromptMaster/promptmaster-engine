@@ -106,10 +106,13 @@ export async function generateOutlineDraft(args: GenerateOutlineArgs): Promise<O
     model: project.model,
     web_access: webAccessOf(project),
     later_stages: stagesAfterPlan(args.template, args.stageId),
+    // What is written stays attached (7 Nov, production: a regenerate detached all eight documents).
+    ...(doc.items.some((i) => i.title.trim()) ? { existing: doc.items.map((i) => ({ id: i.id, title: i.title, abstract: i.abstract })) } : {}),
   });
   await keepFound(project, res, { stageId: args.stageId ?? null, agentRunId: args.agentRunId ?? null });
   const { outline } = res;
-  return mergeRegeneratedOutline(doc, outline.map((s) => ({ title: s.title, abstract: s.abstract })), keep);
+  const known = new Set(doc.items.map((i) => i.id));
+  return mergeRegeneratedOutline(doc, outline.map((s) => ({ ...(known.has(s.id) ? { id: s.id } : {}), title: s.title, abstract: s.abstract })), keep);
 }
 
 /**
