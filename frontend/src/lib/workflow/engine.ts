@@ -109,12 +109,13 @@ function evaluateCriterion(
     }
 
     case 'all_sections_complete': {
-      const { complete: done, total } = ctx.sections[stageId] ?? { total: 0, complete: 0 };
+      const { complete: done, total, cut = [] } = ctx.sections[stageId] ?? { total: 0, complete: 0 };
       return {
         ...base,
         // Zero sections is not "all complete" — it means drafting hasn't started.
-        satisfied: total > 0 && done >= total,
-        detail: total === 0 ? 'no sections yet' : done >= total ? undefined : `${done} of ${total}`,
+        // A section cut off mid-sentence is written but not finished (8 Nov).
+        satisfied: total > 0 && done >= total && cut.length === 0,
+        detail: total === 0 ? 'no sections yet' : done < total ? `${done} of ${total}` : cut.length ? `${cut.length} cut off` : undefined,
       };
     }
 
@@ -843,6 +844,8 @@ export type OutstandingItem =
   | { kind: 'carried_forward'; stageId: string; label: string; rows: string[] }
   | { kind: 'unmet_blocking'; stageId: string; label: string; criteria: string[] }
   | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
+  /** Written sections the model stopped at its length limit (8 Nov): the text ends mid-sentence. */
+  | { kind: 'cut_sections'; stageId: string; label: string; sections: string[] }
   /**
    * The latest check of the stage's current draft says it is incomplete or
    * off the objective, and Go will not move on past it (18 Oct). A model's
@@ -889,6 +892,8 @@ export function outstandingWork(
     if (status === 'blocked') {
       out.push({ kind: 'blocked_stage', stageId: stage.id, label, reason: st?.blocked?.reason ?? 'marked stuck' });
     }
+    const cut = stage.renderer === 'long_form' ? (ctx.sections?.[stage.id]?.cut ?? []) : [];
+    if (cut.length) out.push({ kind: 'cut_sections', stageId: stage.id, label, sections: cut });
 
     const proposed = ctx.itemsProposed?.[stage.id] ?? 0;
     const findings = ctx.findings?.[stage.id];
@@ -961,6 +966,7 @@ export function openFindingsByStage(items: readonly OutstandingItem[]): Record<s
       item.kind === 'open_findings' && !item.optional ? item.count
       : item.kind === 'carried_forward' ? item.rows.length
       : item.kind === 'unmet_blocking' ? item.criteria.length
+      : item.kind === 'cut_sections' ? item.sections.length
       : 0;
     if (n && 'stageId' in item) out[item.stageId] = (out[item.stageId] ?? 0) + n;
   }
@@ -1020,6 +1026,8 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
       return t('out.unmet', { label: item.label, criteria: item.criteria.map((c) => templateWord(locale, c)).join('; ') });
     case 'blocked_stage':
       return t('out.stuck', { label: item.label, reason: item.reason });
+    case 'cut_sections':
+      return t('out.cutSections', { label: item.label, names: item.sections.join('; ') });
     case 'check_says':
       return t('out.checkSays', { label: item.label, says: shownCheckText(locale, item.says) });
     case 'go_waiting':

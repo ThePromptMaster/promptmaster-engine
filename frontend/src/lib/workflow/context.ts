@@ -14,6 +14,7 @@
  * anyStageId, context)` is right for any stage, whoever asks.
  */
 
+import { cutSections } from '@/lib/jobs/continuation';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
@@ -110,9 +111,11 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 
     if (s.renderer === 'long_form') {
       const outline = manuscriptArtifactFor(template, s, bundles)?.long_form?.outline ?? [];
+      const cut = cutSections(outline, events).map((section) => section.title);
       sections[s.id] = {
         total: outline.length,
         complete: outline.filter((section) => section.status === 'complete').length,
+        ...(cut.length ? { cut } : {}),
       };
       // The chapters are this stage's work even though no version row holds
       // them: a written manuscript is not an empty stage (1 Oct, item 1).

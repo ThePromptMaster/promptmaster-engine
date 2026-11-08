@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { blocksCompletion, completionSummary, describeOutstanding, initialState, outstandingBeyondCriteria, outstandingElsewhere, outstandingWork } from './engine';
+import { blocksCompletion, completionSummary, describeOutstanding, initialState, openFindingsByStage, outstandingBeyondCriteria, outstandingElsewhere, outstandingWork } from './engine';
 import { deriveWorkflowRecommendations } from './recommend';
 import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
@@ -20,7 +20,7 @@ import { itemSchemaFor } from './stage-artifact';
 import { policyConfirmable, repairTries, staleRepair } from '@/lib/agent/needs';
 import { honestChangeNote, recheckInstruction, withFreshMeasurements, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
-import type { StageContext, WorkflowState } from './types';
+import type { StageContext, WorkflowState, WorkflowTemplate } from './types';
 
 const ctx = (over: Partial<StageContext> = {}): StageContext => ({
   fields: { objective: 'Choose one project within 160 staff hours' },
@@ -291,5 +291,29 @@ describe('11 Oct, survey brief: shortening a brief over its limit is routine', (
   it('not before there is a draft, and at most twice', () => {
     expect(staleRepair(template, atOutput, [], over, new Set())).toBeNull();
     expect(staleRepair(template, atOutput, ['output', 'output'], over, new Set(['output']))).toBeNull();
+  });
+});
+
+describe('a manuscript with text cut off is not finished work (8 Nov, production)', () => {
+  const tpl = { stages: [{ id: 'd', label: 'Manuscript', renderer: 'long_form', exit_criteria: [{ id: 'all', label: 'Every chapter is written', check: 'auto', blocking: true, rule: { type: 'all_sections_complete' } }], transitions: {} }] } as unknown as WorkflowTemplate;
+  const state = { current_stage_id: 'd', stages: { d: { status: 'complete' } } } as unknown as WorkflowState;
+  const c = { fields: {}, itemCounts: {}, itemsMissingStatus: {}, artifactNonEmpty: { d: true }, outlineApproved: true, findings: {}, manualChecks: {}, sections: { d: { total: 2, complete: 2, cut: ['Chapter 7'] } } } as unknown as StageContext;
+
+  it('is outstanding, blocks completion and is named', () => {
+    const items = outstandingWork(tpl, state, c).filter((i) => i.kind === 'cut_sections');
+    expect(items).toHaveLength(1);
+    expect(blocksCompletion(items[0])).toBe(true);
+    expect(describeOutstanding(items[0])).toContain('Chapter 7');
+    expect(openFindingsByStage(items)).toEqual({ d: 1 });
+  });
+
+  it('fails the every-chapter-written check', () => {
+    const e = evaluateStage(tpl, 'd', c);
+    expect(e.canAdvance).toBe(false);
+    expect(e.unmet[0].detail ?? '').toContain('1 cut off');
+  });
+
+  it('whole chapters pass', () => {
+    expect(evaluateStage(tpl, 'd', { ...c, sections: { d: { total: 2, complete: 2 } } }).canAdvance).toBe(true);
   });
 });

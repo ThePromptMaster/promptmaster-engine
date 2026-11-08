@@ -469,6 +469,7 @@ export const zh: Record<keyof typeof en, string> = {
   'out.andMore': ' 等另外 {n} 项',
   'out.unmet': '{label}：{criteria}',
   'out.stuck': '{label} 受阻：{reason}',
+  'out.cutSections': '{label} 有文字在句中被截断：{names}',
   'out.checkSays': '{label}：最新检查结果为 {says}',
   'out.goWaiting': 'Go 正在等你：{need}',
   'out.objWaiting': '目标未达成，正在等待：{list}',

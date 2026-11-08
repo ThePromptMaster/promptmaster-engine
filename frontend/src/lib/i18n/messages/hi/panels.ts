@@ -469,6 +469,7 @@ export const hi: Record<keyof typeof en, string> = {
   'out.andMore': ' और {n} अन्य',
   'out.unmet': '{label}: {criteria}',
   'out.stuck': '{label} अटका हुआ है — {reason}',
+  'out.cutSections': '{label} में पाठ वाक्य के बीच में कटा है — {names}',
   'out.checkSays': '{label}: नवीनतम जाँच के अनुसार {says}',
   'out.goWaiting': 'Go आपकी प्रतीक्षा कर रहा है: {need}',
   'out.objWaiting': 'उद्देश्य पूरा नहीं हुआ — प्रतीक्षा: {list}',

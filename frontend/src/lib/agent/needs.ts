@@ -309,7 +309,7 @@ export function repairTries(steps: readonly AgentStep[], state: WorkflowState, t
     .filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s))
     .filter((s) => {
       const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
-      if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried);
+      if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried) || Boolean(s.params?.cut);
       // Unmarked (a step the planner chose): counted within this run.
       return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
     })
@@ -402,7 +402,9 @@ export function staleRepair(
    * rather than waited on (12 Oct; Sean: "If it needs correcting, I'd expect
    * Go to revise and recheck automatically under these settings").
    */
-  carried: { deliverableId: string; rows: readonly string[] } | null = null
+  carried: { deliverableId: string; rows: readonly string[] } | null = null,
+  /** Per long-form stage: sections cut off at the length limit (8 Nov). Finished before anything else. */
+  cut: Readonly<Record<string, readonly string[]>> = {}
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -415,6 +417,17 @@ export function staleRepair(
     const st = state.stages[stage.id];
     if (here >= 0 && index > here && !(ahead && st?.stale)) continue;
     if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
+    // 8 Nov (production): eight chapters of a book ended mid-sentence and every
+    // stage was marked done. Finished here without touching what was written.
+    const cutHere = stage.renderer === 'long_form' && st?.status !== 'stale' && (isDone(st?.status) || st?.status === 'in_progress') ? (cut[stage.id] ?? []) : [];
+    if (cutHere.length && (here < 0 || index <= here || ahead)) {
+      return {
+        key: 'recheck_stage',
+        rationale: `${stage.label} has text cut off mid-sentence: ${cutHere.join('; ')}. Finishing it comes before anything else; what is already written stays as it is.`,
+        expected: `Each cut section carried on from where it stopped to a complete ending.`,
+        params: { stage_id: stage.id, cut: true },
+      };
+    }
     // L-63 (9 Oct): "Announcement: 100–140 words — 74 words" on a finished
     // stage was reported and left; it is repaired, and the stage stays finished.
     const open = st?.status === 'in_progress' && drafted.has(stage.id);

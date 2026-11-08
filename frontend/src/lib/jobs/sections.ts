@@ -187,3 +187,37 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
   }
   return queued;
 }
+
+export interface ContinueJobsArgs {
+  project: Project;
+  artifactId: string;
+  stageId: string;
+  approvedOutlineVersionId: string | null;
+  /** The sections cut off at the length limit. */
+  targets: readonly { id: string; index: number; revision?: number }[];
+  stageHint?: string;
+  jobs?: readonly ProjectJob[];
+}
+
+/**
+ * Carry on the sections the model stopped at its length limit. Same queue,
+ * same keys as a revision: a new revision of the section, and a fresh row
+ * past a job that stopped.
+ */
+export async function enqueueContinueJobs(args: ContinueJobsArgs): Promise<string[]> {
+  const { project, artifactId, stageId, approvedOutlineVersionId, targets, stageHint } = args;
+  const queued: string[] = [];
+  for (const { id, index, revision: own } of targets) {
+    const revision = (own ?? 0) + 1;
+    const retry = (args.jobs ?? []).filter((j) => j.payload?.section_id === id && j.payload?.revision === revision && isStoppedJob(j)).length;
+    await enqueueSectionJob({
+      project, artifactId, stageHint, stageId,
+      outlineVersionId: approvedOutlineVersionId,
+      sectionId: id, sectionIndex: index, revision,
+      continueOnly: true,
+      ...(retry ? { retry } : {}),
+    });
+    queued.push(id);
+  }
+  return queued;
+}

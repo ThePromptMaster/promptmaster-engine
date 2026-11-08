@@ -24,6 +24,7 @@
  * source of truth, and nothing that can fail halfway and leave a partial file.
  */
 
+import { isCutSection } from '@/lib/jobs/continuation';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { formatManuscript } from '@/lib/workflow/digest';
 import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
@@ -197,6 +198,9 @@ export function toMarkdown(bundle: ExportBundle): string {
           '_',
         ''
       );
+      // The reader of the file is told, as the page tells the user (8 Nov).
+      const cut = sections.filter((s) => isCutSection(s, true)).map((s) => s.title);
+      if (cut.length) lines.push(`_Cut off mid-sentence: ${cut.join('; ')}_`, '');
       continue;
     }
 

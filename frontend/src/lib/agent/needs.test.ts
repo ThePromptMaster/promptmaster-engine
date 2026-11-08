@@ -1,5 +1,6 @@
 import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
-import { approvalsAskedFor } from './needs';
+import { approvalsAskedFor, repairTries } from './needs';
+import type { AgentStep } from '@/types/agent';
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
@@ -620,3 +621,41 @@ describe('an Assess stage with nothing to judge (6 Nov, production)', () => {
     expect(held({})).toBe(false);
   });
 });
+
+describe('chapters cut off mid-sentence are finished before anything else (8 Nov, production)', () => {
+  const tpl = {
+    stages: [
+      { id: 'draft', label: 'Manuscript', renderer: 'long_form', transitions: {} },
+      { id: 'final', label: 'Final', renderer: 'prose', transitions: {} },
+    ],
+  } as unknown as Parameters<typeof staleRepair>[0];
+  const doneAt = (current: string) => ({ current_stage_id: current, stages: { draft: { status: 'complete' }, final: { status: 'complete' } } }) as unknown as Parameters<typeof staleRepair>[1];
+  const cut = { draft: ['Chapter 7', 'Chapter 13'] };
+
+  it('names them and asks for no rewrite', () => {
+    const move = staleRepair(tpl, doneAt('final'), [], {}, new Set(), null, cut);
+    expect(move?.key).toBe('recheck_stage');
+    expect(move?.params).toEqual({ stage_id: 'draft', cut: true });
+    expect(move?.rationale).toContain('Chapter 7; Chapter 13');
+  });
+
+  it('stops after the repair tries are used', () => {
+    expect(staleRepair(tpl, doneAt('final'), ['draft', 'draft'], {}, new Set(), null, cut)).toBeNull();
+  });
+
+  it('does nothing with no cut chapters', () => {
+    expect(staleRepair(tpl, doneAt('final'), [], {}, new Set(), null, {})).toBeNull();
+  });
+
+  it('a stale stage is repaired as a stale stage: its rewrite finishes the chapters too', () => {
+    const state = { current_stage_id: 'final', stages: { draft: { status: 'stale', stale: { reason: 'x', since: 't' } }, final: { status: 'complete' } } } as unknown as Parameters<typeof staleRepair>[1];
+    expect(staleRepair(tpl, state, [], {}, new Set(), null, cut)?.params).toEqual({ stage_id: 'draft', stale_since: 't' });
+  });
+
+  it('a finishing step counts as a try', () => {
+    const state = doneAt('final');
+    const step = { id: 's', action_key: 'recheck_stage', status: 'failed', params: { stage_id: 'draft', cut: true } } as unknown as AgentStep;
+    expect(repairTries([step], state, new Set())).toEqual(['draft']);
+  });
+});
+

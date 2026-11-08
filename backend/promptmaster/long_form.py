@@ -19,6 +19,7 @@ from .schemas import (
     ContinuitySnapshot,
     DetectLongFormResponse,
     GenerateSectionProseResponse,
+    SectionContinuation,
     SectionRevisionBrief,
     GenerateSectionResponse,
     GlossaryTerm,
@@ -396,6 +397,50 @@ def build_section_revision_prompt(
     return system, user
 
 
+#: What the model replies when a section it was asked to carry on is already finished.
+SECTION_COMPLETE = "SECTION ALREADY COMPLETE"
+
+
+def build_section_continuation_prompt(
+    inputs: PMInput,
+    outline: list[OutlineSection],
+    section_index: int,
+    continuation: SectionContinuation,
+    stage_hint: str = "",
+) -> tuple[str, str]:
+    """Build (system, user) prompts to carry on a section cut off at the length limit.
+
+    8 Nov, production: eight of a book's chapters ended mid-sentence, one at
+    "Tet", because a chapter was one call of 4,096 tokens. The reply starts from
+    the unfinished sentence so the caller can replace that sentence whole.
+    """
+    target = outline[section_index]
+    system = _prose_system(inputs, _section_system(stage_hint))
+    sentence = continuation.unfinished.strip()
+    start = (
+        f'Its last sentence is unfinished: "{sentence}". Begin your reply with that sentence, '
+        "from its first word, finish it, and carry on."
+        if sentence
+        else "It stops at the end of a sentence. Carry on with what comes next."
+    )
+    user = (
+        f"Original objective: {inputs.objective}\n"
+        f"Audience: {inputs.audience}\n"
+        f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
+        f"FULL OUTLINE:\n{_format_outline_for_prompt(outline, section_index)}\n\n"
+        f"SECTION {section_index + 1}: {target.title}\n"
+        f"This section covers: {target.abstract}\n\n"
+        f"--- THE END OF THE SECTION AS IT STANDS ---\n{continuation.text_so_far}\n--- WHERE IT STOPS ---\n\n"
+        f"The section was cut off by a length limit before it was finished. {start} "
+        "Write only what comes next: nothing from before that point, no title, no note about what you did. "
+        "Finish the section as its brief requires, keep to any length its brief or the constraints give, "
+        "and end on a complete sentence. "
+        f"If the section is in fact already complete, reply with exactly: {SECTION_COMPLETE}"
+    )
+    return system, user
+
+
 def _record_block(record: str) -> str:
     """The saved work a section reports, as it stands now (C9, 9 Oct).
 
@@ -429,6 +474,7 @@ async def generate_section_prose(
     deadline: float | None = None,
     revision: SectionRevisionBrief | None = None,
     stage_hint: str = "",
+    continuation: SectionContinuation | None = None,
 ) -> GenerateSectionProseResponse:
     """Write one section. One LLM call, and nothing else.
 
@@ -439,7 +485,11 @@ async def generate_section_prose(
     With `revision`, the section is rewritten from its current text rather than
     drafted from the outline.
     """
-    if revision is not None:
+    if continuation is not None:
+        system, user = build_section_continuation_prompt(
+            inputs=inputs, outline=outline, section_index=section_index, continuation=continuation, stage_hint=stage_hint
+        )
+    elif revision is not None:
         system, user = build_section_revision_prompt(
             inputs=inputs, outline=outline, section_index=section_index, revision=revision, stage_hint=stage_hint
         )
@@ -462,6 +512,8 @@ async def generate_section_prose(
         model=model,
         deadline=deadline,
     )
+    if continuation is not None and content.strip().rstrip(".") == SECTION_COMPLETE:
+        return GenerateSectionProseResponse(content="", finish_reason="stop")
     return GenerateSectionProseResponse(content=strip_process_note(content), finish_reason=finish_reason)
 
 

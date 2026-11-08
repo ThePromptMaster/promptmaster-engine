@@ -874,7 +874,7 @@ class ScriptedClient(OpenRouterClient):
         # A continuation finishes what was cut off, as a real one usually does:
         # the marker cuts the first draft, not every call after it (31 Oct —
         # a continuation now keeps its own finish reason).
-        continuing = "PREVIOUS OUTPUT (do not repeat any of this)" in prompt
+        continuing = "PREVIOUS OUTPUT (do not repeat any of this)" in prompt or "cut off by a length limit" in prompt
         # Nor does it cut a revision against findings (2 Nov): a cut revision
         # is now refused rather than saved over the whole text, and the mock's
         # texts are short enough that a real one would come back whole.

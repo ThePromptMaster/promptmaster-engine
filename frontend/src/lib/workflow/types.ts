@@ -455,7 +455,12 @@ export interface StageContext {
    * is right for whichever stage asks — Go evaluates the current stage while
    * the user may be viewing another.
    */
-  sections: Record<string, { total: number; complete: number }>;
+  sections: Record<string, {
+    total: number;
+    complete: number;
+    /** Titles of written sections cut off at the length limit: written, but not finished (8 Nov). */
+    cut?: string[];
+  }>;
   /** Per review stage id: findings held and how many carry a status. */
   findings: Record<string, { total: number; triaged: number }>;
   /** Manual criteria the user has ticked, by criterion id. */

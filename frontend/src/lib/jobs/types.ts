@@ -62,6 +62,8 @@ export interface DraftSectionPayload {
    * 2026-10-03, which the drain sends as no hint.
    */
   stage_hint?: string;
+  /** The section was cut off at the length limit: carry it on instead of writing it. */
+  continue_only?: boolean;
   /**
    * Set by the Revision and Editing stages: rewrite the section as it stands,
    * applying these notes, instead of drafting it from the outline. The current
@@ -92,12 +94,20 @@ export interface SectionRevisionBrief extends SectionRevisePayload {
  * to the artifact, so a worker killed at any moment either has not written the
  * section yet or has written it and will never write it again.
  */
-export type DraftStep = 'prose' | 'record';
+export type DraftStep = 'prose' | 'continue' | 'record';
 
 export interface DraftCheckpoint {
   step: DraftStep;
   prose_written?: boolean;
   finish_reason?: string;
+  /** `continue`: how many continuations this job has already made. */
+  rounds?: number;
+}
+
+/** A section cut off at the length limit, as the model is shown it. */
+export interface SectionContinuationRequest {
+  text_so_far: string;
+  unfinished: string;
 }
 
 export interface GlossaryTerm {
@@ -203,6 +213,8 @@ export interface SectionGenerator {
     revision?: SectionRevisionBrief;
     /** The stage's `entry_prompt_hint`, from the job's payload. */
     stage_hint?: string;
+    /** Carry on a section cut off at the length limit; the reply is what comes next. */
+    continuation?: SectionContinuationRequest;
   }): Promise<{ content: string; finish_reason: string }>;
 
   extractSectionRecord(req: {

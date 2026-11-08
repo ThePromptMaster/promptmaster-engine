@@ -213,6 +213,8 @@ interface ProjectState {
        * recheck reopened Revision, and Drafting reached v7 in one run).
        */
       writtenFor?: string;
+      /** Only what was missing was written (a chapter's lost ending): the stages after it are not reopened. */
+      keepLaterStages?: boolean;
     }
   ) => Promise<ArtifactVersion>;
   restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
@@ -830,7 +832,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const state = projectState(template, events);
       // Nor does one that only records review rows the deliverable already
       // carries out (4 Nov): reopening the deliverable would revise it again.
-      const later = onlyConfirmsProposals(head?.content, version.content) || onlyRewords(head?.content, version.content) || onlyRecordsCarriedOut(head?.content, version.content)
+      const later = options?.keepLaterStages || onlyConfirmsProposals(head?.content, version.content) || onlyRewords(head?.content, version.content) || onlyRecordsCarriedOut(head?.content, version.content)
         ? []
         : laterDoneStages(template, state, laterOf(template, stageId, options?.writtenFor), drafted);
       // A reopened draft in progress is answered by this version (13 Oct); the

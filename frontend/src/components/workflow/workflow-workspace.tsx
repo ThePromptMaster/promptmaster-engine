@@ -171,7 +171,7 @@ interface Props {
     name: string,
     version: NewVersion,
     evaluation?: undefined,
-    options?: { keepRecommendations?: readonly string[]; writtenFor?: string }
+    options?: { keepRecommendations?: readonly string[]; writtenFor?: string; keepLaterStages?: boolean }
   ) => Promise<unknown>;
   /**
    * Attach an evaluation to a stage version that already exists (FR-11).

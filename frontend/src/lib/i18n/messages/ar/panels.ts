@@ -469,6 +469,7 @@ export const ar: Record<keyof typeof en, string> = {
   'out.andMore': ' و{n} أخرى',
   'out.unmet': '{label}: {criteria}',
   'out.stuck': '{label} متعثرة — {reason}',
+  'out.cutSections': '{label} فيها نص انقطع في منتصف الجملة — {names}',
   'out.checkSays': '{label}: يقول الفحص الأخير {says}',
   'out.goWaiting': 'Go بانتظارك: {need}',
   'out.objWaiting': 'الهدف لم يتحقق — بانتظار: {list}',

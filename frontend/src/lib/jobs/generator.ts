@@ -15,6 +15,7 @@
 
 import type {
   OutlineSectionState,
+  SectionContinuationRequest,
   SectionGenerator,
   SectionRecord,
   SectionRevisionBrief,
@@ -214,6 +215,7 @@ export class HttpSectionGenerator implements SectionGenerator {
     userId: string;
     revision?: SectionRevisionBrief;
     stage_hint?: string;
+    continuation?: SectionContinuationRequest;
   }): Promise<{ content: string; finish_reason: string }> {
     return this.post(
       '/api/generate-section-prose',
@@ -225,6 +227,7 @@ export class HttpSectionGenerator implements SectionGenerator {
         prev_section_content: req.prev_section_content,
         model: req.model,
         ...(req.revision ? { revision: req.revision } : {}),
+        ...(req.continuation ? { continuation: req.continuation } : {}),
         ...(req.stage_hint ? { stage_hint: req.stage_hint } : {}),
       },
       req.userId
