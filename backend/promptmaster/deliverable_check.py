@@ -109,7 +109,7 @@ _INSTRUCTION = (
     "what it conflicts with quoted verbatim (from the deliverable, or the fact's own words), the problem in one "
     "sentence, and the smallest fix. At most five, most material first. Never report style, tone, length, "
     "missing detail or a point a careful reader would not call contradictory. When in doubt, report nothing.\n"
-    # 7 Nov (Sean, training event and Northline): "check that the readiness verdict, email
+    # 7 Nov (training event and financial plan tests): "check that the readiness verdict, email
     # conditions and takeover checklist agree"; "whether operational instructions follow
     # from the financial analysis and its assumptions".
     "3. FOLLOW-THROUGH. What the deliverable tells someone to do, or states as settled, that its own analysis "

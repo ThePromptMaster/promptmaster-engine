@@ -300,7 +300,7 @@ _NEXT_ACTION_INSTRUCTION = (
     "requirement, deciding rows, attaching data — is not missing data. If it is "
     "needed and no listed move does it, choose request_user_decision. Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
-    # 7 Nov (Sean, training event): Go marked a finished handoff stuck until someone
+    # 7 Nov (training event test): Go marked a finished handoff stuck until someone
     # covered a shift. "Please separate completion of the requested document from
     # readiness to execute its plan."
     "THE DOCUMENT IS NOT THE EVENT. Something that has to happen outside the "
