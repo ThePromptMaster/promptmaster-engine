@@ -649,7 +649,10 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
     key = str(result.get("action_key") or "")
     if key not in permitted:
         logger.warning(f"Planner chose {key!r}, outside the allowed actions; asking the user instead")
-        return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
+        fallback = _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
+        # The browser shows what the stage is really waiting for, when it knows (8 Nov).
+        fallback.params = {"unplanned": key[:60]}
+        return fallback
     params = _named_control(result.get("params") if isinstance(result.get("params"), dict) else {}, controls)
     if "rows_addressed" in params:
         rows = _rows_addressed(params.pop("rows_addressed"))

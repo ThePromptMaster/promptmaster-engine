@@ -164,6 +164,8 @@ function partBefore(text: string, start: number): string {
  * its item — in brackets, or after a comma — in a text with more than one
  * limit: "a survey kickoff brief under 30 words" is the deliverable itself.
  */
+const ITEM_HAS_PARTS = /\s(?:with|that|which|distinguishing|including|covering|containing|listing)\b/i;
+
 function itemBefore(text: string, start: number): string {
   let seg = text.slice(Math.max(0, start - 240), start);
   if (!/[(,]\s*$/.test(seg) || (text.match(new RegExp(`\\b${NUM}[\\s-]*words?\\b`, 'gi')) ?? []).length < 2) return '';
@@ -175,6 +177,13 @@ function itemBefore(text: string, start: number): string {
     })
   );
   seg = seg.slice(cut).replace(/^[\s),.]+/, '').replace(/^(?:\d+[.)]|[-*•])\s+/, '');
+  // A plain list: the limit closes the item right before it, not the first in the list
+  // (8 Nov, production: "delivery plan, staffing schedule, budget, attendee email
+  // (under 150 words)" held the delivery plan to 150 words). An item with parts of its
+  // own ("a practice case with interview exercise, sample summary, and notes") still
+  // opens with what it is.
+  const parts = seg.split(',').filter((p) => p.trim());
+  if (parts.length > 1 && !ITEM_HAS_PARTS.test(parts[0])) seg = parts.at(-1)!.replace(/^\s*(?:and|or)\s+/i, '');
   const head = seg.split(/\s(?:with|that|which|distinguishing|including|covering|containing|listing|for|of|on|about|at|in|under|to)\b|[,(]/i)[0] ?? '';
   const words = head.trim().split(/\s+/).filter(Boolean);
   if (words.length && /^(?:a|an|the|one|single|each)$/i.test(words[0])) words.shift();

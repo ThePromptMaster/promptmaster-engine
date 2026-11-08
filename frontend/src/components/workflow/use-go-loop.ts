@@ -1062,6 +1062,15 @@ export function useGoLoop(opts: Options) {
         if (carriedNote) {
           Object.assign(choice, { action_key: 'declare_objective_complete', params: {}, rationale: carriedNote, expected_outcome: 'The objective judged with the carried-forward fixes named.', needs_user_decision: false, decision_question: null });
         }
+        // A move the planner chose that isn't on offer: say what the stage is waiting
+        // for, rather than "what would you like to do next?" (8 Nov, production).
+        if (!required && typeof choice.params?.unplanned === 'string') {
+          const waitingOn = needsUser({ ...needInput, allowed: [] });
+          if (waitingOn) {
+            await setRunStatus('awaiting_decision', describeNeed(waitingOn, stageLabelFor).message, waitingOn);
+            break;
+          }
+        }
         // Before a question interrupts the user: does it hold the work up? (Q1b)
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
           // The way back kept the planner in the loop only so it could read the answer.

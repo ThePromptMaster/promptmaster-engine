@@ -180,7 +180,12 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "commitments (a deadline, a budget, a promise, a scope change not in the source), keep "
         "those apart — approval is the routine check of the extraction, and decision is the "
         "user's own sign-off on the new commitments, in the first person (\"I accept the new "
-        "commitments it proposes\"). Otherwise \"\"\n\n"
+        "commitments it proposes\"). Otherwise \"\"\n"
+        # 8 Nov, production: a brief saying "recommend how to resolve any gaps" and "document
+        # preparation only" got a stage whose approval was "I choose how the gap will be resolved".
+        "When the work is a document, never make an approval or a stop condition out of something the "
+        "document is only asked to propose, or something that has to happen outside it (covering a shift, "
+        "booking, confirming). The document proposes it and says what is still to do.\n\n"
         "Set inquiry true only when the work investigates or tests ideas (science, "
         "analysis, a thought experiment) rather than writes something.\n\n"
         "EXECUTION — whether the work ends, and when it is done:\n"
