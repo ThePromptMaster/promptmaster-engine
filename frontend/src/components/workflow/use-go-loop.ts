@@ -1420,6 +1420,12 @@ export function useGoLoop(opts: Options) {
     [budget, autoWindows, startRun]
   );
 
+  /** Puts a stage one try short of the limit: "Try once more" must try, however many it has had. */
+  const allowOneMoreRepair = useCallback((stageId: string) => {
+    const tried = repairTries([...priorStepsRef.current, ...stepsRef.current], latest.current.state, new Set(stepsRef.current.map((s) => s.id)));
+    extraTriesRef.current.set(stageId, extraTriesForOneMore(tried, stageId, extraTriesRef.current.get(stageId)));
+  }, []);
+
   const go = useCallback(async () => {
     setError(null);
     freshAllowance();
@@ -1442,10 +1448,7 @@ export function useGoLoop(opts: Options) {
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
         // Resume on a repair that did not settle is "Try once more": without
         // the extra try the same used-up repair stopped the run again at once.
-        if (live.needs?.kind === 'repair_stuck') {
-          const stageId = live.needs.stageId;
-          extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
-        }
+        if (live.needs?.kind === 'repair_stuck') allowOneMoreRepair(live.needs.stageId);
         sinceRef.current = stepsRef.current.length;
         fingerprintsRef.current = [];
         reconsiderRef.current = null;
@@ -1683,14 +1686,10 @@ export function useGoLoop(opts: Options) {
       // What the user said to fix goes with that one repair (8 Nov: "a way to
       // request a specific repair and rerun the relevant check").
       if (note?.trim()) repairNotesRef.current.set(stageId, note.trim().slice(0, 1_000));
-      // Resuming a run stopped on this repair grants its own try: one press, one more try.
-      const live = runRef.current;
-      if (live?.needs?.kind !== 'repair_stuck' || live.needs.stageId !== stageId) {
-        extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
-      }
+      allowOneMoreRepair(stageId);
       await go();
     },
-    [go]
+    [go, allowOneMoreRepair]
   );
 
   const fixObjective = useCallback(
@@ -2023,6 +2022,15 @@ export function useGoLoop(opts: Options) {
     handsOff,
     dismissError: useCallback(() => setError(null), []),
   };
+}
+
+/**
+ * How many of a stage's tries to set aside so exactly one more is allowed. A count
+ * per press wasn't enough once a stage had used more than its two (9 Nov, production:
+ * after three tries and a reload, "Try once more" came straight back without trying).
+ */
+export function extraTriesForOneMore(tried: readonly string[], stageId: string, granted = 0): number {
+  return Math.max(granted, tried.filter((id) => id === stageId).length - REPAIR_TRIES + 1);
 }
 
 /** The repairs tried, less one per extra try the user granted for a stage. */
