@@ -17,7 +17,7 @@ import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
-import { policyConfirmable, repairTries, staleRepair } from '@/lib/agent/needs';
+import { policyConfirmable, repairTries, exhaustedRepair, staleRepair } from '@/lib/agent/needs';
 import { honestChangeNote, recheckInstruction, withFreshMeasurements, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState, WorkflowTemplate } from './types';
@@ -146,13 +146,18 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     expect(staleRepair(template, state)).toMatchObject({ key: 'recheck_stage', params: { stage_id: 'output' } });
     // A repair that failed is tried once more (D2, 8 Oct), then left to the user.
     expect(staleRepair(template, state, ['output'])).toMatchObject({ params: { stage_id: 'output' } });
-    expect(staleRepair(template, state, ['output', 'output'])).toMatchObject({ params: { stage_id: 'summary' } });
-    expect(staleRepair(template, state, ['output', 'output', 'summary', 'summary'])).toBeNull();
+    expect(staleRepair(template, state, ['output', 'output'])).toBeNull();
   });
   it('a stage a change reopened after the current one is repaired too, through to the final bundle (8 Oct, TeamNotes)', () => {
     const changed = { status: 'stale' as const, stale: { reason: 'the launch date changed', since: 'x', was: 'complete' as const } };
-    const atOutput: WorkflowState = { ...afterChange, current_stage_id: 'output', stages: { ...afterChange.stages, output: changed, summary: changed } };
-    expect(staleRepair(template, atOutput, ['output', 'output'])).toMatchObject({ params: { stage_id: 'summary' } });
+    const atOutput: WorkflowState = { ...afterChange, current_stage_id: 'output', stages: { ...afterChange.stages, output: { status: 'complete' }, summary: changed } };
+    expect(staleRepair(template, atOutput)).toMatchObject({ params: { stage_id: 'summary' } });
+  });
+  it('later stages wait for one that could not be settled, and it goes to the user (9 Nov, production)', () => {
+    const changed = { status: 'stale' as const, stale: { reason: 'the budget changed', since: 'x', was: 'complete' as const } };
+    const both: WorkflowState = { ...afterChange, current_stage_id: 'summary', stages: { ...afterChange.stages, output: changed, summary: changed } };
+    expect(staleRepair(template, both, ['output', 'output'])).toBeNull();
+    expect(exhaustedRepair(template, both, ['output', 'output'])).toBe('output');
   });
   it('a stage after the one the project is on is redone in order, not repaired ahead of it', () => {
     const back: WorkflowState = { ...afterChange, current_stage_id: 'review', stages: { ...afterChange.stages, review: { status: 'in_progress' }, output: { status: 'stale', stale: { reason: 'went back', since: 'x', was: 'complete' } } } };
