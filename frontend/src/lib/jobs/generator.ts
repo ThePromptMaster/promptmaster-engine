@@ -41,6 +41,8 @@ export class GeneratorError extends Error {
 
 /** One provider call the drain paid for, ready to be written to `model_usage`. */
 export interface DrainUsage {
+  /** What the call was for: first draft, revision, repair or continuation. */
+  operation?: string | null;
   userId: string;
   projectId: string | null;
   requestId: string;
@@ -92,10 +94,12 @@ export class HttpSectionGenerator implements SectionGenerator {
    */
   private jobId: string | null = null;
   private projectId: string | null = null;
+  private operation: string | null = null;
 
-  attributeTo(jobId: string, projectId: string | null): void {
+  attributeTo(jobId: string, projectId: string | null, operation: string | null = null): void {
     this.jobId = jobId;
     this.projectId = projectId;
+    this.operation = operation;
   }
 
   /** Never throws: metering must not be able to fail a section. */
@@ -104,6 +108,7 @@ export class HttpSectionGenerator implements SectionGenerator {
       const events = parseUsageHeader(res.headers?.get(USAGE_HEADER) ?? null);
       for (const event of events) {
         this.spent.push({
+          operation: this.operation,
           userId,
           projectId: this.projectId,
           requestId,

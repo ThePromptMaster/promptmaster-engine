@@ -79,6 +79,8 @@ export interface SectionRevisePayload {
   notes: string;
   /** The saved work this section reports, as it stood when queued (C9). */
   record?: string;
+  /** Queued by a repair after a change: only so its cost is counted as one. */
+  repair?: boolean;
 }
 
 /** What the backend is sent for a rewrite: the brief plus the section's current text. */
@@ -246,5 +248,5 @@ export interface SectionGenerator {
    * what it means to generate a section, and a required method here would make
    * every implementation carry bookkeeping plumbing to satisfy a type.
    */
-  attributeTo?(jobId: string, projectId: string | null): void;
+  attributeTo?(jobId: string, projectId: string | null, operation?: string | null): void;
 }

@@ -2592,6 +2592,7 @@ async function recheckManuscript(
       instruction: recheckInstruction(target.label, why, superseded, 'section'),
       findings: [{ source: 'Why it was reopened', text: why }],
       sources: [],
+      repair: true,
       ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
     },
     stageHint: target.entry_prompt_hint,
