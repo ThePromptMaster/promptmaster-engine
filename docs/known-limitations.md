@@ -3728,10 +3728,11 @@ chapters aren't numbered falls back to every heading that names the unit.
 
 The check on a finished deliverable reads the brief's constraints, the accepted facts and the source
 material. It looks for deadlines nobody supplied, money called committed when the record says approved,
-and proceeding past a limit the text says is breached. It is one model call, at most five items of each
-kind, told to report nothing when in doubt, so a run can miss one. Its items go to the bounded repair
-rounds. It isn't shown the project's event history, so a date only the record holds ("7 Nov") can be
-reported as unsupported.
+proceeding past a limit the text says is breached, an old suggestion worked out on numbers that have since
+changed, and a readiness sentence its own checklist goes beyond. It is one model call, at most five items
+of each kind, told to report nothing when in doubt, so a run can miss one. Its items go to the bounded
+repair rounds. It isn't shown the project's event history, so it is told never to report a past date as
+unsupported, and a past date that really was invented goes unreported.
 
 ### L-229 — A routine approval isn't asked for a reason (2026-11-09)
 
