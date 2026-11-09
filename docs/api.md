@@ -107,8 +107,9 @@ Outline and long-form:
 
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
-| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** Takes `later_stages`, so the plan leaves their work to them. |
-| POST | `/api/generate-section-prose` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
+| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** Takes `later_stages`, so the plan leaves their work to them. Takes `existing`, the items already on the plan, so a regenerated plan keeps their ids (8 Nov). |
+| POST | `/api/revise-outline` | `reviseOutline` | `long_form.py` | **Live** — a reopened chapter plan brought up to date, every id kept (enforced in code). Returns `restructure` instead when chapters would have to change; nothing is saved then (L-212). |
+| POST | `/api/generate-section-prose` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` Takes `governing` (the current text of the earlier stages) and `continuation` (carry on a section cut at the length limit). |
 | POST | `/api/extract-section-record` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | POST | `/api/estimate-job` | `estimateJob` | `usage.py` | **Live** — the cost estimate shown before a large drafting run |
 
@@ -125,6 +126,7 @@ Go mode (the loop itself runs in the browser; see [`architecture.md`](architectu
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
 | POST | `/api/agent/next-action` | `agentNextAction` | `agent.py` | **Live** — chooses ONE move from `allowed_actions`; anything else becomes `request_user_decision` |
+| POST | `/api/agent/screen-question` | `agentScreenQuestion` | `agent.py` | **Live** — under autonomous and handle, whether a question Go wants to ask is a routine repair, a real-world action, a business decision, a reserved approval or a missing input. One Sonnet call; any error means ask (L-210). |
 | POST | `/api/agent/reason` | `agentReason` | `agent.py` | **Live** — performs a reasoning move (label `discussed`); 422 for non-reasoning actions |
 | POST | `/api/agent/write-code` | `agentWriteCode` | `agent.py` | **Live** — code only, never claimed output (label `code_written`). Told the project's data files by name, columns and first rows |
 | POST | `/api/agent/interpret-result` | `agentInterpretResult` | `agent.py` | **Live** — takes the real stdout/stderr/exit code from a `sandbox_runs` row (label `result_interpreted`) |
