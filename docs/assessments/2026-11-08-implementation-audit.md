@@ -225,8 +225,11 @@ The first pass left these to automated tests. Each was then run on production, o
 | Stray working text in Change it | Forced | Shown in a warning before Apply |
 | Item IDs | One real, one forced | A brought-back ID was refused, answered under the routine policy, retried once, then recorded with no question. A respelled ID was put back in code. Going back to a stage skipped this check, now fixed (#642), with a unit test only |
 | Phone width | 390-pixel frame | Three pages, no sideways scroll, and the overall status shows on the phone bar |
+| A wrong sum in the finished text | Typed in, real check | Flagged in code: "$2,000 + $1,600 + $600 = $4,500" works out to 4,200, and the objective was not met |
+| A renamed ID | Forced | P7 to P7-P was refused, answered under the routine policy, and the version stood, with no question |
+| Two failed repairs of one stage | Forced | The repair card appeared with "Tell Go what to fix", and Apply and continue was not offered |
 
-Still not done: a locked screen, a real browser permission prompt, and the full eight-chapter book.
+Still not done: a locked screen, a real browser permission prompt, and the full eight-chapter book. A rewrite job that really fails couldn't be caused from the browser, so "a failed rewrite isn't reported as written" (#585) has automated tests only.
 
 Screenshots are in `docs/media/nov9b`.
 
