@@ -173,6 +173,8 @@ export interface Project {
   routine_decisions?: RoutineDecisions;
   /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. On by default since 22 Oct. */
   web_access?: 'off' | 'on';
+  /** May the side chat and a requested draft search the owner's connected accounts (8 Nov, L-203). */
+  account_search?: 'off' | 'on';
   /** 14 Oct call ("increase the thinking level"): Deep asks the model to reason at high effort on every call. */
   thinking?: Thinking;
   /** Client, 21 Oct ("pick your language"): the language the work is written in, a two-letter code; English when unset. */
@@ -431,6 +433,7 @@ export type ProjectPatch = Partial<
     | 'manual_check_versions'
     | 'routine_decisions'
     | 'web_access'
+    | 'account_search'
     | 'third_party'
     | 'thinking'
     | 'language'

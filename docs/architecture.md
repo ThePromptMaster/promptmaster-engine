@@ -61,7 +61,10 @@ Microsoft connection, keyed by their Supabase user id; the backend calls Composi
 their behalf (`promptmaster/composio_client.py`), as it calls OpenRouter, and stores
 nothing it reads. Because the backend now acts for a user against a service that holds
 their data, `routers/connections.py` *does* check ownership: every connection id is
-confirmed to be the caller's before it is used.
+confirmed to be the caller's before it is used. Since 8 Nov a search covers the whole of
+every connected account (`promptmaster/account_search.py`, L-203): the chat and a draft the
+person asked for run it through `with_accounts` while the project's `account_search` switch
+is on, written from the person's own words only, and at most 8 items are opened. Go does not.
 The browser shows each account's logo from Composio's logo service
 (`logos.composio.dev`, no referrer sent; `ToolkitLogo`), so Composio sees the viewer's
 IP address when those pages load. A Material icon stands in if the service is

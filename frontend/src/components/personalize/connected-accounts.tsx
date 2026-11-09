@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
+import { forgetConnectedAccount } from '@/lib/connections/account-found';
 import { api } from '@/lib/api/client';
 import { CONNECT_PATH, TOOLKITS, rememberReturn, type Connection, type ToolkitSlug } from '@/lib/connections/items';
 import { useT } from '@/lib/i18n/i18n-provider';
@@ -73,6 +74,7 @@ export function ConnectedAccounts({
     setError(null);
     try {
       await api.disconnect(connection.id);
+      forgetConnectedAccount();
       await load();
     } catch (e) {
       setError(t('conn.failed', { why: e instanceof Error ? e.message : '' }));

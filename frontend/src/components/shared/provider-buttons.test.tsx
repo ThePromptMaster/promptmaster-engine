@@ -45,7 +45,7 @@ describe('ProviderButtons', () => {
   it('says what signing in shares, and that mail and files are read only once connected', () => {
     render(<ProviderButtons providers={['google']} onError={vi.fn()} />);
     expect(
-      screen.getByText('Signing in shares your name and email. PromptMaster reads your mail, calendar or files only if you connect them, and only what you choose.')
+      screen.getByText('Signing in shares your name and email. PromptMaster reads your mail, calendar or files only if you connect them.')
     ).toBeInTheDocument();
   });
 });

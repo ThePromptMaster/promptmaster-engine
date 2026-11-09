@@ -3377,7 +3377,7 @@ guest, and the call runs on our key, as a guest's other calls do. An attachment 
 characters and all of them to 28,000 together, and the page names any file that was cut. Whether a
 suggestion is good is a property of the run; the parser only guarantees that it traces to something
 shared and carries no link. Later on 7 Nov, connected accounts (L-201) became a second source: the
-emails, meetings and files a person ticks, read and shown before they are sent.
+emails, meetings and files a person ticks, read and shown before they are sent (replaced by a search of the whole account on 8 Nov, L-203).
 
 ### L-194 — An attached invite or email is labelled, not fenced (2026-11-07)
 
@@ -3463,8 +3463,10 @@ Built 6 Nov ahead of connected accounts (closed #534), shipped 7 Nov with them (
   than falling back. Checked 7 Nov against OpenRouter's zero-retention list, which is stricter: Opus,
   Sonnet and Haiku 5.5 have Bedrock and Google, GPT-5.6 Sol has Azure, and no other model is called.
   Setting `allow` undoes it; the value is read per call, but Vercel needs a redeploy to see a change.
-- Links in generated text stay clickable. A project holding third-party text should not offer them;
-  that comes with the briefing itself, where such a project first exists.
+- **Links (closed 8 Nov).** In a project holding third-party text, a chat reply or a stage draft keeps a
+  link only if the person gave it or it is a saved source (`source_access.without_foreign_links`). Other
+  writers (revisions, chapters) are not covered yet; they read what the project holds, and the prompt
+  still tells them not to copy links.
 
 ### L-201 — Connected accounts go through Composio, and shipped before the privacy policy (2026-11-07)
 
@@ -3475,8 +3477,8 @@ security assessment, and costs this:
 
 - **Their name, their scope.** Google's and Microsoft's screens say "Composio". Composio's Gmail app
   asks for full mailbox access (`https://mail.google.com/`), and its scopes are fixed. PromptMaster
-  only reads, and only on a press: a preview with no contents, then the text of what was ticked,
-  shown before it is sent. The settings page says this before anyone connects.
+  only reads. Since 8 Nov it searches without being asked item by item (L-203). The settings page says
+  this before anyone connects.
 - **A fourth company holds the mail.** What is read passes through Composio, which keeps request and
   response payloads for up to a year; its zero retention covers its own apps only on Enterprise.
   OpenRouter is told to keep nothing (L-200).
@@ -3490,10 +3492,10 @@ security assessment, and costs this:
   disconnect now revokes at Google or Microsoft only with that provider's last account; until then it
   only removes the connection in Composio, and the settings page says so. A connection already broken
   by a revoke still shows as connected until Composio notices, and preview reports it as unreadable.
-- **A briefing's guess at related mail is narrow.** "Brief me for this" ticks an email only if it
-  shares two words with the meeting's title, or one word and someone invited. An address alone was
-  enough until production showed why not (7 Nov): a meeting organised from the person's own personal
-  address pre-ticked their unrelated personal mail. The person ticks anything else themselves.
+- **A briefing's related mail is chosen by a model since 8 Nov.** It searches by the meeting's title and
+  by those invited, and picks from titles, senders and dates. On 7 Nov, matching on an address alone had
+  pre-ticked someone's unrelated personal mail, so an unrelated email can still be opened; it shows in
+  the project's panel to remove.
 - **Limits.** The free plan allows 20,000 calls to Composio's apps a month, then stops until the
   next; Google's quota is shared with Composio's other customers. A preview is up to six calls.
 - **Shapes not documented.** Composio documents every tool's output as an opaque object, so the
@@ -3502,7 +3504,7 @@ security assessment, and costs this:
 - **Files.** Google Docs, Sheets and Slides, plain text, PDF and Office files are read; anything else,
   or anything over 2.5 MB, says so and asks for an attachment instead. PDFs and Office files are read in
   the browser, as attachments are.
-- **What a briefing holds is not shown in the project.** The ticked text is in `projects.third_party`
+- **(Fixed by L-202.) What a briefing holds was not shown in the project.** The text is in `projects.third_party`
   and in every prompt, but no panel in the workspace lists it yet; it was shown, exactly, before the
   project was made.
 
@@ -3510,7 +3512,7 @@ security assessment, and costs this:
 ### L-202 — Account items in any project: added, carried and removed (2026-11-07)
 
 Before 7 Nov, only a meeting briefing could hold items from connected accounts. Now:
-- **"Start this" keeps the items** the suggestion came from, or every ticked item if it names none, whichever way the project starts.
+- **"Start this" keeps the items** the suggestion came from, or everything listed if it names none, whichever way the project starts.
 - **Every project has a "From your accounts" panel.** It lists the items as [T1]…, shows each one's exact text, and has Remove and "Add from my accounts" (at most 20).
 - **Web access** keeps the project's default beside them (L-200).
 
@@ -3518,6 +3520,50 @@ What it does not do:
 - **Adding or removing items doesn't redo finished stages.** The next draft, check or chat answer uses what is held then. Redo a stage to bring them in.
 - **Items carried to the start screen live in that tab's storage**, like the goal. A reload of the start page loses them, as it loses attached files. A project already made keeps them.
 - **The start conversation and "Ask me questions" see titles only, never text.** The brief they draft becomes the user's word, and other people's words must not. So the conversation knows the items exist but not what they say. The project's stages read them in full, fenced.
-- **Go never fetches mail itself.** Items reach a project only by the person ticking them.
-- **Edited text is not tracked.** A ticked item's text can be edited before it is added, the same as before.
+- **Go never fetches mail itself.** Items reach a project by the person's search or a chat or draft they asked for (L-203).
+
+### L-203 — Connected accounts are searched whole, and nothing is ticked (2026-11-08)
+
+The user's call, 8 Nov: "It should just search everything", as Claude's Gmail connector does, with no tick
+button. Until then the page listed the last 14 days of mail (at most 30), the next 14 days of meetings and
+the 20 newest files, and the person ticked up to 20. This reverses the 7 Nov rule in L-201 that nothing
+reaches a model until someone has ticked it and seen its text.
+
+**What happens.** A search covers the whole of every connected account, with no date limit unless the person
+gives one. It brings back up to 25 matches a kind. A small model picks what to open from titles, senders and
+dates, and at most 8 are read (`promptmaster/account_search.py`). It runs in three places: the box on
+`/projects/from-accounts` (`POST /api/connections/search`), the side chat, and a stage draft the person asked
+for or opened. Whatever a chat or draft reads is saved to the project's "From your accounts" panel.
+
+**What stands in for the tick:**
+- The search is written from the person's own words only, in one round, so an email can't steer what is
+  searched next. Web queries stay on the L-200 rule, because what was read is held by the project.
+- Picking can only answer with numbers from the list, so a hostile subject line can change the choice but
+  nothing else.
+- What is read is cleaned and fenced as before. Only read tools are called.
+- Links in replies and drafts are removed unless the person gave them or they are saved sources (L-200).
+- Each project has a "Search my accounts" switch. **Projects made before 8 Nov are off**, because their
+  owners connected when the page said nothing is read until they tick it. New projects are on.
+
+**What it costs:**
+- **A stranger's email can reach the model without anyone choosing it.** The fence weakens injected text and
+  doesn't remove it. Anything matching the person's words can be opened.
+- **The exact text isn't shown first**, and it can't be edited before use. It is listed afterwards, to see and
+  remove. Removing it doesn't redo finished work.
+- **More mail passes through Composio**, which keeps requests and responses for up to a year (L-201). The
+  privacy page is still a 404 and counsel has reviewed nothing.
+- **Composio's free plan.** One search is about 15 calls, so 20,000 a month is about 1,300 searches across
+  all users. A chat turn that needs no search makes none, only one small model call.
+- **A full project is expensive.** At most 20 items of 8,000 characters, in every prompt: about 40,000 tokens
+  a call. Once full, what a search finds is used for that turn and not kept.
+
+**What it does not do:**
+- It searches everything but doesn't read everything: 8 items a search, one search a turn. Something outside
+  the first 25 matches won't be seen unless the person's words narrow it.
+- Go never searches. Outlines and chapters don't either; they read what the project holds. The start
+  conversation stays titles-only (L-202).
+- PDF and Office files open only from the box, because only the browser reads them. In chat and drafts they
+  are named in a note and not opened.
+- Outlook and OneDrive search (`OUTLOOK_LIST_MESSAGES` with `search`, `OUTLOOK_SEARCH_EVENTS`,
+  `ONE_DRIVE_SEARCH_ITEMS`) follow Composio's documentation and have run only against scripted data.
 

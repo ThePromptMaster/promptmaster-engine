@@ -25,6 +25,7 @@
  *   Stop aborted the real draft somewhere else (4 Oct).
  */
 
+import { accountLine, accountSearchOf, keepAccountItems } from '@/lib/connections/account-found';
 import { keepFound, withWebLine } from '@/lib/workflow/web-found';
 import { userNoteLine } from '@/lib/workflow/user-note';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -154,14 +155,18 @@ export function useStageGeneration({
         // The chapters as saved, not this page's copy (10 Oct, email 6.2).
         // …and a check is never written about work that has no saved text (4 Nov).
         const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b, p.id) : (assertCheckedInput(t, target, b), b);
+        // Only here, a draft the person asked for or opened: Go builds the same request without it.
+        const accountSearch = p.account_search === 'on' ? await accountSearchOf(p) : 'off';
         const response = await api.generateStageArtifact(
-          generationRequest(p, t, s, fresh, target, options?.force ? head : ''),
+          { ...generationRequest(p, t, s, fresh, target, options?.force ? head : ''), account_search: accountSearch },
           controller.signal
         );
 
         if (controller.signal.aborted) return;
         // What a search found is saved before the draft that cites it (22 Oct).
         const web = await keepFound(p, response, { stageId: target.id });
+        // And what a search of the person's accounts read (8 Nov, L-203).
+        const accounts = await keepAccountItems(p.id, response);
 
         const content = generationContent(target, response);
 
@@ -191,6 +196,7 @@ export function useStageGeneration({
               options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
               // What the writer said to the user, kept off the document (4 Nov).
               userNoteLine(response.note_to_user),
+              accountLine(accounts),
             ].filter(Boolean).join(' '),
             web
           ),

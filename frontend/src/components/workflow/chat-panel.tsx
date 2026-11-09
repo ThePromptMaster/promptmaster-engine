@@ -1035,6 +1035,17 @@ function Bubble({ message }: { message: StageChatMessage }) {
           </span>
         </p>
       )}
+      {message.accounts && (
+        <p className="mt-1 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">{message.accounts.query ? 'inbox' : 'mail_off'}</span>
+          <span dir="auto">
+            {message.accounts.query
+              ? t(message.accounts.read ? 'conn.accountsRead' : 'conn.accountsNone', { query: message.accounts.query, count: message.accounts.read })
+              : ''}
+            {message.accounts.note ? `${message.accounts.query ? ' ' : ''}${message.accounts.note}` : ''}
+          </span>
+        </p>
+      )}
       {message.role === 'assistant' && message.spent && <SpentLine spent={message.spent} />}
     </div>
   );

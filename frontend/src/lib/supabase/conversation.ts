@@ -120,11 +120,20 @@ export interface StageChatMessage extends ChatMessage {
   discarded?: boolean;
   /** Discuss only: the web search this reply was made with (22 Oct). */
   web?: ChatWebSearch | null;
+  /** Discuss only: the search of the person's accounts this reply was made with (8 Nov). */
+  accounts?: ChatAccountSearch | null;
   /** An assistant reply: what it cost, as `spent.ts` totals it (31 Oct). */
   spent?: { cost: number | null; unpriced: number } | null;
 }
 
 /** A search the chat made for a reply: what for, and what it saved. */
+/** A search of the person's own accounts, kept with the reply it was for (8 Nov). */
+export interface ChatAccountSearch {
+  query: string;
+  read: number;
+  note?: string;
+}
+
 export interface ChatWebSearch {
   query: string;
   /** Sources newly saved to the project. */
@@ -139,6 +148,7 @@ interface StageChatMeta {
   applied_version_id?: string | null;
   discarded?: boolean;
   web?: ChatWebSearch | null;
+  accounts?: ChatAccountSearch | null;
   spent?: { cost: number | null; unpriced: number } | null;
 }
 
@@ -157,6 +167,7 @@ function rowToStageMessage(row: StageRow): StageChatMessage {
     appliedVersionId: meta.applied_version_id ?? null,
     discarded: meta.discarded === true,
     web: meta.web ?? null,
+    accounts: meta.accounts ?? null,
     spent: meta.spent ?? null,
   };
 }
@@ -210,6 +221,7 @@ export async function saveStageChatMessage(msg: {
   scope?: string | null;
   applied_version_id?: string | null;
   web?: ChatWebSearch | null;
+  accounts?: ChatAccountSearch | null;
   spent?: { cost: number | null; unpriced: number } | null;
 }): Promise<StageChatMessage> {
   const local = (): StageChatMessage => ({
@@ -222,6 +234,7 @@ export async function saveStageChatMessage(msg: {
     scope: msg.scope ?? null,
     appliedVersionId: msg.applied_version_id ?? null,
     web: msg.web ?? null,
+    accounts: msg.accounts ?? null,
     spent: msg.spent ?? null,
   });
 
@@ -234,6 +247,7 @@ export async function saveStageChatMessage(msg: {
     scope: msg.scope ?? null,
     applied_version_id: msg.applied_version_id ?? null,
     ...(msg.web ? { web: msg.web } : {}),
+    ...(msg.accounts ? { accounts: msg.accounts } : {}),
     ...(msg.spent ? { spent: msg.spent } : {}),
   };
 

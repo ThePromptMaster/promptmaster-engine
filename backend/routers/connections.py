@@ -24,7 +24,6 @@ from promptmaster.account_search import active_toolkits, search_accounts
 from promptmaster.composio_client import Account, Composio, ComposioError
 from promptmaster.connections import (
     MAX_ATTENDEES,
-    MAX_PICKED,
     PROVIDER,
     TOOLKITS,
     ConnectedFile,
@@ -34,7 +33,6 @@ from promptmaster.connections import (
     Problem,
     Skipped,
     preview,
-    read,
 )
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
@@ -104,11 +102,7 @@ class PreviewResponse(BaseModel):
     problems: list[Problem]
 
 
-class ReadRequest(BaseModel):
-    items: list[PickedItem] = Field(min_length=1, max_length=MAX_PICKED)
-
-
-class ReadResponse(BaseModel):
+class FoundResponse(BaseModel):
     items: list[ConnectedText]
     files: list[ConnectedFile]
     skipped: list[Skipped]
@@ -122,7 +116,7 @@ class SearchRequest(BaseModel):
     people: list[str] = Field(default_factory=list, max_length=MAX_ATTENDEES)
 
 
-class SearchResponse(ReadResponse):
+class SearchResponse(FoundResponse):
     #: The words searched for, or "" when nothing was typed.
     query: str = ""
     problems: list[Problem]
@@ -259,18 +253,3 @@ async def api_search(
         query=opened.said, items=opened.items, files=opened.files, skipped=opened.skipped,
         problems=opened.problems, matches=opened.matches,
     )
-
-
-@router.post("/read")
-async def api_read(
-    req: ReadRequest, user: AuthUser = Depends(connecting_user), composio: Composio = Depends(get_composio)
-) -> ReadResponse:
-    """The text of each ticked item, cleaned and capped. No model call: the person sees it first."""
-    active = {a.toolkit for a in await _accounts(composio, user) if a.status == "ACTIVE"}
-    usable = [p for p in req.items if p.toolkit in active]
-    skipped = [Skipped(id=p.id, title=p.title, reason="That account is no longer connected.") for p in req.items if p.toolkit not in active]
-    try:
-        texts, files, more_skipped = await read(composio, user.id, usable) if usable else ([], [], [])
-    except ComposioError:
-        raise HTTPException(status_code=502, detail=UNREACHABLE)
-    return ReadResponse(items=texts, files=files, skipped=skipped + more_skipped)

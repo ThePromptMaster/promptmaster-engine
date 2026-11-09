@@ -7,12 +7,16 @@ import { ProjectThirdParty } from './project-third-party';
 let auth = { isGuest: false };
 vi.mock('@/hooks/use-auth', () => ({ useAuth: () => auth }));
 
+let connected = true;
+vi.mock('@/lib/connections/account-found', () => ({ hasConnectedAccount: async () => connected }));
+
 const MAIL = { kind: 'email' as const, source: 'Gmail · Dana', title: 'Pricing for Q1', text: 'Our price rises 4% in January.', when: '2026-11-03T09:00:00Z' };
 const EVENT = { kind: 'calendar_event' as const, source: 'Google Calendar', title: 'Supplier review', text: 'Agenda: prices.' };
 
 describe('the "From your accounts" panel', () => {
   beforeEach(() => {
     auth = { isGuest: false };
+    connected = true;
   });
   afterEach(() => vi.clearAllMocks());
 
@@ -72,5 +76,27 @@ describe('the "From your accounts" panel', () => {
     const full = Array.from({ length: 20 }, (_x, i) => ({ ...MAIL, title: `m${i}` }));
     render(<ProjectThirdParty project={{ id: 'p2', third_party: full }} onSave={vi.fn()} onAdd={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'At most 20' })).toBeDisabled();
+  });
+
+  it('has a switch for searching the accounts, only once something is connected', async () => {
+    const ui = userEvent.setup();
+    const onAccountSearch = vi.fn(async () => undefined);
+    render(<ProjectThirdParty project={{ id: 'p1', third_party: [MAIL], account_search: 'on' }} onSave={vi.fn()} onAdd={vi.fn()} onAccountSearch={onAccountSearch} />);
+    const toggle = await screen.findByRole('switch', { name: 'Search my accounts for this project' });
+    expect(toggle).toBeChecked();
+    await ui.click(toggle);
+    await waitFor(() => expect(onAccountSearch).toHaveBeenCalledWith('off'));
+  });
+
+  it('shows no switch with nothing connected', async () => {
+    connected = false;
+    render(<ProjectThirdParty project={{ id: 'p1', third_party: [MAIL], account_search: 'on' }} onSave={vi.fn()} onAdd={vi.fn()} onAccountSearch={vi.fn()} />);
+    await screen.findByText('Pricing for Q1');
+    await waitFor(() => expect(screen.queryByRole('switch')).not.toBeInTheDocument());
+  });
+
+  it('read-only: the switch can be seen, not changed', async () => {
+    render(<ProjectThirdParty project={{ id: 'p1', third_party: [MAIL], account_search: 'off' }} readOnly onSave={vi.fn()} onAdd={vi.fn()} onAccountSearch={vi.fn()} />);
+    expect(await screen.findByRole('switch')).toBeDisabled();
   });
 });

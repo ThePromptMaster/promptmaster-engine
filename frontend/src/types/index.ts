@@ -310,6 +310,8 @@ export interface ChatMessageRequest {
   context?: ChatContext;
   /** The project's Web access switch (22 Oct): on, the chat may search the web. */
   web_access?: 'on' | 'off';
+  /** The project's "Search my accounts" switch (8 Nov, L-203). */
+  account_search?: 'on' | 'off';
   /** What the user attached to this message (5 Nov). */
   attachments?: { name: string; text?: string; image?: string; not_read?: boolean }[];
 }
@@ -322,6 +324,10 @@ export interface ChatMessageResponse {
   web_sources?: { url: string; title: string; excerpt: string }[];
   /** A search was wanted but failed; the reply used only the project. */
   web_note?: string;
+  /** What the chat searched the person's accounts for, what it opened, or why it couldn't (8 Nov). */
+  account_query?: string;
+  account_items?: ThirdPartyItem[];
+  account_note?: string;
 }
 
 export interface ApplyToAnswerRequest {
@@ -584,6 +590,8 @@ export interface SuggestActionsRequest {
 export interface GenerateStageArtifactRequest {
   /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
   web_access?: 'on' | 'off';
+  /** The project's "Search my accounts" switch (8 Nov, L-203). A draft the person asked for only; never Go. */
+  account_search?: 'on' | 'off';
   inputs: PMInput;
   stage: StageDescriptorRequest;
   digest: StageDigestRequest;
@@ -606,6 +614,10 @@ export interface MeasuredLine {
 }
 
 export interface GenerateStageArtifactResponse extends WebUse {
+  /** What a search of the person's accounts looked for and opened (8 Nov). */
+  account_query?: string;
+  account_items?: ThirdPartyItem[];
+  account_note?: string;
   content: string;
   /** Rows for list and review stages; the extra keys are schema-defined. */
   items: Record<string, string>[];

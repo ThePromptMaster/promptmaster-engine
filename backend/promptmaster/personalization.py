@@ -23,7 +23,7 @@ from .llm_client import OpenRouterClient
 MAX_SUGGESTIONS = 3
 #: Enough to judge what someone is working on, well under the request body limit.
 MAX_ITEM_CHARS = 12_000
-#: 7 Nov: up to twenty ticked emails, meetings and files from connected accounts,
+#: 7 Nov: up to twenty emails, meetings and files from connected accounts,
 #: each already capped at 8,000 characters. About 20,000 tokens on Sonnet at most.
 MAX_ITEMS_CHARS = 80_000
 MAX_ITEMS = 20
@@ -57,7 +57,7 @@ _SYSTEM = (
 
 class SharedItem(BaseModel):
     """What the person typed, a document they attached, or (7 Nov) an email, meeting
-    or file they ticked in a connected account. `source` says where it came from."""
+    or file read from a connected account. `source` says where it came from."""
 
     kind: Literal["note", "file", "email", "calendar_event"]
     source: str = Field(default="", max_length=300)

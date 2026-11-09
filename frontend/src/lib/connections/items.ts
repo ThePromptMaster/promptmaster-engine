@@ -4,9 +4,8 @@ import type { ThirdPartyItem } from '@/types';
  * Connected accounts (the client's call, 7 Nov): Gmail, Google Calendar, Google
  * Drive, Outlook and OneDrive, through Composio (`backend/routers/connections.py`).
  *
- * Two reads, both on a press. A preview lists what is there without any contents;
- * the person ticks; the backend reads only what was ticked and the browser shows
- * that exact text before it goes anywhere. What is sent is what is shown
+ * Since 8 Nov a search covers the whole account and nothing is ticked (L-203): the
+ * backend reads the best matches and the browser lists exactly what was read
  * (`toThirdParty`, `toSharedItems`). Pure, apart from sessionStorage.
  */
 
@@ -68,7 +67,7 @@ export interface PreviewItem {
   note: string;
 }
 
-/** The text of a ticked item, as the backend read and cleaned it. */
+/** The text of an item the search opened, as the backend read and cleaned it. */
 export interface ConnectedText {
   id: string;
   toolkit: ToolkitSlug;
@@ -76,7 +75,7 @@ export interface ConnectedText {
   source: string;
   title: string;
   text: string;
-  /** From the preview the person ticked it in; the read itself does not say. */
+  /** When it was sent or happens, from the search that found it. */
   when?: string;
 }
 
@@ -88,6 +87,7 @@ export interface ConnectedFile {
   title: string;
   mime: string;
   data_base64: string;
+  when?: string;
 }
 
 export interface Skipped {
@@ -96,15 +96,12 @@ export interface Skipped {
   reason: string;
 }
 
-/** The backend reads twenty at a time, and suggestions take twenty. */
-export const MAX_TICKED = 20;
-
 /** A stable key: ids are only unique within one account. */
 export function itemKey(item: { toolkit: string; id: string }): string {
   return `${item.toolkit}:${item.id}`;
 }
 
-/** What goes back to be read: only what the read needs. */
+/** A meeting to prepare for: only what reading it needs. */
 export function toPicked(item: PreviewItem): { id: string; toolkit: ToolkitSlug; kind: ItemKind; title: string; ref: Record<string, string> } {
   return { id: item.id, toolkit: item.toolkit, kind: item.kind, title: item.title, ref: item.ref };
 }
@@ -185,59 +182,6 @@ export function titlesOnly(items: readonly ThirdPartyItem[]): ThirdPartyItem[] {
 /** For `suggestWorkflows`: the same, in its item shape. */
 export function toSharedItems(items: readonly ConnectedText[]): { kind: ItemKind; source: string; title: string; text: string }[] {
   return items.map(({ kind, source, title, text }) => ({ kind, source, title, text }));
-}
-
-const STOP = new Set([
-  'about', 'after', 'again', 'agenda', 'call', 'catch', 'from', 'have', 'invitation', 'meeting', 'please', 're', 'fwd',
-  'review', 'sync', 'that', 'this', 'update', 'weekly', 'with', 'your', 'will', 'what', 'when', 'week', 'today',
-]);
-
-function words(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length >= 4 && !STOP.has(w))
-  );
-}
-
-function addresses(text: string): Set<string> {
-  return new Set((text.toLowerCase().match(/[^\s<>,;"']+@[^\s<>,;"']+/g) ?? []).map((a) => a.replace(/[.>]+$/, '')));
-}
-
-/**
- * The person's own addresses: the one they signed in with, and any address most of
- * their listed mail was sent to. A connected mailbox need not be the sign-in one, and
- * its owner is on every invite and every email, so it must never count as a link.
- */
-function ownAddresses(emails: readonly PreviewItem[], signedInAs: string): Set<string> {
-  const own = new Set(signedInAs ? [signedInAs.toLowerCase()] : []);
-  const counts = new Map<string, number>();
-  for (const e of emails) for (const a of addresses(e.people.join(' '))) counts.set(a, (counts.get(a) ?? 0) + 1);
-  for (const [a, n] of counts) if (emails.length >= 2 && n * 2 >= emails.length) own.add(a);
-  return own;
-}
-
-/**
- * The emails worth ticking for a meeting's briefing: sharing two words of the meeting's
- * title, or one word and someone invited (the person's own addresses aside). A narrow
- * starting point the person can add to or untick, never more than the limit allows.
- */
-export function relatedTo(meeting: PreviewItem, items: readonly PreviewItem[], ownAddress = ''): PreviewItem[] {
-  const emails = items.filter((item) => item.kind === 'email');
-  const own = ownAddresses(emails, ownAddress);
-  const invited = new Set([...addresses([meeting.who, ...meeting.people].join(' '))].filter((a) => !own.has(a)));
-  const titleWords = words(meeting.title);
-  return emails
-    .filter((item) => {
-      const shared = [...words(item.title)].filter((w) => titleWords.has(w)).length;
-      const byPerson = [...addresses([item.who, ...item.people].join(' '))].some((a) => invited.has(a));
-      // An address alone is not enough: it may be the person's own other address, and on
-      // production (7 Nov) that pre-ticked their unrelated personal mail. A ticked email
-      // goes to a model, so the guess stays narrow and the person ticks the rest.
-      return shared >= 2 || (byPerson && shared >= 1);
-    })
-    .slice(0, MAX_TICKED - 1);
 }
 
 /** Where Composio sends the person back: our own page, which the backend insists on. */

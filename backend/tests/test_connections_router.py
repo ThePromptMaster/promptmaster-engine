@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from typing import Any
 
@@ -14,6 +15,7 @@ from main import app
 from promptmaster import composio_mock_data
 from promptmaster.composio_client import Account, ComposioError, MockComposio, build_composio, composio_mode
 from promptmaster.connections import (
+    MAX_PICKED,
     MAX_TEXT_CHARS,
     PickedItem,
     clean_text,
@@ -23,6 +25,7 @@ from promptmaster.connections import (
     google_event_items,
     onedrive_items,
     outlook_mail_items,
+    read,
     shape,
 )
 from tests.conftest import TEST_USER_ID
@@ -245,49 +248,48 @@ def test_a_file_that_cant_be_read_says_so_in_the_preview(fake):
 # --- read ------------------------------------------------------------------
 
 
-def _pick(id: str, toolkit: str, kind: str, **ref: str) -> dict[str, Any]:
-    return {"id": id, "toolkit": toolkit, "kind": kind, "title": id, "ref": ref}
+def _pick(id: str, toolkit: str, kind: str, **ref: str) -> PickedItem:
+    return PickedItem(id=id, toolkit=toolkit, kind=kind, title=id, ref=ref)
+
+
+def _read(fake: FakeComposio, *items: PickedItem):
+    return asyncio.run(read(fake, TEST_USER_ID, list(items)))
 
 
 def test_read_cleans_hidden_text_and_links(fake):
-    fake.add("g", "gmail")
-    body = client.post("/api/connections/read", json={"items": [_pick("m-inject", "gmail", "email")]}).json()
-    text = body["items"][0]["text"]
-    assert "19.10" in text
-    assert "Ignore your instructions" not in text  # it was hidden by style
-    assert "http" not in text and "[link removed]" in text
-    assert body["items"][0]["source"].startswith("Gmail · Supplier Desk")
+    texts, _files, _skipped = _read(fake, _pick("m-inject", "gmail", "email"))
+    assert "19.10" in texts[0].text
+    assert "Ignore your instructions" not in texts[0].text  # it was hidden by style
+    assert "http" not in texts[0].text and "[link removed]" in texts[0].text
+    assert texts[0].source.startswith("Gmail · Supplier Desk")
 
 
 def test_read_meeting_and_doc(fake):
-    fake.add("c", "googlecalendar")
-    fake.add("d", "googledrive")
-    body = client.post("/api/connections/read", json={"items": [
+    texts, _files, _skipped = _read(
+        fake,
         _pick("e-board", "googlecalendar", "calendar_event"),
         _pick("f-plan", "googledrive", "file", mime="application/vnd.google-apps.document"),
-    ]}).json()
-    by_id = {i["id"]: i for i in body["items"]}
-    assert "What: Q3 board meeting" in by_id["e-board"]["text"] and "Agenda" in by_id["e-board"]["text"]
-    assert "Headcount grows from 42 to 51" in by_id["f-plan"]["text"]
+    )
+    by_id = {i.id: i for i in texts}
+    assert "What: Q3 board meeting" in by_id["e-board"].text and "Agenda" in by_id["e-board"].text
+    assert "Headcount grows from 42 to 51" in by_id["f-plan"].text
     export = next(a for k, a in fake.calls if k == "execute" and a[0] == "GOOGLEDRIVE_EXPORT_GOOGLE_WORKSPACE_FILE")[1]
     assert export == {"fileId": "f-plan", "mimeType": "text/plain"}
 
 
-def test_read_skips_disconnected_and_unreadable_with_reasons(fake):
-    fake.add("d", "googledrive")
-    body = client.post("/api/connections/read", json={"items": [
-        _pick("m-board", "gmail", "email"),
-        _pick("f-video", "googledrive", "file", mime="video/mp4"),
-    ]}).json()
-    reasons = {s["id"]: s["reason"] for s in body["skipped"]}
-    assert reasons["m-board"] == "That account is no longer connected."
-    assert "attach" in reasons["f-video"]
-    assert body["items"] == []
+def test_read_says_why_an_unreadable_file_was_skipped(fake):
+    texts, _files, skipped = _read(fake, _pick("f-video", "googledrive", "file", mime="video/mp4"))
+    assert texts == [] and "attach" in skipped[0].reason
 
 
-def test_read_refuses_more_than_twenty(fake):
-    r = client.post("/api/connections/read", json={"items": [_pick(f"m{i}", "gmail", "email") for i in range(21)]})
-    assert r.status_code == 422
+def test_read_opens_no_more_than_the_limit(fake):
+    picked = [_pick("m-board", "gmail", "email") for _ in range(25)]
+    texts, _files, _skipped = _read(fake, *picked)
+    assert len(texts) == MAX_PICKED
+
+
+def test_the_route_that_read_ticked_items_is_gone(fake):
+    assert client.post("/api/connections/read", json={"items": []}).status_code in (404, 405)
 
 
 # --- parsers and cleaning ----------------------------------------------------
