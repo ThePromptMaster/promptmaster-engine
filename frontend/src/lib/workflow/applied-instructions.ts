@@ -21,8 +21,17 @@ const USER_INSTRUCTED: ReadonlySet<string> = new Set(['chat_instruct', 'chat_sav
 /** Not an instruction: what "Save this discussion" records in place of one. */
 const NOT_SAID = /^save the discussion as a new version$/i;
 
-const EACH_MAX = 1_500;
+/**
+ * The latest two are kept whole: 1,500 characters cut a sponsor's revision off
+ * before it gave two roles new authority, and the final check called them
+ * invented (9 Nov, production). Earlier ones stay short, since each rides on every request.
+ */
+const LATEST_MAX = 8_000;
+const EARLIER_MAX = 1_500;
+const LATEST_KEPT = 2;
 const MAX = 12;
+
+const clipped = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 
 export interface AppliedInstruction {
   stage: string;
@@ -35,7 +44,7 @@ function said(v: ArtifactVersion): string {
   if (!USER_INSTRUCTED.has(v.source_operation)) return '';
   const text = (v.instruction ?? '').replace(/\s+/g, ' ').trim();
   if (!text || NOT_SAID.test(text)) return '';
-  return text.length > EACH_MAX ? `${text.slice(0, EACH_MAX - 1).trimEnd()}…` : text;
+  return text;
 }
 
 /** Every instruction the user applied, oldest first, the latest `MAX`. */
@@ -51,7 +60,8 @@ export function appliedInstructions(
       if (instruction) out.push({ stage: stage.label, version: v.version_number, instruction, at: v.created_at });
     }
   }
-  return out.sort((a, b) => a.at.localeCompare(b.at)).slice(-MAX);
+  const latest = out.sort((a, b) => a.at.localeCompare(b.at)).slice(-MAX);
+  return latest.map((a, i) => ({ ...a, instruction: clipped(a.instruction, i >= latest.length - LATEST_KEPT ? LATEST_MAX : EARLIER_MAX) }));
 }
 
 /**
