@@ -539,7 +539,7 @@ function SectionRow({
               disabled={!section.content}
               className="text-start text-body font-semibold text-[var(--on-surface)] disabled:cursor-default"
             >
-              {index + 1}. {section.title}
+              {/^\d+[.)]\s/.test(section.title) ? section.title : `${index + 1}. ${section.title}`}
             </button>
 
             {gaveUp && onRetry && (
