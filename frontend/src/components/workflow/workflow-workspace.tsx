@@ -2441,6 +2441,9 @@ export function WorkflowWorkspace({
                 {t('stageHead.position', { index: stageIndex + 1, total: template.stages.length })}
                 {progress.leftOpen > 0 && t('ws.leftOpenCount', { count: progress.leftOpen })}{t('ws.toGo', { count: progress.remaining })}
               </span>
+              {overall !== 'in_progress' && (
+                <span data-overall-status-phone className="block truncate text-label font-semibold text-[var(--on-surface)]">{t(`status.${overall}` as const)}</span>
+              )}
             </span>
             <span
               aria-hidden
