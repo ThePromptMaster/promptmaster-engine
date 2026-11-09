@@ -104,12 +104,17 @@ export interface DraftCheckpoint {
   finish_reason?: string;
   /** `continue`: how many continuations this job has already made. */
   rounds?: number;
+  /** `continue`, on a rewrite: the section as it read before the rewrite began. */
+  before?: string;
 }
 
 /** A section cut off at the length limit, as the model is shown it. */
 export interface SectionContinuationRequest {
   text_so_far: string;
   unfinished: string;
+  /** On a rewrite: what it has to do, and the old text it had not reached. */
+  revision_brief?: string;
+  rest_of_current?: string;
 }
 
 export interface GlossaryTerm {

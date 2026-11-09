@@ -20,7 +20,7 @@
  * tab close discards a section that was already finished and already billed.
  */
 
-import { continuationTail, endsMidSentence, joinContinuation, MAX_CONTINUE_ROUNDS, splitUnfinished } from './continuation';
+import { continuationTail, endsMidSentence, joinContinuation, MAX_CONTINUE_ROUNDS, rewriteToCarryOn, splitUnfinished } from './continuation';
 import { classifyDrainError, classified, withPreserved } from './errors';
 import { drainLog } from './log';
 import { withoutRemoved } from '@/lib/workflow/removed-text';
@@ -238,7 +238,7 @@ async function runStep(args: StepArgs): Promise<StepOutcome> {
     return { done: true };
   }
 
-  if (checkpoint.step === 'continue') return await runContinueStep(args, context, checkpoint.rounds ?? 0);
+  if (checkpoint.step === 'continue') return await runContinueStep(args, context, checkpoint.rounds ?? 0, checkpoint.before);
 
   if (checkpoint.step === 'prose') {
     // A section cut off at the limit, queued to be carried on: no new draft.
@@ -326,7 +326,7 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
   });
 
   const next: DraftCheckpoint = finishReason === 'length'
-    ? { step: 'continue', rounds: 0 }
+    ? { step: 'continue', rounds: 0, ...(payload.revise && context.section?.content ? { before: context.section.content } : {}) }
     : { step: 'record', prose_written: true, finish_reason: finishReason };
   await store.checkpointJob(job.id, worker, next, 120);
   return { done: false, checkpoint: next };
@@ -337,7 +337,7 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
  * each committed like the prose it continues: a worker killed between rounds
  * resumes from what was saved.
  */
-async function runContinueStep(args: StepArgs, context: SectionContext, rounds: number): Promise<StepOutcome> {
+async function runContinueStep(args: StepArgs, context: SectionContext, rounds: number, before?: string): Promise<StepOutcome> {
   const { job, payload, store, generator, worker } = args;
   const section = context.section!;
   const toRecord = async (finishReason: string): Promise<StepOutcome> => {
@@ -359,7 +359,7 @@ async function runContinueStep(args: StepArgs, context: SectionContext, rounds: 
     model: payload.model,
     userId: job.user_id,
     ...(payload.stage_hint ? { stage_hint: payload.stage_hint } : {}),
-    continuation: { text_so_far: continuationTail(section.content), unfinished },
+    continuation: { text_so_far: continuationTail(section.content), unfinished, ...rewriteToCarryOn(payload.revise, before, kept) },
   });
 
   // Nothing to add: the section was complete, and it stops being counted as cut.
@@ -374,7 +374,7 @@ async function runContinueStep(args: StepArgs, context: SectionContext, rounds: 
     outlineVersionId: payload.outline_version_id,
   });
   if (finishReason !== 'length') return toRecord(finishReason);
-  const next: DraftCheckpoint = { step: 'continue', rounds: rounds + 1 };
+  const next: DraftCheckpoint = { step: 'continue', rounds: rounds + 1, ...(before ? { before } : {}) };
   await store.checkpointJob(job.id, worker, next, 120);
   return { done: false, checkpoint: next };
 }
@@ -473,7 +473,7 @@ async function recordFailure(args: FailureArgs): Promise<void> {
 
 function normaliseCheckpoint(raw: Record<string, unknown> | null | undefined): DraftCheckpoint {
   const step = raw?.step;
-  if (step === 'continue') return { step: 'continue', rounds: typeof raw?.rounds === 'number' ? raw.rounds : 0 };
+  if (step === 'continue') return { step: 'continue', rounds: typeof raw?.rounds === 'number' ? raw.rounds : 0, ...(typeof raw?.before === 'string' ? { before: raw.before } : {}) };
   if (step === 'record') {
     return {
       step: 'record',

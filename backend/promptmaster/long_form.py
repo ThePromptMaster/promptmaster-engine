@@ -502,6 +502,18 @@ def build_section_revision_prompt(
 #: What the model replies when a section it was asked to carry on is already finished.
 SECTION_COMPLETE = "SECTION ALREADY COMPLETE"
 
+SECTION_MAX_TOKENS = 4096
+#: The most a rewrite of one section is given. Past this it is carried on, as a draft is.
+REWRITE_MAX_TOKENS = 16_384
+
+
+def _section_token_limit(revision: SectionRevisionBrief | None) -> int:
+    """A rewrite hands back the whole section, so it needs room for the whole section. At 4,096 a
+    4,200-word chapter was cut off on every rewrite, before reaching its own end (9 Nov)."""
+    if revision is None:
+        return SECTION_MAX_TOKENS
+    return min(REWRITE_MAX_TOKENS, max(SECTION_MAX_TOKENS, len(revision.current_content) // 3 + 512))
+
 
 def build_section_continuation_prompt(
     inputs: PMInput,
@@ -536,6 +548,7 @@ def build_section_continuation_prompt(
         f"SECTION {section_index + 1}: {target.title}\n"
         f"This section covers: {target.abstract}\n\n"
         f"--- THE END OF THE SECTION AS IT STANDS ---\n{continuation.text_so_far}\n--- WHERE IT STOPS ---\n\n"
+        f"{_rewrite_in_progress(continuation)}"
         f"The section was cut off by a length limit before it was finished. {start} "
         "Write only what comes next: nothing from before that point, no title, no note about what you did. "
         "Finish the section as its brief requires, keep to any length its brief or the constraints give, "
@@ -543,6 +556,27 @@ def build_section_continuation_prompt(
         f"If the section is in fact already complete, reply with exactly: {SECTION_COMPLETE}"
     )
     return system, user
+
+
+def _rewrite_in_progress(continuation: SectionContinuation) -> str:
+    """9 Nov, production: a rewrite asked for one closing sentence. It was cut off before the end,
+    and the continuation, told nothing of the rewrite and shown none of the old text, wrote a new
+    ending of its own. The last part of a long section was being replaced on every revision."""
+    brief = continuation.revision_brief.strip()
+    rest = continuation.rest_of_current.strip()
+    if not brief and not rest:
+        return ""
+    return (
+        "THIS SECTION WAS BEING REWRITTEN WHEN IT WAS CUT OFF.\n"
+        + (f"WHAT THE REWRITE HAS TO DO:\n{brief}\n\n" if brief else "")
+        + (
+            f"--- THE SECTION AS IT READ BEFORE THE REWRITE, FROM ABOUT THIS POINT ON ---\n{rest}\n--- END OF THE OLD TEXT ---\n"
+            "Carry on by following that old text from the point reached, word for word wherever the rewrite does not change it.\n"
+            if rest
+            else ""
+        )
+        + "Whatever the rewrite asks for that has not been done yet is yours to do now, including anything it asks for at the end.\n\n"
+    )
 
 
 def _record_block(record: str) -> str:
@@ -614,7 +648,7 @@ async def generate_section_prose(
         prompt=user,
         system=system,
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=_section_token_limit(revision),
         model=model,
         deadline=deadline,
     )

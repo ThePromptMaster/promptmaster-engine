@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { continuationTail, CONTINUE_TAIL_CHARS, cutSections, endsMidSentence, everCutIds, isCutSection, joinContinuation, splitUnfinished } from './continuation';
+import { continuationTail, CONTINUE_TAIL_CHARS, cutSections, endsMidSentence, everCutIds, isCutSection, joinContinuation, splitUnfinished, rewriteToCarryOn } from './continuation';
 import type { OutlineSection } from '@/types';
 
 const LONG = 'The study followed four hundred people across a decade and reached';
@@ -89,5 +89,24 @@ describe('joining a continuation', () => {
   it('shows the model only where it stopped', () => {
     expect(continuationTail('x'.repeat(CONTINUE_TAIL_CHARS + 50))).toHaveLength(CONTINUE_TAIL_CHARS);
     expect(continuationTail('short')).toBe('short');
+  });
+});
+
+describe('rewriteToCarryOn', () => {
+  it('gives a first draft nothing', () => {
+    expect(rewriteToCarryOn(undefined, 'old text', 'new')).toEqual({});
+  });
+
+  it('gives a rewrite its brief, and the old text from a little before where the new text stops', () => {
+    const before = `${'a'.repeat(6_000)}${'b'.repeat(6_000)}`;
+    const out = rewriteToCarryOn({ instruction: 'Change it.', notes: '- why' }, before, 'x'.repeat(9_000));
+    expect(out.revision_brief).toBe('Change it.\n- why');
+    expect(out.rest_of_current).toHaveLength(7_000);
+    expect(out.rest_of_current!.startsWith('a')).toBe(true);
+    expect(out.rest_of_current!.endsWith('b')).toBe(true);
+  });
+
+  it('still gives the brief when the old text is not known', () => {
+    expect(rewriteToCarryOn({ instruction: 'Change it.' }, undefined, 'new')).toEqual({ revision_brief: 'Change it.' });
   });
 });
