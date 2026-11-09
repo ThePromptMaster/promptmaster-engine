@@ -24,6 +24,23 @@ import type { StageDefinition, WorkflowTemplate } from './types';
 export const HOLDS_THE_WORK = 0.8;
 /** Under this share it is a note on the work, not a copy of it. */
 export const ONLY_A_NOTE = 0.15;
+/** A tightened copy: at least this share of the words, with every chapter under its own heading. */
+export const TIGHTENED_COPY = 0.5;
+
+/**
+ * Whether every chapter stands on a heading line of `text` (9 Nov, production:
+ * Go shortened a finished eight-document package to its word target, it fell
+ * under `HOLDS_THE_WORK`, and the longer chapters behind it were judged instead).
+ */
+function headsEveryChapter(text: string, titles: readonly string[]): boolean {
+  if (titles.length < 2) return false;
+  const plain = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const headings = text.split('\n').filter((line) => /^\s*(?:#{1,6}\s|\*\*)/.test(line)).map(plain);
+  return titles.every((title) => {
+    const want = plain(title.replace(/^\s*\d+[.)]\s*/, ''));
+    return Boolean(want) && headings.some((h) => h.includes(want));
+  });
+}
 
 type Head = StageArtifactBundle['versions'][number];
 
@@ -51,7 +68,8 @@ export function deliverableDocument(template: WorkflowTemplate, bundles: Record<
     const head = bundles[base.id]?.versions.at(-1) ?? null;
     return { stage: base, version: head, text: head?.content ?? '' };
   }
-  const chapters = formatManuscript(manuscriptArtifactFor(template, base, bundles)?.long_form?.outline ?? [], Number.POSITIVE_INFINITY);
+  const outline = manuscriptArtifactFor(template, base, bundles)?.long_form?.outline ?? [];
+  const chapters = formatManuscript(outline, Number.POSITIVE_INFINITY);
   const saved = bundles[base.id]?.versions.at(-1);
   const manuscript: DeliverableDocument = { stage: base, version: saved && saved.content === chapters ? saved : null, text: chapters };
 
@@ -64,7 +82,8 @@ export function deliverableDocument(template: WorkflowTemplate, bundles: Record<
 
   const total = wordsIn(chapters);
   const share = (s: StageDefinition) => (total ? wordsIn(headWithText(bundles, s.id)!.content) / total : 1);
-  const holder = later.find((s) => share(s) >= HOLDS_THE_WORK);
+  const titles = outline.map((s) => s.title);
+  const holder = later.find((s) => share(s) >= HOLDS_THE_WORK || (share(s) >= TIGHTENED_COPY && headsEveryChapter(headWithText(bundles, s.id)!.content, titles)));
   if (holder) {
     const head = headWithText(bundles, holder.id)!;
     return { stage: holder, version: head, text: head.content };
