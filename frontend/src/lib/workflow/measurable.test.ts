@@ -621,3 +621,13 @@ describe('a limit inside a plain list belongs to the item it closes (8 Nov, prod
   });
 });
 
+
+describe('a heading that only mentions the unit is not one of them (9 Nov, production)', () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  const text = `## Chapter 1: Pay\n${words(700)}\n\n## What to carry out of this chapter\n${words(40)}\n\n## Chapter 2: Leave\n${words(700)}\n\n## What to carry out of this chapter\n${words(40)}`;
+
+  it('counts the numbered chapters only', () => {
+    const [r] = parseRequirements(['Two chapters, about 700 words each.']);
+    expect(measure(r, text)).toMatchObject({ satisfied: true, value: expect.stringMatching(/^2 chapters/) });
+  });
+});
