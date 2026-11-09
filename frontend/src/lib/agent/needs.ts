@@ -392,8 +392,8 @@ export function needHeading(need: NeedsUser): 'suggestion' | 'repair' | 'decisio
 export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
   const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);
   const recent = repairs.slice(-Math.max(REPAIR_TRIES, 3));
+  // A repair that failed its check may still have saved its attempt, so it can be seen (9 Nov).
   const saved = recent.filter((s) => {
-    if (s.status !== 'succeeded') return false;
     const c = (s.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown };
     return (Array.isArray(c.version_ids) && c.version_ids.length > 0) || (Array.isArray(c.sections_written) && c.sections_written.length > 0);
   }).length;
