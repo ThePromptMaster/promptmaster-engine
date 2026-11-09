@@ -835,3 +835,19 @@ export function plannedBeforeLatestChange(
     return !Number.isNaN(at) && at > planned;
   });
 }
+
+/**
+ * The move to make when the planner's reply could not be used, twice, and
+ * nothing is waiting on the user. A stage with no draft has one obvious next
+ * step; asking "what would you like to do next?" was the only thing Go could
+ * say (8 Nov, production, on the last stage of a package). Null otherwise.
+ */
+export function unplannedMove(hasDraft: boolean, allowed: readonly string[]) {
+  if (hasDraft || !allowed.includes('draft_stage')) return null;
+  return {
+    action_key: 'draft_stage', params: {},
+    rationale: 'This stage has no draft yet, so writing it is the next step.',
+    expected_outcome: 'A first draft of this stage.',
+    needs_user_decision: false, decision_question: null,
+  };
+}
