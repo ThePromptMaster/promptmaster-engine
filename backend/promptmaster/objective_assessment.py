@@ -298,7 +298,7 @@ def build_assessment_prompt(
         '"performed" lists ONLY step ids from the RUN RECORD whose execution label shows work was done.\n'
         # 17 Oct (Sean, FIELDGUIDE): follow-up questions about the fictional
         # practice candidate were listed as the project's unfinished work.
-        # 7 Nov (Sean, training event): "Please separate completion of the requested
+        # 7 Nov (training event test): "Please separate completion of the requested
         # document from readiness to execute its plan."
         '"open_actions" are the real-world tasks the document records as still to do: confirming, booking, hiring, '
         'sending, covering a shift. They do not make the document unfinished: a plan that says clearly what is still '

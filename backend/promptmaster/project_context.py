@@ -111,8 +111,8 @@ def reporting_date_line(inputs: PMInput) -> str:
     )
 
 
-#: 7 Nov (Sean, training event): confirmation "in writing" was the app's own suggestion, and
-#: Go later treated it as necessary. Northline: an earlier suggestion of six more attendees
+#: 7 Nov (training event test): confirmation "in writing" was the app's own suggestion, and
+#: Go later treated it as necessary. In another test an earlier suggestion of six more attendees
 #: was reread as six on top of a new total of 28.
 SUGGESTIONS_RULE = (
     "Only what is listed here, in the objective or in the constraints is a requirement. A practice a draft or "

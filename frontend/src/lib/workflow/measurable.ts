@@ -918,7 +918,7 @@ export interface LengthTarget {
 
 /**
  * The length the brief hedges for the whole document, with the text counted
- * (8 Nov; Sean, training event: "Go estimated its package was over the target
+ * (8 Nov; training event test: "Go estimated its package was over the target
  * and stopped to ask whether to shorten it"). Information for the planner and
  * the objective check. L-141 stands: a hedged figure blocks nothing.
  */
