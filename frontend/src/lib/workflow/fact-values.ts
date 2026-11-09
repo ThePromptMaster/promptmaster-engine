@@ -437,7 +437,7 @@ function carriesOnReporting(lines: readonly string[]): Set<string> {
   for (const line of lines) {
     let reporting = false;
     for (const sentence of sentencesOf(line)) {
-      const carries = reporting && /^\W*(?:these|those|they|such)\b/i.test(sentence);
+      const carries: boolean = reporting && /^\W*(?:these|those|they|such)\b/i.test(sentence);
       if (carries) out.add(sentence);
       reporting = carries || ATTRIBUTED.test(sentence);
     }
