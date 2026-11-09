@@ -93,3 +93,18 @@ describe('each stop says whose it is (8 Nov: a business decision or an internal 
     expect(document.querySelector('[data-need-heading]')?.textContent).toBe('Your decision');
   });
 });
+
+describe('a section whose title is already numbered is numbered once', () => {
+  it('shows "4. Plan", not "4. 4. Plan"', () => {
+    const props = {
+      readOnly: true, versions: [], activeVersionId: null, onSelectVersion: () => undefined, evaluation: null,
+      longForm: {
+        project: { id: 'p', user_id: 'u', mode: 'architect' }, artifactId: 'a', stageId: 'docs', approvedOutlineVersionId: 'o1', onRefresh: () => undefined,
+        state: { outline: [{ id: 's1', title: '4. Plan', abstract: '', status: 'complete', content: 'x' }, { id: 's2', title: 'Budget', abstract: '', status: 'complete', content: 'y' }] },
+      },
+    } as unknown as StageRendererProps;
+    render(<LongFormRenderer {...props} />);
+    expect(screen.getByRole('button', { name: '4. Plan' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '2. Budget' })).toBeTruthy();
+  });
+});
