@@ -80,3 +80,13 @@ describe('a reopened stage Go has tried to repair says so wherever it is listed'
     expect(shown).toBe('Core plan needs a recheck — the budget changed Go has tried to repair it and it is not settled (tries: 2). Last result: still gives $8,000');
   });
 });
+
+describe('a failed repair that saved its attempt is said to have saved it (9 Nov, production)', () => {
+  it('counts versions, whatever the check said', async () => {
+    const { repairStuckNeed } = await import('./needs');
+    const state = { stages: { plan: { status: 'stale', stale: { reason: 'x', since: 't' } } } } as unknown as WorkflowState;
+    const failedButSaved = repair('plan', { status: 'failed', changes: { version_ids: ['v9'] }, output: 'It is saved, so you can see it.' });
+    const refused = repair('plan', { status: 'failed', changes: {}, output: 'Refused.' });
+    expect(repairStuckNeed(state, 'plan', [failedButSaved, refused])).toMatchObject({ tries: 2, saved: 1 });
+  });
+});
