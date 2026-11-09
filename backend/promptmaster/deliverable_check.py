@@ -88,7 +88,7 @@ class DeliverableCheck(BaseModel):
 
 
 _INSTRUCTION = (
-    "You check a finished deliverable for three things, and nothing else.\n"
+    "You check a finished deliverable for four things, and nothing else.\n"
     "1. ACCEPTED FINDINGS. Each was accepted earlier, so the deliverable was meant to make its suggested "
     "change. For each, by its id: \"carried\" when the deliverable now does what the suggested change asks "
     "(quote the passage that shows it); \"not_carried\" when the deliverable still has the problem or lacks "
@@ -109,22 +109,34 @@ _INSTRUCTION = (
     "what it conflicts with quoted verbatim (from the deliverable, the brief, or the fact's own words), the problem in one "
     "sentence, and the smallest fix. At most five, most material first. Never report style, tone, length, "
     "missing detail or a point a careful reader would not call contradictory. When in doubt, report nothing.\n"
-    # 7 Nov (training event and financial plan tests): "check that the readiness verdict, email
-    # conditions and takeover checklist agree"; "whether operational instructions follow
+    # 7 Nov (training event and financial plan tests): "whether operational instructions follow
     # from the financial analysis and its assumptions".
     "3. FOLLOW-THROUGH. What the deliverable tells someone to do, or states as settled, that its own analysis "
     "or what the user supplied (the brief's constraints, the accepted facts, the source material) does not support. "
-    "Only these: a readiness verdict, a condition for sending or proceeding, "
-    "and a checklist that do not agree (the plan is called ready once one thing happens while its own checklist "
-    "still requires others); an instruction to proceed or spend that does not follow from its financial analysis "
+    "Only these: an instruction to proceed or spend that does not follow from its financial analysis "
     "or ignores an assumption that analysis rests on, such as telling a team to proceed while the same text says "
     "a limit is already breached; a deadline it gives someone that the user did not supply, even one reasoned "
     "from the schedule, unless the text says it is the document's own suggestion; something stated as settled "
     "that what was supplied leaves uncertain, such as money called committed or owed when the record says only "
-    "approved, so that an instruction resting on it should be conditional; an earlier suggestion recalculated on "
-    "a new base with no update saying it applies to that base. Something the brief states is supplied: never "
-    "report it as unsupported. For each: the passage quoted verbatim, the problem in one sentence, and the smallest "
-    "fix. At most five, most material first. When in doubt, report nothing.\n"
+    "approved, so that an instruction resting on it should be conditional; an earlier suggestion worked out on "
+    "numbers that changed after it was made, or treated as on top of a later change or as separate from it, when "
+    "nothing supplied says which, even in a list of things not adopted (an old suggestion to add six places, costed "
+    "as six on top of a total that has since risen). Something the brief states is supplied: never report it as unsupported. You are "
+    "not shown the project's history, so the date of a decision or event that has already happened is not a "
+    "deadline and is never reported as unsupported. For each: the passage quoted verbatim, the problem in one "
+    "sentence, and the smallest fix. At most five, most material first. When in doubt, report nothing.\n"
+    # 9 Nov: the same rule as one clause of the list above let a saved package through. It said the
+    # event was deliverable once one hour was covered, while its own checklist still had the trainer,
+    # room and equipment to book. Each line reads well alone, so the check has to put them side by side.
+    "4. READINESS. First find every sentence that says when the thing becomes ready or deliverable, or when "
+    "something may be sent, launched or go ahead (\"one gap blocks it\", \"deliverable only when X\", \"send this "
+    "only after X\"). Then read every checklist, action list and status table in the deliverable. A step on those "
+    "lists that is still to be done, has to be done before the thing can happen (book, confirm, order, pay, sign, "
+    "arrange), and that the sentence neither names nor covers means the two do not agree, even when each reads well "
+    "alone. Report it under \"contradictions\": the sentence as rule_quote, the list item as conflicts_quote, and as "
+    "the fix what else must be true, or that the sentence covers only that one gap. A sentence that points to the "
+    "open items as a whole (\"until the open items below are done\") covers them, and a step that can only come "
+    "after the thing happens is not part of it. At most two.\n"
     "Copy every quote exactly, one sentence or less. "
     "Return JSON: {\"findings\": [{\"id\": string, \"verdict\": \"carried\" | \"not_carried\" | \"not_applicable\", "
     "\"quote\": string, \"note\": string}], \"contradictions\": [{\"rule_quote\": string, \"conflicts_quote\": string, "

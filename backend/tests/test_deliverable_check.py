@@ -182,8 +182,41 @@ def test_a_follow_through_gap_needs_only_its_own_passage():
 
 def test_the_check_is_told_to_look_for_follow_through():
     system, _user = build_prompt(INPUTS, "Final decision memo", MEMO, ACCEPTED)
-    for words in ("FOLLOW-THROUGH", "do not agree", "follow from its financial analysis", "a deadline it gives someone that the user did not supply", "recalculated on a new base"):
+    for words in ("FOLLOW-THROUGH", "follow from its financial analysis", "a deadline it gives someone that the user did not supply", "worked out on numbers that changed after it was made"):
         assert words in system
+
+
+def test_readiness_is_put_beside_the_checklist():
+    """9 Nov: as one clause of a list, the rule let a saved package through. It said the event was
+    deliverable once one hour was covered, with the trainer, room and equipment still to book."""
+    system, _user = build_prompt(INPUTS, "the package", MEMO, [])
+    for words in ("4. READINESS", "deliverable only when X", "send this only after X", "the two do not agree", "the sentence as rule_quote, the list item as conflicts_quote", "covers them"):
+        assert words in system
+    package = (
+        "One gap blocks it. The event becomes deliverable only when the Tuesday hour is covered.\n"
+        "| 7 | Book or confirm the trainer, room and equipment for both dates. |\n"
+    )
+    raw = {"contradictions": [
+        {"rule_quote": "The event becomes deliverable only when the Tuesday hour is covered.", "conflicts_quote": "Book or confirm the trainer, room and equipment for both dates.", "problem": "The checklist still has bookings the verdict does not name.", "fix": "Name them."},
+        {"rule_quote": "The event becomes deliverable only when the Tuesday hour is covered.", "conflicts_quote": "Hire a band for the evening.", "problem": "Not in the text."},
+    ]}
+    got = parse(raw, INPUTS, package, []).contradictions
+    assert [c.conflicts_quote for c in got] == ["Book or confirm the trainer, room and equipment for both dates."]
+
+
+def test_a_past_date_is_not_a_deadline_the_check_can_call_unsupported():
+    """9 Nov: a decision dated 7 Nov was reported as invented on every run, because the check is not
+    shown the project's history, and a repair would have removed a true date."""
+    system, _user = build_prompt(INPUTS, "the package", MEMO, [])
+    assert "the date of a decision or event that has already happened is not a deadline" in system
+
+
+def test_an_old_suggestion_on_a_changed_total_is_named():
+    """7 Nov: a suggestion of six more attendees was costed as six on top of a total that had since
+    risen by four, and nothing said the six were separate from the four."""
+    system, _user = build_prompt(INPUTS, "the package", MEMO, [])
+    assert "as six on top of a total that has since risen" in system
+    assert "even in a list of things not adopted" in system
 
 
 
