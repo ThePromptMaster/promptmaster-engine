@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
@@ -12,6 +12,7 @@ import {
   MAX_HELD,
   itemKey,
   mergeThirdParty,
+  notHeld,
   rememberStartItems,
   shortWhen,
   toPicked,
@@ -34,6 +35,7 @@ import { startExample } from '@/lib/projects/examples/start-example';
 import { rememberStartGoal } from '@/lib/projects/example-goals';
 import { getProject, updateProject } from '@/lib/supabase/projects';
 import { startLanguage } from '@/lib/workflow/languages';
+import type { ThirdPartyItem } from '@/types';
 import { ProjectConflictError } from '@/types/project';
 
 import { ConnectedAccounts } from './connected-accounts';
@@ -63,19 +65,22 @@ function isText(x: ConnectedText | Skipped): x is ConnectedText {
 }
 
 /**
- * The person's own mail, meetings and files (8 Nov: "it should just search
- * everything"). One box, and nothing to tick:
+ * The person's own mail, meetings and files, with nothing to type and nothing to tick
+ * (9 Nov: "the AI should figure out all automatically").
  *
- * 1. They say what they are after, or leave it empty for what is going on now. The
- *    backend searches the whole of every connected account and reads the best matches.
+ * 1. Opening the page is the whole request. The backend looks at the newest of every
+ *    connected account and reads what matters.
  * 2. Straight on to suggestions, with what was read listed beside them to see or remove.
  * 3. "Brief me for this" on a meeting searches for it and starts the project at once.
+ *    "Start this" and that button stay presses: each makes a project.
  *
  * What was read is other people's words: fenced in every prompt, and a web search
  * there is written from the person's own words only (L-200).
  *
- * `into`: opened from a project's "From your accounts" panel, what was found is added
- * to that project on one press, up to what it has room for.
+ * `into`: opened from a project's "From your accounts" panel, it searches for that
+ * project's own title and objective, adds what the project doesn't hold, up to what it
+ * has room for, and goes back. `briefing`: opened to prepare for a meeting, it reads
+ * nothing until one is chosen.
  */
 export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; into?: string }) {
   const t = useT();
@@ -83,8 +88,8 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Connection[] | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
-  const [words, setWords] = useState('');
   const [meetings, setMeetings] = useState<PreviewItem[]>([]);
+  const [meetingsLoaded, setMeetingsLoaded] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [chosen, setChosen] = useState<ConnectedText[]>([]);
   const [skipped, setSkipped] = useState<Skipped[]>([]);
@@ -97,13 +102,15 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
   const [error, setError] = useState<string | null>(null);
   // The project the items go into, when opened from one.
   // Translated at render: an effect that used `t` would run again on every language change.
-  const [target, setTarget] = useState<{ title: string; held: number } | { gone: true } | { failed: string } | null>(null);
+  const [target, setTarget] = useState<{ title: string; words: string; held: ThirdPartyItem[] } | { gone: true } | { failed: string } | null>(null);
+  // The newest search: a meeting pressed part-way through replaces the automatic one.
+  const run = useRef(0);
 
   useEffect(() => {
     if (!into) return;
     let live = true;
     getProject(into)
-      .then((p) => live && setTarget(p ? { title: p.title, held: p.third_party?.length ?? 0 } : { gone: true }))
+      .then((p) => live && setTarget(p ? { title: p.title, words: [p.title, p.objective].filter(Boolean).join(': ').slice(0, 2_000), held: p.third_party ?? [] } : { gone: true }))
       .catch((e: unknown) => live && setTarget({ failed: e instanceof Error ? e.message : '' }));
     return () => {
       live = false;
@@ -122,17 +129,19 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
     api
       .previewConnections(calendars.split(',') as ToolkitSlug[])
       .then((found) => live && setMeetings(found.items.filter((i) => i.kind === 'calendar_event').slice(0, MAX_MEETINGS)))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => live && setMeetingsLoaded(true));
     return () => {
       live = false;
     };
   }, [calendars, into]);
 
-  const cap = into ? Math.max(0, MAX_HELD - (project?.held ?? 0)) : MAX_HELD;
+  const cap = into ? Math.max(0, MAX_HELD - (project?.held.length ?? 0)) : MAX_HELD;
   const busy = phase === 'searching' || phase === 'suggesting' || phase === 'starting';
   const why = (e: unknown) => t('conn.failed', { why: e instanceof Error ? e.message : '' });
 
   async function search(forMeeting: PreviewItem | null) {
+    const mine = ++run.current;
     setPhase('searching');
     setError(null);
     setResult(null);
@@ -144,28 +153,30 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
       const back = await api.searchConnections(
         forMeeting
           ? { meeting: toPicked(forMeeting), people: [forMeeting.who, ...forMeeting.people].filter(Boolean).slice(0, MAX_PEOPLE) }
-          : { words: words.trim() }
+          : { words: project?.words ?? '' }
       );
       const fromFiles = await Promise.all(back.files.map((f) => fileToText(f, t('conn.fileUnread'))));
+      if (mine !== run.current) return;
       // The meeting's own read doesn't say when it is; the list it was pressed in does.
-      const texts = [...back.items, ...fromFiles.filter(isText)]
-        .map((x) => (forMeeting && itemKey(x) === itemKey(forMeeting) ? { ...x, when: forMeeting.when } : x))
-        .slice(0, cap);
+      const found = [...back.items, ...fromFiles.filter(isText)]
+        .map((x) => (forMeeting && itemKey(x) === itemKey(forMeeting) ? { ...x, when: forMeeting.when } : x));
+      const texts = (project ? notHeld(project.held, found) : found).slice(0, cap);
       setChosen(texts);
       setSkipped([...back.skipped, ...fromFiles.filter((x): x is Skipped => !isText(x))]);
       setProblems(back.problems.map((p) => `${toolkitLabel(p.toolkit)}: ${p.message}`));
       setSearched(true);
       if (!texts.length) setPhase('idle');
       else if (forMeeting) await startBriefing(forMeeting, texts);
-      else if (into) setPhase('found');
-      else await suggest(texts);
+      else if (into) await addToProject(texts);
+      else await suggest(texts, mine);
     } catch (e) {
+      if (mine !== run.current) return;
       setError(why(e));
       setPhase('idle');
     }
   }
 
-  async function suggest(items: ConnectedText[]) {
+  async function suggest(items: ConnectedText[], mine = run.current) {
     setPhase('suggesting');
     setError(null);
     setRequestLanguage(startLanguage(getLocale()));
@@ -178,10 +189,12 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
           description: t(`ex.${c.key}.blurb` as MessageKey).slice(0, 400),
         })),
       });
+      if (mine !== run.current) return;
       setSent(items);
       setResult(back);
       setPhase('suggestions');
     } catch (e) {
+      if (mine !== run.current) return;
       setError(why(e));
       setPhase('found');
     } finally {
@@ -224,12 +237,12 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
   }
 
   /** Into the project it was opened from: merged with what it holds, re-read once if it moved on. */
-  async function addToProject() {
+  async function addToProject(items: ConnectedText[]) {
     if (!into) return;
     setPhase('starting');
     setError(null);
     try {
-      const added = toThirdParty(chosen);
+      const added = toThirdParty(items);
       for (let attempt = 0; ; attempt++) {
         const current = await getProject(into);
         if (!current) throw new Error(t('conn.intoGone'));
@@ -242,7 +255,8 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
           throw e;
         }
       }
-      goSignedIn(`/projects/${into}`);
+      // Replaced, so Back goes to the project and doesn't search and add again.
+      goSignedIn(`/projects/${into}`, true);
     } catch (e) {
       setError(why(e));
       setPhase('found');
@@ -255,8 +269,17 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
     ? '/projects/from-accounts?for=briefing'
     : '/projects/from-accounts';
 
-  const running = phase === 'searching' ? t('conn.searching') : phase === 'suggesting' ? t('conn.suggesting') : phase === 'starting' ? t('conn.starting') : '';
+  const running = phase === 'searching' ? t('conn.searching') : phase === 'suggesting' ? t('conn.suggesting') : phase === 'starting' ? t(into ? 'conn.adding' : 'conn.starting') : '';
   const showRead = chosen.length > 0 && phase !== 'searching';
+  const noMeetings = briefing && active.length > 0 && (!calendars || meetingsLoaded) && meetings.length === 0;
+
+  // Opening the page is the whole request. Once, when the accounts and any project have loaded.
+  const ready = active.length > 0 && !briefing && (!into || (!!project && cap > 0));
+  useEffect(() => {
+    if (!ready || run.current) return;
+    void search(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-6 sm:py-12">
@@ -264,13 +287,16 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
         {into ? t('conn.intoTitle') : briefing ? t('conn.entryBriefing') : t('conn.flowTitle')}
       </h1>
       <p className="mt-3 text-body text-[var(--on-surface-variant)]">
-        {into ? (project ? (cap ? t('conn.intoLead', { title: project.title, count: cap }) : t('conn.intoFull', { max: MAX_HELD })) : '') : t('conn.flowLead')}
+        {into ? (project ? (cap ? t('conn.intoLead', { title: project.title, count: cap }) : t('conn.intoFull', { max: MAX_HELD })) : '') : briefing ? t('conn.briefingLead') : t('conn.flowLead')}
       </p>
-      {into && (
-        <Link href={`/projects/${into}`} className="mt-2 inline-block text-label font-medium text-[var(--pm-primary)] hover:underline">
-          {t('conn.intoBack')}
-        </Link>
-      )}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        {into && (
+          <Link href={`/projects/${into}`} className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.intoBack')}</Link>
+        )}
+        {active.length > 0 && (
+          <Link href="/projects/settings" className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.manage')}</Link>
+        )}
+      </div>
 
       {(accounts === null || active.length === 0) && (
         <section className="mt-6">
@@ -280,38 +306,18 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
         </section>
       )}
 
-      {active.length > 0 && (
-        <form
-          className="mt-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void search(null);
-          }}
-        >
-          <label htmlFor="account-search" className="text-title text-[var(--on-surface)]">{t('conn.searchLabel')}</label>
-          <input
-            id="account-search"
-            dir="auto"
-            value={words}
-            onChange={(e) => setWords(e.target.value)}
-            disabled={busy}
-            className="mt-2 w-full rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-body text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--pm-primary)]"
-          />
-          <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">{t('conn.searchHint')}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <button type="submit" disabled={busy || (!!into && (!project || cap === 0))} className={primary}>
-              {running || t('conn.search')}
-            </button>
-            <Link href="/projects/settings" className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.manage')}</Link>
-          </div>
-        </form>
+      {running && (
+        <p role="status" className="mt-6 flex items-center gap-2 text-body text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+          {running}
+        </p>
       )}
 
       {problems.map((p) => (
         <p key={p} role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">{p}</p>
       ))}
       {searched && !chosen.length && !busy && !error && (
-        <p role="status" className="mt-4 text-body text-[var(--on-surface)]">{t('conn.noneFound')}</p>
+        <p role="status" className="mt-4 text-body text-[var(--on-surface)]">{t(into ? 'conn.noneNew' : 'conn.noneFound')}</p>
       )}
 
       {phase === 'suggestions' && result && (
@@ -343,6 +349,35 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
             </ul>
           )}
         </>
+      )}
+
+      {noMeetings && <p role="status" className="mt-6 text-body text-[var(--on-surface)]">{t('conn.noMeetings')}</p>}
+
+      {!into && meetings.length > 0 && !(meeting && busy) && (
+        <section className="mt-8">
+          <h2 className="text-title text-[var(--on-surface)]">{t('conn.nextMeetings')}</h2>
+          <ul className="mt-2 space-y-1.5">
+            {meetings.map((item) => (
+              <li key={itemKey(item)} className="flex items-start gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
+                <ToolkitLogo slug={item.toolkit} size={18} className="mt-0.5 text-[var(--on-surface-variant)]" />
+                <span className="min-w-0 flex-1">
+                  <span dir="auto" className="block truncate text-body text-[var(--on-surface)]">{item.title}</span>
+                  <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">
+                    {[item.who, shortWhen(item.when, locale), toolkitLabel(item.toolkit)].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={!!meeting && busy}
+                  onClick={() => void search(item)}
+                  className="shrink-0 rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  {t('conn.brief')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {showRead && (
@@ -400,7 +435,7 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
           {(phase === 'found' || (phase === 'starting' && !!into)) && (
             <div className="mt-5 flex flex-wrap gap-3">
               {into ? (
-                <button type="button" onClick={() => void addToProject()} disabled={busy} className={primary}>
+                <button type="button" onClick={() => void addToProject(chosen)} disabled={busy} className={primary}>
                   {phase === 'starting' ? t('conn.adding') : t('conn.addN', { count: chosen.length })}
                 </button>
               ) : meeting ? (
@@ -413,35 +448,11 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
         </section>
       )}
 
-      {!into && meetings.length > 0 && !showRead && (
-        <section className="mt-8">
-          <h2 className="text-title text-[var(--on-surface)]">{t('conn.nextMeetings')}</h2>
-          <ul className="mt-2 space-y-1.5">
-            {meetings.map((item) => (
-              <li key={itemKey(item)} className="flex items-start gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
-                <ToolkitLogo slug={item.toolkit} size={18} className="mt-0.5 text-[var(--on-surface-variant)]" />
-                <span className="min-w-0 flex-1">
-                  <span dir="auto" className="block truncate text-body text-[var(--on-surface)]">{item.title}</span>
-                  <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">
-                    {[item.who, shortWhen(item.when, locale), toolkitLabel(item.toolkit)].filter(Boolean).join(' · ')}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void search(item)}
-                  className="shrink-0 rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-                >
-                  {t('conn.brief')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {(error || targetProblem) && (
         <p role="alert" className="mt-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3 text-body text-[var(--pm-error)]">{error || targetProblem}</p>
+      )}
+      {error && phase === 'idle' && (
+        <button type="button" onClick={() => void search(meeting)} className={`mt-3 ${secondary}`}>{t('conn.tryAgain')}</button>
       )}
     </main>
   );
