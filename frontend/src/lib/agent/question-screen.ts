@@ -79,7 +79,21 @@ export function planFromScreen(
       },
     };
   }
-  if (!input.allowed.includes('revise_stage')) return { kind: 'ask' };
+  if (!input.allowed.includes('revise_stage')) {
+    // Routine, and this run has used up its edits on the stage: judged as it stands
+    // and said, not asked (9 Nov, production: "trim it, or accept it?" over 7% on a
+    // hedged target, because "further edits are paused for this run").
+    if (!input.allowed.includes('declare_objective_complete')) return { kind: 'ask' };
+    return {
+      kind: 'repair',
+      move: {
+        action_key: 'declare_objective_complete',
+        params: { set_aside_question: input.question.slice(0, 1000) },
+        rationale: `${instead} This run has used up its edits on this stage, so the work is judged as it stands.`,
+        expected_outcome: 'The objective judged on the current version, with this noted for you.',
+      },
+    };
+  }
   return {
     kind: 'repair',
     move: { action_key: 'revise_stage', params: { instruction: screen.instruction }, rationale: instead, expected_outcome: screen.instruction },
