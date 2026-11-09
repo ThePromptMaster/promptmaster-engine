@@ -293,3 +293,24 @@ describe('a superseded price is caught only where it applies (7 Nov, production,
     expect(named[0].text).toContain('**Data migration:**');
   });
 });
+
+describe('a paragraph that sets old choices aside (9 Nov, production)', () => {
+  const superseded = supersededValues('Budget $60,000, with $6,000 uncommitted.', 'Budget $58,000, with $7,000 uncommitted.');
+  const saved = 'Earlier planning choices no longer apply. These include six sessions of 12, the $60,000 budget with a $6,000 minimum. All of them were superseded by the sponsor revision of 8 Nov.';
+
+  it('reports them, as the sponsor asked', () => {
+    expect(leftoverMentions(saved, superseded)).toEqual([]);
+  });
+
+  it('carries through several sentences that carry on', () => {
+    expect(leftoverMentions('Earlier choices no longer apply. These include the $60,000 budget. They also include the $6,000 minimum.', superseded)).toEqual([]);
+  });
+
+  it('a "these" with nothing set aside before it still states the value', () => {
+    expect(leftoverValues('The plan is settled. These include the $60,000 budget.', superseded)).toHaveLength(1);
+  });
+
+  it('the set-aside ends with its paragraph', () => {
+    expect(leftoverValues('Earlier choices no longer apply.\n\nThese include the $60,000 budget.', superseded)).toHaveLength(1);
+  });
+});

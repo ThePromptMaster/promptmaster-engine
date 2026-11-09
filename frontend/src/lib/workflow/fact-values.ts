@@ -426,6 +426,25 @@ function quotable(piece: string): string {
   return t.length > 200 ? `${t.slice(0, 197)}…` : t;
 }
 
+/**
+ * Sentences that carry on reporting what the one before them set aside, in the
+ * same paragraph: "Earlier planning choices no longer apply. These include the
+ * $8,000 migration price." (9 Nov, production: the list the sponsor asked for,
+ * of what was superseded, failed two repairs.)
+ */
+function carriesOnReporting(lines: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const line of lines) {
+    let reporting = false;
+    for (const sentence of sentencesOf(line)) {
+      const carries = reporting && /^\W*(?:these|those|they|such)\b/i.test(sentence);
+      if (carries) out.add(sentence);
+      reporting = carries || ATTRIBUTED.test(sentence);
+    }
+  }
+  return out;
+}
+
 /** One superseded value a text still states as current, and a sentence that states it. */
 export interface LeftoverMention {
   value: SupersededValue;
@@ -486,6 +505,7 @@ export function leftoverMentions(
     return true;
   });
   const pieces = sentencesOf(kept.join('\n'));
+  const reported = carriesOnReporting(kept);
   // Rows of a table are serialised as JSON: a key before a colon is not a label.
   const labelled = !/^\s*[[{]/.test(text);
   const out: LeftoverMention[] = [];
@@ -498,7 +518,7 @@ export function leftoverMentions(
     const subject = coincident ? (ownLabel.length ? ownLabel : subjectWords(s.now)) : [];
     for (const raw of pieces) {
       const p = withoutEmphasis(raw);
-      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) continue;
+      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
       if (!found.includes(s.value) || now.some((v) => found.includes(v))) continue;
       // A figure the document works out is its own; only beside the fact's
