@@ -117,11 +117,16 @@ export function useGoAlerts({ running, status, reason, projectName }: {
   const wasRunning = useRef(running);
   const titleBefore = useRef<string | null>(null);
   useEffect(() => {
-    const stopped = wasRunning.current && !running;
-    wasRunning.current = running;
-    if (!stopped || document.visibilityState === 'visible') return;
+    if (running) {
+      wasRunning.current = true;
+      return;
+    }
+    // The run's status lands just after Go stops working (9 Nov, production: read
+    // on the stop itself it still said "running", and no alert was ever sent).
+    if (!wasRunning.current || !status || status === 'running') return;
+    wasRunning.current = false;
     const kind = stopKind(status);
-    if (!kind) return;
+    if (!kind || document.visibilityState === 'visible') return;
     if (titleBefore.current === null) titleBefore.current = document.title;
     document.title = t(kind === 'finished' ? 'alert.titleFinished' : 'alert.titleNeedsYou', { title: projectName });
     if (!on || permissionNow() !== 'granted') return;

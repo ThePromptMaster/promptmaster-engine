@@ -53,6 +53,18 @@ describe('the browser alert when Go stops (8 Nov)', () => {
     expect(document.title).toBe('PromptMaster');
   });
 
+  it('waits for the run status that lands just after Go stops, and alerts once', () => {
+    localStorage.setItem('pm.go.alerts', 'on');
+    const { rerender } = renderHook((p: Props) => useGoAlerts(p), { initialProps: start });
+    setHidden(true);
+    rerender({ ...start, running: false, status: 'running' });
+    expect(shown).toEqual([]);
+    rerender({ ...start, running: false, status: 'awaiting_decision', reason: 'Needs your approval.' });
+    expect(shown).toEqual([{ title: 'Go needs you on Rollout', body: 'Needs your approval.' }]);
+    rerender({ ...start, running: false, status: 'awaiting_decision', reason: 'Needs your approval, again.' });
+    expect(shown).toHaveLength(1);
+  });
+
   it('with the tab in view nothing fires', () => {
     localStorage.setItem('pm.go.alerts', 'on');
     const { rerender } = renderHook((p: Props) => useGoAlerts(p), { initialProps: start });
