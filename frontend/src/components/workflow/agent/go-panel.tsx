@@ -14,6 +14,8 @@ import type { useGoLoop } from '../use-go-loop';
 import { GoTerms } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt, type LatestChange } from './decision-prompt';
 import { GoControl } from './go-control';
+import { GoAlertsControl } from './go-alerts-control';
+import type { GoAlerts } from './use-go-alerts';
 import { NeedsYouCard } from './needs-you-card';
 import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
@@ -66,6 +68,7 @@ export function GoPanel({
   needsActions,
   needContext,
   dockHost = null,
+  alerts,
   routine,
   stageModes,
   latestChange = null,
@@ -97,6 +100,8 @@ export function GoPanel({
    * don't have to keep scrolling back and forth".
    */
   dockHost?: HTMLElement | null;
+  /** The opt-in alert when Go stops (`useGoAlerts`, held by the workspace so it outlives this panel). */
+  alerts?: GoAlerts;
   /** 13 Oct: each stage in its own recommended mode, or the project's mode everywhere. */
   stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
   /** Whether another stage holds work Go can do while an approval here waits (`otherWorkFor`). */
@@ -373,6 +378,7 @@ export function GoPanel({
           {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
+          {alerts && <div className="mt-2"><GoAlertsControl alerts={alerts} /></div>}
           </div>
           {go.policy !== 'guided' && !live && (
             <GoTerms
