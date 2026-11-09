@@ -1,8 +1,8 @@
 """Suggest work from what someone tells us (the client's call, 4 Nov).
 
 A thin shell over `promptmaster.personalization`. It reads no account itself and
-stores nothing; items from a connected account (7 Nov) arrive already read and
-ticked, through `/api/connections/read`. A check-like call, not a writer: it takes no `web_access`.
+stores nothing; items from a connected account arrive already read, through
+`/api/connections/search` (8 Nov). A check-like call, not a writer: it takes no `web_access`.
 """
 
 from __future__ import annotations
