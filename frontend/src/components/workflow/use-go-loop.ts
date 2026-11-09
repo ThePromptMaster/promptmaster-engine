@@ -67,7 +67,7 @@ import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurab
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { MAX_RETURNS, allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -1033,12 +1033,7 @@ export function useGoLoop(opts: Options) {
           stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft, asItStands,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         }));
-        const choice = required
-          ? {
-              action_key: required.key, params: required.params ?? {}, rationale: required.rationale, expected_outcome: required.expected,
-              needs_user_decision: false, decision_question: null,
-            }
-          : await planning(() => api.agentNextAction(
+        const planNext = () => planning(() => api.agentNextAction(
               {
                 inputs: inputsFrom(o.project),
                 state: buildAgentState({
@@ -1055,6 +1050,15 @@ export function useGoLoop(opts: Options) {
               },
               signal
             ));
+        const firstChoice = required
+          ? {
+              action_key: required.key, params: required.params ?? {}, rationale: required.rationale, expected_outcome: required.expected,
+              needs_user_decision: false, decision_question: null,
+            }
+          : await planNext();
+        // A reply the planner could not make usable is PromptMaster's failure,
+        // not a question for the user: it is asked once more (8 Nov, production).
+        const choice = !required && !signal.aborted && typeof firstChoice.params?.unplanned === 'string' ? await planNext() : firstChoice;
         if (signal.aborted) throw new Stopped();
         if (reconsider) reconsiderRef.current = { ...reconsider, pending: false };
         // A reasoning move repeated while its last result is unsaved becomes
@@ -1097,6 +1101,8 @@ export function useGoLoop(opts: Options) {
             await setRunStatus('awaiting_decision', describeNeed(waitingOn, stageLabelFor).message, waitingOn);
             break;
           }
+          const fallbackMove = unplannedMove(hasDraft, allowed);
+          if (fallbackMove) Object.assign(choice, fallbackMove);
         }
         // Before a question interrupts the user: does it hold the work up? (Q1b)
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
