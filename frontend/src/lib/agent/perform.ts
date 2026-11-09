@@ -1353,6 +1353,10 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (content && stillUnmet.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
+        // Judged on this text, not the one before it (9 Nov, production: a line the
+        // final attempt took out was still reported as there, and the repair failed).
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
       }
       // Shortening to meet a limit cuts words, never a heading or every timing
       // under one (17 Oct, Sean, FIELDGUIDE: the curriculum lost its timed
@@ -1363,6 +1367,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT DROPPED ${dropped.join(', ')}. Keep every heading and the timings under them; shorten by tightening the prose instead.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
         dropped = content ? structureDropped(head, content) : [];
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
       }
       if (dropped.length) {
         const { question, questions } = cutToFitQuestions({
