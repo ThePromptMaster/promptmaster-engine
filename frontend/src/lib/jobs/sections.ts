@@ -162,6 +162,7 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
     stage_label: brief.stageLabel,
     instruction: brief.instruction,
     notes: formatRevisionNotes(brief.findings),
+    ...(brief.repair ? { repair: true } : {}),
   };
   const queued: string[] = [];
   for (const { section, index } of targets) {
