@@ -224,7 +224,7 @@ Four chapters on Sonnet 5.5 (project 44a05e38, $5.36), with a correction given a
 | Business decision or internal repair | Each stop is headed "Your decision" or "Internal repair: PromptMaster needs a steer" |
 | Status that explains itself | One status line (repair failed, out of date, needs your decision, complete, document finished with actions open), and Written, Checked, Approved and Ready shown apart with their versions |
 | Recovery that keeps the writing | "Tell Go what to fix" on the repair card, and "Change this section" on any section, with the current text kept as a version first |
-| Consequences before acting | One line before approve, regenerate and discard. A reason is required to approve or finish past a major finding |
+| Consequences before acting | One line before approve, regenerate and discard. A reason is required to give a reserved approval or to finish past a major finding (L-229) |
 
 ## 6. Cost
 
