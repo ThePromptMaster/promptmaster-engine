@@ -29,6 +29,8 @@ import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/wo
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
 import { recordDecision } from '@/lib/supabase/recommendations';
+import { deliverableReadiness, overallStatus } from '@/lib/workflow/readiness';
+import { DeliverableReadiness } from './deliverable-readiness';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -70,6 +72,7 @@ import {
   projectState,
   type TransitionOption,
   completionSummary,
+  blocksCompletion,
   describeOutstanding,
   openMajorFindings,
   outstandingBeyondCriteria,
@@ -84,7 +87,7 @@ import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
-import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
+import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
@@ -661,7 +664,9 @@ export function WorkflowWorkspace({
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
   // workshop: "Summary appeared completed while the project remained open").
   const projectOpenOn = useMemo(() => {
-    if (!objectiveAssessment || project.status === 'finalized') return null;
+    // …or while earlier work is out of date (8 Nov: a final tick beside a stale chapter plan).
+    const staleEarlier = template.stages.some((s) => state.stages[s.id]?.status === 'stale');
+    if ((!objectiveAssessment && !staleEarlier) || project.status === 'finalized') return null;
     const last = [...template.stages].reverse().find((s) => state.stages[s.id]?.status !== 'skipped');
     return last && isDone(state.stages[last.id]?.status) ? last.id : null;
   }, [objectiveAssessment, project.status, template, state]);
@@ -1975,6 +1980,22 @@ export function WorkflowWorkspace({
   };
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
+  const assessedEvent = [...(events ?? [])].reverse().find((e) => e.type === 'objective_assessed');
+  const assessedLatest = latestObjectiveAssessment(events ?? []);
+  const readinessCheck = assessedLatest
+    ? { outcome: assessedLatest.outcome, versionId: (assessedEvent?.payload as { basis?: { version_id?: string } } | undefined)?.basis?.version_id ?? null }
+    : null;
+  const overall = overallStatus({
+    outstanding: completion.outstanding,
+    finalized: project.status === 'finalized',
+    repairFailed: !go.active && go.run?.needs?.kind === 'repair_stuck',
+    waitingOnUser: !go.active && !go.run?.ended_at && go.run?.status === 'awaiting_decision',
+    openActions: recommendations.tasks.filter((task) => task.status === 'open' && task.origin === 'system').length,
+    allStagesDone: completion.notStarted === 0 && completion.leftOpen === 0 && completion.blocked === 0,
+  });
+  const overallLine = overall === 'in_progress' ? null : (
+    <div data-overall-status={overall} className="mt-0.5 text-label font-semibold text-[var(--on-surface)]">{t(`status.${overall}` as const)}</div>
+  );
   // The deliverable's latest objective check, for the finished screen (C4).
   const deliverableHead = deliverable ? bundles?.[deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
@@ -2315,6 +2336,7 @@ export function WorkflowWorkspace({
         <div className="mb-5 px-3">
           <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
+          {overallLine}
         </div>
 
         <StageRail
@@ -2352,6 +2374,7 @@ export function WorkflowWorkspace({
               <div className="min-w-0 flex-1">
                 <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
                 <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
+          {overallLine}
               </div>
               <button
                 onClick={() => setMobileRailOpen(false)}
@@ -2956,6 +2979,18 @@ export function WorkflowWorkspace({
                 evidence some of them rest on, so it sits under the thing it
                 justifies rather than above it. Tasks are what was set aside,
                 and the transition bar is the way out. */}
+            {deliverable?.id === stage.id && stageBundles[stage.id]?.versions.length ? (
+              <DeliverableReadiness
+                rows={deliverableReadiness({
+                  versions: stageBundles[stage.id]?.versions ?? [],
+                  assessment: readinessCheck,
+                  evaluatedVersionIds: new Set(Object.keys(evaluations ?? {})),
+                  approvals: evaluation.criteria.filter((c) => (c.manual ?? manualIds.has(c.id)) && c.authority !== 'delegable'),
+                  approvalVersions: project.manual_check_versions ?? {},
+                  blocking: completion.outstanding.filter(blocksCompletion).map((item) => shownOutstanding(item, locale, outstandingShow)),
+                })}
+              />
+            ) : null}
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
