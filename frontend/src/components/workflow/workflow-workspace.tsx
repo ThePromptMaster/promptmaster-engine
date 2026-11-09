@@ -31,6 +31,7 @@ import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
 import { recordDecision } from '@/lib/supabase/recommendations';
 import { deliverableReadiness, overallStatus } from '@/lib/workflow/readiness';
 import { DeliverableReadiness } from './deliverable-readiness';
+import { useGoAlerts } from './agent/use-go-alerts';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -1630,6 +1631,8 @@ export function WorkflowWorkspace({
     setTimeout(() => document.querySelector('[data-panel="go"]')?.scrollIntoView({ block: 'start' }), 100);
   }, []);
 
+  const goAlerts = useGoAlerts({ running: go.active || go.autoPending, status: go.run?.status, reason: go.run?.stop_reason, projectName: project.title });
+
   // The one next action, at the top of whichever stage is open (17 Oct, Sean).
   const nextStep = nextAction({
     finalized: project.status === 'finalized',
@@ -2653,6 +2656,7 @@ export function WorkflowWorkspace({
               needsActions={goNeedsActions}
               needContext={goNeedContextOnPage}
               dockHost={goDockHost}
+              alerts={goAlerts}
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
               latestChange={goLatestChange}
