@@ -3664,3 +3664,25 @@ Later stages read earlier ones, so Go stops at the first reopened stage whose re
 puts it to the user, rather than repairing what depends on it. A project with an unrelated later stage
 waits too. The planner's reply is capped at 2,500 tokens. Past that it's cut off, asked once more, and
 a stage with no draft is then drafted. Anything else is asked.
+
+### L-226 — A section that answers instead of writing (2026-11-09)
+
+The section prompt says the plan is approved and the section is due, and never to reply with a plan, a
+status or a request for approval. That is asked of the model. Nothing in code refuses such a reply, so
+one that slips through is saved as the section. The objective check and the word counts catch it
+afterwards, as they did in the test that found this.
+
+### L-227 — Per-chapter word counts read numbered headings (2026-11-09)
+
+"Each chapter about N words" counts the headings that name a numbered chapter ("Chapter 3: Pay").
+Headings that only mention the word ("What to carry out of this chapter") are ignored. A document whose
+chapters aren't numbered falls back to every heading that names the unit.
+
+### L-228 — What the final check can be relied on for (2026-11-09)
+
+The check on a finished deliverable reads the brief's constraints, the accepted facts and the source
+material. It looks for deadlines nobody supplied, money called committed when the record says approved,
+and proceeding past a limit the text says is breached. It is one model call, at most five items of each
+kind, told to report nothing when in doubt, so a run can miss one. Its items go to the bounded repair
+rounds. It isn't shown the project's event history, so a date only the record holds ("7 Nov") can be
+reported as unsupported.
