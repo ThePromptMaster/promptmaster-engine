@@ -352,6 +352,14 @@ Web access (2026-10-20): each project has a `web_access` switch (`on` by default
 
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
+**8 Nov additions, in the loop's order.** A question the planner wants to ask is screened first
+(`lib/agent/question-screen.ts`, L-210). Real-world actions a finished document names are saved as
+tasks rather than waited on (L-211). A reopened chapter plan is repaired with its ids kept, and the
+approval carries (L-212). After a repair writes, `chaptersNotLanded` checks that it landed, and the
+step fails if it didn't (L-213). A repair records `changes.stage_closed`, and only a closed stage
+is called repaired (`account.ts`). `lib/workflow/readiness.ts` holds the one overall status and the
+deliverable's Written, Checked, Approved and Ready rows, read from `outstandingWork`.
+
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)
 and persists every step as it goes. The backend stays stateless: it chooses a move and
 performs model work (`/api/agent/*`, B2); the Next route `/api/sandbox/run` executes code in
