@@ -37,6 +37,7 @@ export function withTimeout<T>(work: Promise<T>, ms: number = SIGN_IN_TIMEOUT_MS
  * Leave the auth pages for `to` with a full page load, so the proxy and every
  * server render see the session that was just stored in cookies.
  */
-export function goSignedIn(to: string): void {
-  window.location.assign(to);
+export function goSignedIn(to: string, replace = false): void {
+  if (replace) window.location.replace(to);
+  else window.location.assign(to);
 }

@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { API_URL } from './env';
-import { dismissBetaNotice, serviceSelect } from './helpers';
+import { dismissBetaNotice, servicePatch, serviceSelect } from './helpers';
 
 /**
- * Connected accounts (8 Nov: "it should just search everything"), against scripted
- * accounts (COMPOSIO_MODE=mock): connect, search the whole account with nothing to tick,
- * see what was read, start from a suggestion with its items, brief for a meeting, see
- * and remove what the project holds, let the side chat search, switch it off, add, and
- * disconnect. An email's hidden instruction and its links never reach the screen.
+ * Connected accounts (9 Nov: "no need to type anything or tap anything"), against
+ * scripted accounts (COMPOSIO_MODE=mock): connect, open the page and let it read, see
+ * what was read, start from a suggestion with its items, brief for a meeting, see and
+ * remove what the project holds, let the side chat search, switch it off, add with no
+ * press, and disconnect. An email's hidden instruction and its links never reach the screen.
  */
 
 function calls(page: Page): string[] {
@@ -43,41 +43,32 @@ test('connect, search everything, suggest, brief, chat and disconnect', async ({
   expect(seen.filter((c) => c.includes('/api/connections/confirm'))).toHaveLength(3);
   await shot('02-connected.png');
 
-  // One box and the next meetings: nothing to tick, and no contents yet.
+  // Opening the page is the whole request: nothing to type, tick or press.
   await page.getByRole('link', { name: 'Suggest work from my accounts' }).click();
-  const box = page.getByRole('textbox', { name: 'What are you working on, or looking for?' });
-  await expect(box).toBeVisible();
-  await expect(page.getByText('Q3 board meeting')).toBeVisible();
-  await expect(page.getByRole('checkbox')).toHaveCount(0);
-  await expect(page.getByText(/19\.10|Agenda:/)).toHaveCount(0);
-  expect(seen.some((c) => c.includes('/api/connections/search') || c.includes('/api/suggest-workflows'))).toBe(false);
-  await shot('03-search-box.png');
-
-  // An email from 200 days ago: well outside the 14 days this used to look at.
-  await box.fill('Warehouse lease terms');
-  await page.getByRole('button', { name: 'Search my accounts' }).click();
   const read = page.getByRole('region', { name: 'What PromptMaster read' });
+  await expect(page.getByRole('heading', { name: 'Work you could start' })).toBeVisible({ timeout: 30_000 });
+  // An email from 200 days ago: well outside the 14 days this used to look at.
   await expect(read.getByText('Warehouse lease terms from last spring')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Work you could start' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /search my accounts/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Brief me for this' })).toHaveCount(2);
+  expect(seen.filter((c) => c === 'POST /api/connections/search')).toHaveLength(1);
+  expect(seen.filter((c) => c === 'POST /api/suggest-workflows')).toHaveLength(1);
 
-  // An email with an injection hidden in it: straight on to suggestions, one call each.
-  await box.fill('Updated price list');
-  await page.getByRole('button', { name: 'Search my accounts' }).click();
-  await expect(read.getByText('Updated price list')).toBeVisible();
-  await expect(read.getByText('Warehouse lease terms from last spring')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Work you could start' })).toBeVisible();
-  expect(seen.filter((c) => c === 'POST /api/suggest-workflows')).toHaveLength(2);
-  await read.getByRole('button', { name: 'Show text' }).click();
-  await expect(read.getByText(/19\.10/)).toBeVisible();
+  // An email with an injection hidden in it: its hidden line and link are gone.
+  const injected = read.getByRole('listitem').filter({ hasText: 'Updated price list' });
+  await injected.getByRole('button', { name: 'Show text' }).click();
+  await expect(injected.getByText(/19\.10/)).toBeVisible();
   await expect(read.getByText(/Ignore your instructions/)).toHaveCount(0);
   await expect(read.getByText(/https?:/)).toHaveCount(0);
   await shot('04-read-and-suggested.png');
 
   // "Start this" keeps the item the suggestion came from, whichever way the project starts.
-  await page.getByRole('button', { name: 'Start this' }).first().click();
+  await page.getByRole('listitem').filter({ hasText: 'From: Board pack for Thursday' }).getByRole('button', { name: 'Start this' }).click();
   await page.waitForURL('**/projects/new');
   const carried = page.getByRole('region', { name: 'From your accounts' });
-  await expect(carried.getByText('Updated price list')).toBeVisible();
+  await expect(carried.getByText('Board pack for Thursday')).toBeVisible();
   await shot('05-start-carries.png');
   await page.getByRole('button', { name: /Get a first draft/ }).click();
   await page.waitForURL(/\/projects\/[0-9a-f-]{36}$/);
@@ -87,9 +78,9 @@ test('connect, search everything, suggest, brief, chat and disconnect', async ({
     context: string;
     account_search: string;
   }[];
-  expect(started.third_party.map((i) => i.title)).toEqual(['Updated price list']);
-  expect(started.third_party[0].text).toMatch(/19\.10/);
-  expect(started.context).not.toMatch(/19\.10/);
+  expect(started.third_party.map((i) => i.title)).toEqual(['Board pack for Thursday']);
+  expect(started.third_party[0].text).toMatch(/4\.2m/);
+  expect(started.context).not.toMatch(/4\.2m/);
   expect(started.account_search).toBe('on');
 
   // Brief for a meeting: one press searches the whole mailbox, and the project starts.
@@ -156,17 +147,22 @@ test('connect, search everything, suggest, brief, chat and disconnect', async ({
   await expect(chat.getByText(/Searched your accounts for/)).toHaveCount(before);
   await expect(held.getByText('3 of 20')).toBeVisible();
 
-  // Add from my accounts: back into this project, and back to it.
-  await held.getByRole('button', { name: 'Add from my accounts' }).click();
-  await page.waitForURL(`**/projects/from-accounts?into=${id}`);
-  await expect(page.getByText(/It has room for 17 more/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Brief me for this' })).toHaveCount(0);
-  await page.getByRole('textbox', { name: 'What are you working on, or looking for?' }).fill('2027 operating plan');
-  await page.getByRole('button', { name: 'Search my accounts' }).click();
-  await page.getByRole('button', { name: 'Add 1 to this project' }).click();
-  await page.waitForURL(`**/projects/${id}`);
+  // Add from my accounts: it searches for the project's own words and adds with no press.
+  await servicePatch('projects', `id=eq.${id}`, { title: '2027 operating plan' });
+  await page.reload();
+  await page.getByRole('region', { name: 'From your accounts' }).getByRole('button', { name: 'Add from my accounts' }).click();
+  await page.waitForURL(`**/projects/${id}`, { timeout: 30_000 });
   await expect(page.getByRole('region', { name: 'From your accounts' }).getByText('4 of 20')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'From your accounts' }).getByText('2027 operating plan')).toBeVisible();
   await shot('09-added.png');
+
+  // Again: nothing new, so it says so and changes nothing.
+  await page.goto(`/projects/from-accounts?into=${id}`);
+  await expect(page.getByText('Nothing new in your accounts for this project.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /Add \d+ to this project/ })).toHaveCount(0);
+  await expect
+    .poll(async () => ((await serviceSelect('projects', `id=eq.${id}&select=third_party`)) as { third_party: unknown[] }[])[0].third_party.length)
+    .toBe(4);
 
   // Disconnect: the row goes back to Connect, and the others stay connected.
   await page.goto('/projects/settings');

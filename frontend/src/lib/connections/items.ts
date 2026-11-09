@@ -136,6 +136,11 @@ export function mergeThirdParty(
   return { items, left };
 }
 
+/** What a search found that the project doesn't hold yet. */
+export function notHeld(held: readonly ThirdPartyItem[], found: readonly ConnectedText[]): ConnectedText[] {
+  return found.filter((item) => !held.some((h) => sameItem(h, item)));
+}
+
 /**
  * Items "Start this" carries to the start screen (7 Nov). In this tab's storage, as the
  * goal is (`rememberStartGoal`): they are someone's mail, and a URL ends up in logs.

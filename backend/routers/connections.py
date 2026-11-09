@@ -109,7 +109,7 @@ class FoundResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    #: What they typed. Empty means what is going on now.
+    #: What to look for, such as a project's title and objective. Empty means what is going on now.
     words: str = Field(default="", max_length=MAX_CHAT_MESSAGE_CHARS)
     #: A meeting to prepare for: it, and what the mailbox holds about it.
     meeting: PickedItem | None = None
@@ -117,7 +117,7 @@ class SearchRequest(BaseModel):
 
 
 class SearchResponse(FoundResponse):
-    #: The words searched for, or "" when nothing was typed.
+    #: The words searched for, or "" when it looked at what is going on now.
     query: str = ""
     problems: list[Problem]
     #: How many it found, whether or not they were opened.

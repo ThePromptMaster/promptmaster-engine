@@ -416,7 +416,7 @@ async def search_accounts(
     people: Sequence[str] = (),
     own_address: str = "",
 ) -> Opened:
-    """The search box. Words search everything; nothing typed means what is going on now; a meeting brings its mail."""
+    """The accounts page. Words search everything; no words means what is going on now; a meeting brings its mail."""
     if meeting is not None:
         return await _for_meeting(client, c, user_id, toolkits, meeting, people, own_address)
     if not words.strip():

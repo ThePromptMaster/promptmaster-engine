@@ -3550,7 +3550,7 @@ reaches a model until someone has ticked it and seen its text.
 
 **What happens.** A search covers the whole of every connected account, with no date limit unless the person
 gives one. It brings back up to 25 matches a kind. A small model picks what to open from titles, senders and
-dates, and at most 8 are read (`promptmaster/account_search.py`). It runs in three places: the box on
+dates, and at most 8 are read (`promptmaster/account_search.py`). It runs in three places: opening
 `/projects/from-accounts` (`POST /api/connections/search`), the side chat, and a stage draft the person asked
 for or opened. Whatever a chat or draft reads is saved to the project's "From your accounts" panel.
 
@@ -3581,10 +3581,22 @@ for or opened. Whatever a chat or draft reads is saved to the project's "From yo
   the first 25 matches won't be seen unless the person's words narrow it.
 - Go never searches. Outlines and chapters don't either; they read what the project holds. The start
   conversation stays titles-only (L-202).
-- PDF and Office files open only from the box, because only the browser reads them. In chat and drafts they
+- PDF and Office files open only on `/projects/from-accounts`, because only the browser reads them. In chat and drafts they
   are named in a note and not opened.
 - Outlook and OneDrive search (`OUTLOOK_LIST_MESSAGES` with `search`, `OUTLOOK_SEARCH_EVENTS`,
   `ONE_DRIVE_SEARCH_ITEMS`) follow Composio's documentation and have run only against scripted data.
+
+**Since 9 Nov the page has no box.** The user's call: "the AI should figure out all automatically, no need to
+type anything or tap anything." Opening `/projects/from-accounts` looks at the newest 25 of each kind, opens at
+most 8 and goes on to suggestions. Add from my accounts searches for the project's own title and objective, adds
+what the project doesn't hold, and goes back. "Start this" and "Brief me for this" are still presses, because each
+makes a project. `?for=briefing` reads nothing until a meeting is chosen. What this costs:
+- **Merely opening the page sends up to 8 items to a model** and makes about 15 Composio calls plus one Sonnet
+  call, every time it is opened, including Back and reload. Nothing is cached.
+- **A title and objective a suggestion wrote can carry an email's words** into the search of the person's own
+  accounts (the case L-200 keeps out of web queries). It can change what is read from their own accounts, and
+  reaches nothing outside them.
+- There is no way left to ask this page for something specific. The side chat in a project does that.
 
 ### L-210 — Which of Go's questions are screened (2026-11-08)
 
