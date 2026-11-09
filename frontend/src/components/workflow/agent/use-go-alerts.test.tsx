@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { stopKind, useGoAlerts } from './use-go-alerts';
+import { goIsWorking, stopKind, useGoAlerts } from './use-go-alerts';
 
 type Props = { running: boolean; status: string | null; reason: string | null; projectName: string };
 const start: Props = { running: true, status: 'running', reason: null, projectName: 'Rollout' };
@@ -34,6 +34,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('the browser alert when Go stops (8 Nov)', () => {
+  it('a pause for the user is not work, even with windows left; a window carrying on by itself is', () => {
+    expect(goIsWorking(true, false, 'running')).toBe(true);
+    expect(goIsWorking(false, true, 'awaiting_decision')).toBe(false);
+    expect(goIsWorking(false, true, 'budget_exhausted')).toBe(true);
+    expect(goIsWorking(false, false, 'budget_exhausted')).toBe(false);
+  });
+
   it('says which stops need the user, and which are finished', () => {
     expect(stopKind('awaiting_decision')).toBe('needs_you');
     expect(stopKind('blocked')).toBe('needs_you');

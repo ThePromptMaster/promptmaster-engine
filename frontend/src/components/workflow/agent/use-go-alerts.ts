@@ -53,6 +53,15 @@ function writePref(on: boolean): void {
   }
 }
 
+/**
+ * Whether Go is at work, for the alert. Windows left to run isn't enough: that
+ * stays true through a pause for the user (9 Nov, production: no alert was ever
+ * sent). Between two windows it carries on through by itself, it still is.
+ */
+export function goIsWorking(active: boolean, windowsLeft: boolean, status: string | null | undefined): boolean {
+  return active || (windowsLeft && status === 'budget_exhausted');
+}
+
 export interface GoAlerts {
   permission: Permission;
   on: boolean;
