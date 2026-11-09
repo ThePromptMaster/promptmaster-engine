@@ -96,7 +96,7 @@ export const en = {
   'beta.show': 'Show the beta notice',
   'beta.title': 'This is an early beta',
   'beta.body':
-    'PromptMaster is an early beta, so outputs require review before you act on them — production-critical reliance is not intended, and nothing here replaces your own professional judgement. Please do not enter sensitive information: no credentials, and no confidential client material you may not share with an outside service. If you connect your mail, calendar or files, nothing is read until you press a button, and only what you tick is sent to the AI model.',
+    'PromptMaster is an early beta, so outputs require review before you act on them — production-critical reliance is not intended, and nothing here replaces your own professional judgement. Please do not enter sensitive information: no credentials, and no confidential client material you may not share with an outside service. If you connect your mail, calendar or files, PromptMaster searches them when your work needs it and sends what it reads to the AI model. Each project lists what was read, and you can turn this off there.',
   'beta.gotIt': 'Got it',
   'beta.feedback': 'Tell us how it went',
   'beta.hideFeedback': 'Hide feedback form',

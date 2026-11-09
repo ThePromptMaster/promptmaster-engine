@@ -14,7 +14,7 @@ export const zh: Record<keyof typeof en, string> = {
   'auth.orUpper': '或',
   'auth.or': '或',
   'auth.signInWith': '使用 {provider} 登录',
-  'auth.signInShares': '登录时会共享您的姓名和邮箱。只有在你连接了邮箱、日历或文件之后，PromptMaster 才会读取，而且只读取你选择的内容。',
+  'auth.signInShares': '登录时会共享您的姓名和邮箱。只有在你连接了邮箱、日历或文件之后，PromptMaster 才会读取。',
   'auth.redirecting': '正在跳转…',
   'auth.guest': '不注册账户，直接继续',
   'auth.guestStarting': '正在启动…',

@@ -62,5 +62,5 @@ export async function fileToText(file: ConnectedFile, couldNotRead: string): Pro
   if ('error' in result) return { id: file.id, title: file.title, reason: result.error || couldNotRead };
   const text = cleanText(result.text);
   if (!text) return { id: file.id, title: file.title, reason: couldNotRead };
-  return { id: file.id, toolkit: file.toolkit, kind: 'file', source: file.source, title: file.title, text };
+  return { id: file.id, toolkit: file.toolkit, kind: 'file', source: file.source, title: file.title, text, ...(file.when ? { when: file.when } : {}) };
 }

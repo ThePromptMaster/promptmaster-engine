@@ -3,6 +3,7 @@
 import { strayWorkingText } from '@/lib/workflow/working-text';
 import { withinMessage, type MessageAttachment } from '@/lib/data/attachments';
 import { withRunRecord } from '@/lib/workflow/chat-run-record';
+import { accountSearchOf, keepAccountItems } from '@/lib/connections/account-found';
 import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { savedNumbers } from '@/lib/workflow/sources';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
@@ -44,6 +45,7 @@ import {
   markStageChatApplied,
   markStageChatDiscarded,
   saveStageChatMessage,
+  type ChatAccountSearch,
   type ChatWebSearch,
   type StageChatMessage,
 } from '@/lib/supabase/conversation';
@@ -307,7 +309,8 @@ export function useStageChat({
       mode: 'discuss' | 'instruct',
       scope?: string,
       web?: ChatWebSearch | null,
-      spent?: Spent | null
+      spent?: Spent | null,
+      accounts?: ChatAccountSearch | null
     ): Promise<StageChatMessage> => {
       const own = `${project.id}:${stageId}`;
       const saved = await saveStageChatMessage({
@@ -320,6 +323,7 @@ export function useStageChat({
         mode,
         scope: scope ?? null,
         web: web ?? null,
+        accounts: accounts ?? null,
         spent: spent ? { cost: spent.cost, unpriced: spent.unpriced } : null,
       });
       if (live.current && thread.current === own) setMessages((prior) => [...prior, saved]);
@@ -358,6 +362,7 @@ export function useStageChat({
           model: project.model,
           context: sentContext,
           web_access: project.web_access ?? 'off',
+          account_search: project.account_search === 'on' ? await accountSearchOf(project) : 'off',
           ...(attachments.length ? { attachments } : {}),
         });
         // Carried only once the reply is back: a failed send keeps them for the next try.
@@ -379,8 +384,14 @@ export function useStageChat({
           web = { query: '', saved: 0, note: response.web_note };
         }
 
+        // What a search of the person's accounts read joins the project (8 Nov, L-203).
+        const accounts = await keepAccountItems(project.id, response);
+
         // What the reply cost, kept with it (31 Oct, client: "Billing isn't visible").
-        await persist('assistant', response.assistant_message.content, 'discuss', undefined, web, spentOn(response));
+        await persist(
+          'assistant', response.assistant_message.content, 'discuss', undefined, web, spentOn(response),
+          accounts ? { query: accounts.query, read: accounts.read, ...(accounts.note ? { note: accounts.note } : {}) } : null
+        );
         onAnswered?.(sentContext);
       } catch (err) {
         if (live.current) {

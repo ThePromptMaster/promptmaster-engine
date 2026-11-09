@@ -10,10 +10,8 @@ import { setRequestLanguage } from '@/lib/api/language';
 import { goSignedIn } from '@/lib/auth/sign-in';
 import {
   MAX_HELD,
-  MAX_TICKED,
   itemKey,
   mergeThirdParty,
-  relatedTo,
   rememberStartItems,
   shortWhen,
   toPicked,
@@ -23,6 +21,7 @@ import {
   type Connection,
   type PreviewItem,
   type Skipped,
+  type ToolkitSlug,
   toolkitLabel,
 } from '@/lib/connections/items';
 import { fileToText } from '@/lib/connections/read-file';
@@ -39,7 +38,7 @@ import { ProjectConflictError } from '@/types/project';
 
 import { ConnectedAccounts } from './connected-accounts';
 
-type Phase = 'idle' | 'looking' | 'pick' | 'reading' | 'review' | 'suggesting' | 'suggestions' | 'starting';
+type Phase = 'idle' | 'searching' | 'found' | 'suggesting' | 'suggestions' | 'starting';
 
 interface Suggestion {
   example_key: string;
@@ -48,6 +47,11 @@ interface Suggestion {
   objective: string;
   based_on: number[];
 }
+
+const MAX_MEETINGS = 8;
+const CALENDARS: readonly ToolkitSlug[] = ['googlecalendar', 'outlook'];
+/** The backend's `MAX_ATTENDEES`. */
+const MAX_PEOPLE = 20;
 
 const primary =
   'inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40';
@@ -59,19 +63,19 @@ function isText(x: ConnectedText | Skipped): x is ConnectedText {
 }
 
 /**
- * The person's own mail, meetings and files, used only as far as they choose
- * (the client's call, 7 Nov). Every step is a press, and nothing happens behind one:
+ * The person's own mail, meetings and files (8 Nov: "it should just search
+ * everything"). One box, and nothing to tick:
  *
- * 1. "Show what's there" lists titles, senders and dates. No contents, no model.
- * 2. They tick, nothing ticked to start with; or press "Brief me for this" on a
- *    meeting, which ticks it and the emails around it.
- * 3. "Read what I ticked" fetches only those, and shows the exact text, which they
- *    may change or remove. What is sent is what is shown.
- * 4. Suggestions (one model call), or a briefing project holding the text as other
- *    people's words. A search there is written from the person's own words only (L-200).
+ * 1. They say what they are after, or leave it empty for what is going on now. The
+ *    backend searches the whole of every connected account and reads the best matches.
+ * 2. Straight on to suggestions, with what was read listed beside them to see or remove.
+ * 3. "Brief me for this" on a meeting searches for it and starts the project at once.
  *
- * `into` (7 Nov): opened from a project's "From your accounts" panel, the ticked
- * items are added to that project instead, up to what it has room for.
+ * What was read is other people's words: fenced in every prompt, and a web search
+ * there is written from the person's own words only (L-200).
+ *
+ * `into`: opened from a project's "From your accounts" panel, what was found is added
+ * to that project on one press, up to what it has room for.
  */
 export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; into?: string }) {
   const t = useT();
@@ -79,11 +83,13 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Connection[] | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
-  const [items, setItems] = useState<PreviewItem[]>([]);
+  const [words, setWords] = useState('');
+  const [meetings, setMeetings] = useState<PreviewItem[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [chosen, setChosen] = useState<ConnectedText[]>([]);
   const [skipped, setSkipped] = useState<Skipped[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [shown, setShown] = useState<string | null>(null);
   const [meeting, setMeeting] = useState<PreviewItem | null>(null);
   const [result, setResult] = useState<{ work_summary: string; suggestions: Suggestion[] } | null>(null);
   // What the suggestions were made from, as sent: "based on" points into it.
@@ -107,118 +113,113 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
   const targetProblem = !target ? null : 'gone' in target ? t('conn.intoGone') : 'failed' in target ? t('conn.failed', { why: target.failed }) : null;
 
   const active = (accounts ?? []).filter((a) => a.status === 'ACTIVE');
-  const cap = into ? Math.max(0, Math.min(MAX_TICKED, MAX_HELD - (project?.held ?? 0))) : MAX_TICKED;
-  const full = ticked.size >= cap;
+  const calendars = active.map((a) => a.toolkit).filter((slug) => CALENDARS.includes(slug)).join(',');
+
+  // The next meetings, by title, so one can be prepared for. No contents.
+  useEffect(() => {
+    if (!calendars || into) return;
+    let live = true;
+    api
+      .previewConnections(calendars.split(',') as ToolkitSlug[])
+      .then((found) => live && setMeetings(found.items.filter((i) => i.kind === 'calendar_event').slice(0, MAX_MEETINGS)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [calendars, into]);
+
+  const cap = into ? Math.max(0, MAX_HELD - (project?.held ?? 0)) : MAX_HELD;
+  const busy = phase === 'searching' || phase === 'suggesting' || phase === 'starting';
   const why = (e: unknown) => t('conn.failed', { why: e instanceof Error ? e.message : '' });
 
-  async function look() {
-    setPhase('looking');
+  async function search(forMeeting: PreviewItem | null) {
+    setPhase('searching');
     setError(null);
+    setResult(null);
+    setChosen([]);
+    setShown(null);
+    setSearched(false);
+    setMeeting(forMeeting);
     try {
-      const found = await api.previewConnections();
-      setItems(found.items);
-      setProblems(found.problems.map((p) => `${toolkitLabel(p.toolkit)}: ${p.message}`));
-      setTicked(new Set());
-      setPhase('pick');
+      const back = await api.searchConnections(
+        forMeeting
+          ? { meeting: toPicked(forMeeting), people: [forMeeting.who, ...forMeeting.people].filter(Boolean).slice(0, MAX_PEOPLE) }
+          : { words: words.trim() }
+      );
+      const fromFiles = await Promise.all(back.files.map((f) => fileToText(f, t('conn.fileUnread'))));
+      // The meeting's own read doesn't say when it is; the list it was pressed in does.
+      const texts = [...back.items, ...fromFiles.filter(isText)]
+        .map((x) => (forMeeting && itemKey(x) === itemKey(forMeeting) ? { ...x, when: forMeeting.when } : x))
+        .slice(0, cap);
+      setChosen(texts);
+      setSkipped([...back.skipped, ...fromFiles.filter((x): x is Skipped => !isText(x))]);
+      setProblems(back.problems.map((p) => `${toolkitLabel(p.toolkit)}: ${p.message}`));
+      setSearched(true);
+      if (!texts.length) setPhase('idle');
+      else if (forMeeting) await startBriefing(forMeeting, texts);
+      else if (into) setPhase('found');
+      else await suggest(texts);
     } catch (e) {
       setError(why(e));
       setPhase('idle');
     }
   }
 
-  function toggle(item: PreviewItem) {
-    const key = itemKey(item);
-    setTicked((held) => {
-      const next = new Set(held);
-      if (next.has(key)) next.delete(key);
-      else if (next.size < cap) next.add(key);
-      return next;
-    });
-  }
-
-  async function read(keys: Set<string>, forMeeting: PreviewItem | null) {
-    setPhase('reading');
-    setError(null);
-    setMeeting(forMeeting);
-    try {
-      const picked = items.filter((i) => keys.has(itemKey(i)) && i.readable);
-      const back = await api.readConnections(picked.map(toPicked));
-      const fromFiles = await Promise.all(back.files.map((f) => fileToText(f, t('conn.fileUnread'))));
-      // When it was sent or happens comes from the list it was ticked in.
-      const when = new Map(picked.map((p) => [itemKey(p), p.when]));
-      const texts = [...back.items, ...fromFiles.filter(isText)].map((x) => ({ ...x, when: when.get(itemKey(x)) || undefined }));
-      // In the order they were listed, so the meeting leads a briefing.
-      const order = new Map(picked.map((p, i) => [itemKey(p), i]));
-      texts.sort((a, b) => (order.get(itemKey(a)) ?? 0) - (order.get(itemKey(b)) ?? 0));
-      setChosen(texts);
-      setSkipped([...back.skipped, ...fromFiles.filter((x): x is Skipped => !isText(x))]);
-      setPhase('review');
-    } catch (e) {
-      setError(why(e));
-      setPhase('pick');
-    }
-  }
-
-  function briefMe(item: PreviewItem) {
-    const keys = new Set([itemKey(item), ...relatedTo(item, items, user?.email ?? '').map(itemKey)]);
-    setTicked(keys);
-    void read(keys, item);
-  }
-
-  async function suggest() {
+  async function suggest(items: ConnectedText[]) {
     setPhase('suggesting');
     setError(null);
     setRequestLanguage(startLanguage(getLocale()));
     try {
       const back = await api.suggestWorkflows({
-        items: toSharedItems(chosen),
+        items: toSharedItems(items),
         catalog: EXAMPLE_CARDS.map((c) => ({
           key: c.key,
           title: t(`ex.${c.key}.title` as MessageKey),
           description: t(`ex.${c.key}.blurb` as MessageKey).slice(0, 400),
         })),
       });
-      setSent(chosen);
+      setSent(items);
       setResult(back);
       setPhase('suggestions');
     } catch (e) {
       setError(why(e));
-      setPhase('review');
+      setPhase('found');
     } finally {
       setRequestLanguage('en');
     }
   }
 
-  async function startBriefing() {
+  async function startBriefing(forMeeting: PreviewItem, items: ConnectedText[]) {
     const example = EXAMPLES.find((e) => e.key === 'meeting_briefing');
-    if (!meeting || !example || !user) return;
+    if (!example || !user) return;
     setPhase('starting');
     setError(null);
     try {
-      const title = meeting.title.length <= 60 ? meeting.title : `${meeting.title.slice(0, 57).trimEnd()}…`;
+      const title = forMeeting.title.length <= 60 ? forMeeting.title : `${forMeeting.title.slice(0, 57).trimEnd()}…`;
       const id = await startExample(example, user.id, {
         language: startLanguage(getLocale()),
         own: {
           title,
-          objective: t('conn.briefingObjective', { title: meeting.title, when: shortWhen(meeting.when, locale) }),
+          objective: t('conn.briefingObjective', { title: forMeeting.title, when: shortWhen(forMeeting.when, locale) }),
           context: '',
           files: [],
           images: [],
-          third_party: toThirdParty(chosen),
+          third_party: toThirdParty(items),
         },
       });
       goSignedIn(`/projects/${id}`);
     } catch (e) {
       setError(why(e));
-      setPhase('review');
+      setPhase('found');
     }
   }
 
-  /** "Start this" keeps what the suggestion came from (7 Nov): every ticked item if it names none. */
+  /** "Start this" keeps what the suggestion came from and is still listed: everything listed if it names none. */
   function startFrom(s: Suggestion) {
-    const from = s.based_on.map((n) => sent[n - 1]).filter((x): x is ConnectedText => !!x);
+    const listed = new Set(chosen.map(itemKey));
+    const from = s.based_on.map((n) => sent[n - 1]).filter((x): x is ConnectedText => !!x && listed.has(itemKey(x)));
     rememberStartGoal(s.objective);
-    rememberStartItems(toThirdParty(from.length ? from : sent));
+    rememberStartItems(toThirdParty(from.length ? from : chosen));
     goSignedIn('/projects/new');
   }
 
@@ -244,7 +245,7 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
       goSignedIn(`/projects/${into}`);
     } catch (e) {
       setError(why(e));
-      setPhase('review');
+      setPhase('found');
     }
   }
 
@@ -254,52 +255,8 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
     ? '/projects/from-accounts?for=briefing'
     : '/projects/from-accounts';
 
-  const section = (heading: string, kind: PreviewItem['kind']) => {
-    const rows = items.filter((i) => i.kind === kind);
-    return (
-      <section className="mt-5">
-        <h2 className="text-title text-[var(--on-surface)]">{heading}</h2>
-        {rows.length === 0 ? (
-          <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('conn.nothing')}</p>
-        ) : (
-          <ul className="mt-2 space-y-1.5">
-            {rows.map((item) => {
-              const key = itemKey(item);
-              const on = ticked.has(key);
-              const sub = [item.who, shortWhen(item.when, locale), toolkitLabel(item.toolkit)].filter(Boolean).join(' · ');
-              return (
-                <li key={key} className="flex items-start gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
-                  <input
-                    id={`item-${key}`}
-                    type="checkbox"
-                    checked={on}
-                    disabled={!item.readable || (!on && full)}
-                    onChange={() => toggle(item)}
-                    className="mt-1"
-                  />
-                  <ToolkitLogo slug={item.toolkit} size={18} className="mt-0.5 text-[var(--on-surface-variant)]" />
-                  <label htmlFor={`item-${key}`} className="min-w-0 flex-1 cursor-pointer">
-                    <span dir="auto" className="block truncate text-body text-[var(--on-surface)]">{item.title}</span>
-                    <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">{sub}</span>
-                    {!item.readable && <span className="block text-label text-[var(--on-surface-variant)]">{item.note || t('conn.fileUnread')}</span>}
-                  </label>
-                  {kind === 'calendar_event' && !into && (
-                    <button
-                      type="button"
-                      onClick={() => briefMe(item)}
-                      className="shrink-0 rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
-                    >
-                      {t('conn.brief')}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-    );
-  };
+  const running = phase === 'searching' ? t('conn.searching') : phase === 'suggesting' ? t('conn.suggesting') : phase === 'starting' ? t('conn.starting') : '';
+  const showRead = chosen.length > 0 && phase !== 'searching';
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-6 sm:py-12">
@@ -323,111 +280,43 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
         </section>
       )}
 
-      {active.length > 0 && (phase === 'idle' || phase === 'looking') && (
-        <div className="mt-6 flex flex-wrap items-center gap-4">
-          <button type="button" onClick={() => void look()} disabled={phase === 'looking' || (!!into && (!project || cap === 0))} className={primary}>
-            {phase === 'looking' ? t('conn.looking') : t('conn.look')}
-          </button>
-          <Link href="/projects/settings" className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.manage')}</Link>
-        </div>
+      {active.length > 0 && (
+        <form
+          className="mt-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void search(null);
+          }}
+        >
+          <label htmlFor="account-search" className="text-title text-[var(--on-surface)]">{t('conn.searchLabel')}</label>
+          <input
+            id="account-search"
+            dir="auto"
+            value={words}
+            onChange={(e) => setWords(e.target.value)}
+            disabled={busy}
+            className="mt-2 w-full rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-body text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--pm-primary)]"
+          />
+          <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">{t('conn.searchHint')}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <button type="submit" disabled={busy || (!!into && (!project || cap === 0))} className={primary}>
+              {running || t('conn.search')}
+            </button>
+            <Link href="/projects/settings" className="text-label font-medium text-[var(--pm-primary)] hover:underline">{t('conn.manage')}</Link>
+          </div>
+        </form>
       )}
 
-      {(phase === 'pick' || phase === 'reading') && (
-        <>
-          {problems.map((p) => (
-            <p key={p} role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">{p}</p>
-          ))}
-          {section(t('conn.meetings'), 'calendar_event')}
-          {section(t('conn.mail'), 'email')}
-          {section(t('conn.files'), 'file')}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button type="button" disabled={ticked.size === 0 || phase === 'reading'} onClick={() => void read(ticked, null)} className={primary}>
-              {phase === 'reading' ? t('conn.reading') : t('conn.read')}
-            </button>
-            <span role="status" className="text-label text-[var(--on-surface-variant)]">
-              {t('conn.ticked', { count: ticked.size })}
-              {full ? ` ${t('conn.tickMax', { max: cap })}` : ''}
-            </span>
-          </div>
-        </>
-      )}
-
-      {(phase === 'review' || phase === 'suggesting' || phase === 'starting') && (
-        <>
-          <h2 className="mt-6 text-headline text-[var(--on-surface)]">{t('conn.reviewTitle')}</h2>
-          <p className="mt-2 text-body text-[var(--on-surface-variant)]">{t('conn.reviewLead')}</p>
-          <ol className="mt-5 space-y-3">
-            {chosen.map((item) => (
-              <li key={itemKey(item)} className="rounded-xl bg-[var(--surface-container-low)] p-4">
-                <div className="flex items-start gap-2">
-                  <ToolkitLogo slug={item.toolkit} size={20} className="mt-0.5 text-[var(--on-surface-variant)]" />
-                  <p dir="auto" className="min-w-0 flex-1 text-title text-[var(--on-surface)]">{item.title}</p>
-                  <button
-                    type="button"
-                    onClick={() => setChosen((held) => held.filter((c) => itemKey(c) !== itemKey(item)))}
-                    className="shrink-0 text-label font-medium text-[var(--pm-primary)] hover:underline"
-                  >
-                    {t('conn.remove')}
-                  </button>
-                </div>
-                <p dir="auto" className="text-label text-[var(--on-surface-variant)]">{item.source}</p>
-                <textarea
-                  dir="auto"
-                  aria-label={item.title}
-                  value={item.text}
-                  onChange={(e) => setChosen((held) => held.map((c) => (itemKey(c) === itemKey(item) ? { ...c, text: e.target.value } : c)))}
-                  rows={Math.min(10, Math.max(3, item.text.split('\n').length + 1))}
-                  className="mt-2 w-full resize-y rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-label text-[var(--on-surface)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--pm-primary)]"
-                />
-              </li>
-            ))}
-          </ol>
-          {skipped.length > 0 && (
-            <section className="mt-5">
-              <h3 className="text-title text-[var(--on-surface)]">{t('conn.skippedTitle')}</h3>
-              <ul className="mt-2 space-y-1">
-                {skipped.map((s) => (
-                  <li key={`${s.id}-${s.reason}`} dir="auto" className="text-label text-[var(--on-surface-variant)]">
-                    {s.title ? `${s.title}: ` : ''}
-                    {s.reason}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {(meeting || into) && <p className="mt-5 text-label text-[var(--on-surface-variant)]">{t('conn.webOff')}</p>}
-          <div className="mt-5 flex flex-wrap gap-3">
-            {into ? (
-              <button type="button" onClick={() => void addToProject()} disabled={!chosen.length || phase !== 'review'} className={primary}>
-                {phase === 'starting' ? t('conn.adding') : t('conn.addN', { count: chosen.length })}
-              </button>
-            ) : meeting ? (
-              <button type="button" onClick={() => void startBriefing()} disabled={!chosen.length || phase !== 'review'} className={primary}>
-                {phase === 'starting' ? t('conn.starting') : t('conn.startBriefing')}
-              </button>
-            ) : (
-              <button type="button" onClick={() => void suggest()} disabled={!chosen.length || phase !== 'review'} className={primary}>
-                {phase === 'suggesting' ? t('conn.suggesting') : t('conn.suggest')}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setMeeting(null);
-                setPhase('pick');
-              }}
-              disabled={phase !== 'review'}
-              className={secondary}
-            >
-              {t('conn.back')}
-            </button>
-          </div>
-        </>
+      {problems.map((p) => (
+        <p key={p} role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">{p}</p>
+      ))}
+      {searched && !chosen.length && !busy && !error && (
+        <p role="status" className="mt-4 text-body text-[var(--on-surface)]">{t('conn.noneFound')}</p>
       )}
 
       {phase === 'suggestions' && result && (
         <>
-          <h2 className="mt-6 text-headline text-[var(--on-surface)]">{t('conn.suggestTitle')}</h2>
+          <h2 className="mt-8 text-headline text-[var(--on-surface)]">{t('conn.suggestTitle')}</h2>
           {result.work_summary && <p dir="auto" className="mt-2 text-body text-[var(--on-surface-variant)]">{result.work_summary}</p>}
           {result.suggestions.length === 0 ? (
             <p className="mt-4 text-body text-[var(--on-surface)]">{t('conn.noSuggestions')}</p>
@@ -453,8 +342,102 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
               })}
             </ul>
           )}
-          <button type="button" onClick={() => setPhase('review')} className={`mt-5 ${secondary}`}>{t('conn.back')}</button>
         </>
+      )}
+
+      {showRead && (
+        <section aria-label={t('conn.readTitle')}>
+          <h2 className="mt-8 text-headline text-[var(--on-surface)]">{t('conn.readTitle')}</h2>
+          <p className="mt-2 text-body text-[var(--on-surface-variant)]">{t('conn.readLead')}</p>
+          <ol className="mt-5 space-y-3">
+            {chosen.map((item) => {
+              const key = itemKey(item);
+              return (
+                <li key={key} className="rounded-xl bg-[var(--surface-container-low)] p-4">
+                  <div className="flex items-start gap-2">
+                    <ToolkitLogo slug={item.toolkit} size={20} className="mt-0.5 text-[var(--on-surface-variant)]" />
+                    <p dir="auto" className="min-w-0 flex-1 text-title text-[var(--on-surface)]">{item.title}</p>
+                    <button
+                      type="button"
+                      onClick={() => setChosen((held) => held.filter((c) => itemKey(c) !== key))}
+                      className="shrink-0 text-label font-medium text-[var(--pm-primary)] hover:underline"
+                    >
+                      {t('conn.remove')}
+                    </button>
+                  </div>
+                  <p dir="auto" className="text-label text-[var(--on-surface-variant)]">{item.source}</p>
+                  <button
+                    type="button"
+                    aria-expanded={shown === key}
+                    onClick={() => setShown(shown === key ? null : key)}
+                    className="mt-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
+                  >
+                    {shown === key ? t('conn.heldHide') : t('conn.heldShow')}
+                  </button>
+                  {shown === key && (
+                    <pre dir="auto" className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 font-sans text-label text-[var(--on-surface)]">
+                      {item.text}
+                    </pre>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          {skipped.length > 0 && (
+            <section className="mt-5">
+              <h3 className="text-title text-[var(--on-surface)]">{t('conn.skippedTitle')}</h3>
+              <ul className="mt-2 space-y-1">
+                {skipped.map((s) => (
+                  <li key={`${s.id}-${s.reason}`} dir="auto" className="text-label text-[var(--on-surface-variant)]">
+                    {s.title ? `${s.title}: ` : ''}
+                    {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {(meeting || into) && <p className="mt-5 text-label text-[var(--on-surface-variant)]">{t('conn.webOff')}</p>}
+          {(phase === 'found' || (phase === 'starting' && !!into)) && (
+            <div className="mt-5 flex flex-wrap gap-3">
+              {into ? (
+                <button type="button" onClick={() => void addToProject()} disabled={busy} className={primary}>
+                  {phase === 'starting' ? t('conn.adding') : t('conn.addN', { count: chosen.length })}
+                </button>
+              ) : meeting ? (
+                <button type="button" onClick={() => void startBriefing(meeting, chosen)} className={primary}>{t('conn.startBriefing')}</button>
+              ) : (
+                <button type="button" onClick={() => void suggest(chosen)} className={primary}>{t('conn.suggest')}</button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!into && meetings.length > 0 && !showRead && (
+        <section className="mt-8">
+          <h2 className="text-title text-[var(--on-surface)]">{t('conn.nextMeetings')}</h2>
+          <ul className="mt-2 space-y-1.5">
+            {meetings.map((item) => (
+              <li key={itemKey(item)} className="flex items-start gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
+                <ToolkitLogo slug={item.toolkit} size={18} className="mt-0.5 text-[var(--on-surface-variant)]" />
+                <span className="min-w-0 flex-1">
+                  <span dir="auto" className="block truncate text-body text-[var(--on-surface)]">{item.title}</span>
+                  <span dir="auto" className="block truncate text-label text-[var(--on-surface-variant)]">
+                    {[item.who, shortWhen(item.when, locale), toolkitLabel(item.toolkit)].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void search(item)}
+                  className="shrink-0 rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  {t('conn.brief')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {(error || targetProblem) && (

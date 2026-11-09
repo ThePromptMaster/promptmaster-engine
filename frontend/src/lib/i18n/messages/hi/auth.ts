@@ -15,7 +15,7 @@ export const hi: Record<keyof typeof en, string> = {
   'auth.orUpper': 'या',
   'auth.or': 'या',
   'auth.signInWith': '{provider} से साइन इन करें',
-  'auth.signInShares': 'साइन इन करने पर आपका नाम और ईमेल साझा होता है। PromptMaster आपका मेल, कैलेंडर या फ़ाइलें तभी पढ़ता है जब आप उन्हें जोड़ें, और सिर्फ़ वही जो आप चुनें।',
+  'auth.signInShares': 'साइन इन करने पर आपका नाम और ईमेल साझा होता है। PromptMaster आपका मेल, कैलेंडर या फ़ाइलें तभी पढ़ता है जब आप उन्हें जोड़ें।',
   'auth.redirecting': 'रीडायरेक्ट हो रहा है...',
   'auth.guest': 'बिना खाते के जारी रखें',
   'auth.guestStarting': 'शुरू हो रहा है…',

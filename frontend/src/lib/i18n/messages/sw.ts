@@ -78,7 +78,7 @@ export const sw: Messages = {
   'beta.chip': 'Beta',
   'beta.show': 'Onyesha ilani ya beta',
   'beta.title': 'Hili ni toleo la awali la beta',
-  'beta.body': 'PromptMaster ni toleo la awali la beta, kwa hiyo matokeo yanahitaji kupitiwa kabla hujayatumia — haikusudiwi kutegemewa katika kazi nyeti za uzalishaji, na hakuna kitu hapa kinachochukua nafasi ya busara yako ya kitaaluma. Tafadhali usiweke taarifa nyeti: hakuna vitambulisho vya kuingia, wala nyaraka za siri za wateja usizoruhusiwa kushiriki na huduma ya nje. Ukiunganisha barua pepe, kalenda au faili zako, hakuna kinachosomwa hadi ubonyeze kitufe, na kile tu unachochagua ndicho hutumwa kwa modeli ya AI.',
+  'beta.body': 'PromptMaster ni toleo la awali la beta, kwa hiyo matokeo yanahitaji kupitiwa kabla hujayatumia — haikusudiwi kutegemewa katika kazi nyeti za uzalishaji, na hakuna kitu hapa kinachochukua nafasi ya busara yako ya kitaaluma. Tafadhali usiweke taarifa nyeti: hakuna vitambulisho vya kuingia, wala nyaraka za siri za wateja usizoruhusiwa kushiriki na huduma ya nje. Ukiunganisha barua pepe, kalenda au faili zako, PromptMaster huzitafuta kazi yako inapohitaji na kutuma inachosoma kwa modeli ya AI. Kila mradi unaonyesha kilichosomwa, na unaweza kuzima hili hapo.',
   'beta.gotIt': 'Nimeelewa',
   'beta.feedback': 'Tuambie ilivyokwenda',
   'beta.hideFeedback': 'Ficha fomu ya maoni',

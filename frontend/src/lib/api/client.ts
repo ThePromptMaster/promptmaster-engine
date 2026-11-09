@@ -667,8 +667,8 @@ export const api = {
 
   /**
    * Up to three pieces of work from what someone typed or attached (the client's call,
-   * 4 Nov), or (7 Nov) emails, meetings and files they ticked in a connected account,
-   * already read through `readConnections`. One model call; nothing is saved.
+   * 4 Nov), or (7 Nov) emails, meetings and files from a connected account, already read
+   * through `searchConnections`. One model call; nothing is saved.
    */
   async suggestWorkflows(req: {
     items: { kind: 'note' | 'file' | 'email' | 'calendar_event'; source?: string; title: string; text: string }[];
@@ -684,7 +684,7 @@ export const api = {
 
   /**
    * Connected accounts through Composio (the client's call, 7 Nov). Composio holds
-   * each connection; nothing here calls a model. `backend/routers/connections.py`.
+   * each connection. `backend/routers/connections.py`.
    */
   async listConnections(): Promise<{ accounts: Connection[]; toolkits: { slug: ToolkitSlug; label: string; reads: string }[] }> {
     return apiFetch('/api/connections');
@@ -705,14 +705,25 @@ export const api = {
     return apiFetch(`/api/connections/${encodeURIComponent(connectionId)}`, { method: 'DELETE' });
   },
 
-  /** What is in the connected accounts, without contents. */
+  /** The newest of each kind and the next meetings, without contents. */
   async previewConnections(toolkits: ToolkitSlug[] = []): Promise<{ items: PreviewItem[]; problems: { toolkit: ToolkitSlug; message: string }[] }> {
     return apiFetch('/api/connections/preview', { method: 'POST', body: JSON.stringify({ toolkits }) });
   },
 
-  /** The text of what was ticked, cleaned; PDFs and Office files come back for this browser to read. */
-  async readConnections(items: ReturnType<typeof toPicked>[]): Promise<{ items: ConnectedText[]; files: ConnectedFile[]; skipped: Skipped[] }> {
-    return apiFetch('/api/connections/read', { method: 'POST', body: JSON.stringify({ items }) });
+  /**
+   * Search the whole of every connected account and read the best matches (8 Nov, L-203).
+   * Words, nothing (what is going on now), or a meeting to prepare for. PDFs and Office
+   * files come back for this browser to read.
+   */
+  async searchConnections(req: { words?: string; meeting?: ReturnType<typeof toPicked>; people?: string[] }): Promise<{
+    query: string;
+    matches: number;
+    items: ConnectedText[];
+    files: ConnectedFile[];
+    skipped: Skipped[];
+    problems: { toolkit: ToolkitSlug; message: string }[];
+  }> {
+    return apiFetch('/api/connections/search', { method: 'POST', body: JSON.stringify(req) });
   },
 
   /** One turn of the conversational front door: a reply and the draft brief (6 Oct, email 8). Saves nothing. */

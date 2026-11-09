@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
+import { hasConnectedAccount } from '@/lib/connections/account-found';
 import { MAX_HELD, shortWhen, toolkitFromSource } from '@/lib/connections/items';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { ThirdPartyItem } from '@/types';
@@ -13,8 +14,9 @@ const ICON: Record<ThirdPartyItem['kind'], string> = { email: 'mail', calendar_e
 
 /**
  * What the project holds from the person's accounts (7 Nov): the emails, meetings
- * and files they ticked, numbered [T1]… as every prompt numbers them. Their text can
- * be read here exactly as it is sent, removed, or added to from the accounts.
+ * and files they added or a search read (L-203), numbered [T1]… as every prompt numbers
+ * them. Their text can be read here exactly as it is sent, removed, or added to from
+ * the accounts, and the switch says whether this project may search them at all.
  * Other people's words: fenced in every prompt, and never what a web search is
  * written from (L-200).
  */
@@ -23,13 +25,16 @@ export function ProjectThirdParty({
   readOnly = false,
   onSave,
   onAdd,
+  onAccountSearch,
 }: {
-  project: Pick<Project, 'id' | 'third_party'>;
+  project: Pick<Project, 'id' | 'third_party' | 'account_search'>;
   readOnly?: boolean;
   /** Save the list as it now is: patched and flushed by the workspace. */
   onSave: (items: ThirdPartyItem[]) => Promise<void>;
   /** Open the accounts to add more, once pending edits are saved. */
   onAdd: () => Promise<void>;
+  /** Turn searching the person's accounts on or off for this project. */
+  onAccountSearch?: (value: 'on' | 'off') => Promise<void>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -40,6 +45,17 @@ export function ProjectThirdParty({
   const [shown, setShown] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+
+  const canSwitch = !!onAccountSearch;
+  useEffect(() => {
+    if (isGuest || !canSwitch) return;
+    let live = true;
+    void hasConnectedAccount().then((yes) => live && setConnected(yes));
+    return () => {
+      live = false;
+    };
+  }, [isGuest, canSwitch]);
 
   // A guest cannot connect an account, and has nothing to see until they could.
   if (isGuest && items.length === 0) return null;
@@ -78,6 +94,23 @@ export function ProjectThirdParty({
       {open && (
         <div className="mt-3">
           <p className="text-label text-[var(--on-surface-variant)]">{t('conn.heldExplain')}</p>
+
+          {connected && onAccountSearch && (
+            <label className="mt-3 flex items-start gap-3">
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label={t('conn.heldSwitch')}
+                checked={project.account_search === 'on'}
+                disabled={readOnly || busy}
+                onChange={(e) => void run(() => onAccountSearch(e.target.checked ? 'on' : 'off'))}
+                className="mt-1 h-4 w-4 accent-[var(--pm-primary)]"
+              />
+              <span className="text-label text-[var(--on-surface-variant)]">
+                <span className="font-semibold text-[var(--on-surface)]">{t('conn.heldSwitch')}</span> {t('conn.heldSwitchNote')}
+              </span>
+            </label>
+          )}
 
           {items.length > 0 && (
             <ol aria-label={t('conn.heldTitle')} className="mt-3 space-y-2">

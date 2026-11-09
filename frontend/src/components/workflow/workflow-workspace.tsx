@@ -2796,6 +2796,10 @@ export function WorkflowWorkspace({
                 await flushProject();
                 goSignedIn(`/projects/from-accounts?into=${encodeURIComponent(project.id)}`);
               }}
+              onAccountSearch={async (value) => {
+                onPatchProject({ account_search: value });
+                await flushProject();
+              }}
             />
             {/* On every stage: the switch and the sources every stage cites (20 Oct). */}
             <WebSources

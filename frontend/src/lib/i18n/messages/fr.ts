@@ -82,7 +82,7 @@ export const fr: Messages = {
   'beta.show': "Afficher l'avertissement bêta",
   'beta.title': "Ceci est une version bêta précoce",
   'beta.body':
-    "PromptMaster est une version bêta précoce : les résultats doivent être relus avant d’agir — ils ne sont pas destinés à un usage critique en production, et rien ici ne remplace votre propre jugement professionnel. N’y saisissez pas d’informations sensibles : ni identifiants, ni documents confidentiels de clients que vous ne pouvez pas confier à un service extérieur. Si vous connectez votre messagerie, votre agenda ou vos fichiers, rien n’est lu avant que vous appuyiez sur un bouton, et seul ce que vous cochez est envoyé au modèle d’IA.",
+    "PromptMaster est une version bêta précoce : les résultats doivent être relus avant d’agir — ils ne sont pas destinés à un usage critique en production, et rien ici ne remplace votre propre jugement professionnel. N’y saisissez pas d’informations sensibles : ni identifiants, ni documents confidentiels de clients que vous ne pouvez pas confier à un service extérieur. Si vous connectez votre messagerie, votre agenda ou vos fichiers, PromptMaster y cherche quand votre travail l’exige et envoie ce qu’il lit au modèle d’IA. Chaque projet liste ce qui a été lu, et vous pouvez y désactiver cela.",
   'beta.gotIt': 'Compris',
   'beta.feedback': 'Dites-nous comment ça s’est passé',
   'beta.hideFeedback': 'Masquer le formulaire',
