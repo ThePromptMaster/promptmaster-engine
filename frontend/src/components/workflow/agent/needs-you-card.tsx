@@ -3,7 +3,7 @@
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
-import { describeNeed, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
+import { describeNeed, needHeading, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
 import { isMajorRow } from '@/lib/workflow/engine';
 
 /**
@@ -58,7 +58,7 @@ export function NeedsYouCard({
   };
   return (
     <section aria-label={t('nyc.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' || need.kind === 'next_round' || need.kind === 'add_stage' ? t('nyc.suggestion') : t('nyc.needYou')}</p>
+      <p data-need-heading className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t(({ suggestion: 'nyc.suggestion', repair: 'nyc.headRepair', decision: 'nyc.headDecision', waiting: 'nyc.needYou' } as const)[needHeading(need)])}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{message}</p>
       {detail && <p data-need-detail className="mt-1 text-label text-[var(--on-surface-variant)]">{detail}</p>}
       {canTell && (

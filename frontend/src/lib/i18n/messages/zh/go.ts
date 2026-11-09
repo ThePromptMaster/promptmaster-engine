@@ -140,6 +140,8 @@ export const zh: Record<keyof typeof en, string> = {
   'nyc.label': 'Go 模式需要你',
   'nyc.suggestion': '一条建议——由你决定',
   'nyc.needYou': '我需要你……',
+  'nyc.headDecision': '由你决定',
+  'nyc.headRepair': '内部修复：PromptMaster 需要你的指引',
   'nyc.working': '处理中…',
   'nyc.tellGoWhat': '告诉 Go 要修正什么（可选）',
   'nyc.tellGoHint': '例如：培训这一行的 $8,000 是正确的；旧价格只适用于迁移。',

@@ -362,6 +362,32 @@ export function unsettledRepairs(state: WorkflowState, steps: readonly AgentStep
   return out;
 }
 
+/**
+ * What kind of stop this is, for the card's heading (8 Nov: "what is my
+ * business decision and what is an internal repair"). A repair is
+ * PromptMaster's own unfinished work; a decision is the user's to make.
+ */
+export function needHeading(need: NeedsUser): 'suggestion' | 'repair' | 'decision' | 'waiting' {
+  switch (need.kind) {
+    case 'skip_stage':
+    case 'next_round':
+    case 'add_stage':
+      return 'suggestion';
+    case 'repair_stuck':
+      return 'repair';
+    case 'objective_check':
+      return need.finding === 'unmet' || need.finding === 'repair_limit' || need.finding === 'no_evidence' ? 'repair' : 'decision';
+    case 'wait_for_jobs':
+    case 'continue_budget':
+    case 'unblock_stage':
+    case 'paste_batch':
+    case 'set_objective':
+      return 'waiting';
+    default:
+      return 'decision';
+  }
+}
+
 /** The `repair_stuck` need for a stage, from the repair steps recorded for it. */
 export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
   const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);

@@ -140,6 +140,8 @@ export const ar: Record<keyof typeof en, string> = {
   'nyc.label': 'وضع Go يحتاج إليك',
   'nyc.suggestion': 'اقتراح — والقرار لك',
   'nyc.needYou': 'أحتاج منك أن…',
+  'nyc.headDecision': 'قرارك',
+  'nyc.headRepair': 'إصلاح داخلي: يحتاج PromptMaster إلى توجيه',
   'nyc.working': 'جارٍ العمل…',
   'nyc.tellGoWhat': 'أخبر Go بما يجب إصلاحه (اختياري)',
   'nyc.tellGoHint': 'مثال: بند التدريب صحيح عند $8,000؛ السعر القديم يخص الترحيل فقط.',

@@ -140,6 +140,8 @@ export const hi: Record<keyof typeof en, string> = {
   "nyc.label": "Go मोड को आपकी ज़रूरत है",
   "nyc.suggestion": "एक सुझाव — निर्णय आपका",
   "nyc.needYou": "मुझे आपसे यह चाहिए…",
+  "nyc.headDecision": "आपका निर्णय",
+  "nyc.headRepair": "आंतरिक सुधार: PromptMaster को मार्गदर्शन चाहिए",
   "nyc.working": "काम चल रहा है…",
   "nyc.tellGoWhat": "Go को बताएँ कि क्या ठीक करना है (वैकल्पिक)",
   "nyc.tellGoHint": "जैसे: प्रशिक्षण की पंक्ति $8,000 पर सही है; पुरानी कीमत केवल माइग्रेशन पर लागू है।",

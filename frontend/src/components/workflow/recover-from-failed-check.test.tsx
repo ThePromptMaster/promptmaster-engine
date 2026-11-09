@@ -83,3 +83,13 @@ describe('one section can be changed from the list (8 Nov: "Change it was disabl
     expect(screen.queryByRole('button', { name: 'Change this section' })).toBeNull();
   });
 });
+
+describe('each stop says whose it is (8 Nov: a business decision or an internal repair)', () => {
+  it('a failed repair is an internal repair; an approval is the user’s decision', () => {
+    const { unmount } = render(<NeedsYouCard need={stuck} stageLabel={label} onAction={vi.fn(async () => undefined)} />);
+    expect(document.querySelector('[data-need-heading]')?.textContent).toBe('Internal repair: PromptMaster needs a steer');
+    unmount();
+    render(<NeedsYouCard need={{ kind: 'tick_criterion', stageId: 's', criterionId: 'a', label: 'I approve' } as NeedsUser} stageLabel={label} onAction={vi.fn(async () => undefined)} />);
+    expect(document.querySelector('[data-need-heading]')?.textContent).toBe('Your decision');
+  });
+});

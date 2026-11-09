@@ -140,6 +140,8 @@ export const sw: Record<keyof typeof en, string> = {
   'nyc.label': 'Hali ya Go inakuhitaji',
   'nyc.suggestion': 'Pendekezo — uamuzi ni wako',
   'nyc.needYou': 'Ninahitaji ufanye hivi…',
+  'nyc.headDecision': 'Uamuzi wako',
+  'nyc.headRepair': 'Ukarabati wa ndani: PromptMaster inahitaji mwongozo',
   'nyc.working': 'Inafanya kazi…',
   'nyc.tellGoWhat': 'Iambie Go cha kurekebisha (si lazima)',
   'nyc.tellGoHint': 'mfano: Mstari wa mafunzo ni sahihi kwa $8,000; bei ya zamani inahusu uhamishaji tu.',
