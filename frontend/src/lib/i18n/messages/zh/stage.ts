@@ -20,6 +20,8 @@ export const zh: Record<keyof typeof en, string> = {
   'stage.evaluate': '评估本阶段',
   'stage.oneCheck': '· 一次 AI 检查',
   'stage.regenerate': '重新生成',
+  'stage.regenerateNote': '这会根据计划和当前事实重新撰写这一部分。当前文本会先保存为一个版本。',
+  'stage.reviseNote': '这会根据上面的问题重写这一部分。当前文本会先保存为一个版本。',
   'stage.changeSection': '修改这一部分',
   'stage.changeSectionHelp': '说明要修改的内容。当前文本会先保存为一个版本，然后只重写这一部分。',
   'stage.changeSectionSend': '重写这一部分',

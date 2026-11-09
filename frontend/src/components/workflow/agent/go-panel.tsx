@@ -33,7 +33,7 @@ import { doingNow } from '@/lib/agent/doing';
 export interface NeedsActions {
   approveOutline: (stageId: string) => Promise<void>;
   unblock: () => Promise<void>;
-  tick: (criterionId: string) => Promise<void>;
+  tick: (criterionId: string, reason?: string) => Promise<void>;
   /** Skip the current stage, with the reason given. */
   skip?: (reason: string) => Promise<void>;
   /** Start the next round of a looping workflow: the user's return to its first stage. */
@@ -192,7 +192,7 @@ export function GoPanel({
           await go.go();
           return;
         }
-        await needsActions?.tick(need.criterionId);
+        await needsActions?.tick(need.criterionId, note);
         await go.go();
         return;
       case 'skip_stage':

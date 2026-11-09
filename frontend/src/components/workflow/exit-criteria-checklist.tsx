@@ -6,7 +6,7 @@ import { templateWord } from '@/lib/i18n/templates';
 import { useState } from 'react';
 
 import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
-import type { CriterionResult } from '@/lib/workflow/types';
+import type { CriterionResult, OpenFindingRow } from '@/lib/workflow/types';
 
 interface Props {
   criteria: CriterionResult[];
@@ -15,7 +15,11 @@ interface Props {
    * the result's own flag wins, since it also covers degraded criteria.
    */
   manualIds?: Set<string>;
-  onToggleManual: (id: string, checked: boolean) => void;
+  onToggleManual: (id: string, checked: boolean, reason?: string) => void;
+  /** Undecided major findings: approving past one asks why (8 Nov). */
+  openMajors?: readonly OpenFindingRow[];
+  /** The stage's current version number: what an approval is given on. */
+  headVersion?: number;
   /** Viewing a stage that cannot be worked on from here: boxes shown, not clickable. */
   readOnly?: boolean;
   /**
@@ -85,12 +89,16 @@ export function ExitCriteriaChecklist({
   committedByPolicy = {},
   approvedVersions: olderApprovals = {},
   onFinish,
+  openMajors = [],
+  headVersion,
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const t = useT();
   const locale = useLocale();
   const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
   const [open, setOpen] = useState<boolean | null>(null);
+  const [askingWhy, setAskingWhy] = useState<string | null>(null);
+  const [why, setWhy] = useState('');
   if (criteria.length === 0) return null;
   // Until the user toggles it, follow whether it needs them.
   const expanded = !collapsible || (open ?? needsYou);
@@ -117,7 +125,10 @@ export function ExitCriteriaChecklist({
               type="checkbox"
               checked={c.satisfied}
               disabled={readOnly}
-              onChange={(e) => onToggleManual(c.id, e.target.checked)}
+              onChange={(e) => {
+                if (e.target.checked && openMajors.length && c.authority !== 'delegable') setAskingWhy(c.id);
+                else onToggleManual(c.id, e.target.checked);
+              }}
               className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
             />
           ) : (
@@ -167,8 +178,42 @@ export function ExitCriteriaChecklist({
             {!c.satisfied && c.hint && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">{templateWord(locale, c.hint)}</span>
             )}
+            {manual && !c.satisfied && !readOnly && c.authority !== 'delegable' && headVersion !== undefined && (
+              <span data-approves-version className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">{t('cl.approvesVersion', { n: headVersion })}</span>
+            )}
           </span>
         </Row>
+        {askingWhy === c.id && (
+          <div data-major-open className="ms-6 mt-2 rounded-lg bg-[var(--surface-container)] px-3 py-2">
+            <p className="text-label text-[var(--on-surface)]">
+              {t('cl.majorOpen', { list: openMajors.slice(0, 3).map((r) => `${r.id}: "${r.text}"`).join('; ') })}
+            </p>
+            <textarea
+              value={why}
+              onChange={(e) => setWhy(e.target.value)}
+              rows={2}
+              maxLength={1000}
+              className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)]"
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={!why.trim()}
+                onClick={() => {
+                  onToggleManual(c.id, true, why.trim());
+                  setAskingWhy(null);
+                  setWhy('');
+                }}
+                className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+              >
+                {t('cl.approveAnyway')}
+              </button>
+              <button type="button" onClick={() => setAskingWhy(null)} className="text-label text-[var(--on-surface-variant)]">
+                {t('cl.notYet')}
+              </button>
+            </div>
+          </div>
+        )}
       </li>
     );
   };

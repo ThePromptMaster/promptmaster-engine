@@ -28,6 +28,7 @@ import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools'
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
+import { recordDecision } from '@/lib/supabase/recommendations';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -70,6 +71,7 @@ import {
   type TransitionOption,
   completionSummary,
   describeOutstanding,
+  openMajorFindings,
   outstandingBeyondCriteria,
   shownOutstanding,
   type OutstandingShow,
@@ -1192,7 +1194,7 @@ export function WorkflowWorkspace({
   });
 
   const handleToggleManual = useCallback(
-    async (id: string, checked: boolean) => {
+    async (id: string, checked: boolean, reason?: string) => {
       // From the store's latest copy, as commitCriterion does: a tick built on
       // this render's \`project\` wiped an approval Go had committed since (2 Nov,
       // prod: "This list matches the requirements I gave" vanished after three
@@ -1203,6 +1205,13 @@ export function WorkflowWorkspace({
       const head = stageBundles[stageId]?.versions.at(-1)?.id;
       const others = Object.fromEntries(Object.entries(latest.manual_check_versions ?? {}).filter(([k]) => k !== id));
       onPatchProject({ manual_checks, manual_check_versions: checked && head ? { ...others, [id]: head } : others });
+      // Approved with a major finding open: the reason goes on the decision trail.
+      if (checked && reason) {
+        void recordDecision(project.id, project.user_id, {
+          decision_type: 'finalize', version_id: head ?? null, rationale: reason,
+          metadata: { approval: id, open_major_findings: openMajorFindings(outstanding).map((r) => r.id) },
+        }).catch(() => undefined);
+      }
 
       // Ticking the last required box on a stage that was left open closes
       // it. The tick is the user's declaration, so the event is theirs
@@ -1224,7 +1233,7 @@ export function WorkflowWorkspace({
         setTransitionError(e instanceof Error && e.message ? t('wsa.notClosedWhy', { message: e.message }) : t('wsa.notClosed'));
       }
     },
-    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion, t]
+    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion, t, outstanding]
   );
 
   // "Routine decisions" (5 Oct). Written through before the event, because the
@@ -1663,7 +1672,7 @@ export function WorkflowWorkspace({
         if (draft) onReload?.();
       },
       unblock: () => setBlocked(null),
-      tick: (criterionId: string) => handleToggleManual(criterionId, true),
+      tick: (criterionId: string, reason?: string) => handleToggleManual(criterionId, true, reason),
       keepStage: async (keepId: string, reason?: string) => {
         const since = state.stages[keepId]?.stale?.since;
         if (!since) return;
@@ -2258,6 +2267,12 @@ export function WorkflowWorkspace({
               .filter(Boolean)
               .join(' — ')
           : note;
+        if (reason) {
+          void recordDecision(project.id, project.user_id, {
+            decision_type: 'finalize', version_id: headVersion?.id ?? null, rationale: reason,
+            metadata: { open: completion.outstanding.map(describeOutstanding) },
+          }).catch(() => undefined);
+        }
         void handleTransition(option, why, undefined, option.early ? completion.outstanding : undefined);
       }}
       onCancel={() => {
@@ -2946,7 +2961,9 @@ export function WorkflowWorkspace({
               manualIds={manualIds}
               committedByPolicy={committedByPolicy}
               approvedVersions={approvedVersions(stageBundles[stageId]?.versions ?? [], project.manual_check_versions)}
-              onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
+              onToggleManual={(id, checked, reason) => void handleToggleManual(id, checked, reason)}
+              openMajors={openMajorFindings(outstanding)}
+              headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
               readOnly={!isEditable}
               collapsible={foldStageExtras}
               onFinish={finishHere ? () => setFinishing({ option: finishHere, from: 'checklist' }) : undefined}

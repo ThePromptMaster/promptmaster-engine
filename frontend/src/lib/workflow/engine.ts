@@ -1062,6 +1062,16 @@ export function blocksCompletion(item: OutstandingItem): boolean {
   return !('optional' in item && item.optional);
 }
 
+/** A finding rated major or worse (8 Nov: a screen offered approval with major finding i14 open). */
+export function isMajorRow(row: Pick<OpenFindingRow, 'severity'>): boolean {
+  return /\b(?:major|critical|blocker)\b/i.test(row.severity ?? '');
+}
+
+/** Undecided findings rated major or worse, wherever they are. Approving or finishing past one asks why. */
+export function openMajorFindings(items: readonly OutstandingItem[]): OpenFindingRow[] {
+  return items.flatMap((i) => (i.kind === 'open_findings' ? (i.rows ?? []) : [])).filter(isMajorRow);
+}
+
 /**
  * What "Ready to move on" must also mention: everything open except the given
  * stage's own unmet criteria, which its checklist and `canAdvance` already

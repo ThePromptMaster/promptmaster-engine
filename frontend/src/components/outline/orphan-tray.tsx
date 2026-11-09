@@ -35,6 +35,7 @@ export function OrphanTray({ orphans, wordsFor, readOnly, onReattach, onDiscard 
         {t('ol.detachedNote')}
       </p>
 
+      {!readOnly && <p className="mb-2 text-label text-[var(--on-surface-variant)]">{t('ol.trayNote', { putBack: t('ol.putBack'), discard: t('pnl.discard') })}</p>}
       <ul className="mt-3 space-y-2">
         {orphans.map((orphan) => {
           const name = orphan.title.trim() || t('ol.untitled');

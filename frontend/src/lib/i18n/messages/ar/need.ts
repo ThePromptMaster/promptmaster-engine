@@ -26,6 +26,7 @@ export const ar: Record<keyof typeof en, string> = {
   'need.policyAsk': 'إنها موافقة روتينية، لكن قراراتك الروتينية مضبوطة على «اسألني».',
   'need.approval': 'يحتاج إلى موافقتك: «{label}».',
   'need.approveResume': 'وافق واستأنف',
+  'need.majorReason': 'ما زالت ملاحظة جوهرية مفتوحة، والموافقة تبقيها مفتوحة. اذكر السبب، وسيُسجَّل مع موافقتك.',
   'need.suggestSkip': 'أقترح تخطي {stage}: {reason} يمكنك إعادة فتحها لاحقًا.',
   'need.roundDone': 'انتهت هذه الجولة. {reason} ابدأ الجولة التالية من {stage}، أو توقف هنا.',
   'need.nextRound': 'ابدأ الجولة التالية من {stage}',

@@ -205,6 +205,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ol.removedFrom': '已从大纲中移除',
   'ol.putBackLabel': '将“{name}”放回大纲',
   'ol.putBack': '放回',
+  'ol.trayNote': '“{putBack}”会把这一部分及其文本恢复到计划中。“{discard}”会将它们从计划中移除。',
   'ol.discardLabel': '永久删除“{name}”',
   'ol.staleTitle_one': '{count} 个小节是按大纲 {versions} 写的',
   'ol.staleTitle_other': '{count} 个小节是按大纲 {versions} 写的',
