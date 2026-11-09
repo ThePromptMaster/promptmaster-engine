@@ -842,7 +842,9 @@ export function preparesFor(label: string, subject: string): boolean {
 export function requirementsForStage(
   stage: StageDefinition,
   deliverableId: string | undefined,
-  requirements: readonly MeasurableRequirement[]
+  requirements: readonly MeasurableRequirement[],
+  /** The stage holds several documents: a named limit is only ever that part, under its heading. */
+  partsOnly = false
 ): { requirement: MeasurableRequirement; whole: boolean }[] {
   if (stage.renderer !== 'prose') return [];
   // The prompt a deliverable is made from, and a statement of the objective,
@@ -870,7 +872,7 @@ export function requirementsForStage(
     // A part of it ("executive update", "section 1") is only ever that part:
     // with no heading for it, nothing is measured (14 Oct, ASPEN: 171 words
     // of a three-section pack were held to the update's 100).
-    else if (stage.id === deliverableId) out.push({ requirement: r, whole: wholeSubjects.size === 1 && wholeSubjects.has(r.subject) && !isPart(r) });
+    else if (stage.id === deliverableId) out.push({ requirement: r, whole: !partsOnly && wholeSubjects.size === 1 && wholeSubjects.has(r.subject) && !isPart(r) });
   }
   return oneCountOfTheWhole(out, stage.label.toLowerCase());
 }
