@@ -719,7 +719,9 @@ function partsOf(text: string, unit: string): { title: string; body: string }[] 
   const heads = all.map((l, i) => ({ l, i })).filter(({ l }) => l.level > 0 && l.level <= 7 && !isQuestion(l) && !NOTE.test(l.text));
   if (!heads.length) return [];
   const naming = heads.filter(({ l }) => new RegExp(`\\b${unit}\\b`, 'i').test(l.text));
-  let chosen = naming;
+  // "Chapter 3: Pay", not "What to carry out of this chapter" (9 Nov, production).
+  const numbered = naming.filter(({ l }) => new RegExp(`\\b${unit}\\s+(?:\\d+|[ivxlc]+\\b|one|two|three|four|five|six|seven|eight|nine|ten)\\b`, 'i').test(l.text));
+  let chosen = numbered.length ? numbered : naming;
   if (!chosen.length) {
     const top = Math.min(...heads.map((h) => h.l.level));
     const atTop = heads.filter((h) => h.l.level === top);
