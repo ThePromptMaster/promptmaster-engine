@@ -629,7 +629,7 @@ function SectionRow({
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{section.abstract}</p>
           {done && section.content && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              {t('stage.words', { count: wordCount(section.content).toLocaleString() })}
+              {t('stage.wordsWhole', { count: wordCount(section.content).toLocaleString() })}
             </p>
           )}
 

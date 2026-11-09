@@ -170,6 +170,7 @@ export const zh: Record<keyof typeof en, string> = {
   'stage.revise': '修改',
   'stage.retrySection': '重试本小节',
   'stage.words': '{count} 字',
+  'stage.wordsWhole': '整个部分共 {count} 词（当前文本）',
   'stage.writing': '正在撰写…',
   'stage.queuedOne': '排队中',
   'stage.attempt': ' · 第 {n}/{max} 次尝试',

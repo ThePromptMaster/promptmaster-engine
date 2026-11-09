@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1, projectState } from './index';
 import { buildChatContext, chatContentFor, outlineLines } from './chat-context';
+import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageArtifactBundle } from './digest';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
@@ -79,5 +80,17 @@ describe('the side chat sees the project (3 Oct call)', () => {
 
   it('skips empty outline rows', () => {
     expect(outlineLines([{ title: '', abstract: '' }, { title: 'A' }])).toBe('1. A');
+  });
+});
+
+describe('the chat is given what code counted, and on which version (8 Nov)', () => {
+  it('lists the count for the text on screen', () => {
+    const template = SINGLE_OUTPUT_V1;
+    const stage = template.stages.find((st) => st.id === 'output') ?? template.stages[1];
+    const words = Array.from({ length: 30 }, (_, i) => `w${i}`).join(' ');
+    const bundles = { [stage.id]: { artifact: null, versions: [{ id: 'v9', version_number: 9, content: words, source_operation: 'stage_generate', finish_reason: 'stop' }] } } as never;
+    const ctx = buildChatContext({ template, state: { current_stage_id: stage.id, stages: {} } as never, project: { objective: 'Write a note.', audience: '', data_files: [], constraints: 'Keep it to at most 20 words.', output_format: '' } as never, stage, bundles, controls: null });
+    expect(ctx.measured_version).toBe(9);
+    expect(ctx.measured?.join(' ')).toMatch(/30 words/);
   });
 });

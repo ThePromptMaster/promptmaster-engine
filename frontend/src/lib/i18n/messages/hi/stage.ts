@@ -175,6 +175,7 @@ export const hi: Record<keyof typeof en, string> = {
   'stage.revise': 'संशोधित करें',
   'stage.retrySection': 'खंड फिर से आज़माएँ',
   'stage.words': '{count} शब्द',
+  'stage.wordsWhole': 'पूरे भाग में {count} शब्द, जैसा यह अभी है',
   'stage.writing': 'लिखा जा रहा है…',
   'stage.queuedOne': 'कतार में',
   'stage.attempt': ' · प्रयास {max} में से {n}',
