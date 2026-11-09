@@ -68,12 +68,9 @@ export function useGoAlerts({ running, status, reason, projectName }: {
   projectName: string;
 }): GoAlerts {
   const t = useT();
-  const [on, setOn] = useState(false);
-  const [permission, setPermission] = useState<Permission>('default');
-  useEffect(() => {
-    setOn(readPref() && permissionNow() === 'granted');
-    setPermission(permissionNow());
-  }, []);
+  // Read once, on the first render: this hook only runs in the browser, under the loaded project.
+  const [on, setOn] = useState(() => readPref() && permissionNow() === 'granted');
+  const [permission, setPermission] = useState<Permission>(permissionNow);
 
   const enable = useCallback(async () => {
     if (typeof Notification === 'undefined') return;
