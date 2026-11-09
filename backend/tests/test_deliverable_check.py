@@ -182,6 +182,32 @@ def test_a_follow_through_gap_needs_only_its_own_passage():
 
 def test_the_check_is_told_to_look_for_follow_through():
     system, _user = build_prompt(INPUTS, "Final decision memo", MEMO, ACCEPTED)
-    for words in ("FOLLOW-THROUGH", "do not agree", "follow from its financial analysis", "no basis in the accepted facts", "recalculated on a new base"):
+    for words in ("FOLLOW-THROUGH", "do not agree", "follow from its financial analysis", "a deadline it gives someone that the user did not supply", "recalculated on a new base"):
         assert words in system
 
+
+
+def test_the_check_is_shown_the_brief():
+    """9 Nov (a finished package): what the brief required read as unsupported, and a
+    deadline nobody supplied passed, because the check never saw the brief's constraints."""
+    inputs = INPUTS.model_copy(update={"constraints": "None of the three fees has been paid yet."})
+    system, user = build_prompt(inputs, "the package", MEMO, [])
+    assert "THE BRIEF'S CONSTRAINTS" in user
+    assert "None of the three fees has been paid yet." in user
+    assert "never report it as unsupported" in system
+    assert "the user did not supply" in system
+    assert "committed or owed when the record says only approved" in system
+    assert "THE BRIEF'S CONSTRAINTS" not in build_prompt(INPUTS.model_copy(update={"constraints": ""}), "the package", MEMO, [])[1]
+
+
+def test_a_conflict_may_quote_the_brief():
+    inputs = INPUTS.model_copy(update={"constraints": "At least $3,000 must remain uncommitted throughout."})
+    raw = {"contradictions": [{
+        "rule_quote": "Decision rule: if pilot revenue holds at or above $8,000 a month, adopt B on a continuing basis.",
+        "conflicts_quote": "At least $3,000 must remain uncommitted throughout.",
+        "problem": "Adopting B commits the reserve.",
+        "fix": "Make it conditional.",
+    }]}
+    assert len(parse(raw, inputs, MEMO, []).contradictions) == 1
+    # A quote from nothing supplied is still dropped.
+    assert parse(raw, INPUTS.model_copy(update={"constraints": ""}), MEMO, []).contradictions == []

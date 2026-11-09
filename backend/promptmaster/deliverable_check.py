@@ -106,20 +106,24 @@ _INSTRUCTION = (
     "it conflicts with; a term the facts give for only part of "
     "an amount stated of the whole of it (\"$3,380 upfront, nonrefundable\" when only the $2,880 subscription "
     "is said to be nonrefundable and the setup fee's terms are not given). For each: the rule quoted verbatim, "
-    "what it conflicts with quoted verbatim (from the deliverable, or the fact's own words), the problem in one "
+    "what it conflicts with quoted verbatim (from the deliverable, the brief, or the fact's own words), the problem in one "
     "sentence, and the smallest fix. At most five, most material first. Never report style, tone, length, "
     "missing detail or a point a careful reader would not call contradictory. When in doubt, report nothing.\n"
     # 7 Nov (training event and financial plan tests): "check that the readiness verdict, email
     # conditions and takeover checklist agree"; "whether operational instructions follow
     # from the financial analysis and its assumptions".
     "3. FOLLOW-THROUGH. What the deliverable tells someone to do, or states as settled, that its own analysis "
-    "or the accepted facts do not support. Only these: a readiness verdict, a condition for sending or proceeding, "
+    "or what the user supplied (the brief's constraints, the accepted facts, the source material) does not support. "
+    "Only these: a readiness verdict, a condition for sending or proceeding, "
     "and a checklist that do not agree (the plan is called ready once one thing happens while its own checklist "
     "still requires others); an instruction to proceed or spend that does not follow from its financial analysis "
-    "or ignores an assumption that analysis rests on; a deadline or date it introduces with no basis in the "
-    "accepted facts; something stated as settled that the supplied facts leave uncertain, so that an instruction "
-    "resting on it should be conditional; an earlier suggestion recalculated on a new base with no update saying "
-    "it applies to that base. For each: the passage quoted verbatim, the problem in one sentence, and the smallest "
+    "or ignores an assumption that analysis rests on, such as telling a team to proceed while the same text says "
+    "a limit is already breached; a deadline it gives someone that the user did not supply, even one reasoned "
+    "from the schedule, unless the text says it is the document's own suggestion; something stated as settled "
+    "that what was supplied leaves uncertain, such as money called committed or owed when the record says only "
+    "approved, so that an instruction resting on it should be conditional; an earlier suggestion recalculated on "
+    "a new base with no update saying it applies to that base. Something the brief states is supplied: never "
+    "report it as unsupported. For each: the passage quoted verbatim, the problem in one sentence, and the smallest "
     "fix. At most five, most material first. When in doubt, report nothing.\n"
     "Copy every quote exactly, one sentence or less. "
     "Return JSON: {\"findings\": [{\"id\": string, \"verdict\": \"carried\" | \"not_carried\" | \"not_applicable\", "
@@ -165,8 +169,12 @@ def build_prompt(
         for f in findings[:MAX_FINDINGS]
     )
     facts = context_block(inputs)
+    # 9 Nov (a finished package): the check was never shown the brief's constraints, so what the
+    # brief required read as unsupported, and a date it never gave passed as ordinary.
+    brief = (inputs.constraints or "").strip()
     user = (
         f"OBJECTIVE: {inputs.objective}\n"
+        + (f"THE BRIEF'S CONSTRAINTS, AS THE USER SUPPLIED THEM:\n<<<\n{brief}\n>>>\n" if brief else "")
         + (f"{facts}\n" if facts else "")
         + f"\nACCEPTED FINDINGS:\n{rows or '(none)'}\n\n"
         + _tables_block(tables)
@@ -210,7 +218,8 @@ def parse(
             # Said to be made, with nothing to show where: not shown.
             continue
         checks.append(FindingCheck(id=fid, verdict=verdict, quote=quote, note=" ".join(str(item.get("note") or "").split())[:300]))
-    record = " ".join(f.statement for f in (inputs.facts or []))
+    # What the user supplied is a source a conflict may quote, the brief as much as a fact.
+    record = " ".join([*(f.statement for f in (inputs.facts or [])), inputs.constraints or "", inputs.context or ""])
     # What a table on record says is a source a conflict may quote (4 Nov).
     on_record = "\n".join(t.rows for t in (tables or [])[:MAX_TABLES])
     contradictions: list[Contradiction] = []
