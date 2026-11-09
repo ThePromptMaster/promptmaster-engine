@@ -76,3 +76,14 @@ describe('a major finding read as the question it would be (8 Nov, production)',
   });
 });
 
+
+describe('routine work this run can no longer do on the stage (9 Nov, production)', () => {
+  it('is judged as it stands and noted, not asked', () => {
+    const plan = planFromScreen(screen({ verdict: 'routine_repair', instruction: 'Trim to 4,000 words.' }), { ...base, allowed: ['declare_objective_complete'] });
+    expect(plan).toMatchObject({ kind: 'repair', move: { action_key: 'declare_objective_complete', params: { set_aside_question: base.question } } });
+  });
+
+  it('with nothing left to do either, it is still asked', () => {
+    expect(planFromScreen(screen({ verdict: 'routine_repair', instruction: 'Trim.' }), { ...base, allowed: [] })).toEqual({ kind: 'ask' });
+  });
+});
