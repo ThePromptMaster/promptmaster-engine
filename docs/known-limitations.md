@@ -84,6 +84,8 @@ against a freshly migrated local Supabase.
 
 ### L-05 · No SQL test harness · `open`
 
+**Since this was written, CI runs `supabase/tests/*.sql` against a migrated database (`.github/workflows/ci.yml`). What follows still applies to anything those files don't cover.**
+
 There is **no pgTAP, no `supabase test db` wiring, and no CI step that runs SQL**.
 
 Most schema invariants in [`data-model.md`](data-model.md) are asserted by **grepping
@@ -1448,7 +1450,7 @@ default is a cost decision.
 Since 12 Oct, an instruction the user applies with "Change it" goes into every
 later prompt and check, under accepted facts and above the reviewed prompt and the
 brief (`lib/workflow/applied-instructions.ts`, `project_context.instructions_block`).
-Only the latest 12 go out, each up to 1,500 characters. Standing changes such as
+Only the latest 12 go out. Since 9 Nov the latest two are sent at up to 8,000 characters and the others at 1,500 (L-223). Standing changes such as
 "the permitted evidence is now S1–S7" are offered as new facts in the same step. They
 are found by a small model call and kept only when quoted from the instruction, so
 one the model misses is still carried as the instruction itself.
@@ -3546,7 +3548,7 @@ Under autonomous and "Handle them for me", a question the planner wants to put t
 recorded and the run carries on, and a business decision, a reserved approval or a missing input
 is asked. Limits:
 - It is a model's judgment. Any error means it asks.
-- Reserved approvals, expert questions and anything touching the objective are never screened.
+- A reserved approval Go raises itself, expert questions and anything touching the objective are never screened. A planner question that asks for a reserved approval is screened with the stage's reserved approvals listed, and comes back as the user's.
 - Undecided findings are screened at most six per review, once each.
 
 ### L-211 — Real-world actions are recorded, not tracked (2026-11-08)
@@ -3585,8 +3587,9 @@ isn't flagged unless it was also cut. A chapter still cut after three rounds sho
 
 ### L-215 — Recovering from a failed repair (2026-11-08)
 
-The stuck card takes a note for that one repair. Each press grants one more try, and the two-try
-cap (L-162) still applies to Go on its own. "Change this section" rewrites one section and keeps
+The stuck card takes a note for that one repair. Each press allows exactly one more attempt, however
+many the stage has had, and the two-try cap (L-162) still applies to Go on its own. Two failed repairs
+of one stage pause on this card; two failures of anything else still end the run. "Change this section" rewrites one section and keeps
 the current text as a version first. Those changes aren't rechecked until Go or the user runs the
 stage's check. The side chat's Change it stays off on long-form stages.
 
@@ -3623,8 +3626,41 @@ the authority. "Checked" means the latest objective check called it met, or the 
 on that version. A check that found problems still counts as having run. "Ready" is not a promise
 about the work, only that nothing listed still holds finishing up.
 
-### L-221 — The Westbridge package can't be repaired in place (2026-11-08)
+### L-221 — A project that already went through a failed repair keeps its history (2026-11-08)
 
 The fixes work on new runs. A project that already went through a failed repair keeps its history,
 and its detached sections stay detached until someone puts them back. The four saved test projects were not
 touched.
+
+### L-222 — Which text is delivered, and where limits on its parts are counted (2026-11-09)
+
+A prose stage after the chapters is the delivered text if it holds at least 80% of the chapters'
+words (L-161), or at least half with every chapter under its own heading. Below that, the chapters
+are delivered and the shorter text is treated as partial. Limits on one named part ("Sponsor email,
+no more than 200 words") are counted on that finishing stage, under the part's heading, and never
+against the whole text. If the part has no heading there, it isn't counted and isn't reported as
+uncounted, because a finishing stage may be a short note. Chapters that are themselves the deliverable
+still have no per-part count.
+
+### L-223 — Long instructions in later prompts (2026-11-09)
+
+The latest two applied instructions reach every later prompt at up to 8,000 characters, earlier ones
+at 1,500. An instruction longer than that is cut. An older accepted fact that a later instruction
+changes in part is not rewritten for the user: the instruction outranks it in the prompt, and the model
+has to act on that.
+
+### L-224 — How an old figure is told from a new one (2026-11-09)
+
+A superseded amount is matched by what it was for, read from the old fact ("migration $8,000"), and a
+line about something else passes. A figure the text works out from other figures counts as its own,
+wherever the sum sits. What this can't do:
+- A line that names nothing of its own ("The fee is $8,000") is read strictly and can be wrong.
+- An old figure with no label of its own is matched by value alone.
+- A real leftover on a line about something else, with no sign of the old figure's subject, is missed.
+
+### L-225 — Repairs stop at the first stage that can't be settled (2026-11-09)
+
+Later stages read earlier ones, so Go stops at the first reopened stage whose repairs are used up and
+puts it to the user, rather than repairing what depends on it. A project with an unrelated later stage
+waits too. The planner's reply is capped at 2,500 tokens. Past that it's cut off, asked once more, and
+a stage with no draft is then drafted. Anything else is asked.
