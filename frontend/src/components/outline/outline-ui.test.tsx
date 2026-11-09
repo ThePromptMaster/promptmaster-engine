@@ -202,7 +202,7 @@ describe('OutlineEditor — regenerate', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Regenerate the outline/ }));
     expect(onRegenerateAll).not.toHaveBeenCalled();
-    expect(screen.getByText(/kept as detached sections, not deleted/)).toBeInTheDocument();
+    expect(screen.getByText(/stays? attached, with (its|their) text/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
     expect(onRegenerateAll).toHaveBeenCalledTimes(1);
