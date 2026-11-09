@@ -951,3 +951,19 @@ def test_a_move_outside_the_list_is_marked_so_the_browser_can_say_what_is_waited
     assert out.action_key == "request_user_decision"
     assert out.params == {"unplanned": "advance_stage"}
 
+
+
+@pytest.mark.asyncio
+async def test_the_planner_has_room_for_its_reply_on_a_large_project():
+    """9 Nov, production: 900 tokens cut the reply off mid-object, and Go asked what to do next."""
+    from promptmaster.agent import choose_next_action
+
+    seen: dict[str, object] = {}
+
+    class Client:
+        async def generate_json(self, prompt, **kw):
+            seen.update(kw)
+            return {"action_key": RESEARCH[0], "params": {}, "rationale": "r", "expected_outcome": "e"}, {}
+
+    await choose_next_action(Client(), None, INPUTS, STATE, RESEARCH, "autonomous")
+    assert seen["max_tokens"] >= 2_000
