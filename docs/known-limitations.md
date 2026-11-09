@@ -3686,3 +3686,9 @@ and proceeding past a limit the text says is breached. It is one model call, at 
 kind, told to report nothing when in doubt, so a run can miss one. Its items go to the bounded repair
 rounds. It isn't shown the project's event history, so a date only the record holds ("7 Nov") can be
 reported as unsupported.
+
+### L-229 — A routine approval isn't asked for a reason (2026-11-09)
+
+A reserved approval, or finishing the project, past an undecided major finding needs a reason. The
+approval's reason is saved as a `finalize` decision with the finding ids. A routine approval, the kind
+Go may give under "Handle them for me", is not asked. The finish step still asks.
