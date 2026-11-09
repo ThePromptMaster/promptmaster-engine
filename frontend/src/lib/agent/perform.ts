@@ -1975,7 +1975,13 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           const generated = generationContent(target, res);
           const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
           const after = before ? parseItems(generated) : null;
-          const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : before ? generated : splitUserNote(generated).body;
+          const drafted = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : before ? generated : splitUserNote(generated).body;
+          // Going back rewrites a stage too, so a register keeps its IDs here as well (9 Nov, production).
+          const ids = idChanges({ head, generated: drafted, removed: removedByUser(ctx.bundles[target.id]?.versions ?? []) });
+          const content = withIdFormsKept(drafted, ids);
+          if (hasIdChanges(ids)) {
+            throw new Error(idChangeQuestion(target.label, ctx.bundles[target.id]?.versions.at(-1)?.version_number ?? 1, ids).split(' Should ')[0]);
+          }
           if (content) {
             const created = await ctx.appendStageVersion(target.id, target.label, {
               content, source_operation: 'agent_revise', base_content: head, instruction,
