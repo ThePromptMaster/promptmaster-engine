@@ -1563,7 +1563,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       }
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
-        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        changes: typeof versionId === 'string' ? { version_ids: [versionId], stage_closed: evaluation.canAdvance } : { stage_closed: false },
         output: [(triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
           : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
@@ -2621,9 +2621,11 @@ async function recheckManuscript(
     });
     await ctx.afterStageEvent();
   }
+  const closed = evaluation.canAdvance && Boolean(evidence || actor === 'user');
   return done(key, {
     ...wrote,
-    output: `${wrote.output} ${target.label} was repaired (${why})${evaluation.canAdvance && (evidence || actor === 'user') ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
+    changes: { ...wrote.changes, stage_closed: closed },
+    output: `${wrote.output} ${target.label} was repaired (${why})${closed ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
 }
 
@@ -2727,7 +2729,7 @@ async function repairOutline(ctx: PerformContext, key: string, target: StageDefi
     await ctx.afterStageEvent();
   }
   return done(key, {
-    status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id] },
+    status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id], stage_closed: closed },
     output: `Updated ${target.label} after the change, with all ${next.items.length} chapters and what is written under them kept — saved as version ${created.version_number}${closed ? '; your approval carries to it' : '; your approval is still needed'}.`,
   });
 }

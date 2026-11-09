@@ -52,6 +52,11 @@ function answeredSince(steps: readonly AgentStep[], from: number, kept: string):
   );
 }
 
+/** Whether a repair closed its stage. A step from before this was recorded says so in its own words. */
+function closedItsStage(s: AgentStep): boolean {
+  return s.changes?.stage_closed ?? /marked complete again|your approval carries/.test(s.output ?? '');
+}
+
 /**
  * The account in the interface's language (client, 21 Oct: "pick your
  * language"). It is derived on every render and never stored; the stop
@@ -72,7 +77,21 @@ export function runAccount(
   const executed = ok.filter((s) => s.execution_label === 'code_executed' || s.execution_label === 'simulation_run').length;
   const derived = ok.filter((s) => actionFor(s.action_key)?.performer === 'reason').length;
   const lookups = ok.filter((s) => s.action_key === 'check_literature').length;
-  const repaired = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && !s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
+  // What each stage's last repair came to. "Repaired" means the stage closed
+  // again: a repair saved with its stage still reopened, or one that failed its
+  // check, was reported as repaired (8 Nov, production: the run's summary said
+  // repaired while the latest repair of the plan had failed).
+  const lastRepair = new Map<string, AgentStep>();
+  for (const s of steps) {
+    if (s.action_key !== 'recheck_stage' || s.params?.measured || s.params?.cut) continue;
+    if (s.status !== 'succeeded' && s.status !== 'failed') continue;
+    const id = String(s.params?.stage_id ?? s.stage_id ?? '');
+    if (id) lastRepair.set(id, s);
+  }
+  const repairsThat = (came: (s: AgentStep) => boolean) => [...lastRepair].filter(([, s]) => came(s)).map(([id]) => id);
+  const repaired = repairsThat((s) => s.status === 'succeeded' && closedItsStage(s));
+  const repairedOpen = repairsThat((s) => s.status === 'succeeded' && !closedItsStage(s));
+  const repairFailed = repairsThat((s) => s.status === 'failed');
   // 11 Oct: shortening a brief to its limit is not "a repair after a change".
   const fitted = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
   const written = new Set(
@@ -84,7 +103,9 @@ export function runAccount(
     derived ? t('acct.derived', { count: derived }) : '',
     lookups ? t('acct.lookups', { count: lookups }) : '',
     written.size ? t('acct.wrote', { stages: [...written].map(stageLabel).join(', ') }) : '',
-    repaired.size ? t('acct.repaired', { stages: [...repaired].filter(Boolean).map(stageLabel).join(', ') }) : '',
+    repaired.length ? t('acct.repaired', { stages: repaired.map(stageLabel).join(', ') }) : '',
+    repairedOpen.length ? t('acct.repairOpen', { stages: repairedOpen.map(stageLabel).join(', ') }) : '',
+    repairFailed.length ? t('acct.repairFailed', { stages: repairFailed.map(stageLabel).join(', ') }) : '',
     fitted.size ? t('acct.fitted', { stages: [...fitted].filter(Boolean).map(stageLabel).join(', ') }) : '',
     returns.length
       ? t('acct.returns', { count: returns.length, stages: returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ') })

@@ -457,6 +457,7 @@ export const zh: Record<keyof typeof en, string> = {
   'cwd.saveNew': '另存为新工作流',
   'cwd.useThis': '使用此工作流',
   'out.stale': '{label} 需要重新检查：{reason}',
+  'out.repairTried': 'Go 已尝试修复，但问题仍未解决（尝试次数：{count}）。最后结果：{last}',
   'out.findings_one': '{label}：{count} 个发现项尚未接受或拒绝',
   'out.findings_other': '{label}：{count} 个发现项尚未接受或拒绝',
   'out.optFindings_one': '{label}：{count} 个可选发现项尚未接受或拒绝',

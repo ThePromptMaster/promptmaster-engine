@@ -27,7 +27,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
-import { describeNeed } from '@/lib/agent/needs';
+import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -1947,7 +1947,8 @@ export function WorkflowWorkspace({
     }
     return shownGoWaiting(locale, line, shownStageByEnglish) ?? line;
   };
-  const outstandingShow: OutstandingShow = { stage: (id) => stageNameShown(id, 'short'), waiting: shownGoWaitingLine };
+  const repairsTried = unsettledRepairs(state, go.steps);
+  const outstandingShow: OutstandingShow = { stage: (id) => stageNameShown(id, 'short'), waiting: shownGoWaitingLine, repair: (id) => repairsTried[id] };
   const outstandingOtherShown = outstandingBeyondCriteria(outstanding, stageId).map((item) => shownOutstanding(item, locale, outstandingShow));
   // Go stopped on the objective check: the pause notice offers Go's own action.
   const objectiveNeed =

@@ -339,6 +339,29 @@ export function exhaustedRepair(template: WorkflowTemplate, state: WorkflowState
   return null;
 }
 
+/**
+ * Reopened stages Go has tried to repair, with how many tries this reopening
+ * has had and what the last one came to. Everywhere a reopened stage is listed
+ * it is said, so a failed repair does not read as a stage nobody has looked at
+ * (8 Nov: "failed repairs remain visibly unresolved").
+ */
+export function unsettledRepairs(state: WorkflowState, steps: readonly AgentStep[]): Record<string, { tries: number; last: string }> {
+  const out: Record<string, { tries: number; last: string }> = {};
+  for (const [id, st] of Object.entries(state.stages)) {
+    if (st?.status !== 'stale') continue;
+    const since = st.stale?.since;
+    const tried = steps.filter(
+      (s) =>
+        s.action_key === 'recheck_stage' &&
+        (s.status === 'succeeded' || s.status === 'failed') &&
+        String(s.params?.stage_id ?? s.stage_id) === id &&
+        (!since || !s.params?.stale_since || s.params.stale_since === since)
+    );
+    if (tried.length) out[id] = { tries: tried.length, last: tried.at(-1)!.output };
+  }
+  return out;
+}
+
 /** The `repair_stuck` need for a stage, from the repair steps recorded for it. */
 export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
   const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);

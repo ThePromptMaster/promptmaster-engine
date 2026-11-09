@@ -457,6 +457,7 @@ export const sw: Record<keyof typeof en, string> = {
   'cwd.saveNew': 'Hifadhi kama mtiririko mpya wa kazi',
   'cwd.useThis': 'Tumia mtiririko huu wa kazi',
   'out.stale': '{label} inahitaji kukaguliwa upya — {reason}',
+  'out.repairTried': 'Go ilijaribu kuikarabati na haijatatuliwa (majaribio: {count}). Matokeo ya mwisho: {last}',
   'out.findings_one': '{label}: ugunduzi {count} bado haujakubaliwa wala kukataliwa',
   'out.findings_other': '{label}: ugunduzi {count} bado haujakubaliwa wala kukataliwa',
   'out.optFindings_one': '{label}: ugunduzi {count} wa hiari bado haujakubaliwa wala kukataliwa',

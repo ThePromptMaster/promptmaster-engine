@@ -990,6 +990,8 @@ export function describeOutstanding(item: OutstandingItem): string {
 export interface OutstandingShow {
   stage?: (stageId: string, english: string) => string;
   waiting?: (english: string) => string;
+  /** What Go's repairs of a reopened stage came to, when it has tried (`unsettledRepairs`). */
+  repair?: (stageId: string) => { tries: number; last: string } | undefined;
 }
 
 /**
@@ -1011,8 +1013,13 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
   const item = 'stageId' in raw && show.stage ? { ...raw, label: show.stage(raw.stageId, raw.label) } : raw;
   switch (item.kind) {
-    case 'stale_stage':
-      return t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
+    case 'stale_stage': {
+      const stale = t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
+      const repair = show.repair?.(item.stageId);
+      if (!repair) return stale;
+      const last = repair.last.replace(/\s+/g, ' ').trim();
+      return `${stale} ${t('out.repairTried', { count: repair.tries, last: last.length > 240 ? `${last.slice(0, 240)}…` : last })}`;
+    }
     case 'open_findings':
       return t(item.optional ? 'out.optFindings' : 'out.findings', { label: item.label, count: item.count }) + namedRows(item.rows);
     case 'unconfirmed_proposals':

@@ -457,6 +457,7 @@ export const hi: Record<keyof typeof en, string> = {
   'cwd.saveNew': 'नए वर्कफ़्लो के रूप में सहेजें',
   'cwd.useThis': 'यह वर्कफ़्लो उपयोग करें',
   'out.stale': '{label} की फिर से जाँच ज़रूरी है — {reason}',
+  'out.repairTried': 'Go ने इसे ठीक करने की कोशिश की, पर यह सुलझा नहीं (प्रयास: {count})। पिछला परिणाम: {last}',
   'out.findings_one': '{label}: {count} निष्कर्ष अभी स्वीकार या अस्वीकार नहीं हुआ',
   'out.findings_other': '{label}: {count} निष्कर्ष अभी स्वीकार या अस्वीकार नहीं हुए',
   'out.optFindings_one': '{label}: {count} वैकल्पिक निष्कर्ष अभी स्वीकार या अस्वीकार नहीं हुआ',
