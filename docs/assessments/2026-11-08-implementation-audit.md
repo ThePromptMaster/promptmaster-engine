@@ -153,7 +153,7 @@ These weren't in the original reports. Each came from the same sponsor-revision 
 
 Run on production, on john@ copies, with the original brief and the exact sponsor revision. Project 48929b9f is the final run, on Opus 5.5. Project be3a3047 is the earlier run on Sonnet 5.5, where each check was first exercised. The saved projects from the original reports were not touched.
 
-**Limits of this evidence.** Failed repairs were forced by altering the model's reply in the page, and each is marked "forced" below. A browser permission prompt can't be clicked from an automated session, so the alert was checked with a stand-in for the permission and a simulated hidden tab. A locked screen wasn't tested. Approving past a major finding was tried separately, on a sample project with three real open findings, because none was left open in these runs.
+**Limits of this evidence.** Failed repairs were forced by altering the model's reply in the page, and each is marked "forced" below. A browser permission prompt can't be clicked from an automated session, so the alert was checked with a stand-in for the permission and a simulated hidden tab. A locked screen wasn't tested. A second hand pass, on what the first had left to automated tests, is at the end of this section. Approving past a major finding was tried separately, on a sample project with three real open findings, because none was left open in these runs.
 
 ### The seven verification points
 
@@ -190,11 +190,45 @@ A reported financial handoff said all fees were already committed and the reserv
 | Text | Before #635 | After #635 |
 |---|---|---|
 | The reported financial handoff | 2 items, both false, because the check couldn't see the brief | 4 items, including "All three are committed", proceeding while the floor is breached, and the Week 4 deadline |
-| The reported event handoff | Not run | 2 items: the $40 ceiling against its one exception, and a date the check isn't shown, which is a false item |
+| The reported event handoff | Not run | 2 items: the $40 ceiling against its one exception, and a date the check isn't shown, which is a false item. It did not flag the two reported problems, so #638 followed (below) |
 | The accepted rollout package | Not run | None |
 | A test copy that had passed | Not run | 3 items about one real hedge: it calls a rate the brief supplies "unknown" |
 
-The deployed backend then returned the same three problems on a short text reproducing them. This is a model's judgment, so it shows the check can catch these, not that it always will (L-228). The third reported problem, an earlier suggestion recalculated on a new base, is no longer in the saved final text and couldn't be tested this way.
+The deployed backend then returned the same three problems on a short text reproducing them. This is a model's judgment, so it shows the check can catch these, not that it always will (L-228).
+
+**#638, the readiness check.** The reported event handoff said the event was deliverable once one hour was covered, while its checklist still had the trainer, room and equipment to book. It also costed an old suggestion of six more attendees on top of a total that had since risen. The check had a rule for each and caught neither. Readiness is now a check of its own, which reads each readiness sentence against every checklist and status table, and the old-suggestion rule says what to look for. The check no longer reports the date of a past decision as unsupported, because it isn't shown the project's history.
+
+| On the reported event handoff | Before #638 | After #638 |
+|---|---|---|
+| Readiness against the checklist | 0 of 6 runs | 4 of 4 runs |
+| Six more attendees on the new total | 0 of 6 runs | 4 of 4 runs |
+| The false past-date item | 6 of 6 runs | 0 of 4 runs |
+
+Half the runs were on Opus 5.5 and half on Sonnet 5.5. On the controls, the reported financial handoff still returned its three problems, and the accepted rollout package returned nothing on Sonnet and one timing mismatch on Opus.
+
+### The second hand pass, 9 Nov
+
+The first pass left these to automated tests. Each was then run on production, on john@ copies. "Forced" means the model's reply or the planner's next move was altered in the page.
+
+| What | How | Result |
+|---|---|---|
+| The final check inside a Go run, on the reported event handoff text | Real, on Opus. Project 6084d9f2, with the saved text pasted in as a new version | Round one found 4 issues, including readiness and the six more attendees. Go asked one fair question, whether the budget was $6,140, because that decision wasn't on the copy. After the answer it repaired the verdict and the checklist and removed the six-attendee line, asking nothing else. It finished with the document done and 7 real-world actions open |
+| What was still open after that | Same run | After its two repair rounds the check still found the email's send condition naming only the staffing hour, and a run-sheet setup time. Go listed both as limitations at the finish |
+| "Go needs you" alert | Stand-in notification, simulated hidden tab, real Go stop | Sent: "Go needs you on …". The tab title changed to "Needs you: …". Go's finish then sent its own alert |
+| Change this section | Real, on Sonnet | The first try found a bug: a long chapter's rewrite was cut off before its end and finished without the request (#640). After the fix, the sentence landed at the very end in one call, only that chapter changed, the old text was kept as a version |
+| A chapter left cut off | Real text, asked for through Change this section | Shown as outstanding, "Every chapter is written: 1 cut off", no way to mark the stage complete, and the export carries "Cut off mid-sentence". Finish project stays available and lists it as open. Go's next run finished the chapter first |
+| Regenerate on a whole chapter plan | Real, on Sonnet | All 4 ids kept, all 4 chapters attached with their text, nothing detached. The warning before it was out of date (#641) |
+| The lines before removing or discarding a section | Real | Shown, and Put it back returned the chapter with its 4,808 words |
+| "None has been independently verified" | Real, typed into a stage | Passes the evidence check. "We verified that none of the shipments failed" is flagged |
+| Running out of credit | Forced | The run stopped at once and said so, the step counted as interrupted, not as a failed repair |
+| Stray working text in a Go save | Forced | Refused, naming the line, and the current version stood |
+| Stray working text in Change it | Forced | Shown in a warning before Apply |
+| Item IDs | One real, one forced | A brought-back ID was refused, answered under the routine policy, retried once, then recorded with no question. A respelled ID was put back in code. Going back to a stage skipped this check, now fixed (#642), with a unit test only |
+| Phone width | 390-pixel frame | Three pages, no sideways scroll, and the overall status shows on the phone bar |
+
+Still not done: a locked screen, a real browser permission prompt, and the full eight-chapter book.
+
+Screenshots are in `docs/media/nov9b`.
 
 ### The book
 
@@ -261,7 +295,7 @@ That is 32 to 48 hours. The price is agreed separately.
 
 **Not recommended yet.** Moving Go to the server (60 to 90 hours), until the browser version has had real use. A proposal and status API for outside contributors (24 to 36 hours). Branching and certification, which nothing in these tests needed.
 
-**A regression test from this case.** `frontend/src/lib/workflow/sponsor-revision-regression.test.ts` holds the real rows and facts. It checks that one revision reopens all seven stages, that repair starts at the first and stops at the first it can't settle, that the correct training cost passes in both saved layouts and the old migration price doesn't, that saved sums are recomputed, that stray working text is refused, and that the status doesn't overstate any of it. It runs on every pull request. `frontend/e2e/acceptance-changed-requirement.spec.ts` holds the changed-requirement path in a browser with a scripted model. No browser test was added for the outline repair itself, which was run by hand on production.
+**A regression test from this case.** `frontend/src/lib/workflow/sponsor-revision-regression.test.ts` holds the real rows and facts. It checks that one revision reopens all seven stages, that repair starts at the first and stops at the first it can't settle, that the correct training cost passes in both saved layouts and the old migration price doesn't, that saved sums are recomputed, that stray working text is refused, and that the status doesn't overstate any of it. It runs on every pull request. `frontend/e2e/acceptance-changed-requirement.spec.ts` holds the changed-requirement path in a browser with a scripted model. `frontend/e2e/go-repairs-outline.spec.ts` holds Go repairing a reopened chapter plan the same way: the same ids, the chapters still attached, and the approval carried with its source.
 
 **Simplification.** Needed in three places, and no rewrite.
 

@@ -3657,7 +3657,9 @@ The alert needs the tab open. On a computer the tab usually keeps running with t
 more slowly, and the alert still shows. On an iPhone a locked screen pauses the tab, so Go stops
 until it's unlocked. Some phones only allow alerts from a service worker, and there isn't one. The
 tab title still says it. Running with the phone locked means moving Go to the server (not built).
-Tested in desktop Chrome only. A locked screen can't be tested from a browser session.
+Tested in desktop Chrome only, with a stand-in for the browser's own notification and a simulated hidden
+tab. Both the "needs you" and the "finished" alert were seen on production that way (9 Nov). A locked
+screen and the real permission prompt can't be tested from a browser session.
 
 ### L-219 — Working text in a save (2026-11-08)
 
@@ -3739,3 +3741,11 @@ unsupported, and a past date that really was invented goes unreported.
 A reserved approval, or finishing the project, past an undecided major finding needs a reason. The
 approval's reason is saved as a `finalize` decision with the finding ids. A routine approval, the kind
 Go may give under "Handle them for me", is not asked. The finish step still asks.
+
+### L-230 — A very long section's rewrite (2026-11-09)
+
+A rewrite is given room for the section it hands back, up to 16,384 tokens. Past that it is cut off and
+carried on, as a draft is. The continuation is told what the rewrite has to do and shown the old text
+from a little before where the new text stops, found by length rather than matched, so a rewrite that
+changed the length a lot can repeat or skip a sentence at the join. Asked to keep everything else, the
+model usually does, but nothing in code compares the two.
