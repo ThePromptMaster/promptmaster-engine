@@ -467,7 +467,14 @@ export function staleRepair(
   for (const [index, stage] of template.stages.entries()) {
     const st = state.stages[stage.id];
     if (here >= 0 && index > here && !(ahead && st?.stale)) continue;
-    if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
+    if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) {
+      // Every stage after it reads this one. Repairing them against text that
+      // could not be settled carries the problem on and pays for it twice
+      // (9 Nov, production: Go skipped the Core plan and rewrote the chapter
+      // plan and documents against it). `exhaustedRepair` then puts it to the user.
+      if (st?.status === 'stale') return null;
+      continue;
+    }
     // 8 Nov (production): eight chapters of a book ended mid-sentence and every
     // stage was marked done. Finished here without touching what was written.
     const cutHere = stage.renderer === 'long_form' && st?.status !== 'stale' && (isDone(st?.status) || st?.status === 'in_progress') ? (cut[stage.id] ?? []) : [];
