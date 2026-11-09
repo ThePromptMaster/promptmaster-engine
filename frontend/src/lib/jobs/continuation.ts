@@ -93,3 +93,22 @@ export function joinContinuation(kept: string, continuation: string): string {
 export function continuationTail(text: string): string {
   return text.length <= CONTINUE_TAIL_CHARS ? text : text.slice(-CONTINUE_TAIL_CHARS);
 }
+
+/** How far back into the old text a carried-on rewrite is shown: the new text is rarely the same length. */
+const REST_MARGIN = 4_000;
+
+/**
+ * What a rewrite cut off at the limit still owes (9 Nov, production): its brief, and
+ * the old text it had not reached. Without them the continuation writes a new ending
+ * of its own, and a change asked for at the end is lost. Nothing on a first draft.
+ */
+export function rewriteToCarryOn(
+  revise: { instruction?: string; notes?: string } | undefined,
+  before: string | undefined,
+  kept: string
+): { revision_brief?: string; rest_of_current?: string } {
+  if (!revise) return {};
+  const brief = [revise.instruction, revise.notes].filter(Boolean).join('\n').slice(0, 8_000);
+  const rest = before ? before.slice(Math.max(0, kept.length - REST_MARGIN)).slice(-39_000) : '';
+  return { ...(brief ? { revision_brief: brief } : {}), ...(rest ? { rest_of_current: rest } : {}) };
+}

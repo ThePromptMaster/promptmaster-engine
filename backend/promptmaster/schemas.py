@@ -515,6 +515,10 @@ class SectionContinuation(BaseModel):
     """
     text_so_far: str = Field(..., max_length=40_000)
     unfinished: str = Field(default="", max_length=4_000)
+    #: When what was cut off was a rewrite: what the rewrite has to do, and the part
+    #: of the old text it had not reached (9 Nov). Empty on a first draft.
+    revision_brief: str = Field(default="", max_length=8_000)
+    rest_of_current: str = Field(default="", max_length=40_000)
 
 
 class GenerateSectionProseResponse(BaseModel):

@@ -304,7 +304,7 @@ class CountingGenerator implements SectionGenerator {
   /** Replies handed out first, in order, before the counting reply. */
   scripted: { content: string; finish_reason: string }[] = [];
   /** What each continuation call was shown. */
-  continuations: { text_so_far: string; unfinished: string }[] = [];
+  continuations: { text_so_far: string; unfinished: string; revision_brief?: string; rest_of_current?: string }[] = [];
 
   constructor(private clock: Clock, private msPerCall = 5_000) {}
 
@@ -318,7 +318,7 @@ class CountingGenerator implements SectionGenerator {
     section_index: number;
     revision?: unknown;
     stage_hint?: string;
-    continuation?: { text_so_far: string; unfinished: string };
+    continuation?: { text_so_far: string; unfinished: string; revision_brief?: string; rest_of_current?: string };
   }): Promise<{ content: string; finish_reason: string }> {
     const section = req.outline[req.section_index];
     if (req.revision) this.revisions.set(section.id, req.revision);
@@ -617,6 +617,38 @@ describe('a chapter cut off at the length limit (8 Nov, production)', () => {
     expect(generator.continuations).toHaveLength(1);
     expect(generator.continuations[0].unfinished).toBe('In *Judgment* (2005), as the whole of that book reports at length, Tet');
     expect(generator.recordCalls).toEqual(['s0']);
+  });
+
+  it('a first draft carried on is told of no rewrite', async () => {
+    const { clock, store, generator } = oneSection();
+    store.enqueue(0, store.outline[0]);
+    generator.scripted = [
+      { content: CUT, finish_reason: 'length' },
+      { content: 'In *Judgment* (2005), as the whole of that book reports at length, Tetlock found it. The end.', finish_reason: 'stop' },
+    ];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations[0].revision_brief).toBeUndefined();
+    expect(generator.continuations[0].rest_of_current).toBeUndefined();
+  });
+
+  // 9 Nov, production: a rewrite asked for one closing sentence, was cut off before the end, and
+  // the continuation, told nothing of it, wrote a new ending of its own.
+  it('a rewrite cut off at the limit is carried on with its brief and the old text it had not reached', async () => {
+    const { clock, store, generator } = oneSection();
+    const old = `${'The old opening stays as it was. '.repeat(400)}The old ending stays.`;
+    store.outline[0] = { ...store.outline[0], status: 'complete', content: old, revision: 1 };
+    const revise = { stage_label: 'Chapter', instruction: 'Add one closing sentence.', notes: '- the user asked' };
+    store.enqueue(0, store.outline[0], 2, revise);
+    generator.scripted = [
+      { content: 'The first sentence is whole. The next one stops ha', finish_reason: 'length' },
+      { content: 'The next one stops halfway no more. The old ending stays. The closing sentence.', finish_reason: 'stop' },
+    ];
+    await drain(store, generator, clock, 'w', 10_000_000);
+    expect(generator.continuations).toHaveLength(1);
+    expect(generator.continuations[0].revision_brief).toContain('Add one closing sentence.');
+    expect(generator.continuations[0].revision_brief).toContain('- the user asked');
+    expect(generator.continuations[0].rest_of_current).toContain('The old ending stays.');
+    expect(store.outline[0].content).toContain('The closing sentence.');
   });
 
   it('stops after three continuations and leaves the section marked cut', async () => {
