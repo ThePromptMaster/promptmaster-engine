@@ -264,6 +264,30 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       });
     });
 
+  /**
+   * One section rewritten to the user's instruction, from the section list
+   * (8 Nov: "Change it was disabled, the side chat was Ask only", and only
+   * Regenerate was left). The text is kept as a version first.
+   */
+  const changeSection = (section: OutlineSection, index: number, instruction: string) =>
+    run(async () => {
+      if (!artifactId) throw new Error('This stage has no manuscript to revise.');
+      await enqueueRevisionJobs({
+        project, artifactId, stageId, outline, approvedOutlineVersionId, stageHint, jobs,
+        brief: {
+          stageLabel: section.title,
+          instruction: `Make this change the user asked for, and keep everything else in the section as it is: ${instruction}`,
+          findings: [{ source: 'The user asked', text: instruction }],
+          sources: [],
+        },
+        targets: [{ section, index }],
+        saveSnapshot: (snapshot) =>
+          appendManuscriptVersion
+            ? appendManuscriptVersion(snapshot)
+            : appendVersion({ id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact, snapshot),
+      });
+    });
+
   const revisedCount = revise ? revisedCountOf(outline, jobs, stageId) : 0;
 
   const reviseAll = () => void reviseSections(writtenSections(outline));
@@ -446,6 +470,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                     : () => regenerate(section, index)
               }
               regenerateLabel={revise ? t('stage.revise') : t('stage.regenerate')}
+              onChange={readOnly ? undefined : (instruction) => changeSection(section, index, instruction)}
               onRetry={readOnly ? undefined : () => retry(section, index)}
               busy={busy}
             />
@@ -464,6 +489,8 @@ interface SectionRowProps {
   onToggle: () => void;
   onRegenerate?: () => void;
   regenerateLabel?: string;
+  /** Rewrite this section to what the user typed. */
+  onChange?: (instruction: string) => void;
   onRetry?: () => void;
   busy: boolean;
 }
@@ -476,10 +503,13 @@ function SectionRow({
   onToggle,
   onRegenerate,
   regenerateLabel,
+  onChange,
   onRetry,
   busy,
 }: SectionRowProps) {
   const t = useT();
+  const [changing, setChanging] = useState(false);
+  const [instruction, setInstruction] = useState('');
   // The job row is the authority on "in flight"; the artifact is the authority
   // on "written". Neither is inferred from the other.
   const inFlight = job !== null && PENDING_JOB_STATUSES.has(job.status);
@@ -513,17 +543,59 @@ function SectionRow({
               </button>
             )}
 
-            {done && onRegenerate && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                disabled={busy || inFlight}
-                className="shrink-0 text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
-              >
-                {regenerateLabel ?? t('stage.regenerate')}
-              </button>
+            {done && (onRegenerate || onChange) && (
+              <span className="flex shrink-0 items-center gap-4">
+                {onChange && (
+                  <button
+                    type="button"
+                    onClick={() => setChanging((v) => !v)}
+                    disabled={busy || inFlight}
+                    aria-expanded={changing}
+                    className="text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
+                  >
+                    {t('stage.changeSection')}
+                  </button>
+                )}
+                {onRegenerate && (
+                  <button
+                    type="button"
+                    onClick={onRegenerate}
+                    disabled={busy || inFlight}
+                    className="text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
+                  >
+                    {regenerateLabel ?? t('stage.regenerate')}
+                  </button>
+                )}
+              </span>
             )}
           </div>
+
+          {changing && onChange && (
+            <div className="mt-2">
+              <p className="text-label text-[var(--on-surface-variant)]">{t('stage.changeSectionHelp')}</p>
+              <textarea
+                data-change-section
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                disabled={busy}
+                rows={2}
+                maxLength={2000}
+                className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
+              />
+              <button
+                type="button"
+                disabled={busy || inFlight || !instruction.trim()}
+                onClick={() => {
+                  onChange(instruction.trim());
+                  setChanging(false);
+                  setInstruction('');
+                }}
+                className="mt-2 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+              >
+                {t('stage.changeSectionSend')}
+              </button>
+            </div>
+          )}
 
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{section.abstract}</p>
           {done && section.content && (

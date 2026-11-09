@@ -30,7 +30,7 @@ export function NeedsYouCard({
   nothingElse?: boolean;
   stageLabel: (stageId: string) => string;
   /** Clear the need and resume. Rejects with a message the card shows. A stuck stage says which of its options was chosen. */
-  onAction: (option?: StuckOption) => Promise<void>;
+  onAction: (option?: StuckOption, note?: string) => Promise<void>;
   context?: NeedContext;
 }) {
   const t = useT();
@@ -38,10 +38,14 @@ export function NeedsYouCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { message, action, options, footer, detail } = describeNeed(need, stageLabel, context, locale);
+  // A failed repair can be told what to fix (8 Nov: "I could not find a way to
+  // give a targeted correction for the failed validation").
+  const [note, setNote] = useState('');
+  const canTell = need.kind === 'repair_stuck' && !need.byHand;
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);
-    onAction(option)
+    onAction(option, option === 'retry' && note.trim() ? note.trim() : undefined)
       .catch((e: unknown) => setError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
       .finally(() => setBusy(false));
   };
@@ -50,6 +54,21 @@ export function NeedsYouCard({
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' || need.kind === 'next_round' || need.kind === 'add_stage' ? t('nyc.suggestion') : t('nyc.needYou')}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{message}</p>
       {detail && <p data-need-detail className="mt-1 text-label text-[var(--on-surface-variant)]">{detail}</p>}
+      {canTell && (
+        <label className="mt-3 block">
+          <span className="text-label text-[var(--on-surface-variant)]">{t('nyc.tellGoWhat')}</span>
+          <textarea
+            data-tell-go
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={busy}
+            rows={2}
+            maxLength={1000}
+            placeholder={t('nyc.tellGoHint')}
+            className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)] disabled:opacity-50"
+          />
+        </label>
+      )}
       {options ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {options.map((o, i) => (
@@ -63,7 +82,7 @@ export function NeedsYouCard({
                   : 'rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-50'
               }
             >
-              {busy && i === 0 ? t('nyc.working') : o.label}
+              {busy && i === 0 ? t('nyc.working') : o.id === 'retry' && canTell && note.trim() ? t('nyc.fixAndCheck') : o.label}
             </button>
           ))}
           {footer && <span className="basis-full text-label text-[var(--on-surface-variant)]">{footer}</span>}

@@ -383,6 +383,8 @@ export function useGoLoop(opts: Options) {
   const reconsiderRef = useRef<{ withdrawn: string[]; note: string; pending?: boolean } | null>(null);
   /** Stages the user asked Go to try once more ("Try once more"): one more repair each, beyond `REPAIR_TRIES`. */
   const extraTriesRef = useRef<Map<string, number>>(new Map());
+  /** What the user said to fix, per stage, for the next repair of it. */
+  const repairNotesRef = useRef(new Map<string, string>());
   /** A move that counted against the window was performed since the last read. */
   const performedRef = useRef(false);
   const tabId = useRef<string>('');
@@ -1011,7 +1013,9 @@ export function useGoLoop(opts: Options) {
         // told to choose, before any check that never read the answer (5 Nov).
         const lastStep = stepsRef.current.at(-1);
         const justLeftToGo = lastStep?.action_key === USER_ANSWER_STEP && isDelegatedAnswer(lastStep.output ?? '');
-        const required = repair ?? (userReturn
+        const repairNote = repair ? repairNotesRef.current.get(String(repair.params?.stage_id ?? '')) : undefined;
+        if (repair && repairNote) repairNotesRef.current.delete(String(repair.params?.stage_id ?? ''));
+        const required = (repair && repairNote ? { ...repair, params: { ...repair.params, user_note: repairNote } } : repair) ?? (userReturn
           ? {
               key: 'return_to_stage',
               rationale: `You chose: "${userReturn.answer.slice(0, 200)}". Going back to ${userReturn.label} to do it.`,
@@ -1675,8 +1679,15 @@ export function useGoLoop(opts: Options) {
    */
   /** "Try once more" on a repair that did not settle: one more try for that stage, then Go carries on (13 Oct). */
   const retryRepair = useCallback(
-    async (stageId: string) => {
-      extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
+    async (stageId: string, note?: string) => {
+      // What the user said to fix goes with that one repair (8 Nov: "a way to
+      // request a specific repair and rerun the relevant check").
+      if (note?.trim()) repairNotesRef.current.set(stageId, note.trim().slice(0, 1_000));
+      // Resuming a run stopped on this repair grants its own try: one press, one more try.
+      const live = runRef.current;
+      if (live?.needs?.kind !== 'repair_stuck' || live.needs.stageId !== stageId) {
+        extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
+      }
       await go();
     },
     [go]
