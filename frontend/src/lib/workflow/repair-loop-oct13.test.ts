@@ -14,7 +14,7 @@ import type { StageItem } from './stage-artifact';
 import type { WorkflowEvent } from './types';
 import { exhaustedRepair, repairStuckNeed, repairTries, describeNeed } from '@/lib/agent/needs';
 import { splitChangeNote } from '@/lib/agent/perform';
-import { withExtraTries } from '@/components/workflow/use-go-loop';
+import { extraTriesForOneMore, withExtraTries } from '@/components/workflow/use-go-loop';
 import type { AgentStep } from '@/types/agent';
 
 const ev = (type: WorkflowEvent['type'], stage_id: string, created_at: string, extra: Partial<WorkflowEvent> = {}): WorkflowEvent => ({
@@ -174,5 +174,19 @@ describe('the record keeps saved and checked apart (screenplay record)', () => {
     expect(outcomeLines(refused, null)).toEqual({ saved: 'No — The revision dropped 2 rows you had decided ("a"), so the current version was kept', checked: '—' });
     const repaired = { ...refused, status: 'succeeded', changes: { version_ids: ['v8'], event_types: ['stage_marked_complete'] }, output: 'Repaired Continuity — saved as a new version and marked complete again.' } as unknown as AgentStep;
     expect(outcomeLines(repaired, null)).toEqual({ saved: 'Yes — 1 new version', checked: 'Passed — the stage was marked complete' });
+  });
+});
+
+describe('"Try once more" always tries once more (9 Nov, production)', () => {
+  const left = (tried: string[], granted?: number) => withExtraTries(tried, new Map([['plan', extraTriesForOneMore(tried, 'plan', granted)]])).filter((id) => id === 'plan').length;
+
+  it('leaves one try short of the limit, however many have been used', () => {
+    expect(left(['plan', 'plan'])).toBe(1);
+    expect(left(['plan', 'plan', 'plan'])).toBe(1);
+    expect(left(['plan', 'plan', 'plan', 'plan', 'other'])).toBe(1);
+  });
+
+  it('never takes back what was already granted', () => {
+    expect(extraTriesForOneMore(['plan'], 'plan', 3)).toBe(3);
   });
 });
