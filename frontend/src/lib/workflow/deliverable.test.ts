@@ -86,3 +86,25 @@ describe('the system workflows are unchanged', () => {
     expect(doc.text).toBe('The output.');
   });
 });
+
+describe('a finished package that was tightened still holds the work (9 Nov, production)', () => {
+  const outline = ['1. Brief', '2. Plan', '3. Budget'].map((title, i) => ({ id: `s${i}`, title, status: 'complete', content: words(400, 'chapter') }));
+  const three = { artifact: { id: 'a', stage_id: 'manuscript', long_form: { outline } }, versions: [] as never[] };
+
+  it('at 70% of the words, with every chapter under its own heading, it is the deliverable', () => {
+    const tightened = `# 1. Brief\n${words(280)}\n\n# 2. Plan\n${words(280)}\n\n# 3. Budget\n${words(280)}`;
+    expect(deliverableDocument(designed, { manuscript: three, finished: prose(tightened) } as never)!.stage.id).toBe('finished');
+  });
+
+  it('with a chapter missing it is a partial copy, and the chapters stay the deliverable', () => {
+    const partial = `# 1. Brief\n${words(420)}\n\n# 2. Plan\n${words(420)}`;
+    const doc = deliverableDocument(designed, { manuscript: three, finished: prose(partial) } as never)!;
+    expect(doc.stage.id).toBe('manuscript');
+    expect(doc.partial).toBeDefined();
+  });
+
+  it('a table of contents with every title is not a copy of the work', () => {
+    const contents = `## 1. Brief\n\n## 2. Plan\n\n## 3. Budget\n${words(300)}`;
+    expect(deliverableDocument(designed, { manuscript: three, finished: prose(contents) } as never)!.stage.id).toBe('manuscript');
+  });
+});

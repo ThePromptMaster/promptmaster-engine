@@ -1184,7 +1184,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
       const st = target ? ctx.state.stages[target.id] : undefined;
       if (target?.renderer === 'long_form' && params.cut) return finishCutChapters(ctx, key, target);
-      if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, st.stale?.reason ?? 'something it relied on changed');
+      // What the user typed on the stuck card goes into the repair and is then
+      // looked for in what it wrote (`chaptersNotLanded`, the leftover checks).
+      const userNote = typeof params.user_note === 'string' ? params.user_note.trim() : '';
+      const withUserNote = (reason: string) => (userNote ? `${reason.replace(/[.\s]+$/, '')}. The user says what to fix: ${userNote}` : reason);
+      if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, withUserNote(st.stale?.reason ?? 'something it relied on changed'));
       // L-63 (9 Oct): a finished stage whose measured requirement fails
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
@@ -1204,11 +1208,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
       const superseded = supersededFactValues(ctx.project.facts);
-      const why = measuredRepair
+      const why = withUserNote(measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
         : carriedRepair
           ? `a review carried forward, as still unmet: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
-          : st?.stale?.reason ?? 'something it relied on changed';
+          : st?.stale?.reason ?? 'something it relied on changed');
       // L-64 (9 Oct): a manuscript is repaired by revising its sections with
       // the reason, each against its current saved record (C9).
       if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);
@@ -1349,6 +1353,10 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (content && stillUnmet.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
+        // Judged on this text, not the one before it (9 Nov, production: a line the
+        // final attempt took out was still reported as there, and the repair failed).
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
       }
       // Shortening to meet a limit cuts words, never a heading or every timing
       // under one (17 Oct, Sean, FIELDGUIDE: the curriculum lost its timed
@@ -1359,6 +1367,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT DROPPED ${dropped.join(', ')}. Keep every heading and the timings under them; shorten by tightening the prose instead.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
         dropped = content ? structureDropped(head, content) : [];
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
       }
       if (dropped.length) {
         const { question, questions } = cutToFitQuestions({
@@ -1563,7 +1573,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       }
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
-        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        changes: typeof versionId === 'string' ? { version_ids: [versionId], stage_closed: evaluation.canAdvance } : { stage_closed: false },
         output: [(triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
           : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
@@ -2588,6 +2598,7 @@ async function recheckManuscript(
       instruction: recheckInstruction(target.label, why, superseded, 'section'),
       findings: [{ source: 'Why it was reopened', text: why }],
       sources: [],
+      repair: true,
       ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
     },
     stageHint: target.entry_prompt_hint,
@@ -2621,9 +2632,11 @@ async function recheckManuscript(
     });
     await ctx.afterStageEvent();
   }
+  const closed = evaluation.canAdvance && Boolean(evidence || actor === 'user');
   return done(key, {
     ...wrote,
-    output: `${wrote.output} ${target.label} was repaired (${why})${evaluation.canAdvance && (evidence || actor === 'user') ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
+    changes: { ...wrote.changes, stage_closed: closed },
+    output: `${wrote.output} ${target.label} was repaired (${why})${closed ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
 }
 
@@ -2727,7 +2740,7 @@ async function repairOutline(ctx: PerformContext, key: string, target: StageDefi
     await ctx.afterStageEvent();
   }
   return done(key, {
-    status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id] },
+    status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id], stage_closed: closed },
     output: `Updated ${target.label} after the change, with all ${next.items.length} chapters and what is written under them kept — saved as version ${created.version_number}${closed ? '; your approval carries to it' : '; your approval is still needed'}.`,
   });
 }

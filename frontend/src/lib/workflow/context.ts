@@ -277,7 +277,8 @@ export function unverifiedLimits(
   stage: StageDefinition,
   content: string
 ): Measurement[] {
-  if (!content.trim()) return [];
+  // A finishing stage may be a short note on the chapters: a part it doesn't hold isn't "not verified".
+  if (!content.trim() || finishingStage(template)?.id === stage.id) return [];
   return stageRequirements(project, template, stage)
     .filter(({ requirement, whole }) => measure(requirement, content, whole) === null)
     .map(({ requirement }) => ({ id: `unverified.${requirement.id}`, label: `${requirementLabel(requirement)} — not verified`, satisfied: false, value: NOT_COUNTED }));
@@ -356,5 +357,18 @@ export function stageRequirements(
     currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
   );
   if (!requirements.length) return [];
+  if (finishingStage(template)?.id === stage.id) return requirementsForStage(stage, stage.id, requirements, true);
   return requirementsForStage(stage, deliverableStage(template)?.id, requirements);
+}
+
+/**
+ * The required prose stage after the chapters, where they are finished into one
+ * text (9 Nov, production: "Sponsor update email (no more than 200 words)" was
+ * counted on no stage of a package whose last stage held the email, and the
+ * check's model counted it by hand). Undefined when chapters are not the deliverable.
+ */
+function finishingStage(template: WorkflowTemplate): StageDefinition | undefined {
+  if (deliverableStage(template)?.renderer !== 'long_form') return undefined;
+  const lastLongForm = template.stages.map((s) => s.renderer).lastIndexOf('long_form');
+  return template.stages.slice(lastLongForm + 1).reverse().find((s) => s.required && s.renderer === 'prose');
 }

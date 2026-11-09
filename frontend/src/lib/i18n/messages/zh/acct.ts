@@ -10,6 +10,8 @@ export const zh: Record<keyof typeof en, string> = {
   'acct.lookups_other': '检索文献 {count} 次',
   'acct.wrote': '撰写或修改了{stages}',
   'acct.repaired': '在一次更改后修复了{stages}',
+  'acct.repairOpen': '在一次更改后修改了{stages}，但仍处于重新打开状态',
+  'acct.repairFailed': '未能修复{stages}',
   'acct.fitted': '修改了{stages}，以满足一项用代码衡量的要求',
   'acct.returns_one': '返回 {count} 次做进一步工作（{stages}）',
   'acct.returns_other': '返回 {count} 次做进一步工作（{stages}）',

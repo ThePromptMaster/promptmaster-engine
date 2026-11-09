@@ -358,7 +358,12 @@ _SECTION_INSTRUCTION = (
     "summarize what other sections will cover, do NOT include meta commentary. "
     "Write the actual prose for this section, in the voice the tone guidance "
     "describes. Headings, bullet scaffolds and numbered sub-plans are wrong here "
-    "even if your mode normally produces them: the reader gets continuous prose."
+    "even if your mode normally produces them: the reader gets continuous prose. "
+    # 9 Nov, production: Chapter 1 came back as "I have not written Chapter 1 ... until you
+    # approve a plan", because an earlier stage said the plan is approved before writing.
+    "The plan is approved and this section is due now. Never reply with a plan, a status, a "
+    "question or a request for approval. If something seems missing, write the section from "
+    "what you have."
 )
 
 
@@ -380,7 +385,8 @@ def _governing_block(governing: str) -> str:
         return ""
     return (
         "THE CURRENT PLAN AND EARLIER STAGES (their latest saved versions, and they govern: where the outline, "
-        "the prior context or an earlier draft of this section disagrees with them, follow these):\n"
+        "the prior context or an earlier draft of this section disagrees with them, follow these. Anything they "
+        "say about approvals, or about what must happen before writing, has already happened):\n"
         f"--- BEGIN ---\n{governing.strip()}\n--- END ---\n\n"
     )
 

@@ -719,7 +719,9 @@ function partsOf(text: string, unit: string): { title: string; body: string }[] 
   const heads = all.map((l, i) => ({ l, i })).filter(({ l }) => l.level > 0 && l.level <= 7 && !isQuestion(l) && !NOTE.test(l.text));
   if (!heads.length) return [];
   const naming = heads.filter(({ l }) => new RegExp(`\\b${unit}\\b`, 'i').test(l.text));
-  let chosen = naming;
+  // "Chapter 3: Pay", not "What to carry out of this chapter" (9 Nov, production).
+  const numbered = naming.filter(({ l }) => new RegExp(`\\b${unit}\\s+(?:\\d+|[ivxlc]+\\b|one|two|three|four|five|six|seven|eight|nine|ten)\\b`, 'i').test(l.text));
+  let chosen = numbered.length ? numbered : naming;
   if (!chosen.length) {
     const top = Math.min(...heads.map((h) => h.l.level));
     const atTop = heads.filter((h) => h.l.level === top);
@@ -842,7 +844,9 @@ export function preparesFor(label: string, subject: string): boolean {
 export function requirementsForStage(
   stage: StageDefinition,
   deliverableId: string | undefined,
-  requirements: readonly MeasurableRequirement[]
+  requirements: readonly MeasurableRequirement[],
+  /** The stage holds several documents: a named limit is only ever that part, under its heading. */
+  partsOnly = false
 ): { requirement: MeasurableRequirement; whole: boolean }[] {
   if (stage.renderer !== 'prose') return [];
   // The prompt a deliverable is made from, and a statement of the objective,
@@ -870,7 +874,7 @@ export function requirementsForStage(
     // A part of it ("executive update", "section 1") is only ever that part:
     // with no heading for it, nothing is measured (14 Oct, ASPEN: 171 words
     // of a three-section pack were held to the update's 100).
-    else if (stage.id === deliverableId) out.push({ requirement: r, whole: wholeSubjects.size === 1 && wholeSubjects.has(r.subject) && !isPart(r) });
+    else if (stage.id === deliverableId) out.push({ requirement: r, whole: !partsOnly && wholeSubjects.size === 1 && wholeSubjects.has(r.subject) && !isPart(r) });
   }
   return oneCountOfTheWhole(out, stage.label.toLowerCase());
 }
@@ -918,7 +922,7 @@ export interface LengthTarget {
 
 /**
  * The length the brief hedges for the whole document, with the text counted
- * (8 Nov; Sean, training event: "Go estimated its package was over the target
+ * (8 Nov; training event test: "Go estimated its package was over the target
  * and stopped to ask whether to shorten it"). Information for the planner and
  * the objective check. L-141 stands: a hedged figure blocks nothing.
  */

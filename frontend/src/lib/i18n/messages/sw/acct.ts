@@ -10,6 +10,8 @@ export const sw: Record<keyof typeof en, string> = {
   'acct.lookups_other': 'ilitafuta katika machapisho mara {count}',
   'acct.wrote': 'iliandika au ilirekebisha {stages}',
   'acct.repaired': 'ilikarabati {stages} baada ya mabadiliko',
+  'acct.repairOpen': 'ilirekebisha {stages} baada ya mabadiliko, lakini bado imefunguliwa upya',
+  'acct.repairFailed': 'haikuweza kukarabati {stages}',
   'acct.fitted': 'ilirekebisha {stages} ili kutimiza hitaji lililopimwa kwa msimbo',
   'acct.returns_one': 'ilirudi nyuma mara {count} kwa kazi zaidi ({stages})',
   'acct.returns_other': 'ilirudi nyuma mara {count} kwa kazi zaidi ({stages})',

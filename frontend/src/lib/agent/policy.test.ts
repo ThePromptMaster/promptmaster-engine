@@ -8,7 +8,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint, repairedTooOften, REPAIRS_PER_STAGE_PER_RUN } from './policy';
+import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint, repairedTooOften, REPAIRS_PER_STAGE_PER_RUN, unplannedMove } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -829,6 +829,21 @@ describe('preempt: a failure recorded on its row is set aside, not a stop (produ
     const state = projectState(RESEARCH_V1, []);
     expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), failed()] })?.status).toBe('failed');
   });
+
+  describe('two failed repairs (9 Nov, production: the run ended with no way to say what to fix)', () => {
+    const state = projectState(RESEARCH_V1, []);
+    const repair = (stage_id: string) => ({ action_key: 'recheck_stage', status: 'failed', stage_id: 'final', params: { stage_id }, changes: {} }) as never;
+
+    it('of one stage: a pause with the repair card, not a finished run', () => {
+      const stop = preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [repair('plan'), repair('plan')] });
+      expect(stop).toMatchObject({ status: 'blocked', repairsFailedOn: 'plan' });
+    });
+
+    it('of two different stages, or a repair and something else: the run stops as before', () => {
+      expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [repair('plan'), repair('docs')] })?.status).toBe('failed');
+      expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), repair('plan')] })?.status).toBe('failed');
+    });
+  });
 });
 
 describe('reservedApprovalsToReopen: going back asks the user again (Q2e, production replay 9 Oct)', () => {
@@ -977,5 +992,15 @@ describe('a return the user chose in an answer (13 Oct, production pass)', () =>
     expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [asked, { ...yes, output: 'Yes, but leave the notes for now' }])).toBeNull();
     // A question that names no stage gives a yes nowhere to go.
     expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [{ ...asked, decision_question: 'Shall I add the remaining budget?', output: '' }, yes])).toBeNull();
+  });
+});
+
+describe('an unusable planner reply with nothing waiting on the user (8 Nov, production)', () => {
+  it('drafts a stage that has no draft', () => {
+    expect(unplannedMove(false, ['draft_stage', 'request_user_decision'])).toMatchObject({ action_key: 'draft_stage', needs_user_decision: false });
+  });
+  it('leaves everything else to the question it would have asked', () => {
+    expect(unplannedMove(true, ['draft_stage'])).toBeNull();
+    expect(unplannedMove(false, ['request_user_decision'])).toBeNull();
   });
 });

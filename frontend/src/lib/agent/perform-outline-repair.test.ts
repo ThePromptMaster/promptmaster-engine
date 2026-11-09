@@ -59,6 +59,13 @@ describe('Go repairs a reopened chapter plan (8 Nov, production)', () => {
     expect((appendWorkflowEvent.mock.calls as unknown as [string, string, { type: string; payload: { evidence_version_id: string } }][])[0][2]).toMatchObject({ type: 'stage_marked_complete', payload: { evidence_version_id: 'v2' } });
   });
 
+  it('what the user typed on the stuck card goes into the repair', async () => {
+    const c = ctx('handle');
+    (c.step as { params: Record<string, unknown> }).params.user_note = 'Keep the eight documents; only the budget moved.';
+    await performStep(c);
+    expect((reviseOutline.mock.calls as unknown as [{ reason: string }][])[0][0].reason).toContain('The user says what to fix: Keep the eight documents; only the budget moved.');
+  });
+
   it('under "ask me" it saves the update and leaves the approval to the user', async () => {
     const out = await performStep(ctx('ask'));
     expect(out.output).toContain('your approval is still needed');

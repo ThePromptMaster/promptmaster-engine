@@ -195,3 +195,16 @@ def test_a_message_with_nothing_attached_sends_no_images(basic_inputs, basic_ite
     finally:
         app.dependency_overrides.pop(get_client, None)
     assert "images" not in stub.generate.call_args.kwargs
+
+
+def test_counts_come_from_the_record_and_say_their_version():
+    block = format_chat_context(ChatContext(stage_label="Email", measured=["Email: at most 200 words: 170 words"], measured_version=5))
+    assert "MEASURED IN CODE on version 5 of this stage:" in block
+    assert "- Email: at most 200 words: 170 words" in block
+    assert "state a word count or any length only if it is listed" in block
+
+
+def test_with_nothing_measured_the_rule_still_stands():
+    block = format_chat_context(ChatContext(stage_label="Email"))
+    assert "MEASURED IN CODE on" not in block
+    assert "say it has not been counted" in block

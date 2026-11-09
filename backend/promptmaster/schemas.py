@@ -100,7 +100,7 @@ class UserInstruction(BaseModel):
     """An instruction the user applied to a stage, as the version it made records it."""
     stage: str = Field(default="", max_length=200)
     version: int = 0
-    instruction: str = Field(..., min_length=1, max_length=1_600)
+    instruction: str = Field(..., min_length=1, max_length=8_100)
 
 
 class UserApproval(BaseModel):

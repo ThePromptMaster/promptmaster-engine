@@ -560,10 +560,16 @@ export function projectState(
         // drafts in progress after it (8 Oct). Older events: done stages.
         const named = Array.isArray(event.payload?.affected) ? (event.payload.affected as unknown[]).filter((x): x is string => typeof x === 'string') : null;
         order.forEach((id, i) => {
-          const was = state.stages[id]?.status;
+          const st = state.stages[id];
+          const was = st?.status;
           if (i <= cutoff) return;
           if (named ? named.includes(id) && (isDone(was) || was === 'in_progress') : isDone(was)) {
             set(id, { status: 'stale', stale: { reason, since: event.created_at, was: was! } });
+          } else if (was === 'stale' && st?.stale?.reason.startsWith(`${label} was changed`)) {
+            // Already reopened by an earlier save of the same stage: the reason
+            // names the version it is now (8 Nov, production: a screen said
+            // "Core plan v6" beside a current v7). `since` stays the first change.
+            set(id, { stale: { ...st.stale, reason } });
           }
         });
         break;
@@ -990,6 +996,8 @@ export function describeOutstanding(item: OutstandingItem): string {
 export interface OutstandingShow {
   stage?: (stageId: string, english: string) => string;
   waiting?: (english: string) => string;
+  /** What Go's repairs of a reopened stage came to, when it has tried (`unsettledRepairs`). */
+  repair?: (stageId: string) => { tries: number; last: string } | undefined;
 }
 
 /**
@@ -1011,8 +1019,13 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
   const item = 'stageId' in raw && show.stage ? { ...raw, label: show.stage(raw.stageId, raw.label) } : raw;
   switch (item.kind) {
-    case 'stale_stage':
-      return t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
+    case 'stale_stage': {
+      const stale = t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
+      const repair = show.repair?.(item.stageId);
+      if (!repair) return stale;
+      const last = repair.last.replace(/\s+/g, ' ').trim();
+      return `${stale} ${t('out.repairTried', { count: repair.tries, last: last.length > 240 ? `${last.slice(0, 240)}…` : last })}`;
+    }
     case 'open_findings':
       return t(item.optional ? 'out.optFindings' : 'out.findings', { label: item.label, count: item.count }) + namedRows(item.rows);
     case 'unconfirmed_proposals':
@@ -1053,6 +1066,16 @@ export function blocksCompletion(item: OutstandingItem): boolean {
   // A repair after an approval is routine: said, but no reason asked to finish past it.
   if (item.kind === 'check_says' || item.kind === 'approval_on_earlier_version') return false;
   return !('optional' in item && item.optional);
+}
+
+/** A finding rated major or worse (8 Nov: a screen offered approval with major finding i14 open). */
+export function isMajorRow(row: Pick<OpenFindingRow, 'severity'>): boolean {
+  return /\b(?:major|critical|blocker)\b/i.test(row.severity ?? '');
+}
+
+/** Undecided findings rated major or worse, wherever they are. Approving or finishing past one asks why. */
+export function openMajorFindings(items: readonly OutstandingItem[]): OpenFindingRow[] {
+  return items.flatMap((i) => (i.kind === 'open_findings' ? (i.rows ?? []) : [])).filter(isMajorRow);
 }
 
 /**

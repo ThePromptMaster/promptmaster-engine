@@ -84,6 +84,8 @@ against a freshly migrated local Supabase.
 
 ### L-05 · No SQL test harness · `open`
 
+**Since this was written, CI runs `supabase/tests/*.sql` against a migrated database (`.github/workflows/ci.yml`). What follows still applies to anything those files don't cover.**
+
 There is **no pgTAP, no `supabase test db` wiring, and no CI step that runs SQL**.
 
 Most schema invariants in [`data-model.md`](data-model.md) are asserted by **grepping
@@ -696,6 +698,9 @@ null ("unknown"), never $0. `SANDBOX_ENABLED` must be `true` in production; when
 it is not, every computation is honestly blocked on a missing tool.
 
 ### L-B4 — Go mode runs while the tab is open
+
+Since 8 Nov a browser alert and a tab-title marker say when Go stops (L-218). That doesn't
+change this: Go runs in the tab.
 
 The Go loop is browser-driven. Closing the tab pauses a run; reopening the project resumes
 it, and whatever step was in flight is recorded as `interrupted` and never repeated. Two
@@ -1445,7 +1450,7 @@ default is a cost decision.
 Since 12 Oct, an instruction the user applies with "Change it" goes into every
 later prompt and check, under accepted facts and above the reviewed prompt and the
 brief (`lib/workflow/applied-instructions.ts`, `project_context.instructions_block`).
-Only the latest 12 go out, each up to 1,500 characters. Standing changes such as
+Only the latest 12 go out. Since 9 Nov the latest two are sent at up to 8,000 characters and the others at 1,500 (L-223). Standing changes such as
 "the permitted evidence is now S1–S7" are offered as new facts in the same step. They
 are found by a small model call and kept only when quoted from the instruction, so
 one the model misses is still carried as the instruction itself.
@@ -1455,6 +1460,12 @@ or that rewrites an ID in another form (D3 → D3-P). It asks instead
 (`lib/workflow/id-changes.ts`). An ID is matched by its shape: one to three capital
 letters and up to three digits, with an optional suffix. An item with no visible ID
 is not protected this way; the prompt rule "keep the record" is all that covers it.
+
+Since 8 Nov, a rewrite that keeps the same letters, number and suffix (P-1 for P1) is
+put back to the original form in code rather than refused, and only when the original
+actually labelled an item. A real change of ID (P7 to P7-P) is still refused. Under
+"Handle them for me" a refusal gets one retry, then Go names it in the run's account
+rather than asking. It doesn't count towards the two-failure stop.
 
 The objective check, the criterion check and the expert review now read the
 project context up to 40,000 characters. Go's planner reads 12,000, because it runs
@@ -2710,6 +2721,10 @@ A firm range ("100–140 words", "under 300 words", "exactly 50 words") is measu
 cost is that an approximate range is never enforced: a section that lands well outside it is
 caught only by the evaluator or by the user.
 
+Since 8 Nov the whole-document target is counted and given to the planner and the objective
+check as information, so "over 900–1,200 words by my estimate" no longer happens. It still
+doesn't block anything (`wholeLengthTarget`, `describeLengthTarget`).
+
 ### L-142 — A web search that saved new sources is progress, not a loop (2026-11-02)
 
 Go's "going round in circles" guard stops a run when the same move is chosen three times in a
@@ -2735,7 +2750,11 @@ stands and the step fails, saying so. The cost is that a finding that spans part
 sections, say) is applied by each part separately, which can be uneven; the next check reads
 the joined text.
 
-### L-144 — A reopened chapter plan is the user's to keep or open (2026-11-02)
+### L-144 — A reopened chapter plan (2026-11-02, replaced 2026-11-08)
+
+**Replaced by L-212 under "Handle them for me".** Under "Ask me", and for an assessment, this
+still holds:
+
 
 Go repairs a reopened stage that is prose, a list, a review table or a manuscript. It does not
 revise a reopened outline (a chapter plan) or an assessment: the outline is the user's to
@@ -3567,3 +3586,155 @@ for or opened. Whatever a chat or draft reads is saved to the project's "From yo
 - Outlook and OneDrive search (`OUTLOOK_LIST_MESSAGES` with `search`, `OUTLOOK_SEARCH_EVENTS`,
   `ONE_DRIVE_SEARCH_ITEMS`) follow Composio's documentation and have run only against scripted data.
 
+### L-210 — Which of Go's questions are screened (2026-11-08)
+
+Under autonomous and "Handle them for me", a question the planner wants to put to the user, a
+`mark_blocked`, and the objective check's "ask" go through one cheap call first
+(`POST /api/agent/screen-question`, Sonnet 5.5). A routine repair is done, a real-world action is
+recorded and the run carries on, and a business decision, a reserved approval or a missing input
+is asked. Limits:
+- It is a model's judgment. Any error means it asks.
+- A reserved approval Go raises itself, expert questions and anything touching the objective are never screened. A planner question that asks for a reserved approval is screened with the stage's reserved approvals listed, and comes back as the user's.
+- Undecided findings are screened at most six per review, once each.
+
+### L-211 — Real-world actions are recorded, not tracked (2026-11-08)
+
+A finished document no longer waits on bookings or staffing. What it says people still have to
+do is saved to `project_tasks` (origin `system`) and listed on the finish screen. Each action is
+kept only if quoted from the text. PromptMaster doesn't follow them up, and can't tell whether
+they happened.
+
+### L-212 — Go repairs a chapter plan and carries the approval (2026-11-08)
+
+Under autonomous and "Handle them for me", Go repairs a reopened chapter plan with
+`POST /api/revise-outline`. Chapter ids are enforced in code, and the user's earlier approval
+carries to the new version (`outline_approved` with `carried_from_version_id`, checked by the
+database). Limits:
+- The user must have approved the plan once. The first approval is never Go's.
+- A change that adds, removes or merges chapters is asked, and nothing is saved.
+- Regenerating the plan by hand keeps ids by matching what the model returns, with a title match
+  as fallback. A section that truly left keeps its text in `long_form.retired`.
+
+### L-213 — What "the repair landed" means (2026-11-08)
+
+A chapter repair is checked after it writes. Old values still stated as current are found in code
+for each chapter. A correction named in the reason is confirmed by quote, by one model call. If
+either fails, the stage stays reopened and the step fails. The limits:
+- A value that isn't in a fact can't be found in code.
+- The quote check is a model's. If it can't run, it concludes nothing and the repair stands.
+- `arithmeticSlips` only recomputes lines of the form `a op b = c`.
+
+### L-214 — Cut chapters (2026-11-08)
+
+A section the model stopped at its length limit is continued in the same job, up to three rounds.
+A revision can't clear "cut": it's sticky once a section was ever cut and still ends mid-sentence.
+`endsMidSentence` never decides alone, so a chapter that ends without a full stop for a good reason
+isn't flagged unless it was also cut. A chapter still cut after three rounds shows as outstanding.
+
+### L-215 — Recovering from a failed repair (2026-11-08)
+
+The stuck card takes a note for that one repair. Each press allows exactly one more attempt, however
+many the stage has had, and the two-try cap (L-162) still applies to Go on its own. Two failed repairs
+of one stage pause on this card; two failures of anything else still end the run. "Change this section" rewrites one section and keeps
+the current text as a version first. Those changes aren't rechecked until Go or the user runs the
+stage's check. The side chat's Change it stays off on long-form stages.
+
+### L-216 — A reason is asked only where a finding says it is major (2026-11-08)
+
+Approving a reserved approval or finishing with a finding rated major or critical needs a reason,
+recorded on the decision trail. A finding with no severity, or one a model rated moderate, doesn't.
+Go's questions with model-written options ("approve as ready") aren't caught by this. They go
+through the question screen (L-210) instead.
+
+### L-217 — What the cost split can and can't say (2026-11-08)
+
+"Where it went" sorts priced calls by what they were for. Section jobs written before 8 Nov have no
+such record and count as "Other". A repair's own review calls count as review, not repair.
+
+### L-218 — Browser alerts (2026-11-08)
+
+The alert needs the tab open. On a computer the tab usually keeps running with the screen locked,
+more slowly, and the alert still shows. On an iPhone a locked screen pauses the tab, so Go stops
+until it's unlocked. Some phones only allow alerts from a service worker, and there isn't one. The
+tab title still says it. Running with the phone locked means moving Go to the server (not built).
+Tested in desktop Chrome only. A locked screen can't be tested from a browser session.
+
+### L-219 — Working text in a save (2026-11-08)
+
+`strayWorkingText` looks for phrases such as "? see below", "Correction to the … above" and exact
+repeated rows. A Go save with any is a failed repair, and Change it shows them before you apply.
+Phrases it doesn't know pass.
+
+### L-220 — What the status line says (2026-11-08)
+
+`overallStatus` and the Written, Checked, Approved and Ready rows read `outstandingWork`, which stays
+the authority. "Checked" means the latest objective check called it met, or the stage's own check ran,
+on that version. A check that found problems still counts as having run. "Ready" is not a promise
+about the work, only that nothing listed still holds finishing up.
+
+### L-221 — A project that already went through a failed repair keeps its history (2026-11-08)
+
+The fixes work on new runs. A project that already went through a failed repair keeps its history,
+and its detached sections stay detached until someone puts them back. The four saved test projects were not
+touched.
+
+### L-222 — Which text is delivered, and where limits on its parts are counted (2026-11-09)
+
+A prose stage after the chapters is the delivered text if it holds at least 80% of the chapters'
+words (L-161), or at least half with every chapter under its own heading. Below that, the chapters
+are delivered and the shorter text is treated as partial. Limits on one named part ("Sponsor email,
+no more than 200 words") are counted on that finishing stage, under the part's heading, and never
+against the whole text. If the part has no heading there, it isn't counted and isn't reported as
+uncounted, because a finishing stage may be a short note. Chapters that are themselves the deliverable
+still have no per-part count.
+
+### L-223 — Long instructions in later prompts (2026-11-09)
+
+The latest two applied instructions reach every later prompt at up to 8,000 characters, earlier ones
+at 1,500. An instruction longer than that is cut. An older accepted fact that a later instruction
+changes in part is not rewritten for the user: the instruction outranks it in the prompt, and the model
+has to act on that.
+
+### L-224 — How an old figure is told from a new one (2026-11-09)
+
+A superseded amount is matched by what it was for, read from the old fact ("migration $8,000"), and a
+line about something else passes. A figure the text works out from other figures counts as its own,
+wherever the sum sits. What this can't do:
+- A line that names nothing of its own ("The fee is $8,000") is read strictly and can be wrong.
+- An old figure with no label of its own is matched by value alone.
+- A real leftover on a line about something else, with no sign of the old figure's subject, is missed.
+
+### L-225 — Repairs stop at the first stage that can't be settled (2026-11-09)
+
+Later stages read earlier ones, so Go stops at the first reopened stage whose repairs are used up and
+puts it to the user, rather than repairing what depends on it. A project with an unrelated later stage
+waits too. The planner's reply is capped at 2,500 tokens. Past that it's cut off, asked once more, and
+a stage with no draft is then drafted. Anything else is asked.
+
+### L-226 — A section that answers instead of writing (2026-11-09)
+
+The section prompt says the plan is approved and the section is due, and never to reply with a plan, a
+status or a request for approval. That is asked of the model. Nothing in code refuses such a reply, so
+one that slips through is saved as the section. The objective check and the word counts catch it
+afterwards, as they did in the test that found this.
+
+### L-227 — Per-chapter word counts read numbered headings (2026-11-09)
+
+"Each chapter about N words" counts the headings that name a numbered chapter ("Chapter 3: Pay").
+Headings that only mention the word ("What to carry out of this chapter") are ignored. A document whose
+chapters aren't numbered falls back to every heading that names the unit.
+
+### L-228 — What the final check can be relied on for (2026-11-09)
+
+The check on a finished deliverable reads the brief's constraints, the accepted facts and the source
+material. It looks for deadlines nobody supplied, money called committed when the record says approved,
+and proceeding past a limit the text says is breached. It is one model call, at most five items of each
+kind, told to report nothing when in doubt, so a run can miss one. Its items go to the bounded repair
+rounds. It isn't shown the project's event history, so a date only the record holds ("7 Nov") can be
+reported as unsupported.
+
+### L-229 — A routine approval isn't asked for a reason (2026-11-09)
+
+A reserved approval, or finishing the project, past an undecided major finding needs a reason. The
+approval's reason is saved as a `finalize` decision with the finding ids. A routine approval, the kind
+Go may give under "Handle them for me", is not asked. The finish step still asks.

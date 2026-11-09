@@ -195,6 +195,7 @@ async function persistDrainUsage(generator: HttpSectionGenerator): Promise<void>
       .from('model_usage')
       .insert(
         spent.map((row) => ({
+          operation: row.operation ?? null,
           user_id: row.userId,
           project_id: row.projectId,
           request_id: row.requestId,

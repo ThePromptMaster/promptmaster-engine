@@ -3,7 +3,8 @@
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
-import { describeNeed, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
+import { describeNeed, needHeading, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
+import { isMajorRow } from '@/lib/workflow/engine';
 
 /**
  * "I need you to do this before I can continue" — with that exact action
@@ -30,7 +31,7 @@ export function NeedsYouCard({
   nothingElse?: boolean;
   stageLabel: (stageId: string) => string;
   /** Clear the need and resume. Rejects with a message the card shows. A stuck stage says which of its options was chosen. */
-  onAction: (option?: StuckOption) => Promise<void>;
+  onAction: (option?: StuckOption, note?: string) => Promise<void>;
   context?: NeedContext;
 }) {
   const t = useT();
@@ -38,32 +39,71 @@ export function NeedsYouCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { message, action, options, footer, detail } = describeNeed(need, stageLabel, context, locale);
+  // A failed repair can be told what to fix (8 Nov: "I could not find a way to
+  // give a targeted correction for the failed validation").
+  const [note, setNote] = useState('');
+  const canTell = need.kind === 'repair_stuck' && !need.byHand;
+  // An approval with a major finding still open asks why, and the reason is recorded (8 Nov).
+  const [why, setWhy] = useState('');
+  const needsWhy = need.kind === 'tick_criterion' && (need.openRows ?? []).some(isMajorRow);
+  const approves = (option?: StuckOption) => need.kind === 'tick_criterion' && (!option || option === 'resume');
+  const waitingForWhy = (option?: StuckOption) => needsWhy && approves(option) && !why.trim();
+  const noteFor = (option?: StuckOption) => (option === 'retry' ? note.trim() : needsWhy && approves(option) ? why.trim() : '') || undefined;
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);
-    onAction(option)
+    onAction(option, noteFor(option))
       .catch((e: unknown) => setError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
       .finally(() => setBusy(false));
   };
   return (
     <section aria-label={t('nyc.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' || need.kind === 'next_round' || need.kind === 'add_stage' ? t('nyc.suggestion') : t('nyc.needYou')}</p>
+      <p data-need-heading className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t(({ suggestion: 'nyc.suggestion', repair: 'nyc.headRepair', decision: 'nyc.headDecision', waiting: 'nyc.needYou' } as const)[needHeading(need)])}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{message}</p>
       {detail && <p data-need-detail className="mt-1 text-label text-[var(--on-surface-variant)]">{detail}</p>}
+      {canTell && (
+        <label className="mt-3 block">
+          <span className="text-label text-[var(--on-surface-variant)]">{t('nyc.tellGoWhat')}</span>
+          <textarea
+            data-tell-go
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={busy}
+            rows={2}
+            maxLength={1000}
+            placeholder={t('nyc.tellGoHint')}
+            className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] placeholder:text-[var(--on-surface-variant)] disabled:opacity-50"
+          />
+        </label>
+      )}
+      {needsWhy && (
+        <label className="mt-3 block">
+          <span className="text-label text-[var(--on-surface-variant)]">{t('need.majorReason')}</span>
+          <textarea
+            data-approve-why
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+            disabled={busy}
+            rows={2}
+            maxLength={1000}
+            className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
+          />
+        </label>
+      )}
       {options ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {options.map((o, i) => (
             <button
               key={o.id}
               onClick={() => run(o.id)}
-              disabled={busy}
+              disabled={busy || waitingForWhy(o.id)}
               className={
                 i === 0
                   ? 'rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50'
                   : 'rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-50'
               }
             >
-              {busy && i === 0 ? t('nyc.working') : o.label}
+              {busy && i === 0 ? t('nyc.working') : o.id === 'retry' && canTell && note.trim() ? t('nyc.fixAndCheck') : o.label}
             </button>
           ))}
           {footer && <span className="basis-full text-label text-[var(--on-surface-variant)]">{footer}</span>}
@@ -72,7 +112,7 @@ export function NeedsYouCard({
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
             onClick={() => run()}
-            disabled={busy}
+            disabled={busy || waitingForWhy()}
             className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
           >
             {busy ? t('nyc.working') : action}

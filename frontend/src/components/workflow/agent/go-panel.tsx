@@ -14,6 +14,8 @@ import type { useGoLoop } from '../use-go-loop';
 import { GoTerms } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt, type LatestChange } from './decision-prompt';
 import { GoControl } from './go-control';
+import { GoAlertsControl } from './go-alerts-control';
+import type { GoAlerts } from './use-go-alerts';
 import { NeedsYouCard } from './needs-you-card';
 import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
@@ -33,7 +35,7 @@ import { doingNow } from '@/lib/agent/doing';
 export interface NeedsActions {
   approveOutline: (stageId: string) => Promise<void>;
   unblock: () => Promise<void>;
-  tick: (criterionId: string) => Promise<void>;
+  tick: (criterionId: string, reason?: string) => Promise<void>;
   /** Skip the current stage, with the reason given. */
   skip?: (reason: string) => Promise<void>;
   /** Start the next round of a looping workflow: the user's return to its first stage. */
@@ -66,6 +68,7 @@ export function GoPanel({
   needsActions,
   needContext,
   dockHost = null,
+  alerts,
   routine,
   stageModes,
   latestChange = null,
@@ -97,6 +100,8 @@ export function GoPanel({
    * don't have to keep scrolling back and forth".
    */
   dockHost?: HTMLElement | null;
+  /** The opt-in alert when Go stops (`useGoAlerts`, held by the workspace so it outlives this panel). */
+  alerts?: GoAlerts;
   /** 13 Oct: each stage in its own recommended mode, or the project's mode everywhere. */
   stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
   /** Whether another stage holds work Go can do while an approval here waits (`otherWorkFor`). */
@@ -152,7 +157,7 @@ export function GoPanel({
       : go.run?.status === 'completed'
         ? t('go.nextNothing')
         : t('go.nextPress', { button });
-  const act = async (option?: StuckOption) => {
+  const act = async (option?: StuckOption, note?: string) => {
     if (!need) return;
     switch (need.kind) {
       case 'approve_outline':
@@ -192,7 +197,7 @@ export function GoPanel({
           await go.go();
           return;
         }
-        await needsActions?.tick(need.criterionId);
+        await needsActions?.tick(need.criterionId, note);
         await go.go();
         return;
       case 'skip_stage':
@@ -244,7 +249,7 @@ export function GoPanel({
           needsActions?.openStage?.(need.stageId);
           return;
         }
-        await go.retryRepair(need.stageId);
+        await go.retryRepair(need.stageId, note);
         return;
       case 'decide_rows':
       case 'triage_findings':
@@ -373,6 +378,7 @@ export function GoPanel({
           {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
+          {alerts && <div className="mt-2"><GoAlertsControl alerts={alerts} /></div>}
           </div>
           {go.policy !== 'guided' && !live && (
             <GoTerms

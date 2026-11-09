@@ -232,6 +232,58 @@ describe('a superseded price is caught only where it applies (7 Nov, production,
     expect(leftoverValues('{"item":"Training: $40"}', labelled).map(describeValue)).toEqual(['$40']);
   });
 
+  describe('the old price was one of a list (9 Nov, production, the same plan again)', () => {
+    const fromList = supersededFactValues([
+      fact('old', 'Fixed prices: process mapping $6,000; configuration $18,000; migration $8,000; launch support $6,000.', null, '2026-11-07T23:24:00Z'),
+      fact('new', 'Fixed prices: process mapping $6,000; configuration $18,000; migration $13,000 (including the data-quality assessment and all required cleansing); launch support $6,000.', 'old'),
+    ]);
+    // The lines both repairs of the plan were refused for, as saved.
+    const saved = [
+      '| Training, eight sessions | $8,000 | 8 × $1,000 |',
+      '| **Planned total** | **$51,000** | $43,000 + $8,000 |',
+      '| Training, eight sessions | $8,000 | 8 × $1,000, current session count and price |',
+      'I also added a worked headroom check showing that the $8,000 training line and the $51,000 total are derived from current values: 8 sessions × $1,000, and $43,000 + $8,000.',
+    ].join('\n');
+
+    it('passes the training line, with its sum written after the result', () => {
+      expect(fromList.map(describeValue)).toEqual(['$8000']);
+      expect(leftoverMentions(saved, fromList)).toEqual([]);
+    });
+
+    it('still catches the old migration price, however it is written', () => {
+      for (const line of ['| Migration | $8,000 | Fixed |', 'Migration: $8,000', 'Process mapping $6,000; configuration $18,000; migration $8,000.', 'Migration costs $8,000.', 'The $8,000 migration fee is fixed.']) {
+        expect(leftoverValues(`${saved}\n${line}`, fromList).map(describeValue), line).toEqual(['$8000']);
+      }
+    });
+
+    it('a row that names migration in another cell is still caught', () => {
+      expect(leftoverValues('| Cost | $8,000 | migration fee |', fromList).map(describeValue)).toEqual(['$8000']);
+    });
+
+    it('a sentence naming something else, with nothing worked out, is not the old price', () => {
+      expect(leftoverValues('Training costs $8,000.', fromList)).toEqual([]);
+    });
+
+    it('a label that names nothing is read strictly', () => {
+      expect(leftoverValues('| Amount | $8,000 |', fromList).map(describeValue)).toEqual(['$8000']);
+      expect(leftoverValues('The fee is $8,000.', fromList).map(describeValue)).toEqual(['$8000']);
+    });
+  });
+
+  it('a sum counts as worked out wherever its result is', () => {
+    expect(derivedValues('| Training | $8,000 | 8 × $1,000 |').has('8000')).toBe(true);
+    expect(derivedValues('Eight sessions at $1,000 each.').has('8000')).toBe(true);
+    expect(derivedValues('8 sessions × $1,000').has('8000')).toBe(true);
+    expect(derivedValues('$43,000 + $8,000').has('51000')).toBe(true);
+    expect(derivedValues('$6,000 + 8 × $1,000').has('14000')).toBe(true);
+  });
+
+  it('words beside a figure are not a sum', () => {
+    expect([...derivedValues('Budget $58,000, with at least $7,000 always uncommitted.')]).toEqual([]);
+    expect([...derivedValues('Weeks 2-4 and Weeks 5–6.')]).toEqual([]);
+    expect([...derivedValues('Launch at 9 on Tuesday.')]).toEqual([]);
+  });
+
   it('a multiplication sign is not taken for emphasis', () => {
     expect([...derivedValues('2 * $4 * 5 = $40')]).toEqual(['40']);
   });
@@ -239,5 +291,26 @@ describe('a superseded price is caught only where it applies (7 Nov, production,
   it('the message quotes the line as it is written', () => {
     const named = namedLeftovers(leftoverMentions('**Data migration:** $8,000 this year.', superseded));
     expect(named[0].text).toContain('**Data migration:**');
+  });
+});
+
+describe('a paragraph that sets old choices aside (9 Nov, production)', () => {
+  const superseded = supersededValues('Budget $60,000, with $6,000 uncommitted.', 'Budget $58,000, with $7,000 uncommitted.');
+  const saved = 'Earlier planning choices no longer apply. These include six sessions of 12, the $60,000 budget with a $6,000 minimum. All of them were superseded by the sponsor revision of 8 Nov.';
+
+  it('reports them, as the sponsor asked', () => {
+    expect(leftoverMentions(saved, superseded)).toEqual([]);
+  });
+
+  it('carries through several sentences that carry on', () => {
+    expect(leftoverMentions('Earlier choices no longer apply. These include the $60,000 budget. They also include the $6,000 minimum.', superseded)).toEqual([]);
+  });
+
+  it('a "these" with nothing set aside before it still states the value', () => {
+    expect(leftoverValues('The plan is settled. These include the $60,000 budget.', superseded)).toHaveLength(1);
+  });
+
+  it('the set-aside ends with its paragraph', () => {
+    expect(leftoverValues('Earlier choices no longer apply.\n\nThese include the $60,000 budget.', superseded)).toHaveLength(1);
   });
 });

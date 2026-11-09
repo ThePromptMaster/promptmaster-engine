@@ -27,7 +27,11 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
-import { describeNeed } from '@/lib/agent/needs';
+import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
+import { recordDecision } from '@/lib/supabase/recommendations';
+import { deliverableReadiness, overallStatus } from '@/lib/workflow/readiness';
+import { DeliverableReadiness } from './deliverable-readiness';
+import { goIsWorking, useGoAlerts } from './agent/use-go-alerts';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -69,7 +73,9 @@ import {
   projectState,
   type TransitionOption,
   completionSummary,
+  blocksCompletion,
   describeOutstanding,
+  openMajorFindings,
   outstandingBeyondCriteria,
   shownOutstanding,
   type OutstandingShow,
@@ -82,7 +88,7 @@ import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
-import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
+import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
@@ -659,7 +665,9 @@ export function WorkflowWorkspace({
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
   // workshop: "Summary appeared completed while the project remained open").
   const projectOpenOn = useMemo(() => {
-    if (!objectiveAssessment || project.status === 'finalized') return null;
+    // …or while earlier work is out of date (8 Nov: a final tick beside a stale chapter plan).
+    const staleEarlier = template.stages.some((s) => state.stages[s.id]?.status === 'stale');
+    if ((!objectiveAssessment && !staleEarlier) || project.status === 'finalized') return null;
     const last = [...template.stages].reverse().find((s) => state.stages[s.id]?.status !== 'skipped');
     return last && isDone(state.stages[last.id]?.status) ? last.id : null;
   }, [objectiveAssessment, project.status, template, state]);
@@ -1192,7 +1200,7 @@ export function WorkflowWorkspace({
   });
 
   const handleToggleManual = useCallback(
-    async (id: string, checked: boolean) => {
+    async (id: string, checked: boolean, reason?: string) => {
       // From the store's latest copy, as commitCriterion does: a tick built on
       // this render's \`project\` wiped an approval Go had committed since (2 Nov,
       // prod: "This list matches the requirements I gave" vanished after three
@@ -1203,6 +1211,13 @@ export function WorkflowWorkspace({
       const head = stageBundles[stageId]?.versions.at(-1)?.id;
       const others = Object.fromEntries(Object.entries(latest.manual_check_versions ?? {}).filter(([k]) => k !== id));
       onPatchProject({ manual_checks, manual_check_versions: checked && head ? { ...others, [id]: head } : others });
+      // Approved with a major finding open: the reason goes on the decision trail.
+      if (checked && reason) {
+        void recordDecision(project.id, project.user_id, {
+          decision_type: 'finalize', version_id: head ?? null, rationale: reason,
+          metadata: { approval: id, open_major_findings: openMajorFindings(outstanding).map((r) => r.id) },
+        }).catch(() => undefined);
+      }
 
       // Ticking the last required box on a stage that was left open closes
       // it. The tick is the user's declaration, so the event is theirs
@@ -1224,7 +1239,7 @@ export function WorkflowWorkspace({
         setTransitionError(e instanceof Error && e.message ? t('wsa.notClosedWhy', { message: e.message }) : t('wsa.notClosed'));
       }
     },
-    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion, t]
+    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion, t, outstanding]
   );
 
   // "Routine decisions" (5 Oct). Written through before the event, because the
@@ -1616,6 +1631,8 @@ export function WorkflowWorkspace({
     setTimeout(() => document.querySelector('[data-panel="go"]')?.scrollIntoView({ block: 'start' }), 100);
   }, []);
 
+  const goAlerts = useGoAlerts({ running: goIsWorking(go.active, go.autoPending, go.run?.status), status: go.run?.status, reason: go.run?.stop_reason, projectName: project.title });
+
   // The one next action, at the top of whichever stage is open (17 Oct, Sean).
   const nextStep = nextAction({
     finalized: project.status === 'finalized',
@@ -1629,6 +1646,7 @@ export function WorkflowWorkspace({
     drafting: generation.generating ? stage?.label : null,
     run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: goIsAsking(go.run.stop_reason) } : null,
     onCurrentStage: isCurrent,
+    repairFailed: !go.active && go.run?.needs?.kind === 'repair_stuck',
   });
   // A paused run holds the next move too: the page drafting Realign while Go
   // proposed skipping it, or Summary while Go waited for approval to draft it,
@@ -1662,7 +1680,7 @@ export function WorkflowWorkspace({
         if (draft) onReload?.();
       },
       unblock: () => setBlocked(null),
-      tick: (criterionId: string) => handleToggleManual(criterionId, true),
+      tick: (criterionId: string, reason?: string) => handleToggleManual(criterionId, true, reason),
       keepStage: async (keepId: string, reason?: string) => {
         const since = state.stages[keepId]?.stale?.since;
         if (!since) return;
@@ -1947,7 +1965,8 @@ export function WorkflowWorkspace({
     }
     return shownGoWaiting(locale, line, shownStageByEnglish) ?? line;
   };
-  const outstandingShow: OutstandingShow = { stage: (id) => stageNameShown(id, 'short'), waiting: shownGoWaitingLine };
+  const repairsTried = unsettledRepairs(state, go.steps);
+  const outstandingShow: OutstandingShow = { stage: (id) => stageNameShown(id, 'short'), waiting: shownGoWaitingLine, repair: (id) => repairsTried[id] };
   const outstandingOtherShown = outstandingBeyondCriteria(outstanding, stageId).map((item) => shownOutstanding(item, locale, outstandingShow));
   // Go stopped on the objective check: the pause notice offers Go's own action.
   const objectiveNeed =
@@ -1964,6 +1983,22 @@ export function WorkflowWorkspace({
   };
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
+  const assessedEvent = [...(events ?? [])].reverse().find((e) => e.type === 'objective_assessed');
+  const assessedLatest = latestObjectiveAssessment(events ?? []);
+  const readinessCheck = assessedLatest
+    ? { outcome: assessedLatest.outcome, versionId: (assessedEvent?.payload as { basis?: { version_id?: string } } | undefined)?.basis?.version_id ?? null }
+    : null;
+  const overall = overallStatus({
+    outstanding: completion.outstanding,
+    finalized: project.status === 'finalized',
+    repairFailed: !go.active && go.run?.needs?.kind === 'repair_stuck',
+    waitingOnUser: !go.active && !go.run?.ended_at && go.run?.status === 'awaiting_decision',
+    openActions: recommendations.tasks.filter((task) => task.status === 'open' && task.origin === 'system').length,
+    allStagesDone: completion.notStarted === 0 && completion.leftOpen === 0 && completion.blocked === 0,
+  });
+  const overallLine = overall === 'in_progress' ? null : (
+    <div data-overall-status={overall} className="mt-0.5 text-label font-semibold text-[var(--on-surface)]">{t(`status.${overall}` as const)}</div>
+  );
   // The deliverable's latest objective check, for the finished screen (C4).
   const deliverableHead = deliverable ? bundles?.[deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
@@ -2256,6 +2291,12 @@ export function WorkflowWorkspace({
               .filter(Boolean)
               .join(' — ')
           : note;
+        if (reason) {
+          void recordDecision(project.id, project.user_id, {
+            decision_type: 'finalize', version_id: headVersion?.id ?? null, rationale: reason,
+            metadata: { open: completion.outstanding.map(describeOutstanding) },
+          }).catch(() => undefined);
+        }
         void handleTransition(option, why, undefined, option.early ? completion.outstanding : undefined);
       }}
       onCancel={() => {
@@ -2298,6 +2339,7 @@ export function WorkflowWorkspace({
         <div className="mb-5 px-3">
           <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
+          {overallLine}
         </div>
 
         <StageRail
@@ -2335,6 +2377,7 @@ export function WorkflowWorkspace({
               <div className="min-w-0 flex-1">
                 <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
                 <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
+          {overallLine}
               </div>
               <button
                 onClick={() => setMobileRailOpen(false)}
@@ -2398,6 +2441,9 @@ export function WorkflowWorkspace({
                 {t('stageHead.position', { index: stageIndex + 1, total: template.stages.length })}
                 {progress.leftOpen > 0 && t('ws.leftOpenCount', { count: progress.leftOpen })}{t('ws.toGo', { count: progress.remaining })}
               </span>
+              {overall !== 'in_progress' && (
+                <span data-overall-status-phone className="block truncate text-label font-semibold text-[var(--on-surface)]">{t(`status.${overall}` as const)}</span>
+              )}
             </span>
             <span
               aria-hidden
@@ -2463,7 +2509,7 @@ export function WorkflowWorkspace({
               {/* The recheck itself, from the stage that is waiting for it: the
                   same as "Apply and continue" — Go rechecks the changed stages
                   in order, before anything is asked of the final work. */}
-              {viewedStale && (
+              {viewedStale && !(go.run?.needs?.kind === 'repair_stuck') && (
                 <button
                   onClick={() => void continueWork()}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"
@@ -2613,6 +2659,7 @@ export function WorkflowWorkspace({
               needsActions={goNeedsActions}
               needContext={goNeedContextOnPage}
               dockHost={goDockHost}
+              alerts={goAlerts}
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
               latestChange={goLatestChange}
@@ -2943,12 +2990,26 @@ export function WorkflowWorkspace({
                 evidence some of them rest on, so it sits under the thing it
                 justifies rather than above it. Tasks are what was set aside,
                 and the transition bar is the way out. */}
+            {deliverable?.id === stage.id && stageBundles[stage.id]?.versions.length ? (
+              <DeliverableReadiness
+                rows={deliverableReadiness({
+                  versions: stageBundles[stage.id]?.versions ?? [],
+                  assessment: readinessCheck,
+                  evaluatedVersionIds: new Set(Object.keys(evaluations ?? {})),
+                  approvals: evaluation.criteria.filter((c) => (c.manual ?? manualIds.has(c.id)) && c.authority !== 'delegable'),
+                  approvalVersions: project.manual_check_versions ?? {},
+                  blocking: completion.outstanding.filter(blocksCompletion).map((item) => shownOutstanding(item, locale, outstandingShow)),
+                })}
+              />
+            ) : null}
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
               committedByPolicy={committedByPolicy}
               approvedVersions={approvedVersions(stageBundles[stageId]?.versions ?? [], project.manual_check_versions)}
-              onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
+              onToggleManual={(id, checked, reason) => void handleToggleManual(id, checked, reason)}
+              openMajors={openMajorFindings(outstanding)}
+              headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
               readOnly={!isEditable}
               collapsible={foldStageExtras}
               onFinish={finishHere ? () => setFinishing({ option: finishHere, from: 'checklist' }) : undefined}

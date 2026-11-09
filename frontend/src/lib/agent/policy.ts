@@ -467,6 +467,11 @@ export interface Preemption {
    * produced nothing new. The loop reconsiders once before it stops.
    */
   repeating?: string[];
+  /**
+   * The last failures were all repairs of this one stage: the user's card, with
+   * what failed and a way to say what to fix, rather than a finished run.
+   */
+  repairsFailedOn?: string;
 }
 
 export function preempt(input: {
@@ -496,6 +501,13 @@ export function preempt(input: {
   // set aside, not a reason to stop: the next row is different work.
   const tail = finished.filter((s) => !(s.status === 'failed' && s.changes?.set_aside)).slice(-MAX_CONSECUTIVE_FAILURES);
   if (tail.length === MAX_CONSECUTIVE_FAILURES && tail.every((s) => s.status === 'failed')) {
+    // Two failed repairs of one stage ended the run, with no way to say what
+    // to fix (9 Nov, production: a correct figure refused twice).
+    const repaired = new Set(tail.map((s) => (s.action_key === 'recheck_stage' ? String(s.params?.stage_id ?? s.stage_id ?? '') : '')));
+    const [stageId] = repaired;
+    if (repaired.size === 1 && stageId) {
+      return { status: 'blocked', reason: `The last ${MAX_CONSECUTIVE_FAILURES} repairs of this stage failed.`, repairsFailedOn: stageId };
+    }
     return { status: 'failed', reason: `The last ${MAX_CONSECUTIVE_FAILURES} steps failed. Stopping rather than retrying blind.` };
   }
   const pair = alternating(finished);
@@ -834,4 +846,20 @@ export function plannedBeforeLatestChange(
     const at = t ? Date.parse(t) : NaN;
     return !Number.isNaN(at) && at > planned;
   });
+}
+
+/**
+ * The move to make when the planner's reply could not be used, twice, and
+ * nothing is waiting on the user. A stage with no draft has one obvious next
+ * step; asking "what would you like to do next?" was the only thing Go could
+ * say (8 Nov, production, on the last stage of a package). Null otherwise.
+ */
+export function unplannedMove(hasDraft: boolean, allowed: readonly string[]) {
+  if (hasDraft || !allowed.includes('draft_stage')) return null;
+  return {
+    action_key: 'draft_stage', params: {},
+    rationale: 'This stage has no draft yet, so writing it is the next step.',
+    expected_outcome: 'A first draft of this stage.',
+    needs_user_decision: false, decision_question: null,
+  };
 }

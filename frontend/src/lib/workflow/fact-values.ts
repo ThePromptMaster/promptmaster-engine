@@ -242,8 +242,86 @@ export function derivedValues(text: string): Set<string> {
       if (/\d/.test(left) && OPERATOR.test(left)) add(piece.slice(m.index! + m[0].length));
     }
     for (const m of piece.matchAll(BOUND)) add(piece.slice(m.index! + m[0].length));
+    for (const result of computedResults(piece)) add(`$${Number.isInteger(result) ? result : result.toFixed(2)}`);
   }
   return out;
+}
+
+const SUM_NUMBER_WORDS: Readonly<Record<string, number>> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const SUM_TOKENS = /(?:[$€£]\s?)?\d[\d,]*(?:\.\d+)?|[×*÷+−]|\s[-–/]\s|\p{L}+/gu;
+
+function operatorOf(token: string): string | null {
+  const t = token.trim().toLowerCase();
+  if (t === '×' || t === '*' || t === 'x' || t === 'at') return '*';
+  if (t === '÷' || t === '/') return '/';
+  if (t === '+' || t === 'plus') return '+';
+  if (t === '−' || t === '-' || t === '–' || t === 'minus' || t === 'less') return '-';
+  return null;
+}
+
+/** One side of a sum as a number, or null. A number word counts only at the start of a sum. */
+function termOf(token: string, atStart: boolean): number | null {
+  if (/\d/.test(token)) return Number(token.replace(/[^\d.]/g, ''));
+  return atStart ? (SUM_NUMBER_WORDS[token.toLowerCase()] ?? null) : null;
+}
+
+/** Multiplication first, then addition, left to right. */
+function evaluated(chain: readonly (number | string)[]): number {
+  const sums: (number | string)[] = [chain[0]];
+  for (let i = 1; i < chain.length; i += 2) {
+    const op = chain[i] as string;
+    const n = chain[i + 1] as number;
+    if (op === '*' || op === '/') {
+      const left = sums.pop() as number;
+      sums.push(op === '*' ? left * n : left / n);
+    } else sums.push(op, n);
+  }
+  let total = sums[0] as number;
+  for (let i = 1; i < sums.length; i += 2) total += sums[i] === '+' ? (sums[i + 1] as number) : -(sums[i + 1] as number);
+  return total;
+}
+
+/**
+ * What the sums written in a piece come to, wherever the result is put: "8 ×
+ * $1,000" in one table cell beside $8,000 in the next, or "Eight sessions at
+ * $1,000" (9 Nov, production: "| Training | $8,000 | 8 × $1,000 |" put the
+ * result before the sum, nothing said it was worked out, and two repairs failed
+ * on the old $8,000 migration price). Up to two words may sit between a figure
+ * and its sign ("8 sessions × $1,000"); none between a sign and its figure, so
+ * "$58,000, with at least $7,000" is no sum.
+ */
+function computedResults(piece: string): number[] {
+  const results: number[] = [];
+  let chain: (number | string)[] = [];
+  let words = 0;
+  const flush = () => {
+    if (chain.length >= 3 && chain.length % 2 === 1) {
+      const r = evaluated(chain);
+      if (Number.isFinite(r) && r > 0) results.push(r);
+    }
+    chain = [];
+    words = 0;
+  };
+  for (const token of piece.match(SUM_TOKENS) ?? []) {
+    const afterFigure = chain.length % 2 === 1;
+    const operator = operatorOf(token);
+    if (afterFigure && operator) {
+      chain.push(operator);
+      words = 0;
+      continue;
+    }
+    const term = termOf(token, chain.length === 0);
+    if (term !== null) {
+      if (afterFigure) flush();
+      chain.push(term);
+      words = 0;
+      continue;
+    }
+    if (afterFigure && /\p{L}/u.test(token) && ++words <= 2) continue;
+    flush();
+  }
+  flush();
+  return results;
 }
 
 const STOPWORDS = new Set([
@@ -289,34 +367,46 @@ function labelOfOldFigure(s: SupersededValue): string[] {
   const said = answered(s.was);
   const raw = valueMentions(said).find((m) => m.kind === 'money' && m.value === s.value)?.raw;
   if (!raw) return [];
-  const clause = said.slice(0, said.indexOf(raw)).split(/[.;\n]/).at(-1) ?? '';
-  const label = /^\s*(.+?)\s*[:—–=]\s*$/u.exec(clause)?.[1] ?? '';
-  return labelWords(label);
+  const at = said.indexOf(raw);
+  // "Data migration: $8,000", or one of a list: "Fixed prices: mapping $6,000; migration $8,000".
+  const clause = said.slice(0, at).split(/[.;,\n]|\band\b/).at(-1) ?? '';
+  const before = labelWords(clause.replace(/\s*[:—–=]\s*$/u, '').split(':').at(-1) ?? '');
+  if (before.length) return before;
+  // "$8,000 for data migration".
+  return labelWords((said.slice(at + raw.length).split(/[.;,\n]/)[0] ?? '').replace(/^\s*(?:for|per|on|in|to)\b/i, ''));
 }
 
 function labelWords(label: string): string[] {
   return [...new Set((label.match(/\p{L}{4,}/gu) ?? []).map(stem).filter((w) => !STOPWORDS.has(w)))];
 }
 
-/** What a table row or a "Label: value" line says it is about. */
+/** What a table row, a "Label: value" line or "Training costs $8,000" says it is about. */
 function pieceLabel(piece: string): string {
   const cell = /^\s*\|\s*([^|]+?)\s*\|/.exec(piece)?.[1];
   if (cell !== undefined) return cell;
-  return /^\s*(?:[-*+]\s+)?(\p{L}[^:|]{1,48}?):\s/u.exec(piece)?.[1] ?? '';
+  const named = /^\s*(?:[-*+]\s+)?(\p{L}[^:|]{1,48}?):\s/u.exec(piece)?.[1];
+  if (named !== undefined) return named;
+  return /^\s*(\p{L}[\p{L}\s,-]{1,48}?)\s+(?:costs?|totals?|is|are|comes? to|runs? at)\s+[$€£]?\d/u.exec(piece)?.[1] ?? '';
 }
+
+/** Words any line about money may use: they say nothing about which money it is. */
+const MONEY_WORDS = new Set(['cost', 'price', 'amount', 'fixed', 'total', 'charge', 'spend', 'spending', 'line', 'item', 'figure', 'planned', 'payment']);
 
 /**
  * A line that labels itself as being about something else than the figure the
  * fact replaced: "| Training | $8,000 |" is not the old "Data migration:
- * $8,000". Money only, only when the old figure carried a label of its own, and
- * never where the figure is an operand: "Revenue at 8 paid: 8 × $40 = $320" uses
- * the old $40, whatever the line calls itself.
+ * $8,000", and neither is "Training costs $8,000." The figure's own words are
+ * looked for anywhere in the line, and a label that names nothing ("Amount",
+ * "The fee") is read strictly. Money only, only when the old figure carried a
+ * label of its own, and never where the figure is an operand: "Revenue at 8
+ * paid: 8 × $40 = $320" uses the old $40, whatever the line calls itself.
  */
 function aboutSomethingElse(piece: string, s: SupersededValue): boolean {
   if (s.kind !== 'money') return false;
   const was = labelOfOldFigure(s);
-  const label = labelWords(pieceLabel(piece));
-  if (!was.length || !label.length || label.some((w) => was.some((x) => sameWord(w, x)))) return false;
+  const label = labelWords(pieceLabel(piece)).filter((w) => !MONEY_WORDS.has(w));
+  const said = labelWords(piece.replace(/[$€£]?\d[\d,.]*/g, ' '));
+  if (!was.length || !label.length || said.some((w) => was.some((x) => sameWord(w, x)))) return false;
   const raws = valueMentions(piece).filter((m) => m.kind === 'money' && m.value === s.value).map((m) => m.raw);
   return raws.length > 0 && raws.every((raw) => {
     const at = piece.indexOf(raw);
@@ -334,6 +424,25 @@ function quotable(piece: string): string {
     .replace(/\\"/g, '"')
     .trim();
   return t.length > 200 ? `${t.slice(0, 197)}…` : t;
+}
+
+/**
+ * Sentences that carry on reporting what the one before them set aside, in the
+ * same paragraph: "Earlier planning choices no longer apply. These include the
+ * $8,000 migration price." (9 Nov, production: the list the sponsor asked for,
+ * of what was superseded, failed two repairs.)
+ */
+function carriesOnReporting(lines: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const line of lines) {
+    let reporting = false;
+    for (const sentence of sentencesOf(line)) {
+      const carries: boolean = reporting && /^\W*(?:these|those|they|such)\b/i.test(sentence);
+      if (carries) out.add(sentence);
+      reporting = carries || ATTRIBUTED.test(sentence);
+    }
+  }
+  return out;
 }
 
 /** One superseded value a text still states as current, and a sentence that states it. */
@@ -396,6 +505,7 @@ export function leftoverMentions(
     return true;
   });
   const pieces = sentencesOf(kept.join('\n'));
+  const reported = carriesOnReporting(kept);
   // Rows of a table are serialised as JSON: a key before a colon is not a label.
   const labelled = !/^\s*[[{]/.test(text);
   const out: LeftoverMention[] = [];
@@ -403,10 +513,12 @@ export function leftoverMentions(
     const now = factValues(s.now)[s.kind].filter((v) => v !== s.value);
     const spanned = s.kind === 'dates' && new RegExp(RANGE.source, 'i').test(s.was);
     const coincident = (s.kind === 'money' || s.kind === 'numbers') && derived.has(s.value);
-    const subject = coincident ? subjectWords(s.now) : [];
+    // Its own label when it had one: "migration", not every word of a list of prices.
+    const ownLabel = coincident && s.kind === 'money' ? labelOfOldFigure(s) : [];
+    const subject = coincident ? (ownLabel.length ? ownLabel : subjectWords(s.now)) : [];
     for (const raw of pieces) {
       const p = withoutEmphasis(raw);
-      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) continue;
+      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
       if (!found.includes(s.value) || now.some((v) => found.includes(v))) continue;
       // A figure the document works out is its own; only beside the fact's

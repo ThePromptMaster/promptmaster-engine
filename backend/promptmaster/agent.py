@@ -300,7 +300,7 @@ _NEXT_ACTION_INSTRUCTION = (
     "requirement, deciding rows, attaching data — is not missing data. If it is "
     "needed and no listed move does it, choose request_user_decision. Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
-    # 7 Nov (Sean, training event): Go marked a finished handoff stuck until someone
+    # 7 Nov (training event test): Go marked a finished handoff stuck until someone
     # covered a shift. "Please separate completion of the requested document from
     # readiness to execute its plan."
     "THE DOCUMENT IS NOT THE EVENT. Something that has to happen outside the "
@@ -737,6 +737,9 @@ def _ask(question: str) -> NextAction:
 #: (6 Nov, production) about one reply in seven came back as prose, and each stopped the run.
 _PLANNER_TRIES = 3
 _PLANNER_REMINDER = "\n\nYour last reply was not a JSON object. Reply with the JSON object only, with no words around it."
+#: 900 cut a reply off mid-object on a large project, and what came back named no move, so
+#: Go asked "what would you like to do next?" about work it could do (9 Nov, production).
+_PLANNER_MAX_TOKENS = 2_500
 
 
 async def choose_next_action(
@@ -748,7 +751,7 @@ async def choose_next_action(
         try:
             result, _usage = await client.generate_json(
                 prompt=user if attempt == 0 else user + _PLANNER_REMINDER,
-                system=system, temperature=0.2, max_tokens=900, model=model,
+                system=system, temperature=0.2, max_tokens=_PLANNER_MAX_TOKENS, model=model,
             )
             break
         except NotJSONError:

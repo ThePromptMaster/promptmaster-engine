@@ -10,6 +10,7 @@
 
 import { describePreview } from '@/lib/data/preview';
 import { buildStageDigest, formatManuscript, type StageArtifactBundle } from './digest';
+import { measuredLines } from './context';
 import { draftingStageId } from './derived-outline';
 import { stageContentForChat, itemSchemaFor } from './stage-artifact';
 import { parseOutlineDocument } from '@/lib/outline/model';
@@ -93,7 +94,7 @@ export function stageStatusLine(st: WorkflowState['stages'][string] | undefined)
 export function buildChatContext(input: {
   template: WorkflowTemplate;
   state: WorkflowState;
-  project: Pick<Project, 'objective' | 'audience' | 'data_files'>;
+  project: Pick<Project, 'objective' | 'audience' | 'data_files'> & Partial<Pick<Project, 'constraints' | 'output_format' | 'facts' | 'code_runs'>>;
   stage: StageDefinition;
   bundles: Record<string, StageArtifactBundle>;
   /** The page's buttons; null for a stage the user is only browsing. */
@@ -155,6 +156,16 @@ export function buildChatContext(input: {
       : null,
     files: (project.data_files ?? []).slice(0, FILES_MAX).map((f) => ({ name: f.name.slice(0, 300), note: describePreview(f.preview).slice(0, 600) })),
     stage_status: stageStatusLine(state.stages[stage.id]),
+    // What code counted on the text on screen, so a count in the chat comes
+    // from here (8 Nov: a card said 236 words, the chat had said 170).
+    ...(shown?.content
+      ? {
+          measured: measuredLines({ ...project, constraints: project.constraints ?? '' }, template, stage, shown.content)
+            .slice(0, 20)
+            .map((m) => `${m.label}: ${m.value}${m.met === false ? ' (not met)' : ''}`.slice(0, 400)),
+          measured_version: shown.version_number,
+        }
+      : {}),
     versions: versions.slice(-VERSIONS_MAX).map((v) => ({
       number: v.version_number,
       made_by: madeBy(v.source_operation),

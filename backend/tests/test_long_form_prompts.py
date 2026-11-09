@@ -365,3 +365,14 @@ def test_chapters_the_brief_names_are_a_section_each_whatever_the_target():
     user = build_outline_prompt(PMInput(objective="A six-chapter book", mode="analyst"), 3)[1]
     assert "each one is its own section" in user
     assert "Never put two chapters in one section." in user
+
+
+def test_a_section_is_written_never_held_for_approval(basic_inputs):
+    """9 Nov, production: an earlier stage said the plan is approved before writing, and Chapter 1
+    came back as "I have not written Chapter 1 ... until you approve a plan"."""
+    outline = [OutlineSection(id="a", title="One", abstract="First.", status="pending")]
+    system, user = build_section_prompt(
+        basic_inputs, outline, 0, None, "", governing="### Brief\nThe chapter plan must be approved before any chapter is written."
+    )
+    assert "Never reply with a plan, a status, a question or a request for approval" in system
+    assert "has already happened" in user

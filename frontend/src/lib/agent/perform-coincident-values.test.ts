@@ -117,3 +117,24 @@ describe("a repair holding the model's own working (7 Nov, production)", () => {
   });
 });
 
+
+describe('the last attempt is the one judged (9 Nov, production)', () => {
+  it('a line the final attempt took out is not reported as still there', async () => {
+    const kept = NEW_PLAN.replace('Spending up to $400 authorized.', 'Keep a $400 minimum reserve.');
+    const short = 'Spending is authorised.';
+    generateStageArtifact.mockReset();
+    generateStageArtifact
+      .mockResolvedValueOnce({ content: kept, items: [], finish_reason: 'stop', model_used: 'm' })
+      .mockResolvedValueOnce({ content: kept, items: [], finish_reason: 'stop', model_used: 'm' })
+      .mockResolvedValueOnce({ content: short, items: [], finish_reason: 'stop', model_used: 'm' });
+    const { c, saved } = ctx();
+    (c.project as { constraints?: string }).constraints = 'A memo under 5 words.';
+    c.template = { ...SINGLE_OUTPUT_V1, stages: SINGLE_OUTPUT_V1.stages.map((st) => (st.id === 'output' ? { ...st, entry_prompt_hint: 'Write the memo.' } : st)) } as typeof c.template;
+    const out = await performStep(c);
+    expect(generateStageArtifact).toHaveBeenCalledTimes(3);
+    expect(generateStageArtifact.mock.calls[2][0].instruction).toContain('YOUR PREVIOUS ATTEMPT MEASURED');
+    expect(saved.at(-1)?.content).toContain(short);
+    expect(out.status).toBe('succeeded');
+    expect(out.output).not.toMatch(/still gives|still says/);
+  });
+});

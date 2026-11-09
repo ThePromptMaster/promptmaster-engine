@@ -12,7 +12,7 @@ export const PROJECT_COST_ROWS = 10_000;
  * unknown and is counted, never added as zero (FR-18). Null when it cannot
  * be read.
  */
-export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean; goSteps: number; goCalls: number }) | null> {
+export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean; goSteps: number; goCalls: number; byKind: CostByKind }) | null> {
   try {
     const { data, error } = await createClient()
       .from('model_usage')
@@ -23,7 +23,7 @@ export async function projectSpent(projectId: string): Promise<(Spent & { capped
     if (error || !data) return null;
     const rows = data as { cost_usd: string | number | null; operation?: string | null; agent_step_id?: string | null }[];
     const spent = totalOf(rows.map((r) => ({ costUsd: r.cost_usd === null ? null : Number(r.cost_usd) })));
-    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS, ...goShare(rows) };
+    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS, ...goShare(rows), byKind: costByKind(rows) };
   } catch {
     return null;
   }
@@ -74,4 +74,32 @@ export function goShare(rows: readonly { operation?: string | null; agent_step_i
     if (r.agent_step_id) steps.add(r.agent_step_id);
   }
   return { goSteps: steps.size, goCalls };
+}
+
+export type CostKind = 'first_draft' | 'revision' | 'review' | 'repair' | 'planning' | 'chat' | 'other';
+export type CostByKind = Partial<Record<CostKind, number>>;
+
+const KIND_OF: Readonly<Record<string, CostKind>> = {
+  'go:draft_stage': 'first_draft', 'go:draft_sections': 'first_draft', 'go:continue_writing': 'first_draft', 'go:generate_outline': 'first_draft',
+  'drain:first_draft': 'first_draft', 'drain:continue': 'first_draft', '/api/generate-stage-artifact': 'first_draft', '/api/generate-outline': 'first_draft',
+  'go:revise_stage': 'revision', 'go:apply_findings': 'revision', 'go:revise_sections': 'revision', 'drain:revision': 'revision',
+  '/api/apply-to-answer': 'revision', '/api/apply-recommendations': 'revision', '/api/save-as-new-version': 'revision', '/api/flow-trigger': 'revision',
+  'go:evaluate_stage': 'review', 'go:declare_objective_complete': 'review', 'go:triage_findings': 'review', 'go:commit_delegated': 'review', 'go:advance_stage': 'review',
+  '/api/evaluate-stage-artifact': 'review', '/api/check-conflicts': 'review', '/api/assess-change': 'review', '/api/extract-figures': 'review', '/api/revision-facts': 'review',
+  '/api/agent/check-answer': 'review', '/api/agent/check-criterion': 'review', '/api/agent/assess-objective': 'review', '/api/agent/screen-question': 'review',
+  '/api/claim-support': 'review', '/api/dependent-claims': 'review', '/api/check-new-claims': 'review',
+  'go:recheck_stage': 'repair', 'drain:repair': 'repair',
+  'go:plan': 'planning', '/api/agent/next-action': 'planning', 'go:return_to_stage': 'planning', 'go:propose_next_round': 'planning',
+  '/api/chat-message': 'chat', '/api/suggest-actions': 'chat', '/api/front-door': 'chat', '/api/guide-next-question': 'chat', '/api/generate-setup': 'chat', '/api/generate-workflow': 'chat',
+};
+
+/** What a project's priced calls went on (pure; a call with no price is not added). */
+export function costByKind(rows: readonly { cost_usd: string | number | null; operation?: string | null }[]): CostByKind {
+  const out: CostByKind = {};
+  for (const r of rows) {
+    if (r.cost_usd === null) continue;
+    const kind = KIND_OF[r.operation ?? ''] ?? 'other';
+    out[kind] = (out[kind] ?? 0) + Number(r.cost_usd);
+  }
+  return out;
 }

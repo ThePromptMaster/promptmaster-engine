@@ -23,6 +23,8 @@ export interface RevisionFinding {
 }
 
 export interface RevisionBrief {
+  /** A repair after a change: only so the cost of its section jobs is counted as one. */
+  repair?: boolean;
   stageLabel: string;
   /** The stage's own instruction, from the template. */
   instruction: string;

@@ -28,6 +28,7 @@ import {
   DRAFT_SECTION,
   type DraftCheckpoint,
   type DraftSectionPayload,
+  type SectionRevisePayload,
   type Job,
   type JobStore,
   type SectionContext,
@@ -71,6 +72,21 @@ const BUDGET_RESERVE_MS = 8_000;
 
 /** A step is assumed to need at least this long; below it, stop and release. */
 const MIN_STEP_MS = 12_000;
+
+
+/** What a section job's model calls are for, on the usage record (8 Nov: "separate baseline, revision, review and repair costs"). */
+export function drainOperation(payload: Pick<DraftSectionPayload, 'revise' | 'continue_only'>): string {
+  if (payload.continue_only) return 'drain:continue';
+  if (payload.revise?.repair) return 'drain:repair';
+  return payload.revise ? 'drain:revision' : 'drain:first_draft';
+}
+
+/** The repair mark is for the usage record; the backend is sent the brief without it. */
+function withoutRepairMark(revise: SectionRevisePayload): SectionRevisePayload {
+  const brief = { ...revise };
+  delete brief.repair;
+  return brief;
+}
 
 export async function runDrain(options: DrainOptions): Promise<DrainReport> {
   const {
@@ -160,7 +176,7 @@ async function runJob(args: RunJobArgs): Promise<void> {
 
   // FR-18/FR-19: attribute everything this job spends and logs. Optional on the
   // interface, so the in-memory test double is unaffected.
-  generator.attributeTo?.(job.id, payload.project_id ?? null);
+  generator.attributeTo?.(job.id, payload.project_id ?? null, drainOperation(payload));
 
   // One checkpointable step per iteration, budget re-checked between them.
   for (;;) {
@@ -284,7 +300,7 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
     userId: job.user_id,
     ...(payload.stage_hint ? { stage_hint: payload.stage_hint } : {}),
     ...(payload.revise && context.section?.content
-      ? { revision: { ...payload.revise, current_content: context.section.content } }
+      ? { revision: { ...withoutRepairMark(payload.revise), current_content: context.section.content } }
       : {}),
   });
 

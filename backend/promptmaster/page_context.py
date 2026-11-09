@@ -121,6 +121,9 @@ class ChatContext(BaseModel):
     stage_status: str = Field(default="", max_length=600)
     #: The stage's latest versions, oldest first.
     versions: list[VersionTrace] = Field(default_factory=list, max_length=12)
+    #: What code counted on the version on screen, and which version that is.
+    measured: list[str] = Field(default_factory=list, max_length=20)
+    measured_version: int | None = None
     #: What changed on the page since the chat's last reply (31 Oct, Sean: the
     #: status and the buttons changed and the chat kept to what it said before).
     changes: list[str] = Field(default_factory=list, max_length=12)
@@ -259,6 +262,23 @@ def format_files(files: list[ProjectFileBrief]) -> str:
     return "\n".join(lines)
 
 
+#: 8 Nov, production: a side-chat reply said "code-verified: 170 words" while the
+#: card showed 236 on a different text. A count is stated from the record or not at all.
+COUNT_RULE = (
+    "Counts: state a word count or any length only if it is listed under MEASURED IN CODE, "
+    "and say which version it is for. If it is not listed, say it has not been counted. "
+    "Never estimate one, and never call a count measured, verified or checked unless it is listed."
+)
+
+
+def format_measured(lines: list[str], version: int | None) -> str:
+    """What code counted on the version on screen, or '' when nothing was."""
+    if not lines:
+        return ""
+    head = f"MEASURED IN CODE on version {version} of this stage:" if version else "MEASURED IN CODE on this stage:"
+    return "\n".join([head, *[f"- {line}" for line in lines]])
+
+
 def format_chat_context(ctx: ChatContext | None) -> str:
     """The block that tells the chat where the user is. '' when nothing was sent,
     so a caller that predates it gets exactly the old prompt."""
@@ -291,6 +311,10 @@ def format_chat_context(ctx: ChatContext | None) -> str:
     versions = format_versions(ctx.versions)
     if versions:
         lines += ["", versions]
+    measured = format_measured(ctx.measured, ctx.measured_version)
+    if measured:
+        lines += ["", measured]
+    lines += ["", COUNT_RULE]
     files = format_files(ctx.files)
     if files:
         lines += ["", files]

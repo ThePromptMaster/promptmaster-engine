@@ -10,6 +10,8 @@ export const hi: Record<keyof typeof en, string> = {
   'acct.lookups_other': 'साहित्य में {count} बार खोजा',
   'acct.wrote': '{stages} लिखा या संशोधित किया',
   'acct.repaired': 'एक बदलाव के बाद {stages} ठीक किया',
+  'acct.repairOpen': 'एक बदलाव के बाद {stages} संशोधित किया, पर यह अब भी फिर से खुला है',
+  'acct.repairFailed': '{stages} ठीक नहीं कर सका',
   'acct.fitted': 'कोड में मापी गई एक आवश्यकता पूरी करने के लिए {stages} संशोधित किया',
   'acct.returns_one': 'आगे के काम के लिए {count} बार वापस गया ({stages})',
   'acct.returns_other': 'आगे के काम के लिए {count} बार वापस गया ({stages})',
