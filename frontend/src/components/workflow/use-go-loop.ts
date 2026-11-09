@@ -708,9 +708,9 @@ export function useGoLoop(opts: Options) {
           const lastRepair = stop.repeating?.includes('recheck_stage')
             ? [...stepsRef.current].reverse().find((s) => s.action_key === 'recheck_stage')
             : undefined;
-          const repairTarget = lastRepair ? String(lastRepair.params?.stage_id ?? lastRepair.stage_id) : '';
+          const repairTarget = stop.repairsFailedOn ?? (lastRepair ? String(lastRepair.params?.stage_id ?? lastRepair.stage_id) : '');
           const need: NeedsUser | null =
-            lastRepair ? repairStuckNeed(o.state, repairTarget, [...priorStepsRef.current, ...stepsRef.current])
+            repairTarget ? repairStuckNeed(o.state, repairTarget, [...priorStepsRef.current, ...stepsRef.current])
             : stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps, saved: savedStages([...priorStepsRef.current, ...stepsRef.current], stageLabelFor) }
             : stop.status === 'blocked' && blocked ? { kind: 'unblock_stage', stageId: o.stage.id, reason: blocked.reason, blockKind: blocked.kind }
             : stop.status === 'awaiting_decision' && !o.project.objective.trim() ? { kind: 'set_objective' }

@@ -829,6 +829,21 @@ describe('preempt: a failure recorded on its row is set aside, not a stop (produ
     const state = projectState(RESEARCH_V1, []);
     expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), failed()] })?.status).toBe('failed');
   });
+
+  describe('two failed repairs (9 Nov, production: the run ended with no way to say what to fix)', () => {
+    const state = projectState(RESEARCH_V1, []);
+    const repair = (stage_id: string) => ({ action_key: 'recheck_stage', status: 'failed', stage_id: 'final', params: { stage_id }, changes: {} }) as never;
+
+    it('of one stage: a pause with the repair card, not a finished run', () => {
+      const stop = preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [repair('plan'), repair('plan')] });
+      expect(stop).toMatchObject({ status: 'blocked', repairsFailedOn: 'plan' });
+    });
+
+    it('of two different stages, or a repair and something else: the run stops as before', () => {
+      expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [repair('plan'), repair('docs')] })?.status).toBe('failed');
+      expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), repair('plan')] })?.status).toBe('failed');
+    });
+  });
 });
 
 describe('reservedApprovalsToReopen: going back asks the user again (Q2e, production replay 9 Oct)', () => {
