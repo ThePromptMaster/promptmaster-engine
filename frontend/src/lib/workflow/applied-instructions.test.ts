@@ -51,3 +51,22 @@ describe('withMeaningChanges: standing changes an instruction states', () => {
     expect(out).toEqual([]);
   });
 });
+
+describe('a long instruction reaches later work whole (9 Nov, production)', () => {
+  const version = (n: number, instruction: string) => ({ id: `v${n}`, version_number: n, source_operation: 'chat_instruct', instruction, created_at: `2026-11-07T0${n}:00:00Z` });
+  const template = { stages: [{ id: 's', label: 'Package' }] } as never;
+  const long = (word: string) => `${word} `.repeat(800).trim();
+
+  it('keeps the latest two up to 8,000 characters, and shortens earlier ones', () => {
+    const bundles = { s: { artifact: null, versions: [version(1, long('first')), version(2, long('second')), version(3, long('third'))] } } as never;
+    const got = appliedInstructions(template, bundles);
+    expect(got.map((g) => g.instruction.endsWith('…'))).toEqual([true, false, false]);
+    expect(got[0].instruction.length).toBe(1_500);
+    expect(got[2].instruction.length).toBeGreaterThan(4_000);
+  });
+
+  it('a limit still applies to the latest', () => {
+    const bundles = { s: { artifact: null, versions: [version(1, 'x'.repeat(9_000))] } } as never;
+    expect(appliedInstructions(template, bundles)[0].instruction.length).toBe(8_000);
+  });
+});
