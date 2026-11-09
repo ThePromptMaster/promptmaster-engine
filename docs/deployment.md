@@ -72,7 +72,8 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 
 | Variable | Required | Notes |
 |---|---|---|
-| `OPENROUTER_API_KEY` | Yes | The only provider credential. Server-side only. |
+| `OPENROUTER_API_KEY` | Yes | The provider credential, used first. Server-side only. |
+| `OPENROUTER_API_KEY_2` | No | A second key. A call moves to it when OpenRouter refuses the first for credit. Read at start-up, so a change needs a redeploy. Credit belongs to an OpenRouter account, so it only helps on a different account, or when each key has its own spending limit. Server-side only. L-231. |
 | `OPENROUTER_DATA_COLLECTION` | No | `deny` (the default) routes only to providers that do not keep what they are sent; `allow` lifts that if a model has no such provider. Read per call, but Vercel needs a redeploy to see a change. L-200. |
 | `ALLOWED_ORIGINS` | Yes | Comma-separated. **No hardcoded default — CORS fails closed if unset.** Must include the frontend's production origin, and any preview origin you want to work. |
 | `SUPABASE_URL` | Yes | Used to build the JWKS URL for asymmetric token verification. |

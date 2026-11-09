@@ -38,7 +38,8 @@ def _build_client() -> OpenRouterClient:
         from promptmaster.mock_llm import ScriptedClient
 
         return ScriptedClient()
-    return OpenRouterClient(api_key=get_api_key())
+    # The second key is optional: it takes over when OpenRouter refuses the first for credit.
+    return OpenRouterClient(api_key=get_api_key(), second_key=os.getenv("OPENROUTER_API_KEY_2"))
 
 
 @asynccontextmanager

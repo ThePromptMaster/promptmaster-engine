@@ -133,6 +133,18 @@ backend, then revoke the old one. Nothing else references it. Brief 5xx on gener
 during the redeploy; saving is unaffected because the save path never touches the
 backend.
 
+### `OPENROUTER_API_KEY_2`
+
+Optional, and rotated the same way. Calls use `OPENROUTER_API_KEY` until OpenRouter
+refuses it for credit (any 402, or a 403 naming a spent budget). The same request then
+moves to this key. The backend logs `openrouter_key_refused_for_credit` with the key's
+number, 1 or 2, and passes over that key for five minutes before trying it first again,
+so a top-up needs no redeploy. People only see "Out of model credits" when both keys
+are refused.
+
+Credit belongs to an OpenRouter account, so two keys on one account share a balance
+and run out together, unless each has its own spending limit. L-231.
+
 ### `WORKER_SHARED_SECRET`
 
 **Set in both Vercel projects and they must match.** Rotating it naively breaks
