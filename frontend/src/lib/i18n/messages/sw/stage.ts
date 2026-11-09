@@ -168,6 +168,7 @@ export const sw: Record<keyof typeof en, string> = {
   'stage.revise': 'Rekebisha',
   'stage.retrySection': 'Jaribu sehemu tena',
   'stage.words': 'Maneno {count}',
+  'stage.wordsWhole': 'Maneno {count} katika sehemu nzima, kama ilivyo sasa',
   'stage.writing': 'Inaandika…',
   'stage.queuedOne': 'Inasubiri',
   'stage.attempt': ' · jaribio {n} kati ya {max}',

@@ -175,6 +175,7 @@ export const ar: Record<keyof typeof en, string> = {
   'stage.revise': 'مراجعة',
   'stage.retrySection': 'إعادة محاولة القسم',
   'stage.words': '{count} كلمة',
+  'stage.wordsWhole': '{count} كلمة في القسم كله بصيغته الحالية',
   'stage.writing': 'جارٍ الكتابة…',
   'stage.queuedOne': 'في قائمة الانتظار',
   'stage.attempt': ' · المحاولة {n} من {max}',

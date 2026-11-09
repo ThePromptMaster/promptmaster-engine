@@ -6,7 +6,7 @@ import type { ProjectFact } from '@/types/project';
 import { laterDoneStages, projectState } from './engine';
 import { BOOK_V1 } from './templates/book.v1';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
-import type { WorkflowEvent } from './types';
+import type { WorkflowEvent, WorkflowTemplate } from './types';
 
 const ev = (type: WorkflowEvent['type'], stage_id: string, created_at: string, extra: Partial<WorkflowEvent> = {}): WorkflowEvent => ({
   type, stage_id, actor: 'user', created_at, ...extra,
@@ -243,5 +243,21 @@ describe('a fact recorded from a side-chat reply is offered, not applied (5 Nov,
       { ...(offered as object), stage_id: 'input', payload: { affected: [], proposed: [{ stage_id: 'input', reason: 'x' }] } } as never,
     ]);
     expect(state.stages.input?.status).not.toBe('stale');
+  });
+});
+
+describe('a reopen reason names the version the stage is at now (8 Nov, production: "v6" beside a current v7)', () => {
+  it('follows later saves of the same stage, and keeps when the stage was first reopened', () => {
+    const template = { key: 'x', stages: ['plan', 'docs'].map((id) => ({ id, label: id === 'plan' ? 'Core plan' : 'Documents', renderer: 'prose', exit_criteria: [], transitions: {} })) } as unknown as WorkflowTemplate;
+    const ev = (type: string, stage_id: string, created_at: string, payload: Record<string, unknown> = {}) => ({ type, stage_id, created_at, payload, actor: 'user' }) as unknown as WorkflowEvent;
+    const events = [
+      ev('stage_marked_complete', 'plan', '2026-11-07T01:00:00Z'),
+      ev('stage_marked_complete', 'docs', '2026-11-07T02:00:00Z'),
+      ev('stage_version_saved', 'plan', '2026-11-07T03:00:00Z', { version_number: 6 }),
+      ev('stage_version_saved', 'plan', '2026-11-07T04:00:00Z', { version_number: 7 }),
+    ];
+    const stale = projectState(template, events).stages.docs.stale;
+    expect(stale?.reason).toBe('Core plan was changed (now v7) after this stage used it.');
+    expect(stale?.since).toBe('2026-11-07T03:00:00Z');
   });
 });

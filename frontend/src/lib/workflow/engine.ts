@@ -560,10 +560,16 @@ export function projectState(
         // drafts in progress after it (8 Oct). Older events: done stages.
         const named = Array.isArray(event.payload?.affected) ? (event.payload.affected as unknown[]).filter((x): x is string => typeof x === 'string') : null;
         order.forEach((id, i) => {
-          const was = state.stages[id]?.status;
+          const st = state.stages[id];
+          const was = st?.status;
           if (i <= cutoff) return;
           if (named ? named.includes(id) && (isDone(was) || was === 'in_progress') : isDone(was)) {
             set(id, { status: 'stale', stale: { reason, since: event.created_at, was: was! } });
+          } else if (was === 'stale' && st?.stale?.reason.startsWith(`${label} was changed`)) {
+            // Already reopened by an earlier save of the same stage: the reason
+            // names the version it is now (8 Nov, production: a screen said
+            // "Core plan v6" beside a current v7). `since` stays the first change.
+            set(id, { stale: { ...st.stale, reason } });
           }
         });
         break;

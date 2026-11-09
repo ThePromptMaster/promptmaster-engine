@@ -296,6 +296,9 @@ export interface ChatContext {
   stage_status?: string;
   /** The stage's latest versions, oldest first, the one on screen marked (31 Oct). */
   versions?: { number: number; made_by: string; cut_off: boolean; shown: boolean }[];
+  /** What code measured on the version on screen ("Email: at most 200 words: 170 words"). */
+  measured?: string[];
+  measured_version?: number;
   /** What changed on the page since the chat's last reply (31 Oct, `chat-changes.ts`). */
   changes?: string[];
 }
