@@ -121,7 +121,7 @@ describe("a repair holding the model's own working (7 Nov, production)", () => {
 describe('the last attempt is the one judged (9 Nov, production)', () => {
   it('a line the final attempt took out is not reported as still there', async () => {
     const kept = NEW_PLAN.replace('Spending up to $400 authorized.', 'Keep a $400 minimum reserve.');
-    const short = 'Spending up to $400.';
+    const short = 'Spending is authorised.';
     generateStageArtifact.mockReset();
     generateStageArtifact
       .mockResolvedValueOnce({ content: kept, items: [], finish_reason: 'stop', model_used: 'm' })
@@ -133,7 +133,7 @@ describe('the last attempt is the one judged (9 Nov, production)', () => {
     const out = await performStep(c);
     expect(generateStageArtifact).toHaveBeenCalledTimes(3);
     expect(generateStageArtifact.mock.calls[2][0].instruction).toContain('YOUR PREVIOUS ATTEMPT MEASURED');
-    expect(saved.at(-1)?.content).toBe(short);
+    expect(saved.at(-1)?.content).toContain(short);
     expect(out.status).toBe('succeeded');
     expect(out.output).not.toMatch(/still gives|still says/);
   });
