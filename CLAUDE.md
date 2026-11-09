@@ -203,7 +203,7 @@ Migrations are the source of truth: always checked in, always idempotent, `drop 
 ## Environment Variables
 
 Frontend `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`).
-Backend `.env`: `OPENROUTER_API_KEY`, `ALLOWED_ORIGINS` (comma-separated; no hardcoded default — CORS fails closed if unset).
+Backend `.env`: `OPENROUTER_API_KEY`, optionally `OPENROUTER_API_KEY_2` (a call moves to it when OpenRouter refuses the first for credit; L-231), `ALLOWED_ORIGINS` (comma-separated; no hardcoded default — CORS fails closed if unset).
 
 **FR-18/FR-19 operations vars.** Frontend: `ADMIN_USER_IDS` — comma-separated
 Supabase user ids allowed to read `/api/admin/overview`. Deliberately *not*

@@ -47,8 +47,8 @@ does not do:
    confirmed against the live project rather than assumed — an untested
    assumption about retention is the most common way a backup policy turns out
    not to exist.
-2. **Custody of the secrets.** `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`,
-   `WORKER_SHARED_SECRET`, `CRON_SECRET` and `ADMIN_USER_IDS` are environment
+2. **Custody of the secrets.** `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`
+   (and `OPENROUTER_API_KEY_2` when set), `WORKER_SHARED_SECRET`, `CRON_SECRET` and `ADMIN_USER_IDS` are environment
    variables in the hosting platform. A database restore does not restore them,
    and a project restored without them is a project that cannot generate, drain
    jobs, or be administered. They are held outside the repository, and losing

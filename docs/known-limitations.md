@@ -3761,3 +3761,13 @@ carried on, as a draft is. The continuation is told what the rewrite has to do a
 from a little before where the new text stops, found by length rather than matched, so a rewrite that
 changed the length a lot can repeat or skip a sentence at the join. Asked to keep everything else, the
 model usually does, but nothing in code compares the two.
+
+### L-231 — Two OpenRouter keys (2026-11-09)
+
+A call moves to `OPENROUTER_API_KEY_2` when OpenRouter refuses the first key for credit: any 402, or a 403
+naming a spent budget. The 403 shape comes from OpenRouter's documentation and hasn't been seen on
+production. Credit belongs to an account, so two keys on one account share a balance unless each has its
+own spending limit. Which key was refused is held in memory on each running server, so a new server asks
+an empty key once more before moving on. Nothing records which key paid for a call, so the split is on
+OpenRouter's own dashboard. A switch shows only in the backend's logs
+(`openrouter_key_refused_for_credit`), so nothing on screen says a key has run out until both have.

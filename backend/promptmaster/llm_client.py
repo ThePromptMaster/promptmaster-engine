@@ -19,6 +19,10 @@ _RETRY_MAX_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 1.5
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
+#: How long a key OpenRouter refused for credit is passed over before it is
+#: tried first again, so a top-up is picked up without a redeploy.
+_NO_CREDIT_REST_SECONDS = 300.0
+
 
 #: Whether the call being made is a JSON repair pass. Set around the repair in
 #: `generate_json`, read by `_meter` (E1, 6 Oct: repair work is measured).
@@ -170,11 +174,24 @@ def _provider_code(response: httpx.Response) -> str | None:
     error = body.get("error")
     if not isinstance(error, dict):
         return None
+    # A spent budget under another status. OpenRouter's docs give a key's own
+    # limit as 402 in one place and 403 in another, and every budget refusal
+    # names its `limit_source`; a moderation 403 carries `reasons` instead.
+    metadata = error.get("metadata")
+    if response.status_code == 403 and isinstance(metadata, dict) and metadata.get("limit_source"):
+        return "insufficient_credits"
     code = error.get("code")
     if code is None:
         # Some providers put the machine-readable name in `type` instead.
         code = error.get("type")
     return str(code) if code is not None else None
+
+
+def _refused_for_credit(error: OpenRouterError) -> bool:
+    """Whether this key could not pay. One definition of that, in `errors`."""
+    from .errors import INSUFFICIENT_CREDITS, classify_error  # late: `errors` imports this module
+
+    return classify_error(error).code == INSUFFICIENT_CREDITS
 
 
 def _retry_after_seconds(response: httpx.Response) -> float | None:
@@ -305,6 +322,7 @@ class OpenRouterClient:
     Features:
     - Configurable per-call timeout
     - Automatic retry (up to 3x) with exponential backoff on transient failures
+    - An optional second key, used when OpenRouter refuses the first for credit
     - JSON-repair pass on parse failure
     - Defensive content validation
     """
@@ -318,13 +336,17 @@ class OpenRouterClient:
         api_key: str | None = None,
         model: str = DEFAULT_MODEL,
         timeout: float = DEFAULT_TIMEOUT,
+        second_key: str | None = None,
     ):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        if not self.api_key:
+        self._keys = list(dict.fromkeys(k.strip() for k in (self.api_key, second_key) if k and k.strip()))
+        if not self._keys:
             raise ValueError(
                 "OpenRouter API key required. Set OPENROUTER_API_KEY environment variable "
                 "or pass api_key parameter."
             )
+        # Held per running server and never stored: forgetting costs one quick refusal.
+        self._no_credit_until: dict[str, float] = {}
         self.model = model
         self.timeout = timeout
         # No client-level timeout: it would silently cap every per-call value.
@@ -372,7 +394,6 @@ class OpenRouterClient:
             payload["response_format"] = {"type": "json_object"}
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/graphcs/promptmaster-engine",
             "X-Title": "PromptMaster Engine",
@@ -419,7 +440,6 @@ class OpenRouterClient:
             payload["response_format"] = {"type": "json_object"}
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/graphcs/promptmaster-engine",
             "X-Title": "PromptMaster Engine",
@@ -459,7 +479,6 @@ class OpenRouterClient:
             "usage": {"include": True},
         }
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/graphcs/promptmaster-engine",
             "X-Title": "PromptMaster Engine",
@@ -614,7 +633,7 @@ class OpenRouterClient:
                 call_timeout = min(call_timeout, remaining)
 
             try:
-                return await self._single_request(payload, headers, attempt, call_timeout)
+                return await self._on_a_key_with_credit(payload, headers, attempt, call_timeout)
             except OpenRouterError as e:
                 # 1 Nov (production, a stage check): the model reasoned until
                 # the limit and answered nothing. Once, straight away, with low
@@ -648,6 +667,43 @@ class OpenRouterClient:
                 await asyncio.sleep(delay)
 
         raise last_error or OpenRouterError("All retry attempts failed")
+
+    async def _on_a_key_with_credit(
+        self,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+        attempt: int,
+        timeout: float | None,
+    ) -> tuple[str, dict[str, int], str]:
+        """One attempt, on the first key that can pay for it.
+
+        OpenRouter refuses for credit before the request reaches a model, so
+        moving to the next key takes a fraction of a second, nothing is
+        generated twice, and it is not one of the retries. A key refused
+        recently goes last rather than being dropped, so it is still asked
+        when no other key can pay, and a top-up counts straight away.
+        """
+        now = time.monotonic()
+        refused: OpenRouterError | None = None
+        for key in sorted(self._keys, key=lambda k: self._no_credit_until.get(k, 0.0) > now):
+            try:
+                return await self._single_request(payload, {**headers, "Authorization": f"Bearer {key}"}, attempt, timeout)
+            except OpenRouterError as e:
+                if not _refused_for_credit(e):
+                    raise
+                refused = e
+                self._rest(key)
+        raise refused or OpenRouterError("No OpenRouter key to try")
+
+    def _rest(self, key: str) -> None:
+        """Pass over a key refused for credit for a while, saying so the first time."""
+        now = time.monotonic()
+        if len(self._keys) > 1 and self._no_credit_until.get(key, 0.0) <= now:
+            logger.warning(
+                "openrouter_key_refused_for_credit",
+                extra={"event": "openrouter_key_refused_for_credit", "key_number": self._keys.index(key) + 1},
+            )
+        self._no_credit_until[key] = now + _NO_CREDIT_REST_SECONDS
 
     async def _single_request(
         self,
