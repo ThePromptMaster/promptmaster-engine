@@ -3850,6 +3850,13 @@ by itself (FR-02). The switch is still one-way (L-123). The size is kept for the
 worked out again when the objective changes, which is how a one-stage project that has grown is noticed.
 A size that could not be read moves nothing.
 
+The draft becomes the first version of the deliverable only when the workflow picked has a written stage to
+take it (`carryTarget`). A workflow that writes in chapters, which is what a long request usually gets, has
+none: the draft was read to design it and is not carried into it, and after the switch the draft is no
+longer shown anywhere in the project, though its versions stay in the database. The panel says which case
+applies before the press. On the first production run it said "Your draft is carried in" for a chapters
+workflow, which was false; the line was corrected the same day.
+
 Not built: shrinking a designed workflow once it is running beyond Go skipping optional stages (L-69), and
 adding stages to a designed writing workflow while it runs (L-115 stays investigations only: the first
 production run of an added stage that had to change the deliverable failed, see L-233). A project started before this
