@@ -15,6 +15,7 @@ from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, PMInput, SavedSource, SetupSuggestion, ThirdPartyItem, WebUse
 from promptmaster.project_context import brought_titles
 from promptmaster import web_search
+from promptmaster.request_size import SizeRequest, SizeResponse, size_request
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.front_door import BRIEF_FIELDS, DraftBrief, FrontDoorTurn, Turn, front_door_turn
@@ -155,6 +156,8 @@ class GenerateWorkflowRequest(BaseModel):
     #: The project's Web access: on, a stage that needs current facts is told to search
     #: and cite, not to leave them unverified (24 Oct).
     web_access: Literal["on", "off"] | None = None
+    #: How much process the request needs (`request_size`): scales the number of stages.
+    depth: Literal["standard", "full"] | None = None
 
 
 class GenerateWorkflowResponse(BaseModel):
@@ -168,12 +171,23 @@ async def api_generate_workflow(
 ) -> GenerateWorkflowResponse:
     """Propose the stages of a workflow for this kind of work. 1 LLM call; saves nothing."""
     try:
-        workflow = await design_workflow(client, req.model or None, req.description, req.objective, req.web_access)
+        workflow = await design_workflow(client, req.model or None, req.description, req.objective, req.web_access, req.depth)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return GenerateWorkflowResponse(workflow=workflow)
+
+
+@router.post("/size-request")
+async def api_size_request(
+    req: SizeRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> SizeResponse:
+    """How much process a request needs: concise, standard or full (11 Nov). A rule
+    where the request's own words settle it, else 1 small LLM call; saves nothing,
+    and never fails: an unreadable answer is `standard`."""
+    return await size_request(client, req)
 
 
 class ReviseWorkflowRequest(BaseModel):

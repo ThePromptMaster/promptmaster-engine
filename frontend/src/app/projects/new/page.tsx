@@ -1,5 +1,6 @@
 'use client';
 
+import { designDepth, isConcise } from '@/lib/workflow/request-size';
 import { formOf } from '@/lib/workflow/work-form';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -311,6 +312,11 @@ export default function NewProjectPage() {
     // default is a custom workflow after answering what you want to do or a
     // conversation"), worked out beside the usual setup. The standard
     // workflow the setup picks stays the fallback and an alternative.
+    // The request, not the way in, decides how much process it gets (11 Nov,
+    // a client: "the actual request determines the depth and workflow"). A
+    // concise one is the one-stage workflow and is not designed; a larger one
+    // is designed to its size. A size that cannot be read designs as before.
+    const sizing = api.sizeRequest({ description: [ask.trim(), brought].filter(Boolean).join('\n\n').slice(0, 20_000), attached_chars: brought.length }).catch(() => null);
     const [{ suggestion }, design] = await Promise.all([
       api.generateSetup({
         objective: ask.trim(),
@@ -319,10 +325,11 @@ export default function NewProjectPage() {
         // A new project has Web access on: its setup may not say there is no web (22 Oct).
         web_access: 'on',
       }),
-      designFor(ask, brought, given),
+      sizing.then((size) => (isConcise(size) && templateFor('quick') ? null : designFor(ask, brought, given, designDepth(size)))),
     ]);
     const standard = templateFor(suggestion.workflow) ?? templateFor('single_output');
-    const recommended = design ?? standard;
+    const concise = isConcise(await sizing) ? templateFor('quick') : undefined;
+    const recommended = concise ?? design ?? standard;
     const split = withDocuments(ask);
     const suggested: SetupDraft = {
       title: titleFrom(ask),
@@ -347,12 +354,12 @@ export default function NewProjectPage() {
    * outrageous"). Null when the design fails or does not pass the checks
    * every workflow must — the standard recommendation stands then.
    */
-  async function designFor(ask: string, brought: string, given?: { question: string; answer: string }[]) {
+  async function designFor(ask: string, brought: string, given?: { question: string; answer: string }[], depth?: 'standard' | 'full') {
     try {
       const answers = (given ?? []).map((a) => `${a.question} ${a.answer}`).join('\n');
       const description = [ask.trim(), answers, brought].filter(Boolean).join('\n\n').slice(0, DESIGN_BRIEF_MAX);
       // A new project has Web access on: stages that need current facts search and cite (24 Oct).
-      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX), web_access: 'on' });
+      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX), web_access: 'on', ...(depth ? { depth } : {}) });
       const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
       const template = templateFromDesign(workflow, suffix);
       if (validateTemplate(template).length) return null;

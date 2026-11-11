@@ -14,7 +14,7 @@
  * project is still the quick answer it was.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { useT } from '@/lib/i18n/i18n-provider';
@@ -22,6 +22,7 @@ import { useWorkflowWords } from '@/components/projects/workflow-picker';
 import { templateFromDesign } from '@/lib/workflow/custom';
 import { validateTemplate } from '@/lib/workflow/validate';
 import { carryTarget, switchBrief } from '@/lib/workflow/quick';
+import { designDepth, keepSize, outgrowsOneStage, readSize, sizeKey, type RequestSize } from '@/lib/workflow/request-size';
 import { appendWorkflowEvent, getLatestTemplate, publishUserTemplate } from '@/lib/supabase/workflow';
 import { appendVersion, createArtifact } from '@/lib/supabase/versions';
 import { loadStageChat, saveStageChatMessage } from '@/lib/supabase/conversation';
@@ -52,6 +53,43 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
   const [error, setError] = useState<string | null>(null);
   const web = project.web_access ?? 'on';
 
+  // The request decides how much process it gets, whichever button started it
+  // (11 Nov, a client). A first draft of a request that is more than one
+  // sitting has the full process set up around it, ready for one press: the
+  // press stays the user's, because re-pinning a workflow moves the project's
+  // stages. Sized once per objective, so a changed objective is sized again.
+  const [size, setSize] = useState<RequestSize | null>(null);
+  const request = project.objective.trim();
+  useEffect(() => {
+    if (!request) return;
+    const key = sizeKey(project.id, request);
+    const kept = readSize(key);
+    if (kept) {
+      setSize(kept);
+      return;
+    }
+    let live = true;
+    void api
+      .sizeRequest({ description: [request, project.context?.trim()].filter(Boolean).join('\n\n').slice(0, 20_000) })
+      .then((found) => {
+        keepSize(key, found);
+        if (live) setSize(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [project.id, request, project.context]);
+  const outgrown = outgrowsOneStage(size);
+  const offered = useRef(false);
+  useEffect(() => {
+    if (!outgrown || offered.current || !answer.trim()) return;
+    offered.current = true;
+    void prepare();
+    // Offered once, when the size is known and there is a draft to carry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outgrown, answer]);
+
   async function prepare() {
     setOpen(true);
     if (choices) return;
@@ -64,7 +102,7 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
       const [setup, designed] = await Promise.all([
         api.generateSetup({ objective: project.objective.trim(), material: brief, web_access: web }),
         api
-          .generateWorkflow({ description: brief, objective: project.objective.trim().slice(0, 8_000), web_access: web })
+          .generateWorkflow({ description: brief, objective: project.objective.trim().slice(0, 8_000), web_access: web, ...(designDepth(size) ? { depth: designDepth(size) } : {}) })
           .then(({ workflow }) => {
             const made = templateFromDesign(workflow, crypto.randomUUID().replace(/-/g, '').slice(0, 10));
             return validateTemplate(made).length ? null : made;
@@ -172,7 +210,10 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
         </div>
       ) : (
         <div>
-          <h2 className="text-title text-[var(--on-surface)]">{t('quick.takeFullTitle')}</h2>
+          <h2 className="text-title text-[var(--on-surface)]">{outgrown ? t('quick.sizedTitle') : t('quick.takeFullTitle')}</h2>
+          {outgrown && (
+            <p data-sized={size?.depth} className="mt-1 text-body text-[var(--on-surface)]">{t('quick.sizedIntro', { reason: size?.reason ?? '' })}</p>
+          )}
           <p className="mt-1 text-body text-[var(--on-surface-variant)]">{t('quick.takeFullIntro')}</p>
           {busy === 'preparing' && (
             <p role="status" className="mt-3 text-body text-[var(--on-surface-variant)]">{t('start.workingSetup')}</p>

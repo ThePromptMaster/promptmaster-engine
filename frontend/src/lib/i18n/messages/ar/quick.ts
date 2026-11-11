@@ -32,6 +32,8 @@ export const ar: Record<keyof typeof en, string> = {
   "early.caveats": "لم يُنجز بعد",
   "early.bannerTitle": "أُنهي مبكرًا — لم يُنجز بعد:",
   "early.goBack": "العودة إلى هذا",
+  "quick.sizedTitle": "هذا الطلب يحتاج أكثر من جولة واحدة",
+  "quick.sizedIntro": "{reason} جهّز PromptMaster العملية الكاملة له أدناه. تُنقل مسودتك معها، وضغطة واحدة تكفي للمتابعة.",
   "fc.checking": "جارٍ التحقق من هذه المسودة مقابل ما قدّمته…",
   "fc.clean": "تم التحقق مقابل ما قدّمته: لا شيء يحتاج تصحيحًا.",
   "fc.corrected": "تم التحقق مقابل ما قدّمته وتصحيح {count}. النسخة السابقة محفوظة في السجل.",

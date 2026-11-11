@@ -125,14 +125,25 @@ WEB_OFF_RULE = (
 )
 
 
-def build_workflow_prompt(description: str, objective: str, web_access: str | None = None) -> tuple[str, str]:
+#: Stages asked for at each depth (11 Nov): the request, not the way in, decides how
+#: many. A concise request is not designed at all: it is the one-stage workflow.
+STAGE_RANGE = {"standard": (MIN_STAGES, 5), "full": (5, MAX_STAGES - 2)}
+
+
+def build_workflow_prompt(description: str, objective: str, web_access: str | None = None, depth: str | None = None) -> tuple[str, str]:
+    low, high = STAGE_RANGE.get(depth or "", (MIN_STAGES, MAX_STAGES - 2))
+    sized = {
+        "standard": " This is one deliverable of ordinary size: keep to the fewest stages that do the work, and mark "
+        "\"required\": false on any stage it could be finished without.",
+        "full": " This is long or many-part work: give it the stages an expert would really go through.",
+    }.get(depth or "", "")
     kinds = "\n".join(f'- "{k}": {v}' for k, v in KINDS.items())
     web = {"on": WEB_ON_RULE, "off": WEB_OFF_RULE}.get(web_access or "", "")
     user = (
         f"THE KIND OF WORK: {description.strip()}\n"
         f"THE USER'S OBJECTIVE: {objective.strip() or '(not given yet)'}\n\n"
         + (f"{web}\n\n" if web else "")
-        + f"Design {MIN_STAGES} to {MAX_STAGES - 2} stages for this kind of work.\n"
+        + f"Design {low} to {high} stages for this kind of work.{sized}\n"
         "The first stage states the objective and what success looks like. The last "
         "stage produces the finished deliverable, ready to use. Put a check stage after "
         "the work it checks, never first — after EVERY stage whose output it checks: a final "
@@ -340,9 +351,10 @@ def fix_loops(stages: list[DesignedStage], execution: Execution) -> list[Designe
 
 
 async def design_workflow(
-    client: OpenRouterClient, model: str | None, description: str, objective: str, web_access: str | None = None
+    client: OpenRouterClient, model: str | None, description: str, objective: str, web_access: str | None = None,
+    depth: str | None = None,
 ) -> DesignedWorkflow:
-    system, user = build_workflow_prompt(description, objective, web_access)
+    system, user = build_workflow_prompt(description, objective, web_access, depth)
     # 3,000 tokens cut a seven-stage design short on 24 Oct; the repair pass
     # rescued it, but a design should not depend on that.
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=6_000, model=model)
