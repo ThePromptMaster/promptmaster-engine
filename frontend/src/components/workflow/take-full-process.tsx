@@ -81,6 +81,8 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
     };
   }, [project.id, request, project.context]);
   const outgrown = outgrowsOneStage(size);
+  /** Whether the workflow picked has a written stage the draft becomes the first version of. */
+  const carries = Boolean(choices?.[picked] && carryTarget(choices[picked].template));
   const offered = useRef(false);
   useEffect(() => {
     if (!outgrown || offered.current || !answer.trim()) return;
@@ -214,7 +216,13 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
           {outgrown && (
             <p data-sized={size?.depth} className="mt-1 text-body text-[var(--on-surface)]">{t('quick.sizedIntro', { reason: size?.reason ?? '' })}</p>
           )}
-          <p className="mt-1 text-body text-[var(--on-surface-variant)]">{t('quick.takeFullIntro')}</p>
+          {/* Said only where it is true (11 Nov, production): a workflow that writes in
+              chapters has no stage the draft can become the first version of. */}
+          {choices && (
+            <p data-carries={carries ? 'yes' : 'no'} className="mt-1 text-body text-[var(--on-surface-variant)]">
+              {carries ? t('quick.takeFullIntro') : t('quick.carriesNot')}
+            </p>
+          )}
           {busy === 'preparing' && (
             <p role="status" className="mt-3 text-body text-[var(--on-surface-variant)]">{t('start.workingSetup')}</p>
           )}
