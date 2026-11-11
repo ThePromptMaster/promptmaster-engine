@@ -631,7 +631,16 @@ export const api = {
   },
 
   /** Propose the stages of a workflow for this kind of work (3 Oct call). 1 LLM call; saves nothing. */
-  async generateWorkflow(req: { description: string; objective?: string; web_access?: 'on' | 'off' }): Promise<{ workflow: import('@/lib/workflow/custom').DesignedWorkflow }> {
+  /**
+   * How much process a request needs (11 Nov): concise, standard or full. A rule
+   * where the request's own words settle it, else one small call. Never fails
+   * on the server: an unreadable answer is `standard`, marked `default`.
+   */
+  async sizeRequest(req: { description: string; attached_chars?: number }): Promise<import('@/lib/workflow/request-size').RequestSize> {
+    return apiFetch('/api/size-request', { method: 'POST', body: JSON.stringify(req) });
+  },
+
+  async generateWorkflow(req: { description: string; objective?: string; web_access?: 'on' | 'off'; depth?: 'standard' | 'full' }): Promise<{ workflow: import('@/lib/workflow/custom').DesignedWorkflow }> {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 

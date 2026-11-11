@@ -11,6 +11,7 @@
  * no renderer or rule learns that a stage was added.
  */
 
+import { ADDED_STAGE_PREFIX } from './digest';
 import type { ExitCriterion, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { withRestatedApprovalsAsChecks } from './triage-approval';
 
@@ -121,7 +122,7 @@ export function placementFor(template: WorkflowTemplate, currentStageId: string)
 
 /** A stage id not yet used in the template, from the stage's name. */
 export function newStageId(template: WorkflowTemplate, label: string): string {
-  const base = `added_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'stage'}`;
+  const base = `${ADDED_STAGE_PREFIX}${label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'stage'}`;
   let id = base;
   for (let n = 2; template.stages.some((s) => s.id === id); n += 1) id = `${base}_${n}`;
   return id;

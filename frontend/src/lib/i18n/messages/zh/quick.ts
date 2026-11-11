@@ -32,6 +32,8 @@ export const zh: Record<keyof typeof en, string> = {
   "early.caveats": "尚未完成",
   "early.bannerTitle": "提前完成——尚未完成：",
   "early.goBack": "回到这里",
+  "quick.sizedTitle": "这个请求需要不止一轮",
+  "quick.sizedIntro": "{reason} PromptMaster 已在下方为它准备好完整流程。你的草稿会一并带入，按一下即可继续。",
   "fc.checking": "正在对照你提供的内容检查这份草稿…",
   "fc.clean": "已对照你提供的内容检查：无需更正。",
   "fc.corrected": "已对照你提供的内容检查并更正 {count} 处。之前的版本保留在历史记录中。",

@@ -3824,8 +3824,34 @@ the page opened, one the user edited or changed through the chat, a cut-off draf
 runs in the browser, so closing the tab during it leaves the draft unchecked, and reopening does not start
 it. The correction does not search the web. Each draft costs one more call, or three when it is corrected.
 
-Found on production during this pass and not fixed: on a workflow marked as an investigation, when the
-objective check names a next task that is really a change to the deliverable, Go adds it as a stage before
-the deliverable (L-115). That stage is not shown the deliverable's text. On one run its writer answered
-with a note instead of a document, the step failed, a skip was refused, and the run stopped on two failures.
+Found on production during this pass: on a workflow marked as an investigation, when the objective check
+names a next task that is really a change to the deliverable, Go adds it as a stage before the deliverable
+(L-115). That stage was not shown the deliverable's text. On one run its writer answered with a note
+instead of a document, the step failed, a skip was refused, and the run stopped on two failures. An added
+stage is now shown what the later stages already hold (`buildStageDigest`). It still writes a document of
+its own that the deliverable is then rechecked from, and a writer can still answer with a note.
+
+### L-234 — The request, not the start button, decides how much process (2026-11-11)
+
+`POST /api/size-request` says whether a request is concise, standard or full: a rule when the request
+states a length or a number of chapters, otherwise one small model call told to choose the smaller when
+unsure. On ten test requests the model agreed with the expected size on nine. It reads the request and
+whatever was attached at the start, not the conversation that follows.
+
+On the planning routes ("Build a plan with me", "I know what I want to do") a concise request is given the
+one-stage workflow with its final check (L-233) instead of a designed one, and a larger one is designed to
+its size: three to five stages for standard, five to eight for full. Go is not shown on a one-stage project,
+as before. "Choose the workflow yourself" is untouched.
+
+On "Get a first draft" the draft is written first, as before. If the request is larger than one sitting,
+the full process is designed around the draft and shown ready, with the reason, for one press. It is not
+switched without that press: re-pinning a workflow moves the project's stages, and a model never does that
+by itself (FR-02). The switch is still one-way (L-123). The size is kept for the browser session and
+worked out again when the objective changes, which is how a one-stage project that has grown is noticed.
+A size that could not be read moves nothing.
+
+Not built: shrinking a designed workflow once it is running beyond Go skipping optional stages (L-69), and
+adding stages to a designed writing workflow while it runs (L-115 stays investigations only: the first
+production run of an added stage that had to change the deliverable failed, see L-233). A project started before this
+keeps the workflow it has.
 
