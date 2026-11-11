@@ -641,6 +641,7 @@ failed check. Assessment: `docs/assessments/2026-10-06-delegation-and-efficiency
 | Validation | automatic exit criteria (`engine.ts`), the commit check (`commit-check.ts`), figure support, the source check (`verify_sources.py`) |
 | Which approvals are routine | `ExitCriterion.authority` (`'delegable'` / `'reserved'`; absent = reserved) in template data; custom workflows from the designer's `approval_kind`, with new commitments as a separate reserved sign-off |
 | Whether routine ones are delegated | `projects.routine_decisions` (`ask` / `handle`), set by the user (`routine_policy_changed`) |
+| What choosing it implies | `policy.levelFor`: Handle sets the level to Autonomous when it was Guided; `shouldPause` ignores a model's flag on `advance_stage` when the stage can advance; the question screen's `routine_choice` verdict is settled by Go and recorded as a fact (L-232) |
 | A delegated commit | Go's `commit_delegated`: `check-criterion` first, then a `criterion_committed` event as the run, then the box; the database checks policy and authority when the row is written (`20261018000100`) |
 | Safe commits | `checkCommit`: empty, prose-for-table, no rows, a dropped user decision (unless the user reviewed it), or a stale base are refused; each refusal is a `revision_refused` event shown on the stage |
 | AI vs Human verified | review statuses `ai_verified` / `ai_not_supported` (a tool sets them, from the abstract, with the quote on the row) vs `verified` ("Human verified") |

@@ -926,6 +926,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           output: cutOffMessage(ctx.stage.label, content),
         });
       }
+      // A question Go settled itself under the routine policy: the choice on
+      // record, as when the user presses "Do whatever is best" (8 Nov).
+      if (revising && typeof params.left_to_go === 'string' && typeof versionId === 'string') {
+        const chosen = chosenFrom([res.note_to_user, split.note].filter(Boolean).join(' '));
+        await recordFacts(ctx.project, [delegatedFact(params.left_to_go, chosen ?? `see ${ctx.stage.label}, the version saved with this choice`, { run_id: ctx.run.id, stage_id: ctx.stage.id, version_id: versionId })]).catch(() => undefined);
+      }
       // Go's own new version leaves the approvals on the one before it (L-117).
       const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, content) : [];
       return done(key, {

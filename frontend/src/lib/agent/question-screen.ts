@@ -10,9 +10,9 @@
 
 import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
-import { touchesObjective } from './stop-audit';
+import { DELEGATED_RULE } from '@/lib/workflow/answers';
 
-export type ScreenVerdict = 'routine_repair' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input';
+export type ScreenVerdict = 'routine_repair' | 'routine_choice' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input';
 
 export interface QuestionScreen {
   verdict: ScreenVerdict;
@@ -28,7 +28,10 @@ const MAX_RECORDED = 2;
 
 export function shouldScreen(input: { policy: ExecutionPolicy; routine: string | null | undefined; question: string; recordedHere: number; expert?: boolean }): boolean {
   if (input.policy !== 'autonomous' || input.routine !== 'handle') return false;
-  if (input.expert || !input.question.trim() || touchesObjective(input.question)) return false;
+  // A word like "scope" or "requirements" in the question no longer keeps it
+  // from the screen (8 Nov): the screen reads the user's own words and says
+  // itself when a question is a business decision.
+  if (input.expert || !input.question.trim()) return false;
   return input.recordedHere < MAX_RECORDED;
 }
 
@@ -60,6 +63,23 @@ export function planFromScreen(
         action_key: 'declare_objective_complete', params: {},
         rationale: 'Not asking for your approval again: it stands for the version you approved, and every version since is one of my routine repairs.',
         expected_outcome: 'The objective judged on the current version, with your approval shown against the version it was given on.',
+      },
+    };
+  }
+  // A choice with no wrong answer is Go's under "handle them for me": what
+  // pressing "Do whatever is best" did, without the press (8 Nov, a client). The
+  // revision decides it in the text and the choice is recorded as a fact the
+  // user can change.
+  if (screen.verdict === 'routine_choice') {
+    if (!input.allowed.includes('revise_stage')) return { kind: 'ask' };
+    const asked = input.question.trim().slice(0, 1000);
+    return {
+      kind: 'repair',
+      move: {
+        action_key: 'revise_stage',
+        params: { instruction: `Settle this question yourself rather than asking it: "${asked}".${DELEGATED_RULE}`, left_to_go: asked },
+        rationale: `Instead of asking "${input.question.slice(0, 200)}": ${screen.reason || 'either answer fits what you asked for, and routine decisions are mine to handle.'}`,
+        expected_outcome: 'The question decided in the text, and the choice recorded as a fact you can change.',
       },
     };
   }

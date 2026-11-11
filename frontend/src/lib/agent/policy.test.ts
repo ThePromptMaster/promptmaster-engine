@@ -8,7 +8,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint, repairedTooOften, REPAIRS_PER_STAGE_PER_RUN, unplannedMove } from './policy';
+import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, levelFor, stageMoveActor, stateFingerprint, repairedTooOften, REPAIRS_PER_STAGE_PER_RUN, unplannedMove } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -149,6 +149,20 @@ describe('shouldPause — the execution policy, not the model', () => {
   it('Autonomous pauses only when the model asks the user', () => {
     expect(shouldPause('autonomous', 'advance_stage', false)).toBe(false);
     expect(shouldPause('autonomous', 'derive', true)).toBe(true);
+  });
+  it('under Handle a model flag does not pause moving on from a stage whose requirements hold (8 Nov)', () => {
+    expect(shouldPause('autonomous', 'advance_stage', true, { routine: 'handle', canAdvance: true })).toBe(false);
+    expect(shouldPause('autonomous', 'advance_stage', true, { routine: 'handle', canAdvance: false })).toBe(true);
+    expect(shouldPause('autonomous', 'advance_stage', true, { routine: 'ask', canAdvance: true })).toBe(true);
+    expect(shouldPause('autonomous', 'derive', true, { routine: 'handle', canAdvance: true })).toBe(true);
+    expect(shouldPause('guided', 'advance_stage', false, { routine: 'handle', canAdvance: true })).toBe(true);
+  });
+  it('choosing Handle means an Autonomous run unless another level was picked (8 Nov)', () => {
+    expect(levelFor('handle')).toBe('autonomous');
+    expect(levelFor('handle', 'guided')).toBe('autonomous');
+    expect(levelFor('handle', 'checkpoint')).toBe('checkpoint');
+    expect(levelFor('ask', 'guided')).toBe('guided');
+    expect(levelFor(undefined)).toBe('guided');
   });
   it('the model can escalate but never de-escalate', () => {
     // needs_user_decision=false does not un-important run_computation.

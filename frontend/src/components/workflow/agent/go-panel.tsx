@@ -1,5 +1,6 @@
 'use client';
 
+import { levelFor } from '@/lib/agent/policy';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { shownModeName } from '@/lib/i18n/stage';
@@ -375,7 +376,16 @@ export function GoPanel({
       {expanded && (
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
-          {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
+          {routine && (
+            <RoutineDecisions
+              value={routine.value}
+              onChange={(v) => {
+                routine.onChange(v);
+                // Handing routine decisions to Go is asking it to carry on: the level follows.
+                if (!go.active && go.phase !== 'watching') go.setPolicy(levelFor(v, go.policy));
+              }}
+            />
+          )}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           {alerts && <div className="mt-2"><GoAlertsControl alerts={alerts} /></div>}
