@@ -31,6 +31,8 @@ def test_a_stated_length_is_read_from_the_request():
 def test_what_the_words_settle_is_a_rule_and_costs_no_call():
     assert size_by_rule("Write a 60,000-word book about lions").depth == "full"
     assert size_by_rule("A report in twelve chapters on the grid").depth == "full"
+    # The reason reads as a sentence however the request spelt it ("12-chapter" on production, 11 Nov).
+    assert size_by_rule("A complete 12-chapter operations handbook").reason == "The request asks for 12 chapters, which is long work."
     short = size_by_rule("A 300 word email to the team about Friday")
     assert short.depth == "concise" and short.by == "rule"
     # A length in between, or none, is not settled by a rule.

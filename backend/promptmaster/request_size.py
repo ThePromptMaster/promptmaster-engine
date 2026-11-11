@@ -77,7 +77,7 @@ def size_by_rule(description: str) -> SizeResponse | None:
     words = stated_words(text)
     chapters = _CHAPTERS.search(text)
     if chapters or (words is not None and words >= FULL_WORDS):
-        said = f"{chapters.group(0)}" if chapters else f"about {words:,} words"
+        said = f"{chapters.group(1)} chapters" if chapters else f"about {words:,} words"
         return SizeResponse(depth="full", reason=f"The request asks for {said}, which is long work.", by="rule")
     if words is not None and words <= CONCISE_WORDS:
         return SizeResponse(depth="concise", reason=f"The request asks for about {words:,} words, which is one sitting.", by="rule")
