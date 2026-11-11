@@ -67,7 +67,7 @@ import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurab
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -1233,7 +1233,7 @@ export function useGoLoop(opts: Options) {
 
         // A question, or a suggestion to skip, is itself the pause.
         const asking = ['ask', 'skip'].includes(actionFor(choice.action_key)?.performer ?? '');
-        if (!asking && shouldPause(current.policy, choice.action_key, choice.needs_user_decision)) {
+        if (!asking && shouldPause(current.policy, choice.action_key, choice.needs_user_decision, { routine, canAdvance: stageEvaluation.canAdvance })) {
           await setAgentStepStatus(step.id, 'awaiting_decision');
           upsertStep({ ...step, status: 'awaiting_decision' });
           await setRunStatus('awaiting_decision', `Waiting for your approval: ${actionLabel(choice.action_key)}.`);
@@ -1866,7 +1866,11 @@ export function useGoLoop(opts: Options) {
       // Nothing live: still show what the last run did — the record should
       // not vanish because the run finished.
       const last = await getLatestAgentRun(opts.project.id);
-      if (!last) return;
+      if (!last) {
+        // No run yet: the panel opens at the level the project's routine setting implies.
+        setPolicy((p) => levelFor(opts.project.routine_decisions, p));
+        return;
+      }
       // Windows authorised in advance outlast a reload (13 Oct).
       autoLeftRef.current = await autoWindowsLeft(last).catch(() => 0);
       setAutoPending(autoLeftRef.current > 0);

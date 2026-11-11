@@ -18,8 +18,8 @@ describe('which questions are read at all (8 Nov)', () => {
     expect(shouldScreen({ ...on, routine: 'ask' })).toBe(false);
     expect(shouldScreen({ ...on, policy: 'checkpoint' })).toBe(false);
   });
-  it('never a question about the objective or the user’s own decision, or one for an expert', () => {
-    expect(shouldScreen({ ...on, question: 'Should the scope change?' })).toBe(false);
+  it('never one for an expert; a word like "scope" no longer keeps a question from being read (8 Nov)', () => {
+    expect(shouldScreen({ ...on, question: 'Should the scope change?' })).toBe(true);
     expect(shouldScreen({ ...on, expert: true })).toBe(false);
   });
   it('stops recording after two on a stage, so a wrong screen cannot loop', () => {
@@ -85,5 +85,28 @@ describe('routine work this run can no longer do on the stage (9 Nov, production
 
   it('with nothing left to do either, it is still asked', () => {
     expect(planFromScreen(screen({ verdict: 'routine_repair', instruction: 'Trim.' }), { ...base, allowed: [] })).toEqual({ kind: 'ask' });
+  });
+});
+
+describe('a choice with no wrong answer is Go’s under Handle (8 Nov, a client: "Do whatever is best" selected automatically)', () => {
+  const input = {
+    question: 'Shall I go back to Manuscript and correct the four flagged passages?',
+    template: { stages: [] }, stage: { transitions: {} as never }, allowed: ['revise_stage'], returnsLeft: 2,
+  };
+  const choice = { verdict: 'routine_choice' as const, reason: 'Either way fits the brief.', instruction: '', target_stage: '', action: '', requirement_quote: '' };
+  it('becomes a revision told to decide it, carrying the question so the choice is recorded', () => {
+    const plan = planFromScreen(choice, input);
+    expect(plan.kind).toBe('repair');
+    if (plan.kind !== 'repair') return;
+    expect(plan.move.action_key).toBe('revise_stage');
+    expect(String(plan.move.params.instruction)).toContain('DECIDE IT NOW');
+    expect(plan.move.params.left_to_go).toBe(input.question);
+    expect(plan.move.rationale).toContain('Instead of asking');
+  });
+  it('is asked when this run can no longer revise the stage', () => {
+    expect(planFromScreen(choice, { ...input, allowed: ['declare_objective_complete'] })).toEqual({ kind: 'ask' });
+  });
+  it('a business decision is still asked', () => {
+    expect(planFromScreen({ ...choice, verdict: 'business_decision' }, input)).toEqual({ kind: 'ask' });
   });
 });

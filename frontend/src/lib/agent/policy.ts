@@ -813,10 +813,32 @@ export function isImportant(actionKey: string, needsUserDecision: boolean): bool
   return needsUserDecision || Boolean(actionFor(actionKey)?.important);
 }
 
+/**
+ * The level a project's Go panel opens at, and the level choosing a routine
+ * setting implies (8 Nov, a client: "Autonomous with 'Handle them for me' is
+ * pausing for routine approvals, like moving to the next stage after checks
+ * have passed" — the run was Guided: the panel opened there, he chose Handle
+ * and pressed Go, and every move waited for a press). Handing routine
+ * decisions to Go is asking it to carry on, so Handle means Autonomous unless
+ * the user then picks another level themselves.
+ */
+export function levelFor(routine: RoutineDecisions | null | undefined, current: ExecutionPolicy = 'guided'): ExecutionPolicy {
+  return routine === 'handle' && current === 'guided' ? 'autonomous' : current;
+}
+
 /** Stop for the user's approval before performing this move? */
-export function shouldPause(policy: ExecutionPolicy, actionKey: string, needsUserDecision: boolean): boolean {
+export function shouldPause(
+  policy: ExecutionPolicy, actionKey: string, needsUserDecision: boolean,
+  /** The project's routine setting, and whether the stage's own requirements all hold. */
+  stage?: { routine?: RoutineDecisions | null; canAdvance?: boolean }
+): boolean {
   if (policy === 'guided') return true;
   if (policy === 'checkpoint') return isImportant(actionKey, needsUserDecision);
+  // Moving on from a stage whose requirements all hold is decided by those
+  // requirements, which are rules, not by a model's flag on the move (8 Nov,
+  // a client: "pausing for routine approvals, like moving to the next stage after
+  // checks have passed").
+  if (stage?.routine === 'handle' && stage.canAdvance && actionKey === 'advance_stage') return false;
   return needsUserDecision;
 }
 

@@ -171,11 +171,17 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "or \"\" when none is needed. On a check stage it is about what the check concludes, "
         "never \"I have accepted or rejected each finding\" — every finding having a decision "
         "is already checked automatically\n"
-        "- approval_kind: \"routine\" when the sign-off only certifies something that can be "
-        "checked against the supplied material — an extraction matches its source, every "
-        "requirement is covered, the format is followed; \"decision\" when it needs the "
-        "user's preference, judgment or authority — choosing an option, accepting a "
-        "recommendation, approving something for use or for execution\n"
+        # 8 Nov (a client): "Autonomous with 'Handle them for me' is pausing for routine approvals".
+        # On his book five of six sign-offs came back "decision", among them "I approve this
+        # chapter architecture": each stopped a delegated run for a tick.
+        "- approval_kind: \"decision\" ONLY for a sign-off that is the user's to give whatever the "
+        "checks say: one the user asked to give (\"Approvals wanted: …\"), a choice between options, "
+        "accepting a recommendation, approving something to be sent, spent, used with other people "
+        "or carried out, and the sign-off on the last stage. Every other sign-off is \"routine\": it "
+        "certifies that the stage's work is sound, complete, consistent or follows what the user "
+        "supplied (an extraction matches its source, every requirement is covered, a structure or a "
+        "plan fits the brief, the format is followed), which can be checked against the material. "
+        "Most sign-offs before the last stage are routine\n"
         "- decision: when a stage both extracts what the user supplied AND may introduce new "
         "commitments (a deadline, a budget, a promise, a scope change not in the source), keep "
         "those apart — approval is the routine check of the extraction, and decision is the "
@@ -254,6 +260,10 @@ def parse_workflow(result: object) -> DesignedWorkflow:
     while stages and stages[0].kind == "check":
         stages.pop(0)
     stages = fix_chapters(with_closing_stage(stages))
+    # The sign-off on the finished work is the user's, whatever the design said (8 Nov):
+    # routine sign-offs are the ones before it.
+    if stages and stages[-1].approval:
+        stages[-1].approval_kind = "decision"
     if len(stages) < MIN_STAGES:
         raise ValueError("The design had too few usable stages. Try describing the work in more detail.")
     stages[0].required = True

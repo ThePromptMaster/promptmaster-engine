@@ -80,3 +80,13 @@ def test_a_real_world_action_falls_back_to_the_question_as_its_wording():
 def test_a_requirement_must_be_the_users_own_words():
     assert parse_screen({"verdict": "business_decision", "requirement_quote": "document preparation only"}, _req()).requirement_quote == "document preparation only"
     assert parse_screen({"verdict": "business_decision", "requirement_quote": "confirmed in writing"}, _req()).requirement_quote == ""
+
+
+def test_a_routine_choice_is_a_verdict_of_its_own_and_carries_no_instruction():
+    """8 Nov (a client): "Do whatever is best" selected automatically for routine decisions."""
+    system, _user = build_screen_prompt(_req())
+    assert "routine_choice" in system and "The assistant picks" in system
+    assert "unsure between routine_repair or routine_choice and business_decision, choose" in system
+    out = parse_screen({"verdict": "routine_choice", "reason": "Either order fits.", "instruction": "Pick one."}, _req())
+    assert out.verdict == "routine_choice" and out.instruction == "" and out.reason == "Either order fits."
+

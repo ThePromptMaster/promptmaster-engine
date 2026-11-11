@@ -3771,3 +3771,34 @@ own spending limit. Which key was refused is held in memory on each running serv
 an empty key once more before moving on. Nothing records which key paid for a call, so the split is on
 OpenRouter's own dashboard. A switch shows only in the backend's logs
 (`openrouter_key_refused_for_credit`), so nothing on screen says a key has run out until both have.
+
+### L-232 — What "Handle them for me" decides, and what it never does (2026-11-11)
+
+Choosing "Handle them for me" now sets the level to Autonomous when it was Guided (`policy.levelFor`), and
+a project with Handle on and no run yet opens there. A person who then picks Guided or Checkpoint gets
+it: Guided still waits before every move, whatever the routine setting says. A project whose last run was
+Guided keeps showing Guided until Handle is chosen again.
+
+A question Go would ask is read by the screen even when it mentions scope or requirements, and the screen
+has a sixth verdict, `routine_choice`: a choice where either answer fits what the user asked for. Go
+settles it in a revision told to decide it and records "Chosen by Go when you left it to Go" as a fact the
+user can change. This is one model's reading of one question. Told to choose a business decision when
+unsure, it got ten of ten right on the client's own questions; it can still take a choice the user would
+have wanted to make, and the fact is where they see and undo it. A choice is asked when the run can no
+longer revise the stage.
+
+A model's flag on "Move to the next stage" no longer pauses a stage whose requirements all hold. A flag on
+any other move still does.
+
+Sign-offs are unchanged on projects already running: a pinned workflow keeps the marks it was designed
+with, because nothing in it says whether the user asked for a sign-off. On one client project both
+reserved mid-workflow sign-offs were ones the brief had asked for. New designs are told that only a
+sign-off the user asked for, a choice, an acceptance, an approval to send, spend or carry out, and the
+last stage's sign-off are the user's; the last stage's is forced in code, the rest is the designer's
+reading.
+
+Still stops under Handle, by design: the final acceptance and any reserved sign-off, a chapter plan's
+approval, the user's own version disagreeing with an accepted fact, skipping a required stage, a drafting
+run of twelve or more sections, a repair that won't settle, a used-up window after the three further
+ones, and credit.
+

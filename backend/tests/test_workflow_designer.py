@@ -150,3 +150,21 @@ def test_a_stage_instruction_names_sections_only_when_the_user_gave_them():
     system, user = build_workflow_prompt("a decision memo", "Choose a support plan")
     assert "Name sections, headings or their order only when the user gave them" in system + user
     assert "leave its structure to the writer" in system + user
+
+
+def test_only_real_decisions_are_the_users_and_the_last_sign_off_always_is():
+    """8 Nov (a client): Handle paused for routine approvals; five of six sign-offs on his
+    book had come back "decision"."""
+    _, user = build_workflow_prompt("a research book", "Write the book")
+    assert 'approval_kind: \"decision\" ONLY' in user
+    assert "Most sign-offs before the last stage are routine" in user
+    assert "one the user asked to give" in user
+
+    wf = parse_workflow({"name": "X", "stages": [
+        _stage("Brief"),
+        _stage("Structure", approval="I approve this structure", approval_kind="routine"),
+        _stage("Final", approval="I approve the finished memo", approval_kind="routine"),
+    ]})
+    assert wf.stages[1].approval_kind == "routine"
+    assert wf.stages[-1].approval_kind == "decision"
+

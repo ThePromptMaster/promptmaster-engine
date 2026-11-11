@@ -24,8 +24,8 @@ from .schemas import PMInput
 #: Classifying one question does not need the default model.
 SCREEN_MODEL = "anthropic/claude-sonnet-5.5"
 
-Verdict = Literal["routine_repair", "real_world_action", "business_decision", "reserved_approval", "missing_input"]
-_VERDICTS = ("routine_repair", "real_world_action", "business_decision", "reserved_approval", "missing_input")
+Verdict = Literal["routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input"]
+_VERDICTS = ("routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input")
 
 SCREEN_INSTRUCTION = (
     "An AI assistant is carrying out a project for a user and wants to stop and ask them something. "
@@ -34,6 +34,12 @@ SCREEN_INSTRUCTION = (
     "gave. Correcting something the supplied facts, sources or accepted findings settle. Making documents "
     "agree with the plan they depend on. Going back to an earlier stage to apply a correction. Re-running "
     "a check. Whether to do this is not a business decision.\n\n"
+    # 8 Nov (a client): "Could it work like having 'Do whatever is best' selected automatically for
+    # routine decisions". On his book he gave that answer six times to questions of this kind.
+    "routine_choice: a choice between ways of doing the work that each fit what the user asked for, "
+    "or permission to go ahead with work the user already asked for: an order, a layout, a wording, "
+    "which of two acceptable treatments, whether to apply a correction now or later. Whichever is "
+    "picked, the user is committed to nothing they have not already said. The assistant picks.\n\n"
     "real_world_action: it asks whether someone has done, or asks the user to get someone to do, something "
     "outside the document: confirming, booking, hiring, covering a shift, obtaining a signature, sending a "
     "message. The assistant only prepares documents, so the document records it as still to do.\n\n"
@@ -45,10 +51,11 @@ SCREEN_INSTRUCTION = (
     "A condition counts as a requirement only if the user's own words state it. A practice the assistant "
     "suggested itself (for example getting something \"in writing\") is not one. When a question rests on a "
     "real requirement, copy the user's words exactly into requirement_quote.\n"
-    "If you are unsure between routine_repair and business_decision, choose business_decision.\n\n"
-    "Return JSON only: {\"verdict\": one of the five names, \"reason\": one short sentence, "
+    "If you are unsure between routine_repair or routine_choice and business_decision, choose "
+    "business_decision.\n\n"
+    "Return JSON only: {\"verdict\": one of the six names, \"reason\": one short sentence, "
     "\"instruction\": for routine_repair, the work to do, in one or two sentences, stating any target "
-    "the question names, "
+    "the question names; for routine_choice, empty, "
     "\"target_stage\": for routine_repair, the name of the EARLIER STAGE where the correction belongs, "
     "exactly as listed, or empty if it belongs on this stage, "
     "\"action\": for real_world_action, what still has to be done, in one short sentence, "
