@@ -44,7 +44,7 @@ from .schemas import (
     StageItem,
     StageItemSchema,
 )
-from .project_context import context_block
+from .project_context import context_block, SUPPLIED_RULE
 from .notation import NOTATION_RULE
 from .reader_text import READER_TEXT_RULE, USER_NOTE_MARKER, USER_NOTE_RULE
 from .saved_documents import format_prior_documents
@@ -328,10 +328,13 @@ NEXT_STEP_RULE = (
 #: though no actual computation, source verification, or required calculation
 #: was performed." Five words for how a result stands, used as they mean.
 EVIDENCE_WORDS_RULE = (
-    "SAY HOW EACH RESULT STANDS, IN ONE OF FIVE WAYS. Reasoned — argued or derived in the text, not computed. "
+    "SAY HOW EACH RESULT STANDS, IN ONE OF SIX WAYS. Supplied — the user stated it in the objective, the brief or "
+    "an accepted fact: it is given, and a result that rests only on supplied figures and arithmetic on them is "
+    "never conditional. Reasoned — argued or derived in the text, not computed. "
     "Calculated — only when the earlier stages or the run record show code or a computation actually ran and "
     "produced it. Externally verified — only when a saved source [S#], a looked-up record or the user confirms it. "
-    "Conditional — it rests on an assumption that is not verified; name the assumption. Speculative — a "
+    "Conditional — it rests on an assumption of your own that is not verified, never on something the user "
+    "supplied; name the assumption. Speculative — a "
     "possibility, not yet supported. Never call a result calculated, computed, verified, confirmed or reproduced "
     "without that evidence; and a stage whose key results are conditional is ready only on that condition — say so."
 )
@@ -395,7 +398,9 @@ def build_stage_prompt(
         f"Audience: {digest.audience or inputs.audience}",
         f"Constraints: {inputs.constraints or '(none)'}",
         f"Output format: {inputs.output_format or '(none)'}",
-        *([context_block(inputs), ""] if context_block(inputs) else [""]),
+        # With no facts and no context the block is empty, and what the user supplied
+        # is in the objective and constraints above: the rule about it still applies.
+        *([context_block(inputs), ""] if context_block(inputs) else [SUPPLIED_RULE, ""]),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_digest(digest)}",
         "",
         # The user's words govern. The first stage writes a statement of the
@@ -443,7 +448,9 @@ def build_stage_prompt(
         "to be general knowledge. Where a number would decide the question (a price, a cost, "
         "a size, a time), give a working estimate labelled \"Assumption: …\" rather than "
         "leaving it out. Reach the conclusion these support, and say briefly what would "
-        "change it. Missing material is something to name, never the whole conclusion. "
+        "change it: only what really would. A result fixed by a figure and a rule the user supplied "
+        "changes only if that figure or that rule changes, never because other questions are answered "
+        "well. Missing material is something to name, never the whole conclusion. "
         "General knowledge is about the subject, never about the people in it: a memory, habit, "
         "trait or event of a real person comes only from what the user supplied.",
     ]

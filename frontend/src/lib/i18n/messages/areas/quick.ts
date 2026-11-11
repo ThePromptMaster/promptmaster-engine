@@ -30,6 +30,13 @@ export const en = {
   "early.caveats": "Not done yet",
   "early.bannerTitle": "Finished early — not done yet:",
   "early.goBack": "Go back to this",
+  "fc.checking": "Checking this draft against what you supplied…",
+  "fc.clean": "Checked against what you supplied: nothing to correct.",
+  "fc.corrected": "Checked against what you supplied and corrected {count}. The earlier version is kept in the history.",
+  "fc.open": "Checked against what you supplied. Some points are still open for you to look at.",
+  "fc.failed": "This draft could not be checked just now. Press Check to try again.",
+  "fc.fixedTitle": "Corrected",
+  "fc.leftTitle": "Still open",
 };
 
 type Keys = Record<keyof typeof en, string>;
@@ -65,6 +72,13 @@ export const es: Keys = {
   "early.caveats": "Pendiente",
   "early.bannerTitle": "Terminado antes de tiempo; pendiente:",
   "early.goBack": "Volver a esto",
+  "fc.checking": "Comprobando este borrador con lo que aportaste…",
+  "fc.clean": "Comprobado con lo que aportaste: nada que corregir.",
+  "fc.corrected": "Comprobado con lo que aportaste y corregido: {count}. La versión anterior se conserva en el historial.",
+  "fc.open": "Comprobado con lo que aportaste. Quedan algunos puntos abiertos para que los revises.",
+  "fc.failed": "No se pudo comprobar este borrador ahora. Pulsa Comprobar para intentarlo de nuevo.",
+  "fc.fixedTitle": "Corregido",
+  "fc.leftTitle": "Aún abierto",
 };
 
 export const fr: Keys = {
@@ -98,6 +112,13 @@ export const fr: Keys = {
   "early.caveats": "Pas encore fait",
   "early.bannerTitle": "Terminé plus tôt — pas encore fait :",
   "early.goBack": "Revenir à ceci",
+  "fc.checking": "Vérification de ce brouillon par rapport à ce que vous avez fourni…",
+  "fc.clean": "Vérifié par rapport à ce que vous avez fourni : rien à corriger.",
+  "fc.corrected": "Vérifié par rapport à ce que vous avez fourni et corrigé : {count}. La version précédente reste dans l’historique.",
+  "fc.open": "Vérifié par rapport à ce que vous avez fourni. Certains points restent ouverts pour votre examen.",
+  "fc.failed": "Ce brouillon n’a pas pu être vérifié pour l’instant. Appuyez sur Vérifier pour réessayer.",
+  "fc.fixedTitle": "Corrigé",
+  "fc.leftTitle": "Encore ouvert",
 };
 
 export const pt: Keys = {
@@ -131,4 +152,11 @@ export const pt: Keys = {
   "early.caveats": "Pendente",
   "early.bannerTitle": "Terminado antes — pendente:",
   "early.goBack": "Voltar a isto",
+  "fc.checking": "Verificando este rascunho com o que você forneceu…",
+  "fc.clean": "Verificado com o que você forneceu: nada a corrigir.",
+  "fc.corrected": "Verificado com o que você forneceu e corrigido: {count}. A versão anterior fica no histórico.",
+  "fc.open": "Verificado com o que você forneceu. Alguns pontos continuam abertos para você examinar.",
+  "fc.failed": "Não foi possível verificar este rascunho agora. Pressione Verificar para tentar de novo.",
+  "fc.fixedTitle": "Corrigido",
+  "fc.leftTitle": "Ainda aberto",
 };

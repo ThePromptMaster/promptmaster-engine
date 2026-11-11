@@ -88,7 +88,7 @@ class DeliverableCheck(BaseModel):
 
 
 _INSTRUCTION = (
-    "You check a finished deliverable for four things, and nothing else.\n"
+    "You check a finished deliverable for five things, and nothing else.\n"
     "1. ACCEPTED FINDINGS. Each was accepted earlier, so the deliverable was meant to make its suggested "
     "change. For each, by its id: \"carried\" when the deliverable now does what the suggested change asks "
     "(quote the passage that shows it); \"not_carried\" when the deliverable still has the problem or lacks "
@@ -137,6 +137,21 @@ _INSTRUCTION = (
     "the fix what else must be true, or that the sentence covers only that one gap. A sentence that points to the "
     "open items as a whole (\"until the open items below are done\") covers them, and a step that can only come "
     "after the thing happens is not part of it. At most two.\n"
+    # 8 Nov (a client, an acquisition screen): the memo called a supplied one-time item
+    # "undocumented" and the margin failure "conditional", and said two favourable answers
+    # could reverse a recommendation a supplied 24% against a supplied 20% limit had fixed.
+    "5. SUPPLIED, THEN DOUBTED OR UNDONE. Two things only. (a) The deliverable questions, hedges or makes "
+    "conditional a fact, figure or rule the user supplied: calls it undocumented, unverified or unconfirmed, "
+    "says a result holds \"only if\" it is right, or calls the user's rule \"a reading\", when nothing the "
+    "user supplied contradicts it and the user did not ask for it to be tested or treated as a claim. Asking "
+    "for the records behind it as later work is not this. (b) First find every sentence that says what could "
+    "reverse or change a result or the recommendation. Then, for each result it speaks of that a supplied rule "
+    "and a supplied figure fix (a threshold missed, a limit exceeded, a must-have failed): the sentence is wrong "
+    "when it says answers, explanations or documents that leave that figure and that rule as they are could "
+    "reverse, clear or change the result. "
+    "Report each under \"gaps\": the passage quoted verbatim, the problem in one sentence, and as the fix the "
+    "result stated as it stands, with only a different figure or a changed rule able to change it. At most four, "
+    "and always the (b) sentence when there is one. "
     "Copy every quote exactly, one sentence or less. "
     "Return JSON: {\"findings\": [{\"id\": string, \"verdict\": \"carried\" | \"not_carried\" | \"not_applicable\", "
     "\"quote\": string, \"note\": string}], \"contradictions\": [{\"rule_quote\": string, \"conflicts_quote\": string, "

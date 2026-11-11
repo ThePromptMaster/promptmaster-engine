@@ -79,6 +79,14 @@ _ASSESS_INSTRUCTION = (
     "evidence would change it MEETS it. Collecting that evidence, and carrying out or authorising the "
     "decision, is future work the document recommends: list it under proposed_next, never as unmet or a "
     "blocker. "
+    # 8 Nov (a client, an acquisition screen): this check asked for a margin failure to be
+    # called "conditional on the undocumented one-time classification" of an item the user
+    # had supplied as one-time, and the memo then said so.
+    "That is for what is really unknown. A fact, figure or rule the user supplied is not an unverified "
+    "assumption, and a result that a supplied rule and a supplied figure fix (a threshold missed, a limit "
+    "exceeded) is not uncertain. A deliverable that calls such a result conditional, doubts the supplied "
+    "fact, or says answers that leave the figure unchanged could reverse the result has misstated it: "
+    "name correcting that under proposed_next. Never ask for a condition or a caveat of that kind to be added. "
     # 14 Oct (Sean, SUMMIT): Luis's request to count two testing days was
     # recorded as a requirement; the pack correctly refused it, and the check
     # called the objective unmet because the request was not carried out.

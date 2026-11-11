@@ -32,4 +32,11 @@ export const zh: Record<keyof typeof en, string> = {
   "early.caveats": "尚未完成",
   "early.bannerTitle": "提前完成——尚未完成：",
   "early.goBack": "回到这里",
+  "fc.checking": "正在对照你提供的内容检查这份草稿…",
+  "fc.clean": "已对照你提供的内容检查：无需更正。",
+  "fc.corrected": "已对照你提供的内容检查并更正 {count} 处。之前的版本保留在历史记录中。",
+  "fc.open": "已对照你提供的内容检查。仍有几点留待你查看。",
+  "fc.failed": "暂时无法检查这份草稿。请按“检查”重试。",
+  "fc.fixedTitle": "已更正",
+  "fc.leftTitle": "仍待处理",
 };

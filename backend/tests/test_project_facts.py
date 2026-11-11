@@ -13,7 +13,7 @@ from __future__ import annotations
 from promptmaster.conversation import build_chat_reply_prompt
 from promptmaster.criterion_check import build_check_prompt
 from promptmaster.objective_assessment import build_assessment_prompt
-from promptmaster.project_context import FACTS_HEADER, context_block, facts_block
+from promptmaster.project_context import FACTS_HEADER, context_block, facts_block, SUPPLIED_RULE
 from promptmaster.reply_actions import build_reply_actions_prompt, parse_reply_actions
 from promptmaster.schemas import AcceptedFact, PMInput, StageDescriptor, StageDigest
 from promptmaster.stage import build_stage_prompt
@@ -37,7 +37,8 @@ def test_the_block_names_each_fact_its_source_and_says_it_is_authoritative():
     assert "- Requirement: At least one researcher stays available" in block
     assert "never call one unsupported or suggest removing it" in block
     # Carried with the context, and on its own when there is no context.
-    assert context_block(_inputs()) == block
+    # …followed by the rule that what the user supplied is given (8 Nov).
+    assert context_block(_inputs()) == f"{block}\n\n{SUPPLIED_RULE}"
     assert context_block(_inputs(context="Board pack.")).startswith(block)
     assert facts_block(PMInput(objective="x", mode="analyst")) == ""
 
@@ -146,3 +147,45 @@ def test_nothing_new_to_record_offers_no_record_button():
 def test_the_record_prompt_rules_out_instructions_requests_and_repeats():
     system, _ = build_reply_actions_prompt(_inputs(), "Summary", "q", "a", None)
     assert "never record it" in system and "never as a requirement" in system and '"replaces"' in system
+
+
+def test_what_the_user_supplied_is_given_wherever_their_material_goes():
+    """8 Nov (a client, an acquisition screen): a supplied one-time item was called
+    "undocumented", and a failure a supplied 24% against a supplied 20% limit had fixed
+    was said to be reversible by favourable answers."""
+    assert "WHAT THE USER SUPPLIED IS GIVEN" in SUPPLIED_RULE
+    assert "make a result conditional on it being right" in SUPPLIED_RULE
+    assert "Only a different figure or a changed rule would change it" in SUPPLIED_RULE
+    assert "unless the user's own material contradicts it" in SUPPLIED_RULE
+    # With facts, and with context alone.
+    assert SUPPLIED_RULE in context_block(_inputs())
+    only_context = PMInput(objective="Screen the target.", audience="", constraints="", output_format="", mode="analyst", context="Revenue: $18 million.")
+    assert SUPPLIED_RULE in context_block(only_context)
+    # Nothing supplied beyond the objective: no block at all, and the writer adds the rule itself.
+    assert context_block(PMInput(objective="Screen the target.", audience="", constraints="", output_format="", mode="analyst")) == ""
+
+
+def test_the_writer_and_both_final_checks_carry_the_rule():
+    bare = PMInput(objective="Screen the target: revenue $18 million against a $10 million floor.", audience="", constraints="", output_format="", mode="analyst")
+    stage = StageDescriptor(id="memo", label="Memo", artifact_kind="draft", instruction="Write the memo.")
+    system, user = build_stage_prompt(bare, stage, StageDigest(objective="o"))
+    writer = system + "\n" + user
+    # No facts and no context: the writer still has the rule, once.
+    assert writer.count("WHAT THE USER SUPPLIED IS GIVEN") == 1
+    assert "IN ONE OF SIX WAYS. Supplied" in writer
+    assert "never on something the user supplied" in writer
+    assert "changes only if that figure or that rule changes" in writer
+    # With facts it arrives with them, still once.
+    system, user = build_stage_prompt(_inputs(), stage, StageDigest(objective="o"))
+    assert (system + user).count("WHAT THE USER SUPPLIED IS GIVEN") == 1
+
+    from promptmaster.deliverable_check import build_prompt as build_check
+    check_system, check_user = build_check(_inputs(), "Memo", "The margin failure is conditional.", [])
+    assert "5. SUPPLIED, THEN DOUBTED OR UNDONE" in check_system
+    assert "leave that figure and that rule as they are could" in check_system
+    assert "WHAT THE USER SUPPLIED IS GIVEN" in check_user
+
+    judge_system, judge_user = build_assessment_prompt(_inputs(), "Memo", "The margin failure is conditional.", [], "")
+    assert "Never ask for a condition or a caveat of that kind to be added" in judge_system
+    assert "WHAT THE USER SUPPLIED IS GIVEN" in judge_user
+

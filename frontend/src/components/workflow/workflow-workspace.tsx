@@ -56,6 +56,8 @@ import { FullDocumentReader } from './full-document-reader';
 import { listWorkflowEvents } from '@/lib/supabase/workflow';
 import { isQuickAnswer } from '@/lib/workflow/quick';
 import { TakeFullProcess } from './take-full-process';
+import { FinalCheckNote } from './final-check-note';
+import { useFinalCheck } from './use-final-check';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
 import { TasksPanel } from './tasks-panel';
@@ -550,6 +552,14 @@ export function WorkflowWorkspace({
     // before the event log has loaded — the current stage is not yet known.
     enabled: Boolean(appendStageVersion) && isCurrent && events !== null && !goDriving,
     yieldToGo: goDriving,
+    appendStageVersion: appendStageVersion ?? (async () => undefined),
+  });
+
+  // A one-stage project has no Go to check its draft: the final check runs when the draft is written (11 Nov).
+  const finalCheck = useFinalCheck({
+    project, template, state, stage, bundles: stageBundles,
+    enabled: Boolean(appendStageVersion) && isCurrent && events !== null && project.status !== 'finalized' && !project.example_key,
+    writing: generation.generating,
     appendStageVersion: appendStageVersion ?? (async () => undefined),
   });
 
@@ -2636,6 +2646,7 @@ export function WorkflowWorkspace({
             hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
           <WebFoundNotice projectId={project.id} stageId={stage.id} />
+          <FinalCheckNote state={finalCheck} />
           {/* Sean, 26 Oct: the quick answer, taken into the full process in place. */}
           {isQuickAnswer(template) && isCurrent && project.status !== 'finalized' && headVersion?.content?.trim() && (
             <TakeFullProcess
