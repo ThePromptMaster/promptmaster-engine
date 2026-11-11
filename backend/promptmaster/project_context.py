@@ -23,6 +23,25 @@ _HEADER = (
 )
 
 
+#: 8 Nov (a client, an acquisition screen): the finished memo called a one-time item
+#: the user had stated, and approved the treatment of, "undocumented", made the margin
+#: failure "conditional" on it, and said favourable answers to two diligence questions
+#: could reverse a recommendation that a supplied 24% against a supplied 20% limit had
+#: already fixed. The writer was not alone: the final check had asked for the condition.
+#: One rule, for every writer and every check, carried by `context_block`.
+SUPPLIED_RULE = (
+    "WHAT THE USER SUPPLIED IS GIVEN. A fact, figure or rule the user stated, in the objective, the "
+    "brief, its constraints, the project context or an accepted fact, is taken as stated. Never question "
+    "it, call it undocumented, unverified or unconfirmed, ask for it to be confirmed, or make a result "
+    "conditional on it being right, unless the user's own material contradicts it or the user asked for it "
+    "to be tested or treated as a claim. Asking for the records behind it as later work is fine; doubting "
+    "it is not. A result that a supplied rule and a supplied figure fix between them (a threshold missed, a "
+    "limit exceeded, a must-have failed) is that result: say it plainly. Only a different figure or a "
+    "changed rule would change it. Never say that answers, explanations or documents which leave the figure "
+    "and the rule as they are could reverse it, and never call it conditional."
+)
+
+
 FACTS_HEADER = (
     "ACCEPTED PROJECT FACTS AND REQUIREMENTS — authoritative: the user accepted each one, "
     "and each says where it came from. Treat them as supplied evidence: use them, quote "
@@ -382,7 +401,9 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     references = references_block(inputs, limit)
     # And after those, what other people wrote: evidence, never the user's word.
     third_party = third_party_block(inputs, limit)
-    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, sample, references, third_party) if b)
+    # The rule about what the user supplied goes wherever their facts or material go.
+    given = SUPPLIED_RULE if facts or context else ""
+    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, given, sample, references, third_party) if b)
 
 
 #: 4 Nov (Sean, after Jordan's niche science talk "got the general information

@@ -32,4 +32,11 @@ export const sw: Record<keyof typeof en, string> = {
   "early.caveats": "Bado hakijafanywa",
   "early.bannerTitle": "Umekamilishwa mapema — bado haijafanywa:",
   "early.goBack": "Rudi kwa hiki",
+  "fc.checking": "Rasimu hii inakaguliwa dhidi ya ulichotoa…",
+  "fc.clean": "Imekaguliwa dhidi ya ulichotoa: hakuna cha kusahihisha.",
+  "fc.corrected": "Imekaguliwa dhidi ya ulichotoa na kusahihishwa: {count}. Toleo la awali limehifadhiwa kwenye historia.",
+  "fc.open": "Imekaguliwa dhidi ya ulichotoa. Baadhi ya mambo bado yako wazi kwako kuyaangalia.",
+  "fc.failed": "Rasimu hii haikuweza kukaguliwa sasa. Bonyeza Kagua ili kujaribu tena.",
+  "fc.fixedTitle": "Imesahihishwa",
+  "fc.leftTitle": "Bado wazi",
 };

@@ -3802,3 +3802,30 @@ approval, the user's own version disagreeing with an accepted fact, skipping a r
 run of twelve or more sections, a repair that won't settle, a used-up window after the three further
 ones, and credit.
 
+### L-233 — What the user supplied is given, and the final check on a one-stage draft (2026-11-11)
+
+Every prompt that carries the user's facts or material now carries one rule with them
+(`project_context.SUPPLIED_RULE`): a supplied fact, figure or rule is not questioned or made a condition, and
+a result a supplied rule and figure fix is not said to be reversible by answers that leave both as they are.
+The stage writer carries it even when the project has no facts and no context. The evidence words gained
+"Supplied", the objective check is told not to ask for such a condition, and the final check has a fifth
+section for it. On one client memo and brief, with the real model: the check flagged the doubted fact 5 of 5
+times (2 of 4 before) and the reversal claim 5 of 5 (0 of 4); 4 of 5 memos regenerated under the old rules
+called the result conditional on the supplied item, and none of 5 under the new. These are a model's
+readings: a memo can still hedge, and the check can still miss it. The exception, "unless the user's own
+material contradicts it or the user asked for it to be tested or treated as a claim", is also the model's
+to read.
+
+A one-stage project (decided by the workflow having one written stage) has its draft checked when this page
+writes it: one call, one correction saved as a new version when the check finds something
+(`source_operation` `applied_findings`, summary starting "Final check:"), and one more check. What is still
+found is listed for the user, and nothing more is tried. Not checked: a draft that was already there when
+the page opened, one the user edited or changed through the chat, a cut-off draft, an example. The check
+runs in the browser, so closing the tab during it leaves the draft unchecked, and reopening does not start
+it. The correction does not search the web. Each draft costs one more call, or three when it is corrected.
+
+Found on production during this pass and not fixed: on a workflow marked as an investigation, when the
+objective check names a next task that is really a change to the deliverable, Go adds it as a stage before
+the deliverable (L-115). That stage is not shown the deliverable's text. On one run its writer answered
+with a note instead of a document, the step failed, a skip was refused, and the run stopped on two failures.
+
