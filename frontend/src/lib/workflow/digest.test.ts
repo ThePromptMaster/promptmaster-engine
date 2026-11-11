@@ -91,6 +91,19 @@ describe('buildStageDigest', () => {
     audience: bundle(serializeItems([{ id: 'i1', who: 'Engineering leads' }])),
   };
 
+  it('shows a stage added while the project runs what the later stages already hold (11 Nov)', () => {
+    const added = { ...BOOK_V1.stages.find((s) => s.id === 'audience')!, id: 'added_fix_wording', label: 'Fix wording' };
+    const at = BOOK_V1.stages.findIndex((s) => s.id === 'positioning');
+    const template = { ...BOOK_V1, stages: [...BOOK_V1.stages.slice(0, at), added, ...BOOK_V1.stages.slice(at)] };
+    const withLater = { ...bundles, positioning: bundle('The positioning statement as it stands.') };
+    const digest = buildStageDigest(template, projectState(template, events), PROJECT, withLater, 'added_fix_wording');
+    const later = digest.prior_stages.find((s) => s.stage_id === 'positioning');
+    expect(later?.label).toContain('written before this stage was added');
+    expect(later?.text ?? later?.summary).toContain('The positioning statement as it stands.');
+    // An ordinary stage is still shown nothing that comes after it.
+    expect(buildStageDigest(BOOK_V1, state, PROJECT, withLater, 'audience').prior_stages.map((s) => s.stage_id)).toEqual(['objective']);
+  });
+
   it('carries the objective in full and prior stages as summaries', () => {
     const digest = buildStageDigest(BOOK_V1, state, PROJECT, bundles, 'positioning');
     expect(digest.objective).toBe(PROJECT.objective);

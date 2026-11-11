@@ -23,6 +23,9 @@
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
 import { manuscriptSourceFor } from './context';
+
+/** Ids of stages added while a project runs begin with this (`added-stages.newStageId`). */
+export const ADDED_STAGE_PREFIX = 'added_';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { itemSchemaFor, parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
 import { carriesForward, isDone } from './types';
@@ -269,12 +272,32 @@ export function buildStageDigest(
   // the question round one ended on (4 Oct).
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const texts: string[] = [];
+  // A stage added while the project runs is placed before the deliverable, and
+  // its work is usually a change to it. It is shown what the later stages
+  // already hold: on production (11 Nov) a stage added to adjust a memo's
+  // wording was not shown the memo, answered "the Screening memo is not in the
+  // project", and the run stopped on two failed steps.
+  const addedLater = cutoff >= 0 && template.stages[cutoff].id.startsWith(ADDED_STAGE_PREFIX);
   template.stages.forEach((stage, index) => {
     const st = state.stages[stage.id];
     const lastRound = loops && index > cutoff && Boolean(st) && st!.status !== 'not_started' && st!.status !== 'skipped';
-    if (!lastRound && cutoff >= 0 && index >= cutoff) return;
     const bundle = bundles[stage.id];
     const headVersion = bundle?.versions.at(-1);
+    const writtenAhead = !lastRound && addedLater && index > cutoff && Boolean(headVersion?.content?.trim());
+    if (writtenAhead) {
+      const text = documentText(stage, headVersion?.content);
+      const summary = summariseStageContent(stage, headVersion?.content);
+      if (summary || text) {
+        prior_stages.push({
+          stage_id: stage.id,
+          label: `${stage.label} (written before this stage was added — its current text, which this stage's work applies to)`,
+          summary, ...(headVersion?.version_number ? { version: headVersion.version_number } : {}),
+        });
+        texts.push(text);
+      }
+      return;
+    }
+    if (!lastRound && cutoff >= 0 && index >= cutoff) return;
     // A stage reopened for editing, or waiting for a recheck, still holds the
     // latest saved work. Dropping it (as before 8 Oct) left a final review
     // reading nothing of an Output the user had just revised; it is shown,
