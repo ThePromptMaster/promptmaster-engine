@@ -31,10 +31,12 @@ Not changed: sign-offs on projects already running. Both reserved mid-workflow s
 | Handle switches the level | By hand on production | Guided + Ask me became Autonomous + Handle on one press (`media/nov11/p1-handle-sets-autonomous.jpg`) |
 | A run under Handle | By hand on production, the client's brief | 24 steps, four stages, no stop; four sign-offs made by Go (database read) |
 | The screen on the client's own questions | Real model, local script | 10 of 10: six handled, a budget choice, a fee, a scope cut and an approval for use still asked |
+| The full designed process, start to finish | By hand on production, second pass: the client's brief on a five-stage designed workflow | 36 steps over two windows, the second started by itself; five stages and two stages Go added; one stop only, for the final sign-off "I approve this memo to share with the investment team" (`media/nov11/p1-full-process-stops-only-for-final-approval.jpg`) |
+| "Ask me" still asks | By hand on production, second pass | Autonomous with "Ask me": stopped at the first sign-off, saying it is routine but routine decisions are set to "Ask me" |
+| A routine choice settled by Go | Not seen on production | No such question came up in either run; real-model script only |
 | The model-flag case | Unit test only | |
-| "Ask me" still asks; the final acceptance stops | Not run | The run ended first, on the failure below |
 
-**Found in the pass:** Go added a stage to adjust the memo's wording. The stage was not shown the memo, its writer returned nothing usable, and the run stopped on two failed steps (`media/nov11/p1-run-ended-on-added-stage.jpg`). Fixed in #649: an added stage now reads what the later stages hold. Not rerun on production.
+**Found in the pass:** Go added a stage to adjust the memo's wording. The stage was not shown the memo, its writer returned nothing usable, and the run stopped on two failed steps (`media/nov11/p1-run-ended-on-added-stage.jpg`). Fixed in #649: an added stage now reads what the later stages hold. In the second pass Go added two stages on the client's brief; both drafted, were checked, and the final memo was repaired from them.
 
 ## 3. Final-answer accuracy (#648, L-233)
 
@@ -54,7 +56,9 @@ Real model, the client's saved memo and brief:
 | Regenerated memo calls the result conditional on the supplied item | 4 of 5 | 0 of 5 |
 | Regenerated memo says diligence could flip the result | 1 of 5 | 0 of 5 |
 
-By hand on production: the client's brief through "Get a first draft". The draft was checked by itself, one point was corrected as version 2 with the earlier one kept, and the re-check was clean (`media/nov11/p2-first-draft-final-check.jpg`). Neither fault is in either version (database read). Not run on production: the full designed process under the new rules; the note's "still open" and "could not be checked" states.
+By hand on production: the client's brief through "Get a first draft". The draft was checked by itself, one point was corrected as version 2 with the earlier one kept, and the re-check was clean (`media/nov11/p2-first-draft-final-check.jpg`). Neither fault is in either version (database read). Second pass, the full designed process on the same brief: none of the final memo's five versions calls anything undocumented, unverified or conditional or says a result could be reversed. Its confidence line reads "High. The verdicts rest on supplied figures and simple arithmetic", and on the largest customer: "This answer reverses the concentration fail only if the figure turns out to be 20% or below." One diligence question still asks whether the records confirm the 24% figure, which the rule allows as later work. Not run on production: the note's "still open" and "could not be checked" states.
+
+On a three-sentence thank-you note the check corrected two phrases ("you made it look effortless", "everyone left full and happy") because the brief from the conversation said to add a moment only if the user gave one. That is the rule as written; a user may find it strict.
 
 ## 4. Depth follows the request (#649, #650, L-234)
 
@@ -82,7 +86,15 @@ By hand on production:
 
 **Found in the pass:** the workflow designed for the report writes in chapters, so the draft was not carried into it (`deliverable_stage_id` null), while the panel said "Your draft is carried in". Corrected in #650: the panel now says which case applies before the press. After such a switch the draft is no longer shown in the project. Also corrected: the rule's reason read "asks for 12-chapter".
 
-Not run by hand: a standard-depth request through "Get a first draft", where the draft should be carried as the deliverable's first version; "Build a plan with me" (the conversation) as the way in, which shares its code with the route that was run; "Choose the workflow yourself".
+Second pass, by hand on production, after #650 and #651 were deployed (CI green on `227de56b` first):
+
+| Start | Result |
+|---|---|
+| A workshop proposal, "Get a first draft" | Sized standard; a four-stage workflow set up; one press switched it; the draft carried as version 1 of the deliverable (database read) |
+| A thank-you note, "Build a plan with me" (the conversation) | One stage, with the four facts from the conversation; final check ran |
+| "Choose the workflow yourself" | Book preselected; nothing sized or designed |
+| The corrected panel | "The request asks for 12 chapters, which is long work"; for the chapters workflow, the draft is said not to be carried (`media/nov11/p3-chapters-workflow-says-draft-not-carried.jpg`) |
+| The manual "Take this into the full PromptMaster process" on a concise project | Still there, and works |
 
 ## What was not done
 
@@ -94,4 +106,4 @@ Not run by hand: a standard-depth request through "Get a first draft", where the
 
 ## Cost of the checks
 
-About $2.20 for the Go run on production, and a few dollars of script and draft calls on top; the exact total is on the usage page.
+About $2.20 for the first Go run on production and $2.70 for the second, and a few dollars of script and draft calls on top; the exact total is on the usage page.
