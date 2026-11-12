@@ -3869,3 +3869,95 @@ adding stages to a designed writing workflow while it runs (L-115 stays investig
 production run of an added stage that had to change the deliverable failed, see L-233). A project started before this
 keeps the workflow it has.
 
+
+### L-235 — A decision's options are read from the stage, and one press cannot run twice (2026-11-12)
+
+A reserved approval that is really a choice ("I approve this decision on the cap", "I choose Option A or
+Option B") was one button. The options are now read from the stage's own text by one small model call
+(`POST /api/agent/decision-options`) and shown as buttons on Go's card and under the approval on the stage,
+with a box for a decision that is none of them. An option is kept only when the passage that states it is
+found in the text, fewer than two is none, and any failure is none: the card then shows the plain approval,
+with a box for the decision when the approval is worded as one. On the three saved production stages that
+put a choice to the user, the options came back right in every run, and three plain sign-offs gave none.
+
+What is not done. The options are whatever the stage's text lays out, so a stage that buries a choice in
+prose, or names its options differently in two places, may give none or an odd label; the box takes the
+decision in words either way. They are read again whenever the stage's text changes, and are not stored
+on the run. Choosing records a fact, ticks the approval on its own stage, puts the choice on the decision
+trail (`finalize`) and reopens a prose stage so Go writes the decision in; a table stage is not rewritten.
+The approval stays stamped with the version it was given on. It is not asked for again while every
+version since is Go's own repair, and it is asked for again once the user edits the stage themselves.
+A decision leaves alone the stages before it: they are what it was made from (the first production run
+reopened and reworked three of them, about a dollar, before this was changed the same day). If an earlier
+stage really does need changing after a decision, the user reopens it, or the final check says so.
+
+A second press of Go, Resume or an answer while the first is still being handled is dropped. Before this
+a choice pressed twice recorded the answer twice, started a second loop, and ended the run failed.
+
+### L-236 — What settles a finding, and what does not (2026-11-12)
+
+A review row keeps the status the user chose and gains `settled_by` when the user's own words answer it:
+the note they wrote on the row, a fact or decision they stated, or their press of "It is settled" on Go's
+stop. A settled row is not carried forward as unmet. The reading is one small model call
+(`POST /api/agent/settles`), and a row is settled only with the words that settle it, found in code in the
+note or statement named. It runs when the user saves a note on a deferred row that would block, and, with
+routine decisions handed to Go, before Go forces a repair or stops for a carried row. Under "Ask me" Go
+does not apply it: the stop shows the row with its note and offers "It is settled". The note becomes a
+fact of the project, so later stages read it and the change check reopens what relied on the opposite.
+
+What is not done. Only the user's words count: a fact PromptMaster assumed, or one Go recorded under the
+routine-decision policy, settles nothing. A note that postpones ("will confirm next week") and a finding
+that says the work itself is wrong are left open, by instruction to the model, not by a rule in code: on
+the saved production row, postponements and a work defect were never settled in fifteen runs, and the
+user's first note was settled in three of three. His reworded note ("No additional absences were
+confirmed for this baseline") was settled in two of three: it can be read either way, and when it is
+read as open the stop now has the button. A model can still read a note wrongly in the other direction;
+"Keep it open instead" on the row undoes it, and a row kept open is not read again until its note changes.
+A row settled on an undecided or accepted status is not affected: only deferred rows that would block are
+read. A superseded row (L-88) no longer counts as carried forward either.
+
+### L-237 — Lengths are counted for every text a check reads (2026-11-12)
+
+A check stage is given a plain count of each written stage before it, whether or not a limit is attached
+to that stage, and a check row that only estimates a length code has counted is dropped before the table
+is saved. The final check is given the deliverable's count; a change that asks for a length of the whole
+text ("aim for about 500 words", "under 600 words") is decided by counting, and the model judges only the
+rest of that change. A change that asks the text to state its own word count is not one to carry, and a
+not-carried verdict with nothing to show for it is dropped. On the saved production memo the old check
+called the finding not carried in four of four runs and the new one in none of four.
+
+What is not done. A length of a part ("each note under 40 words") is still judged by the model, with the
+whole text's count beside it. A hedged whole-text figure is met up to the same slack the brief's own
+hedged target gets (L-141). The count follows `COUNTING_RULE`: headings are not counted unless the
+requirement says so. Check tables saved before this keep any estimate rows they already hold.
+
+### L-238 — Asking once: what Go looks across, and what it does not (2026-11-12)
+
+What waits on the user is read as one list from the project's own records (`lib/agent/user-queue.ts`):
+reserved approvals not given on stages already written, findings nobody decided, rows carried forward as
+unmet, and questions Go set aside, across every stage, each with the stages it holds up, most held up
+first. The planner is told the list and told not to ask those again one by one. When Go stops for the
+user, the rest of the list is shown under the stop and each item can be answered there. One small model
+call (`POST /api/agent/group-questions`) says which items one answer would settle; those are asked as one
+question, the answer is recorded once as a fact, and every row and kept question it covers is closed by
+it. A question set aside is also closed when a later answer covers it. Through the fact, an answer reaches
+every later prompt, and the change check reopens finished work that relied on the opposite.
+
+What is not done, said plainly because it is the part still to build:
+
+- **No branches.** A project is one line of work. There is nothing for Go to look across but its stages
+  (assessed 9 Oct: parallel lines of work in one project are about 9 to 12 days by themselves).
+- **The list is asked at a stop, not planned around.** Go does the work it can before stopping, as before
+  (a question is set aside when the stage can move on, an approval offers "carry on with other work first"),
+  but it does not reorder its work to reach the most valuable question sooner, and it does not predict
+  questions a later stage will raise before that stage is written.
+- **"Holds up" is counted from stage order**, not from which text used which fact: an item on an open
+  stage is taken to hold up every unfinished stage after it. Dependencies between stages are still found
+  by reading text, not stored (L-39).
+- **Grouping is a model's reading**, checked only for its ids. A wrong group asks one odd question; it
+  closes nothing by itself, because what an answer closes is still decided by the user's own words (L-236).
+  Approvals and undecided findings are never merged: each is the user's act on one piece of work.
+- **At most eight items** are shown at one stop, and the grouping reads carried rows and kept questions
+  only. Tasks recorded for the real world (L-211) are not in the list: nothing closes them but the user.
+- Under "Ask me", an answer given from the list is recorded and closes what it names; Go's own reading of
+  the other open rows against it (L-236) runs only with routine decisions handed to Go.
