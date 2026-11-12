@@ -37,4 +37,28 @@ describe('sums recomputed from the text (8 Nov)', () => {
       'The ratio (a + b) = 3',
     ]) expect(arithmeticSlips(fine), fine).toEqual([]);
   });
+
+  it('reads a scale said after a figure as part of it (12 Nov)', () => {
+    for (const fine of [
+      // The line a facts register carried: read as 3.5 − 600,000 it "worked out to -599,996.5, not 2.9".
+      '"claim": "Calculation: Adjusted EBITDA and margin | Category: financials | Value: $3.5 million − $600,000 = $2.9 million; $2.9 million ÷ $18 million ≈ 16.1% vs the 15% floor",',
+      '$3.5 million − $600,000 = $2.9 million',
+      '$3.5m − $0.6m = $2.9m',
+      '$180k + $15k = $195k',
+      '£2 billion + £500 million = £2.5 billion',
+      '3 million people × $2 = $6 million',
+      // The unit left unsaid on the result: right as the bare figures.
+      '$3.5 million − $0.6 million = 2.9',
+      // A result in millions is good to its last digit.
+      '$1.25 million + $1.3 million = $2.6 million',
+      // Metres, not millions.
+      '5 m × 3 m = 15 m',
+    ]) expect(arithmeticSlips(fine), fine).toEqual([]);
+  });
+
+  it('still finds a sum with scales that does not come out', () => {
+    expect(arithmeticSlips('$3.5 million − $600,000 = $3.1 million')[0]).toContain('works out to 2,900,000, not 3,100,000');
+    expect(arithmeticSlips('$180k + $15k = $200k')[0]).toContain('works out to 195,000, not 200,000');
+    expect(arithmeticSlips('$2 million + $3 million = $6 million')).toHaveLength(1);
+  });
 });
