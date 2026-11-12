@@ -43,6 +43,7 @@ from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
+from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
@@ -481,6 +482,18 @@ async def api_screen_question(req: ScreenQuestionRequest, client: OpenRouterClie
     except Exception:  # noqa: BLE001 - the safe answer to any failure here is to ask
         logger.warning("Question screen failed; the question will be asked", exc_info=True)
         return ScreenQuestionResponse(reason="The screen could not run, so the question is asked.")
+
+
+@router.post("/decision-options", response_model=DecisionOptionsResponse)
+async def api_decision_options(req: DecisionOptionsRequest, client: OpenRouterClient = Depends(get_client)) -> DecisionOptionsResponse:
+    """The options a stage puts to the user for one approval, each with the passage
+    that states it (12 Nov). 1 small LLM call; commits nothing. Any failure answers
+    with none, so the page falls back to the plain approval and nothing is invented."""
+    try:
+        return await decision_options(client, req)
+    except Exception:  # noqa: BLE001 - no options is the safe answer to any failure here
+        logger.warning("Decision options could not be read; the plain approval is shown", exc_info=True)
+        return DecisionOptionsResponse()
 
 
 @router.post("/check-answer")

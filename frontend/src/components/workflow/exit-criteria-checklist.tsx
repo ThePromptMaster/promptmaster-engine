@@ -5,8 +5,11 @@ import { shownCheckText } from '@/lib/i18n/check-text';
 import { templateWord } from '@/lib/i18n/templates';
 import { useState } from 'react';
 
+import type { DecisionOffer } from '@/lib/workflow/decision-options';
 import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
 import type { CriterionResult, OpenFindingRow } from '@/lib/workflow/types';
+
+import { DecisionChoices } from './agent/decision-options';
 
 interface Props {
   criteria: CriterionResult[];
@@ -16,6 +19,15 @@ interface Props {
    */
   manualIds?: Set<string>;
   onToggleManual: (id: string, checked: boolean, reason?: string) => void;
+  /**
+   * The options an approval that is a decision offers, by criterion id (12
+   * Nov). With options, the approval is given by choosing one, not by the box.
+   */
+  offers?: Record<string, DecisionOffer>;
+  /** Give the approval with what was decided. */
+  onDecide?: (id: string, choice: string) => Promise<void>;
+  /** What was decided with an approval already given, by criterion id. */
+  decided?: Record<string, string>;
   /** Undecided major findings: approving past one asks why (8 Nov). */
   openMajors?: readonly OpenFindingRow[];
   /** The stage's current version number: what an approval is given on. */
@@ -91,6 +103,9 @@ export function ExitCriteriaChecklist({
   onFinish,
   openMajors = [],
   headVersion,
+  offers = {},
+  onDecide,
+  decided = {},
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const t = useT();
@@ -99,6 +114,8 @@ export function ExitCriteriaChecklist({
   const [open, setOpen] = useState<boolean | null>(null);
   const [askingWhy, setAskingWhy] = useState<string | null>(null);
   const [why, setWhy] = useState('');
+  const [deciding, setDeciding] = useState<string | null>(null);
+  const [decideError, setDecideError] = useState<string | null>(null);
   if (criteria.length === 0) return null;
   // Until the user toggles it, follow whether it needs them.
   const expanded = !collapsible || (open ?? needsYou);
@@ -117,6 +134,10 @@ export function ExitCriteriaChecklist({
 
   const row = ({ c, manual }: { c: CriterionResult; manual: boolean }) => {
     const Row = manual ? 'label' : 'div';
+    // A decision still to make, with the options the stage puts to the user:
+    // choosing one gives the approval, so the bare box does not.
+    const offer = manual && !c.satisfied && !readOnly && c.authority !== 'delegable' && onDecide ? offers[c.id] : undefined;
+    const choosing = Boolean(offer && !offer.loading && offer.options.length);
     return (
       <li key={c.id}>
         <Row className={`flex items-start gap-2.5 text-body ${manual && !readOnly ? 'cursor-pointer' : ''}`}>
@@ -124,7 +145,7 @@ export function ExitCriteriaChecklist({
             <input
               type="checkbox"
               checked={c.satisfied}
-              disabled={readOnly}
+              disabled={readOnly || choosing}
               onChange={(e) => {
                 if (e.target.checked && openMajors.length && c.authority !== 'delegable') setAskingWhy(c.id);
                 else onToggleManual(c.id, e.target.checked);
@@ -170,6 +191,11 @@ export function ExitCriteriaChecklist({
                 {t('cl.approvedVersion', { approved: olderApprovals[c.id].approved, current: olderApprovals[c.id].current })}
               </span>
             )}
+            {c.satisfied && decided[c.id] && (
+              <span data-decided className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
+                {t('cl.decided', { choice: decided[c.id] })}
+              </span>
+            )}
             {c.satisfied && committedByPolicy[c.id] !== undefined && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
                 {t('cl.committed', { what: committedByPolicy[c.id] })}
@@ -183,6 +209,26 @@ export function ExitCriteriaChecklist({
             )}
           </span>
         </Row>
+        {offer && (offer.loading || choosing) && (
+          <div className="ms-6">
+            <DecisionChoices
+              offer={offer}
+              busy={deciding !== null}
+              recordLabel={t('cl.recordDecision')}
+              onChoose={(choice) => {
+                if (!onDecide) return;
+                setDeciding(c.id);
+                setDecideError(null);
+                onDecide(c.id, choice)
+                  .catch((e: unknown) => setDecideError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
+                  .finally(() => setDeciding(null));
+              }}
+            />
+            {decideError && deciding === null && (
+              <p role="alert" className="mt-2 text-label text-[var(--pm-tertiary)]">{decideError}</p>
+            )}
+          </div>
+        )}
         {askingWhy === c.id && (
           <div data-major-open className="ms-6 mt-2 rounded-lg bg-[var(--surface-container)] px-3 py-2">
             <p className="text-label text-[var(--on-surface)]">

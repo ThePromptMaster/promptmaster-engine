@@ -8,7 +8,7 @@
  * prompt was told: the final review and the objective check judged the work
  * as if nothing had been approved. Pure.
  */
-import type { ArtifactVersion, Project } from '@/types/project';
+import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
 
@@ -18,15 +18,33 @@ export interface GivenApproval {
   /** The version it was given on, and the stage's current one; 0 when unknown. */
   version: number;
   current: number;
+  /** The option the user chose when giving it (12 Nov); absent for a plain sign-off. */
+  choice?: string;
+}
+
+/**
+ * The option chosen with each approval, by criterion (12 Nov): read from the
+ * fact the choice recorded. A later choice for the same approval replaces an
+ * earlier one; a retired fact says nothing.
+ */
+export function chosenFor(facts: readonly Pick<ProjectFact, 'source_ref' | 'retired_at'>[] | null | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const f of facts ?? []) {
+    if (f.retired_at) continue;
+    const ref = f.source_ref as { criterion_id?: unknown; choice?: unknown } | null | undefined;
+    if (typeof ref?.criterion_id === 'string' && typeof ref.choice === 'string' && ref.choice.trim()) out.set(ref.criterion_id, ref.choice.trim());
+  }
+  return out;
 }
 
 export function approvalsGiven(
-  project: Pick<Project, 'manual_checks' | 'manual_check_versions'>,
+  project: Pick<Project, 'manual_checks' | 'manual_check_versions' | 'facts'>,
   template: Pick<WorkflowTemplate, 'stages'>,
   bundles: Record<string, StageArtifactBundle> | null | undefined
 ): GivenApproval[] {
   const ticked = project.manual_checks ?? {};
   const given = project.manual_check_versions ?? {};
+  const chosen = chosenFor(project.facts);
   const out: GivenApproval[] = [];
   for (const stage of template.stages) {
     const versions = bundles?.[stage.id]?.versions ?? [];
@@ -34,7 +52,8 @@ export function approvalsGiven(
     for (const c of stage.exit_criteria) {
       if (c.check !== 'manual' || !ticked[c.id]) continue;
       const on = versions.find((v) => v.id === given[c.id])?.version_number ?? 0;
-      out.push({ stage: stage.label, approval: c.label, version: on, current });
+      const choice = chosen.get(c.id);
+      out.push({ stage: stage.label, approval: c.label, version: on, current, ...(choice ? { choice: choice.slice(0, 400) } : {}) });
     }
   }
   return out.slice(0, 60);
@@ -84,12 +103,13 @@ export function approvalStandsThroughRepairs(
  * not the user's. An older tick with no version on record is not guessed at.
  */
 export function approvalsOnEarlierVersion(
-  project: Pick<Project, 'manual_checks' | 'manual_check_versions' | 'routine_decisions'>,
+  project: Pick<Project, 'manual_checks' | 'manual_check_versions' | 'routine_decisions' | 'facts'>,
   template: Pick<WorkflowTemplate, 'stages'>,
   bundles: Record<string, StageArtifactBundle> | null | undefined
 ): ApprovalOnEarlierVersion[] {
   const ticked = project.manual_checks ?? {};
   const given = project.manual_check_versions ?? {};
+  const chosen = chosenFor(project.facts);
   const out: ApprovalOnEarlierVersion[] = [];
   for (const stage of template.stages) {
     const versions = bundles?.[stage.id]?.versions ?? [];
@@ -100,6 +120,11 @@ export function approvalsOnEarlierVersion(
       if (project.routine_decisions === 'handle' && c.authority === 'delegable') continue;
       const on = versions.find((v) => v.id === given[c.id]);
       if (!on || on.id === head.id || on.content === head.content) continue;
+      // An approval given by choosing an option is the decision itself; Go
+      // writing that decision into the stage is not a change to re-confirm
+      // (12 Nov: "I choose option A or option B" was given on v3, Go recorded
+      // the choice, and the finish asked for it again on v5).
+      if (chosen.has(c.id) && versions.filter((v) => v.version_number > on.version_number).every((v) => GO_ROUTINE_OPERATIONS.has(v.source_operation))) continue;
       const since = versions.filter((v) => v.version_number > on.version_number).map((v) => (v.change_summary ?? '').split('\n')[0].slice(0, 160)).filter(Boolean);
       out.push({ stageId: stage.id, label: stage.short_label || stage.label, approval: c.label, version: on.version_number, current: head.version_number, ...(since.length ? { since } : {}) });
     }

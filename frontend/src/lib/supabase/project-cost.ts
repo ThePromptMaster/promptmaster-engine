@@ -86,7 +86,7 @@ const KIND_OF: Readonly<Record<string, CostKind>> = {
   '/api/apply-to-answer': 'revision', '/api/apply-recommendations': 'revision', '/api/save-as-new-version': 'revision', '/api/flow-trigger': 'revision',
   'go:evaluate_stage': 'review', 'go:declare_objective_complete': 'review', 'go:triage_findings': 'review', 'go:commit_delegated': 'review', 'go:advance_stage': 'review',
   '/api/evaluate-stage-artifact': 'review', '/api/check-conflicts': 'review', '/api/assess-change': 'review', '/api/extract-figures': 'review', '/api/revision-facts': 'review',
-  '/api/agent/check-answer': 'review', '/api/agent/check-criterion': 'review', '/api/agent/assess-objective': 'review', '/api/agent/screen-question': 'review',
+  '/api/agent/check-answer': 'review', '/api/agent/check-criterion': 'review', '/api/agent/assess-objective': 'review', '/api/agent/screen-question': 'review', '/api/agent/decision-options': 'review',
   '/api/claim-support': 'review', '/api/dependent-claims': 'review', '/api/check-new-claims': 'review',
   'go:recheck_stage': 'repair', 'drain:repair': 'repair',
   'go:plan': 'planning', '/api/agent/next-action': 'planning', 'go:return_to_stage': 'planning', 'go:propose_next_round': 'planning',

@@ -143,6 +143,21 @@ def test_no_approvals_adds_nothing():
     assert "APPROVED BY THE USER" not in context_block(PMInput(objective="x", mode="analyst", context="c"))
 
 
+def test_an_approval_given_by_choosing_says_which_option_was_chosen():
+    # 12 Nov: "I choose Option A or Option B" was a bare tick, so the next stage
+    # was never told which, and Go asked the question again.
+    from promptmaster.schemas import PMInput, UserApproval
+    block = context_block(PMInput(objective="Recovery plan.", mode="analyst", approvals=[
+        UserApproval(stage="Cap decision", approval="I approve this decision on the cap.", version=2, current=3,
+                     choice="Option A: raise the cap to $195,000 per hire for both searches"),
+        UserApproval(stage="Final pack", approval="I accept this pack as final", version=1, current=1),
+    ]))
+    assert ("- Cap decision: I approve this decision on the cap. — decided: Option A: raise the cap to $195,000 per hire "
+            "for both searches (given on v2; the current version is v3)") in block
+    assert "- Final pack: I accept this pack as final (on v1, the current version)" in block
+    assert "never ask for it again or present the other options as still open" in block
+
+
 def test_a_sentence_the_user_removed_reaches_every_stage_prompt(basic_inputs):
     # 28 Oct (Sean, HarborDesk): a sentence explicitly removed came back later.
     from promptmaster.schemas import RemovedSentence

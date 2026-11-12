@@ -4,7 +4,10 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { describeNeed, needHeading, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
+import { asksForDecision, type DecisionOffer } from '@/lib/workflow/decision-options';
 import { isMajorRow } from '@/lib/workflow/engine';
+
+import { DecisionChoices } from './decision-options';
 
 /**
  * "I need you to do this before I can continue" — with that exact action
@@ -18,8 +21,17 @@ export function NeedsYouCard({
   context,
   onCarryOn,
   nothingElse,
+  offer = null,
+  onChoose,
 }: {
   need: NeedsUser;
+  /**
+   * The options the stage puts to the user for this approval (12 Nov: "Where am
+   * I supposed to select A?"). Choosing one gives the approval and records which.
+   */
+  offer?: DecisionOffer | null;
+  /** Give the approval with what was decided, and resume. Rejects with a message the card shows. */
+  onChoose?: (choice: string) => Promise<void>;
   /**
    * Q2c (9 Oct, production): an approval Go stopped for may not be the only
    * thing left. "Carry on with other work first" resumes the run; Go checks
@@ -53,6 +65,24 @@ export function NeedsYouCard({
     setBusy(true);
     setError(null);
     onAction(option, noteFor(option))
+      .catch((e: unknown) => setError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
+      .finally(() => setBusy(false));
+  };
+  // An approval that is a decision, with nothing still undecided elsewhere:
+  // its options are the buttons, and the plain approval shows only when the
+  // stage offers none.
+  const decides = need.kind === 'tick_criterion' && !options && Boolean(onChoose) && !(need.openRows ?? []).length;
+  const deciding = decides ? offer : null;
+  const readingOptions = Boolean(deciding?.loading);
+  const hasOptions = Boolean(deciding && !deciding.loading && deciding.options.length);
+  // No options read from the text, and the approval is worded as a decision: a place to say it.
+  const [said, setSaid] = useState('');
+  const canSay = decides && !readingOptions && !hasOptions && need.kind === 'tick_criterion' && asksForDecision(need.label);
+  const choose = (choice: string) => {
+    if (!onChoose) return;
+    setBusy(true);
+    setError(null);
+    onChoose(choice)
       .catch((e: unknown) => setError(e instanceof Error && e.message ? e.message : t('nyc.failed')))
       .finally(() => setBusy(false));
   };
@@ -109,14 +139,34 @@ export function NeedsYouCard({
           {footer && <span className="basis-full text-label text-[var(--on-surface-variant)]">{footer}</span>}
         </div>
       ) : action ? (
+        <>
+        {deciding && (readingOptions || hasOptions) && (
+          <DecisionChoices offer={deciding} busy={busy} onChoose={choose} recordLabel={t('nyc.decideResume')} />
+        )}
+        {canSay && (
+          <label className="mt-3 block">
+            <span className="text-label text-[var(--on-surface-variant)]">{t('nyc.sayDecision')}</span>
+            <textarea
+              data-say-decision
+              value={said}
+              onChange={(e) => setSaid(e.target.value)}
+              disabled={busy}
+              rows={2}
+              maxLength={400}
+              className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
+            />
+          </label>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => run()}
-            disabled={busy || waitingForWhy()}
-            className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
-          >
-            {busy ? t('nyc.working') : action}
-          </button>
+          {!readingOptions && !hasOptions && (
+            <button
+              onClick={() => (canSay && said.trim() ? choose(said.trim()) : run())}
+              disabled={busy || waitingForWhy()}
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
+            >
+              {busy ? t('nyc.working') : action}
+            </button>
+          )}
           <span className="text-label text-[var(--on-surface-variant)]">
             {need.kind === 'next_round'
               ? t('nyc.orWriteUp')
@@ -138,6 +188,7 @@ export function NeedsYouCard({
             <span data-nothing-else className="basis-full text-label text-[var(--on-surface-variant)]">{t('nyc.nothingElse')}</span>
           ) : null}
         </div>
+        </>
       ) : (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('nyc.thenResume')}</p>
       )}

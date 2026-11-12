@@ -963,6 +963,18 @@ export const api = {
     return apiFetch('/api/agent/screen-question', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * The options a stage puts to the user for one approval, each with the
+   * passage that states it (12 Nov). None on any failure: the plain approval
+   * is shown then.
+   */
+  async agentDecisionOptions(
+    req: { inputs: PMInput; approval: string; stage_label: string; content: string; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ question: string; options: { label: string; quote: string }[] }> {
+    return apiFetch('/api/agent/decision-options', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** L-65: is a claim the answer makes about the saved record borne out by it? Fails open. */
   async agentCheckAnswer(
     req: { question: string; answer: string; documents: { label: string; version?: number | null; text: string }[]; model?: string },

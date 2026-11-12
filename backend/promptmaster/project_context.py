@@ -272,7 +272,8 @@ APPROVALS_HEADER = (
     "APPROVED BY THE USER — decisions of record. What an approval below covers is settled: never report it as "
     "unresolved, pending or awaiting the user. One given on an earlier version than the stage's current one "
     "covers what that version said; where the current version changed it, say what changed rather than calling "
-    "it approved:"
+    "it approved. Where one says what the user decided, that is the option they chose: carry it through, and "
+    "never ask for it again or present the other options as still open:"
 )
 
 
@@ -289,7 +290,8 @@ def approvals_block(inputs: PMInput) -> str:
             when = f" (given on v{a.version}; the current version is v{a.current})"
         elif a.version:
             when = f" (on v{a.version}, the current version)"
-        lines.append(f"- {where}: {' '.join(a.approval.split())}{when}")
+        decided = f" — decided: {' '.join(a.choice.split())}" if a.choice.strip() else ""
+        lines.append(f"- {where}: {' '.join(a.approval.split())}{decided}{when}")
     return f"{APPROVALS_HEADER}\n" + "\n".join(lines)
 
 

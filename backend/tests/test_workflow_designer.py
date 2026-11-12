@@ -168,3 +168,13 @@ def test_only_real_decisions_are_the_users_and_the_last_sign_off_always_is():
     assert wf.stages[1].approval_kind == "routine"
     assert wf.stages[-1].approval_kind == "decision"
 
+
+
+def test_a_choice_is_worded_as_the_decision_and_never_tells_the_user_to_state_it():
+    # 12 Nov, production: "I choose Option A or Option B (stating which one)." was
+    # one tick box. The page offers the options the stage sets out.
+    from promptmaster.workflow_designer import build_workflow_prompt
+    prompt = "\n".join(build_workflow_prompt("Decide between two recovery options.", "", ""))
+    assert "word it as the decision itself" in prompt
+    assert "set the options out side by side" in prompt
+    assert "Never add an instruction to the user inside an approval" in prompt

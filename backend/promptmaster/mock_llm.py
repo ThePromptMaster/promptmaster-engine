@@ -334,6 +334,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     # import the client.
     from promptmaster import agent, audit_findings, continuity, deliverable_check, evaluator, guidance, long_form, setup_suggester
     from promptmaster import question_screen
+    from promptmaster import decision_options
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
@@ -699,6 +700,11 @@ def _json_reply(system: str, prompt: str) -> dict:
     if system.startswith(question_screen.SCREEN_INSTRUCTION[:60]):
         # Scripted questions are asked, as an unscripted one would be.
         return {"verdict": "business_decision", "reason": "Mock: asked."}
+    if system.startswith(decision_options.OPTIONS_INSTRUCTION[:60]):
+        # The lines of the stage text that name an option, as the text names them.
+        text = prompt.split("STAGE TEXT:\n<<<\n", 1)[-1].rsplit("\n>>>", 1)[0]
+        named = [ln.strip(" -*#>") for ln in text.splitlines() if re.match(r"^[\s\-*#>]*Option [A-D]\b", ln)]
+        return {"question": "Which option do you choose?" if named else "", "options": [{"label": ln[:120], "quote": ln[:300]} for ln in named]}
     if system.startswith(deliverable_check._INSTRUCTION[:60]):
         # Nothing missing, nothing contradictory: the scripted deliverable passes.
         return {"findings": [], "contradictions": []}
