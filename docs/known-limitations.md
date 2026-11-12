@@ -3915,6 +3915,21 @@ the decision, so a designed workflow is not in that case. On the stage's own che
 running, a decision is recorded by choosing one of the options read (or the box beside them); where none
 are read, the tick records the approval alone.
 
+A decision made again replaces whatever stands where the earlier one stood, including the "Not yet
+decided…" fact recorded when the text from before the decision is restored (#672). It makes no value
+untrue: the figures of the option not chosen are still stated by the stages that describe both, and the
+check for old values left in a repaired text does not read them (#674; before that a change from "take
+the carrier's 20 units for $2,400" to the other option failed two repairs on "$2,400" and ended the run).
+The stages before a decision made again are rechecked where one states the earlier choice; the first
+decision leaves them alone.
+
+An answer to a question Go asks is taken as a waiting decision only when it names exactly one of that
+decision's options by the option's own name ("Option A"), and only one decision is waiting (#673). Go
+had asked "Which recovery option do you choose?" as its own question while the approval for it waited,
+and the answer left the approval unticked, so the choice was asked for twice. Options with no name of
+their own ("Approve the $195,000 cap", "Keep the $180,000 cap") are not matched: an answer to Go's
+question is then recorded as an answer, and the approval is still asked for on its card.
+
 A second press of Go, Resume or an answer while the first is still being handled is dropped. Before this
 a choice pressed twice recorded the answer twice, started a second loop, and ended the run failed.
 
