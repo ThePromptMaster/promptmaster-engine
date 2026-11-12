@@ -137,6 +137,10 @@ import type { OutlineDocument } from '@/types/outline';
 import { carriedRows, carriedText, decideRow, effectiveRenderer, isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { keptOpen, markSettled } from '@/lib/workflow/settled-rows';
 import { describeSettled, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
+import { answeredKept, mergeQueue, restOfQueue, userQueue, type QueueEntry } from '@/lib/agent/user-queue';
+import { keptQuestions } from '@/lib/agent/account';
+import { useQuestionGroups } from './agent/use-question-groups';
+import type { QueueAnswer } from './agent/question-queue';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
@@ -161,7 +165,7 @@ import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, chosenFor, withApprovals } from '@/lib/workflow/approvals';
 import { asksForDecision, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
-import { decisionAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
+import { decisionAsFact, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
 import { useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
@@ -1889,6 +1893,80 @@ export function WorkflowWorkspace({
     [project, goRunId, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
   );
 
+  // 12 Nov (a client): "If one answer clears three blockers, Go should ask
+  // once, apply the answer everywhere it matters, and keep going." Whatever
+  // else in the project waits on the user is shown under Go's stop, and each
+  // answer given there is recorded as it would have been at a stop of its own.
+  const queueStopHere = Boolean(go.run && !go.active && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked'));
+  const goNeed = go.needs;
+  const goStopReason = go.run?.stop_reason ?? '';
+  const keptNow = useMemo(() => keptQuestions(go.steps, answeredKept(project.facts, go.steps)), [go.steps, project.facts]);
+  const waitingQueue = useMemo(() => {
+    if (!queueStopHere || project.status === 'finalized') return [];
+    const asking =
+      goNeed?.kind === 'tick_criterion' ? { criterionId: goNeed.criterionId }
+        : goNeed?.kind === 'objective_check' ? { rowIds: [...(goNeed.rows ?? []), ...(goNeed.carried ?? [])].map((r) => r.id) }
+        : goNeed?.kind === 'answer_question' ? { question: goNeed.question }
+        : { question: goStopReason };
+    // A stop on a stage's own table is about its rows already.
+    const ownTable = goNeed?.kind === 'decide_rows' || goNeed?.kind === 'triage_findings' ? goNeed.stageId : null;
+    return restOfQueue(
+      userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
+      asking
+    ).filter((q) => !(ownTable && q.kind === 'finding' && q.stageId === ownTable));
+  }, [queueStopHere, goNeed, goStopReason, template, state, outstanding, stageBundles, project.manual_checks, project.routine_decisions, project.status, keptNow]);
+  const questionGroups = useQuestionGroups(project, waitingQueue, queueStopHere);
+  const queueEntries = useMemo(() => mergeQueue(waitingQueue, questionGroups), [waitingQueue, questionGroups]);
+  const queueTargets = useMemo(() => {
+    const wanted = new Set(waitingQueue.filter((q) => q.kind === 'approval').map((q) => q.criterionId));
+    return decisionTargets(template, stageBundles, project.manual_checks, waitingQueue.filter((q) => q.kind === 'approval').map((q) => q.stageId)).filter((d) => wanted.has(d.criterionId));
+  }, [waitingQueue, template, stageBundles, project.manual_checks]);
+  const queueOffers = useDecisionOptions(project, queueTargets);
+  const answerFromQueue = useCallback(
+    async (entry: QueueEntry, answer: QueueAnswer) => {
+      const first = entry.items[0];
+      if (!first) return;
+      if (entry.items.length === 1 && first.kind === 'approval' && first.criterionId) {
+        if (answer.kind === 'choose' || answer.kind === 'answer') return decideApproval(first.criterionId, first.stageId, answer.kind === 'choose' ? answer.choice : answer.text);
+        if (answer.kind === 'approve') return handleToggleManual(first.criterionId, true, undefined, first.stageId);
+        return;
+      }
+      if (entry.items.length === 1 && first.kind === 'finding' && first.rowId) {
+        if (answer.kind === 'accept') return goNeedsActions.decideRow(first.stageId, first.rowId, 'accepted');
+        if (answer.kind === 'reject') return goNeedsActions.decideRow(first.stageId, first.rowId, 'rejected', answer.reason?.trim() || 'Rejected from the list of what was waiting on you.');
+        return;
+      }
+      if (answer.kind === 'settle' && entry.items.length === 1 && first.kind === 'carried' && first.rowId) return goNeedsActions.settleRow(first.stageId, first.rowId);
+      if (answer.kind !== 'answer' && answer.kind !== 'choose') return;
+      // An answer in words: one fact, and every row and kept question it answers is closed by that fact.
+      const said = (answer.kind === 'choose' ? answer.choice : answer.text).replace(/\s+/g, ' ').trim();
+      const rows = entry.items.filter((i) => i.kind === 'carried' && i.rowId);
+      const kept = entry.items.filter((i) => i.kind === 'kept_question' && i.stepId);
+      const fact = queueAnswerAsFact(entry.question ?? first.text, said, {
+        stage_id: first.stageId, run_id: goRunId,
+        ...(kept.length ? { kept_step_ids: kept.map((k) => k.stepId!) } : {}),
+        ...(rows.length ? { row_ids: rows.map((r) => `${r.stageId}::${r.rowId}`) } : {}),
+      });
+      if (!fact) return;
+      const [saved] = await recordFacts(project, [fact]);
+      for (const tableId of [...new Set(rows.map((r) => r.stageId))]) {
+        const target = template.stages.find((s) => s.id === tableId);
+        const head = bundles?.[tableId]?.versions.at(-1);
+        let items = parseItems(head?.content);
+        if (!target || !items || !appendStageVersion) continue;
+        for (const r of rows.filter((x) => x.stageId === tableId)) items = markSettled(items, r.rowId!, { quote: said, source: 'fact', ref: saved?.id ?? null });
+        await appendStageVersion(tableId, target.label, {
+          content: serializeItems(items), source_operation: 'stage_edit', model: project.model, mode: project.mode,
+          instruction: 'Settled by an answer given from the list of what was waiting.',
+          change_summary: `Settled by your answer: "${said.slice(0, 200)}". No status changed.`,
+          base_content: head?.content ?? '',
+        });
+      }
+      await onReload?.();
+    },
+    [decideApproval, handleToggleManual, goNeedsActions, goRunId, project, template, bundles, appendStageVersion, onReload]
+  );
+
   // For Go's card on a stuck stage: has anything changed since it was marked
   // stuck, and may the stage be skipped (2 Oct, item 9).
   const currentStageDef = getStage(template, state.current_stage_id);
@@ -2800,6 +2878,7 @@ export function WorkflowWorkspace({
               onApplyAnyway={applyAnyway}
               otherWork={(id) => otherWorkFor(outstanding, id)}
               decisionOffers={decisionOffers}
+              queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />

@@ -196,6 +196,29 @@ export function rowAnswerAsFact(
   };
 }
 
+/**
+ * The fact an answer given from the list of what is waiting records (12 Nov).
+ * Unlike an answer to a stop, a bare "Yes" or "None" is recorded: the question
+ * is beside it. It names the kept questions it answers and the rows it
+ * settles, so each is closed by the same fact.
+ */
+export function queueAnswerAsFact(
+  question: string,
+  answer: string,
+  ref: { stage_id: string; run_id?: string | null; kept_step_ids?: string[]; row_ids?: string[] }
+): NewFact | null {
+  const text = answer.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const asked = questionOf(question);
+  return {
+    statement: `Decided by the user — asked "${asked}", answered: ${text}`.slice(0, STATEMENT_MAX),
+    subject: 'Decision',
+    kind: 'fact',
+    source_kind: 'user_edit',
+    source_ref: { via: 'go answer', question: asked, ...ref },
+  };
+}
+
 /** Per stage, at most this much of its latest saved text goes to the answer check (L-65). */
 const ANSWER_DOC_MAX = 20_000;
 const ANSWER_DOCS_MAX = 120_000;

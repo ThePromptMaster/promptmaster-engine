@@ -110,3 +110,56 @@ describe('a question set aside is kept until it is answered', () => {
     expect(keptQuestions(asked).map((k) => k.stepId)).toEqual(['c']);
   });
 });
+
+describe('items one answer settles are asked as one question', () => {
+  const item = (over: Record<string, unknown>) => ({ id: 'x', kind: 'carried', stageId: 'check', stageLabel: 'Coverage check', text: 't', holdsUp: [], blocksFinish: true, ...over }) as never;
+  const queue = [
+    item({ id: 'approval:options:c', kind: 'approval', stageId: 'options', stageLabel: 'Options A/B', text: 'I choose the recovery option', criterionId: 'c', holdsUp: ['Options A/B', 'Final package'] }),
+    item({ id: 'carried:check:i5', rowId: 'i5', text: 'The no-absence assumption is untested.', note: 'No absences.' }),
+    item({ id: 'finding:check:i2', kind: 'finding', rowId: 'i2', text: 'Named lists are missing.' }),
+    item({ id: 'kept_question:brief:k1', kind: 'kept_question', stageId: 'brief', stageLabel: 'Brief', stepId: 'k1', text: 'Should the brief treat absence as a risk?', blocksFinish: false, choices: ['Yes', 'No'] }),
+  ];
+
+  it('only a carried row and a kept question can share an answer', async () => {
+    const { mergeable, groupingItems } = await import('./user-queue');
+    expect(queue.map((q) => mergeable(q))).toEqual([false, true, false, true]);
+    expect(groupingItems(queue)).toEqual([
+      { id: 'carried:check:i5', stage: 'Coverage check', text: 'The no-absence assumption is untested. (note on it: No absences.)' },
+      { id: 'kept_question:brief:k1', stage: 'Brief', text: 'Should the brief treat absence as a risk?' },
+    ]);
+  });
+
+  it('a group becomes one entry where its first item stood, with the one question and its answers', async () => {
+    const { mergeQueue, entryHoldsUp } = await import('./user-queue');
+    const entries = mergeQueue(queue, [{ ids: ['carried:check:i5', 'kept_question:brief:k1'], question: 'Are any absences expected that week?', choices: ['None', 'Yes'] }]);
+    expect(entries.map((e) => [e.key, e.items.length])).toEqual([
+      ['approval:options:c', 1],
+      ['carried:check:i5|kept_question:brief:k1', 2],
+      ['finding:check:i2', 1],
+    ]);
+    expect(entries[1]).toMatchObject({ question: 'Are any absences expected that week?', choices: ['None', 'Yes'] });
+    expect(entryHoldsUp(entries[1])).toBe('the finish');
+    expect(entryHoldsUp(entries[0])).toBe('Options A/B, Final package and the finish');
+  });
+
+  it('a group naming an item that cannot share an answer, or one no longer waiting, is dropped', async () => {
+    const { mergeQueue } = await import('./user-queue');
+    const single = mergeQueue(queue, [
+      { ids: ['carried:check:i5', 'finding:check:i2'], question: 'Both?', choices: [] },
+      { ids: ['carried:check:i5', 'kept_question:gone:k9'], question: 'Gone?', choices: [] },
+      { ids: ['carried:check:i5', 'kept_question:brief:k1'], question: '  ', choices: [] },
+    ]);
+    expect(single.map((e) => e.items.length)).toEqual([1, 1, 1, 1]);
+    expect(single[3].choices).toEqual(['Yes', 'No']);
+    expect(mergeQueue(queue, null)).toHaveLength(4);
+  });
+
+  it('a kept question is covered by the fact that answered it, or the step that settled it', async () => {
+    const { answeredKept } = await import('./user-queue');
+    const covered = answeredKept(
+      [{ source_ref: { kept_step_ids: ['k1', 7] }, retired_at: null }, { source_ref: { kept_step_ids: ['k2'] }, retired_at: '2026-11-12' }, { source_ref: null }],
+      [{ action_key: 'settled_by_answer', params: { kept_settled: ['k3'] } }, { action_key: 'advance_stage', params: {} }]
+    );
+    expect([...covered].sort()).toEqual(['k1', 'k3']);
+  });
+});

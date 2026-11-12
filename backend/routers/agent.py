@@ -45,6 +45,7 @@ from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, c
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
+from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
@@ -497,6 +498,18 @@ async def api_decision_options(req: DecisionOptionsRequest, client: OpenRouterCl
     except Exception:  # noqa: BLE001 - no options is the safe answer to any failure here
         logger.warning("Decision options could not be read; the plain approval is shown", exc_info=True)
         return DecisionOptionsResponse()
+
+
+@router.post("/group-questions", response_model=GroupQuestionsResponse)
+async def api_group_questions(req: GroupQuestionsRequest, client: OpenRouterClient = Depends(get_client)) -> GroupQuestionsResponse:
+    """Which of the things waiting on the user one answer would settle together, each
+    group with the one question to ask (12 Nov). 1 small LLM call; commits nothing.
+    Any failure groups nothing, so the items are asked one by one."""
+    try:
+        return await group_questions(client, req)
+    except Exception:  # noqa: BLE001 - asking one by one is the safe answer to any failure here
+        logger.warning("Question grouping failed; the items are asked one by one", exc_info=True)
+        return GroupQuestionsResponse()
 
 
 @router.post("/settles", response_model=SettlesResponse)

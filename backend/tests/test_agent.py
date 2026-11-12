@@ -967,3 +967,21 @@ async def test_the_planner_has_room_for_its_reply_on_a_large_project():
 
     await choose_next_action(Client(), None, INPUTS, STATE, RESEARCH, "autonomous")
     assert seen["max_tokens"] >= 2_000
+
+
+def test_the_planner_is_told_what_already_waits_on_the_user_across_the_project():
+    # 12 Nov (a client): "If one answer clears three blockers, Go should ask once, apply the
+    # answer everywhere it matters, and keep going." Each item used to be its own stop.
+    from promptmaster.agent import AgentState, build_next_action_prompt
+    from promptmaster.schemas import PMInput
+    state = AgentState(
+        stage_id="brief", stage_label="Leadership brief",
+        waiting_on_user=['Options A/B: approval "I choose the recovery option"', "Coverage check: The no-absence assumption is untested."],
+    )
+    _system, user = build_next_action_prompt(PMInput(objective="Plan the training.", mode="analyst"), state, ["draft_stage", "request_user_decision"], "autonomous")
+    assert "ALREADY WAITING ON THE USER, ACROSS THE WHOLE PROJECT" in user
+    assert '- Options A/B: approval "I choose the recovery option"' in user
+    assert "Do not ask any of them again in other words" in user
+    assert "ask the ONE question whose answer unblocks the most" in user
+    bare = AgentState(stage_id="brief", stage_label="Leadership brief")
+    assert "ALREADY WAITING ON THE USER" not in build_next_action_prompt(PMInput(objective="x", mode="analyst"), bare, ["draft_stage"], "autonomous")[1]

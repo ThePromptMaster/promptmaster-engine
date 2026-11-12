@@ -190,3 +190,65 @@ export function holdsUpLine(item: Pick<QueueItem, 'holdsUp' | 'blocksFinish'>): 
 export function queueLines(queue: readonly QueueItem[]): string[] {
   return queue.map((q) => `${q.stageLabel}: ${q.kind === 'approval' ? `approval "${q.text}"` : q.text.slice(0, 240)}`);
 }
+
+/** One thing to ask: a single item, or several that one answer settles. */
+export interface QueueEntry {
+  /** Stable for the same items: the ids, joined. */
+  key: string;
+  items: QueueItem[];
+  /** The one question for a merged entry; absent for a single item. */
+  question?: string;
+  choices?: string[];
+}
+
+/** What one answer would settle together, as the grouping call returned it. */
+export interface QuestionGroup { ids: string[]; question: string; choices: string[] }
+
+/**
+ * Only what is put as a question can share an answer: a row carried forward
+ * and a question set aside. An approval is the user's own act on one piece of
+ * work, and an undecided finding is accepted or rejected on its own change.
+ */
+export const mergeable = (item: Pick<QueueItem, 'kind'>): boolean => item.kind === 'carried' || item.kind === 'kept_question';
+
+/** The items sent to be grouped, each with its note beside it. */
+export function groupingItems(queue: readonly QueueItem[]): { id: string; stage: string; text: string }[] {
+  return queue.filter(mergeable).map((q) => ({ id: q.id, stage: q.stageLabel, text: (q.note ? `${q.text} (note on it: ${q.note})` : q.text).slice(0, 2_400) }));
+}
+
+/**
+ * The queue with the items one answer settles merged into one entry, in the
+ * queue's own order: a merged entry stands where its first item stood. A group
+ * that names an item no longer waiting, or one that cannot share an answer, is
+ * dropped, and its items are asked on their own.
+ */
+export function mergeQueue(queue: readonly QueueItem[], groups: readonly QuestionGroup[] | null | undefined): QueueEntry[] {
+  const byId = new Map(queue.map((q) => [q.id, q]));
+  const groupOf = new Map<string, QuestionGroup>();
+  for (const g of groups ?? []) {
+    const members = g.ids.filter((id) => byId.has(id) && mergeable(byId.get(id)!) && !groupOf.has(id));
+    if (members.length < 2 || members.length !== g.ids.length || !g.question.trim()) continue;
+    for (const id of members) groupOf.set(id, g);
+  }
+  const out: QueueEntry[] = [];
+  const done = new Set<string>();
+  for (const item of queue) {
+    if (done.has(item.id)) continue;
+    const g = groupOf.get(item.id);
+    if (!g) {
+      out.push({ key: item.id, items: [item], ...(item.choices?.length ? { choices: item.choices } : {}) });
+      done.add(item.id);
+      continue;
+    }
+    const items = g.ids.map((id) => byId.get(id)!);
+    for (const m of items) done.add(m.id);
+    out.push({ key: g.ids.join('|'), items, question: g.question.trim(), ...(g.choices.length ? { choices: g.choices.slice(0, 4) } : {}) });
+  }
+  return out;
+}
+
+/** What an entry holds up: everything its items do, each named once. */
+export function entryHoldsUp(entry: Pick<QueueEntry, 'items'>): string {
+  const stages = [...new Set(entry.items.flatMap((i) => i.holdsUp))];
+  return holdsUpLine({ holdsUp: stages, blocksFinish: entry.items.some((i) => i.blocksFinish) });
+}

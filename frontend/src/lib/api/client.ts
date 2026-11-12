@@ -977,6 +977,17 @@ export const api = {
   },
 
   /**
+   * Which of the things waiting on the user one answer would settle together,
+   * each group with the one question to ask (12 Nov). No groups on any failure.
+   */
+  async agentGroupQuestions(
+    req: { inputs: PMInput; items: { id: string; stage: string; text: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ groups: { ids: string[]; question: string; choices: string[] }[] }> {
+    return apiFetch('/api/agent/group-questions', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  /**
    * Which open findings the user's own words have settled: the note on the
    * finding, or a fact or decision they stated (12 Nov). Settles nothing on
    * any failure.

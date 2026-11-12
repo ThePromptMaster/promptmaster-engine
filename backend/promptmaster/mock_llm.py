@@ -336,6 +336,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import question_screen
     from promptmaster import decision_options
     from promptmaster import settled_items
+    from promptmaster import question_groups
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
@@ -701,6 +702,10 @@ def _json_reply(system: str, prompt: str) -> dict:
     if system.startswith(question_screen.SCREEN_INSTRUCTION[:60]):
         # Scripted questions are asked, as an unscripted one would be.
         return {"verdict": "business_decision", "reason": "Mock: asked."}
+    if system.startswith(question_groups.GROUPS_INSTRUCTION[:60]):
+        # Items that share the word "absence" are one question; nothing else is grouped.
+        ids = [m.group(1) for m in re.finditer(r"^\[([^\]]+)\] [^\n]*\babsences?\b", prompt, re.M | re.I)]
+        return {"groups": [{"ids": ids, "question": "Are any absences expected?", "choices": ["None", "Yes, some"]}] if len(ids) > 1 else []}
     if system.startswith(settled_items.SETTLES_INSTRUCTION[:60]):
         # A note that begins "Answer:" settles its finding; any other note postpones it.
         out = []

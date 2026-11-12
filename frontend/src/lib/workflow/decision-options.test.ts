@@ -141,3 +141,13 @@ describe('the approval carries its choice', () => {
     expect(approvalsOnEarlierVersion(project, template, moved).map((a) => a.stageId)).toEqual(['final']);
   });
 });
+
+describe('an answer given from the list of what is waiting', () => {
+  it('is recorded even when it is one word, with the kept questions and rows it answers', async () => {
+    const { queueAnswerAsFact } = await import('./answers');
+    const fact = queueAnswerAsFact('Are any absences expected that week?', '  None ', { stage_id: 'check', run_id: 'r1', kept_step_ids: ['k1'], row_ids: ['check::i5'] })!;
+    expect(fact.statement).toBe('Decided by the user — asked "Are any absences expected that week?", answered: None');
+    expect(fact.source_ref).toMatchObject({ via: 'go answer', stage_id: 'check', kept_step_ids: ['k1'], row_ids: ['check::i5'] });
+    expect(queueAnswerAsFact('Q?', '   ', { stage_id: 'check' })).toBeNull();
+  });
+});

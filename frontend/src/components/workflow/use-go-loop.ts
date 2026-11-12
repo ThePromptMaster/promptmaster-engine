@@ -791,21 +791,34 @@ export function useGoLoop(opts: Options) {
         // stopped on the row. With routine decisions handed to Go; under "Ask
         // me" the stop offers it instead.
         const openRowsToRead = o.project.routine_decisions === 'handle' && o.appendStageVersion ? settleItems(o.template, context.carriedRows) : [];
-        if (openRowsToRead.length) {
+        // …and so is a question Go set aside earlier that a later answer has
+        // since covered: it is not asked again at the end.
+        const allStepsNow = [...priorStepsRef.current, ...stepsRef.current];
+        const keptToRead = o.project.routine_decisions === 'handle'
+          ? keptQuestions(allStepsNow, answeredKept(o.project.facts, allStepsNow)).slice(0, 4).map((k) => ({ id: `kept::${k.stepId}`, stage: stageLabelFor(k.stageId), text: k.question, note: '' }))
+          : [];
+        if (openRowsToRead.length || keptToRead.length) {
           const { statements, factOf } = userStatements(o.project.facts);
-          const asked = settleKey(openRowsToRead, statements);
-          if (asked !== settleAskedRef.current && !nothingSaid(openRowsToRead, statements)) {
+          const toRead = [...openRowsToRead, ...keptToRead];
+          const asked = settleKey(toRead, statements);
+          if (asked !== settleAskedRef.current && !nothingSaid(toRead, statements)) {
             settleAskedRef.current = asked;
-            const verdict = await api.agentSettles({ inputs: inputsFrom(o.project), items: openRowsToRead, statements, model: o.project.model }, signal).catch(() => null);
+            const verdict = await api.agentSettles({ inputs: inputsFrom(o.project), items: toRead, statements, model: o.project.model }, signal).catch(() => null);
             if (signal.aborted) throw new Stopped();
             const marks = settleMarks(verdict?.settled, openRowsToRead, factOf);
-            if (marks.length) {
+            const keptSettled = (verdict?.settled ?? [])
+              .filter((v) => v.id.startsWith('kept::') && factOf.has(v.by) && keptToRead.some((k) => k.id === v.id))
+              .map((v) => ({ stepId: v.id.slice('kept::'.length), quote: v.quote, question: keptToRead.find((k) => k.id === v.id)?.text ?? '' }));
+            if (marks.length || keptSettled.length) {
               const step = await startAgentStep({
                 runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
                 stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: SETTLED_STEP,
-                params: { settled: marks.map((m) => ({ stage_id: m.stageId, row_id: m.rowId, source: m.source })) },
-                rationale: 'A finding still counted as open was answered in your own words, so it is read against them before anything is repaired or asked again.',
-                expectedOutcome: 'The rows your answer settles marked as settled; the status you set on each is kept.', needsDecision: false, decisionQuestion: null,
+                params: {
+                  settled: marks.map((m) => ({ stage_id: m.stageId, row_id: m.rowId, source: m.source })),
+                  ...(keptSettled.length ? { kept_settled: keptSettled.map((k) => k.stepId) } : {}),
+                },
+                rationale: 'Something still counted as open was answered in your own words, so it is read against them before anything is repaired or asked again.',
+                expectedOutcome: 'What your answer settles marked as settled; the status you set on each row is kept.', needsDecision: false, decisionQuestion: null,
               });
               upsertStep(step);
               const saved: typeof marks = [];
@@ -827,8 +840,12 @@ export function useGoLoop(opts: Options) {
                   // Not saved: the rows stay open and are put to the user, as before.
                 }
               }
-              upsertStep(await finishAgentStep(step.id, saved.length
-                ? { status: 'succeeded', label: null, output: describeSettled(saved, stageLabelFor) }
+              const said = [
+                saved.length ? describeSettled(saved, stageLabelFor) : '',
+                ...keptSettled.map((k) => `A question kept for you is answered by what you have said since ("${k.quote.slice(0, 200)}"): ${k.question.slice(0, 200)}`),
+              ].filter(Boolean).join(' ');
+              upsertStep(await finishAgentStep(step.id, said
+                ? { status: 'succeeded', label: null, output: said }
                 : { status: 'failed', label: null, output: 'Could not save the rows your answer settles; they stay open.' }));
               if (saved.length) {
                 await o.onRefresh?.();
