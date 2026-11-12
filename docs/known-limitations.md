@@ -3634,7 +3634,13 @@ for each chapter. A correction named in the reason is confirmed by quote, by one
 either fails, the stage stays reopened and the step fails. The limits:
 - A value that isn't in a fact can't be found in code.
 - The quote check is a model's. If it can't run, it concludes nothing and the repair stands.
-- `arithmeticSlips` only recomputes lines of the form `a op b = c`.
+- `arithmeticSlips` only recomputes lines of the form `a op b = c`. Since 12 Nov it reads a scale said
+  after a figure (`million`, `billion`, `trillion`, `thousand`; `k`, `m`, `mn`, `bn` straight after a
+  money figure) and calls a sum a slip only when it is wrong both with the scales and as the bare
+  figures. Before that, "$3.5 million − $600,000 = $2.9 million" was reported as "works out to
+  -599,996.5", and a workflow that ends each round on this check went round again for it (#665). Any
+  other unit is still read as a word, so a sum that mixes units it does not know is checked as bare
+  figures or not at all.
 
 ### L-214 — Cut chapters (2026-11-08)
 
@@ -3933,6 +3939,12 @@ text ("aim for about 500 words", "under 600 words") is decided by counting, and 
 rest of that change. A change that asks the text to state its own word count is not one to carry, and a
 not-carried verdict with nothing to show for it is dropped. On the saved production memo the old check
 called the finding not carried in four of four runs and the new one in none of four.
+
+A length is counted on the document it is for, and on nothing else. Where the work goes in rounds, the
+check at the end of a round reads everything the round wrote, before the document exists; a change that
+asks for a length is marked there as "not counted here" and is counted when the document is written
+(#666). Without that, "cut the memo to under 600 words" would have been counted against the round's
+facts, analysis and check together and failed every round.
 
 What is not done. A length of a part ("each note under 40 words") is still judged by the model, with the
 whole text's count beside it. A hedged whole-text figure is met up to the same slack the brief's own
