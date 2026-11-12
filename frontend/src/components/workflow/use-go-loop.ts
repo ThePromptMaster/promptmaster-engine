@@ -1831,7 +1831,7 @@ export function useGoLoop(opts: Options) {
   );
 
   const answer = useCallback(
-    async (text: string, contradicted?: AnswerContradiction) => {
+    async (text: string, contradicted?: AnswerContradiction, opts?: { decided?: boolean }) => {
       const current = runRef.current;
       const o = latest.current;
       if (!current || !o.stage || !text.trim()) return;
@@ -1855,7 +1855,9 @@ export function useGoLoop(opts: Options) {
           // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
           // objective check read the project's facts, never the run's steps.
           const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
-          const fact = answerAsFact(asked, text, {
+          // An answer that made a waiting decision is on record as that decision already
+          // (`decideApproval`): a second fact saying the same would outlive a change of mind.
+          const fact = opts?.decided ? null : answerAsFact(asked, text, {
             run_id: current.id, step_id: step.id, stage_id: stage.id,
             // Recorded knowing the record says otherwise: kept with the fact.
             ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
@@ -1889,7 +1891,7 @@ export function useGoLoop(opts: Options) {
           const unmet = onObjective
             ? await reopenJudged(leftToGo ? FIX_OBJECTIVE_REASON : ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
             : objectiveUnmet(o.events);
-          if (fact || st?.status === 'blocked' || unmet || reopensForChoice) {
+          if (fact || opts?.decided || st?.status === 'blocked' || unmet || reopensForChoice) {
             await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
           }
           await go();

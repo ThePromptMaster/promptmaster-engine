@@ -198,3 +198,37 @@ describe('a decision made again replaces the earlier one', () => {
     expect((earlierDecision(both, 'options.approved') as ProjectFact).id).toBe('b');
   });
 });
+
+describe('an answer to Go\'s own question that makes a waiting decision (12 Nov, production pass)', () => {
+  const options = [
+    { label: "Option A: take the carrier's 20 units, keep all deadlines, approve the $1,400 spending exception", quote: 'q' },
+    { label: 'Option B: no extra spend, East moves to Wednesday and West moves to Thursday', quote: 'q' },
+  ];
+  const pending = [{ criterionId: 'options.approved', stageId: 'options', options }];
+
+  it('names the option it chose, by the option\'s own name', async () => {
+    const { decisionForAnswer } = await import('./decision-options');
+    expect(decisionForAnswer('Option A: I approve the $1,400 spending exception', pending)).toEqual({ criterionId: 'options.approved', stageId: 'options', choice: options[0].label });
+    expect(decisionForAnswer('I will go with option b.', pending)?.choice).toBe(options[1].label);
+  });
+
+  it('is left as an answer when it names both, neither, or nothing', async () => {
+    const { decisionForAnswer } = await import('./decision-options');
+    for (const said of ['Option B, not Option A', 'Do whatever is best', 'Take the carrier', 'Options are fine', '  ']) {
+      expect(decisionForAnswer(said, pending), said).toBeNull();
+    }
+  });
+
+  it('needs every option to carry its own name, and only one waiting decision to be named', async () => {
+    const { decisionForAnswer } = await import('./decision-options');
+    const unnamed = [{ criterionId: 'cap.approved', stageId: 'cap', options: [{ label: 'Approve the $195,000 cap', quote: 'q' }, { label: 'Keep the $180,000 cap', quote: 'q' }] }];
+    expect(decisionForAnswer('Approve the $195,000 cap', unnamed)).toBeNull();
+    const same = [{ criterionId: 'x.approved', stageId: 'x', options: [{ label: 'Option A: one', quote: 'q' }, { label: 'Option A: two', quote: 'q' }] }];
+    expect(decisionForAnswer('Option A', same)).toBeNull();
+    const two = [...pending, { criterionId: 'later.approved', stageId: 'later', options }];
+    expect(decisionForAnswer('Option A', two)).toBeNull();
+    expect(decisionForAnswer('Option A', [])).toBeNull();
+    expect(decisionForAnswer('Option A', [{ criterionId: 'c', stageId: 's', options: [options[0]] }])).toBeNull();
+  });
+});
+
