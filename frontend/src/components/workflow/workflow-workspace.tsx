@@ -1904,7 +1904,8 @@ export function WorkflowWorkspace({
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
-      goNeed?.kind === 'tick_criterion' ? { criterionId: goNeed.criterionId }
+      // An approval's own card already names the findings still undecided elsewhere.
+      goNeed?.kind === 'tick_criterion' ? { criterionId: goNeed.criterionId, rowIds: (goNeed.openRows ?? []).map((r) => r.id) }
         : goNeed?.kind === 'objective_check' ? { rowIds: [...(goNeed.rows ?? []), ...(goNeed.carried ?? [])].map((r) => r.id) }
         : goNeed?.kind === 'answer_question' ? { question: goNeed.question }
         : { question: goStopReason };
