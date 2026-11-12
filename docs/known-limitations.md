@@ -3854,7 +3854,10 @@ The draft becomes the first version of the deliverable only when the workflow pi
 take it (`carryTarget`). A workflow that writes in chapters, which is what a long request usually gets, has
 none: the draft was read to design it and is not carried into it, and after the switch the draft is no
 longer shown anywhere in the project, though its versions stay in the database. The panel says which case
-applies before the press. On the first production run it said "Your draft is carried in" for a chapters
+applies before the press. Where the draft is carried, it becomes the first version of the last stage, and
+the stages before it are shown it until that stage is written again (`buildStageDigest`): before 12 Nov
+they were not, and on production a drafting stage asked the user to attach "the existing proposal draft"
+that was two stages further on in the same project. On the first production run it said "Your draft is carried in" for a chapters
 workflow, which was false; the line was corrected the same day.
 
 Not built: shrinking a designed workflow once it is running beyond Go skipping optional stages (L-69), and

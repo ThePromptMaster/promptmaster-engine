@@ -21,6 +21,7 @@ import { useT } from '@/lib/i18n/i18n-provider';
 import { useWorkflowWords } from '@/components/projects/workflow-picker';
 import { templateFromDesign } from '@/lib/workflow/custom';
 import { validateTemplate } from '@/lib/workflow/validate';
+import { CARRIED_FROM_QUICK } from '@/lib/workflow/digest';
 import { carryTarget, switchBrief } from '@/lib/workflow/quick';
 import { designDepth, keepSize, outgrowsOneStage, readSize, sizeKey, type RequestSize } from '@/lib/workflow/request-size';
 import { appendWorkflowEvent, getLatestTemplate, publishUserTemplate } from '@/lib/supabase/workflow';
@@ -145,7 +146,7 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
         const artifact = await createArtifact(project.id, project.user_id, 'output', carry.label, carry.id);
         await appendVersion(artifact, {
           content: answer,
-          source_operation: 'carried_from_quick',
+          source_operation: CARRIED_FROM_QUICK,
           change_summary: 'The quick answer, carried into the full process.',
         });
       }

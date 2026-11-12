@@ -26,6 +26,9 @@ import { manuscriptSourceFor } from './context';
 
 /** Ids of stages added while a project runs begin with this (`added-stages.newStageId`). */
 export const ADDED_STAGE_PREFIX = 'added_';
+
+/** The version a quick answer becomes when its project is taken into a full workflow (`take-full-process.tsx`). */
+export const CARRIED_FROM_QUICK = 'carried_from_quick';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { itemSchemaFor, parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
 import { carriesForward, isDone } from './types';
@@ -283,14 +286,22 @@ export function buildStageDigest(
     const lastRound = loops && index > cutoff && Boolean(st) && st!.status !== 'not_started' && st!.status !== 'skipped';
     const bundle = bundles[stage.id];
     const headVersion = bundle?.versions.at(-1);
-    const writtenAhead = !lastRound && addedLater && index > cutoff && Boolean(headVersion?.content?.trim());
+    // A first draft carried into this workflow sits on the deliverable, the last
+    // stage, and the stages before it are designed to build on it. Until the
+    // deliverable is written again they are shown it: on production (12 Nov) a
+    // drafting stage asked the user to attach "the existing proposal draft",
+    // which was two stages further on in the same project.
+    const carriedAhead = index > cutoff && headVersion?.source_operation === CARRIED_FROM_QUICK;
+    const writtenAhead = !lastRound && (addedLater || carriedAhead) && index > cutoff && Boolean(headVersion?.content?.trim());
     if (writtenAhead) {
       const text = documentText(stage, headVersion?.content);
       const summary = summariseStageContent(stage, headVersion?.content);
       if (summary || text) {
         prior_stages.push({
           stage_id: stage.id,
-          label: `${stage.label} (written before this stage was added — its current text, which this stage's work applies to)`,
+          label: carriedAhead
+            ? `${stage.label} (the user's first draft, written before this workflow began and carried into it — the existing draft to build on)`
+            : `${stage.label} (written before this stage was added — its current text, which this stage's work applies to)`,
           summary, ...(headVersion?.version_number ? { version: headVersion.version_number } : {}),
         });
         texts.push(text);

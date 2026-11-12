@@ -104,6 +104,19 @@ describe('buildStageDigest', () => {
     expect(buildStageDigest(BOOK_V1, state, PROJECT, withLater, 'audience').prior_stages.map((s) => s.stage_id)).toEqual(['objective']);
   });
 
+  it('shows the stages before the deliverable a first draft that was carried into the workflow (12 Nov)', () => {
+    const carried = bundle('The first draft of the proposal.');
+    carried.versions[0].source_operation = 'carried_from_quick';
+    const withCarried = { ...bundles, positioning: carried };
+    const digest = buildStageDigest(BOOK_V1, state, PROJECT, withCarried, 'audience');
+    const ahead = digest.prior_stages.find((s) => s.stage_id === 'positioning');
+    expect(ahead?.label).toContain("the user's first draft");
+    expect(ahead?.text ?? ahead?.summary).toContain('The first draft of the proposal.');
+    // Once that stage is written again, it is no longer shown ahead of its turn.
+    const rewritten = bundle('The positioning, written by the workflow.');
+    expect(buildStageDigest(BOOK_V1, state, PROJECT, { ...bundles, positioning: rewritten }, 'audience').prior_stages.map((s) => s.stage_id)).toEqual(['objective']);
+  });
+
   it('carries the objective in full and prior stages as summaries', () => {
     const digest = buildStageDigest(BOOK_V1, state, PROJECT, bundles, 'positioning');
     expect(digest.objective).toBe(PROJECT.objective);
