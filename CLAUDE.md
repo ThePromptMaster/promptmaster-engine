@@ -27,13 +27,13 @@ npm run lint             # eslint
 **Backend** (`cd backend`):
 ```
 uvicorn main:app --reload --port 8000     # dev server
-pytest                                     # full suite (128 tests, ~1s, no network)
+pytest                                     # full suite (about 1,280 tests, ~5s, no network)
 pytest tests/test_long_form_router.py      # single file
 pytest -k test_detect                      # single test by name
 ```
 Tests never call OpenRouter — `tests/conftest.py` supplies an `AsyncMock` client plus `basic_inputs` / `good_evaluation` / `basic_iteration` fixtures. Adding an endpoint means adding a router test that asserts on prompt content, not on LLM output.
 
-Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` resolves to a Python without them, use `~/.pyenv/versions/3.12.4/bin/pytest`.
+Backend deps live in a pyenv 3.12.4 environment on the original developer's machine; if `pytest` resolves to a Python without them, use `~/.pyenv/versions/3.12.4/bin/pytest`. On a machine with no such environment, run the suite through `uv` from `backend/`: `uv run --no-project --python 3.12 --with-requirements requirements.txt --with pytest --with pytest-asyncio python -m pytest -q`.
 
 ## Architecture
 
