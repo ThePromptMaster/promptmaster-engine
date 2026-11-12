@@ -42,6 +42,8 @@ import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objec
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { describeSettled, nothingSaid, settleItems, settleKey, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
+import { answeredKept, queueLines, userQueue } from '@/lib/agent/user-queue';
+import { keptQuestions } from '@/lib/agent/account';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
@@ -85,7 +87,7 @@ import {
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
-import { evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
+import { evaluateStage, getStage, nextSuggestedStage, outstandingWork } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { addedByRun, mayAddStages, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
@@ -1113,6 +1115,12 @@ export function useGoLoop(opts: Options) {
                   lengthNote: holder?.id === o.stage!.id ? describeLengthTarget(wholeLengthTarget(o.project, o.bundles[o.stage!.id]?.versions.at(-1)?.content ?? '')) : '',
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
                   polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance) && !allowed.includes('revise_stage') ? polishedHere : undefined,
+                  // What already waits on the user anywhere in the project (12 Nov): not asked one by one.
+                  waitingOnUser: queueLines(userQueue({
+                    template: o.template, state: o.state, outstanding: outstandingWork(o.template, o.state, context),
+                    bundles: o.bundles, manualChecks: o.project.manual_checks, routine,
+                    kept: keptQuestions([...priorStepsRef.current, ...stepsRef.current], answeredKept(o.project.facts, [...priorStepsRef.current, ...stepsRef.current])),
+                  })),
                 }),
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
               },

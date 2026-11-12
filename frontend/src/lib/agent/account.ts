@@ -52,6 +52,31 @@ function answeredSince(steps: readonly AgentStep[], from: number, kept: string):
   );
 }
 
+/** A question Go set aside for the user rather than stop for, still unanswered. */
+export interface KeptQuestion { stepId: string; stageId: string; question: string; choices: string[] }
+
+/**
+ * The questions set aside in these steps that nobody has answered since (12
+ * Nov). They were listed in the run's account and never asked again: "asked
+ * once the work has nowhere further to go, or at the end" was the intent, and
+ * nothing did it. `answeredElsewhere` names the steps a recorded answer covers
+ * (an answer given from the list of what is waiting, kept on its fact).
+ */
+export function keptQuestions(steps: readonly AgentStep[], answeredElsewhere: ReadonlySet<string> = new Set()): KeptQuestion[] {
+  const out: KeptQuestion[] = [];
+  const seen = new Set<string>();
+  steps.forEach((s, i) => {
+    const question = typeof s.params?.set_aside_question === 'string' ? s.params.set_aside_question.trim() : '';
+    if (!question || answeredElsewhere.has(s.id) || answeredSince(steps, i, question)) return;
+    const key = question.toLowerCase().replace(/\s+/g, ' ').slice(0, 160);
+    if (seen.has(key)) return;
+    seen.add(key);
+    const choices = Array.isArray(s.params?.choices) ? (s.params.choices as unknown[]).filter((c): c is string => typeof c === 'string' && Boolean(c.trim())).slice(0, 4) : [];
+    out.push({ stepId: s.id, stageId: s.stage_id, question: question.slice(0, 600), choices });
+  });
+  return out;
+}
+
 /** Whether a repair closed its stage. A step from before this was recorded says so in its own words. */
 function closedItsStage(s: AgentStep): boolean {
   return s.changes?.stage_closed ?? /marked complete again|your approval carries/.test(s.output ?? '');
