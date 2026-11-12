@@ -45,6 +45,12 @@ export interface NeedsActions {
    * written into it.
    */
   decide?: (criterionId: string, stageId: string, choice: string) => Promise<void>;
+  /**
+   * Say a row carried forward as unmet is settled (12 Nov), with the answer
+   * that settles it when one was typed: the answer is recorded as a fact and
+   * the row is marked on its own table. Its status is not changed.
+   */
+  settleRow?: (stageId: string, rowId: string, answer?: string) => Promise<void>;
   /** Skip the current stage, with the reason given. */
   skip?: (reason: string) => Promise<void>;
   /** Start the next round of a looping workflow: the user's return to its first stage. */
@@ -241,6 +247,10 @@ export function GoPanel({
         // Tried twice (5 Nov): open it to change it, or finish with it stated. Neither runs Go again.
         if (option === 'open') return needsActions?.openStage?.(need.stageId);
         if (option === 'finish') return needsActions?.finishWithLimitation?.(need.items);
+        if (option === 'settle_row' && need.carried?.length === 1 && needsActions?.settleRow) {
+          const row = need.carried[0];
+          await needsActions.settleRow(row.stageId, row.id, note);
+        }
         if ((option === 'accept_row' || option === 'reject_row') && need.rows?.length === 1 && needsActions?.decideRow) {
           const row = need.rows[0];
           await needsActions.decideRow(

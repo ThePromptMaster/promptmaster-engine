@@ -1,4 +1,4 @@
-import { actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, type StepStage } from '@/lib/agent/actions';
+import { actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, type StepStage } from '@/lib/agent/actions';
 import { DICTIONARIES, translate } from './translate';
 import type { Locale } from './locales';
 import { getLocale, tr } from './store';
@@ -14,6 +14,7 @@ const SPECIAL: Record<string, MessageKey> = {
   [USER_ANSWER_STEP]: 'goAction.userAnswer',
   [AWAIT_SECTIONS_STEP]: 'goAction.awaitSections',
   [ROUTINE_DEFAULT_STEP]: 'goAction.routineDefault',
+  [SETTLED_STEP]: 'goAction.settledByAnswer',
 };
 
 export function shownActionLabel(key: string, locale: Locale = getLocale()): string {

@@ -44,6 +44,7 @@ from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
+from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
@@ -494,6 +495,18 @@ async def api_decision_options(req: DecisionOptionsRequest, client: OpenRouterCl
     except Exception:  # noqa: BLE001 - no options is the safe answer to any failure here
         logger.warning("Decision options could not be read; the plain approval is shown", exc_info=True)
         return DecisionOptionsResponse()
+
+
+@router.post("/settles", response_model=SettlesResponse)
+async def api_settles(req: SettlesRequest, client: OpenRouterClient = Depends(get_client)) -> SettlesResponse:
+    """Which open findings the user's own words have settled: the note on the finding,
+    or a fact or decision they stated (12 Nov). 1 small LLM call; commits nothing, and
+    the browser marks the rows. Any failure settles nothing, so the finding stays open."""
+    try:
+        return await settled_items(client, req)
+    except Exception:  # noqa: BLE001 - "still open" is the safe answer to any failure here
+        logger.warning("Settled-items check failed; the findings stay open", exc_info=True)
+        return SettlesResponse()
 
 
 @router.post("/check-answer")

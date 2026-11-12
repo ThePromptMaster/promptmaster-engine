@@ -1,4 +1,4 @@
-import { AGENT_ACTIONS, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { AGENT_ACTIONS, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import type { Locale } from './locales';
 import { en as stopEn } from './messages/areas/stop';
 import { en as needEn } from './messages/areas/need';
@@ -46,6 +46,7 @@ function shownAction(locale: Locale, english: string): string {
     [USER_ANSWER_STEP]: 'goAction.userAnswer',
     [AWAIT_SECTIONS_STEP]: 'goAction.awaitSections',
     [ROUTINE_DEFAULT_STEP]: 'goAction.routineDefault',
+    [SETTLED_STEP]: 'goAction.settledByAnswer',
   };
   for (const key of [...AGENT_ACTIONS.map((a) => a.key), ...Object.keys(special)]) {
     if (actionLabel(key) !== english) continue;

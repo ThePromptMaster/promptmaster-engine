@@ -39,6 +39,7 @@ export const hi: Record<keyof typeof en, string> = {
   "goAction.userAnswer": "आपका उत्तर",
   "goAction.awaitSections": "लिखे जा रहे सेक्शनों का इंतज़ार करें",
   "goAction.routineDefault": "नियमित डिफ़ॉल्ट अपनाएँ",
+  "goAction.settledByAnswer": "जो आपके उत्तर से सुलझ गया उसे बंद करें",
   "goAction.measured": "एक मापी गई आवश्यकता ठीक करें",
   "goAction.lastComplete": "आख़िरी चरण को पूरा चिह्नित करें",
   "exec.discussed": "विश्लेषण किया गया",

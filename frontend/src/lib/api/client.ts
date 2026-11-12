@@ -975,6 +975,18 @@ export const api = {
     return apiFetch('/api/agent/decision-options', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * Which open findings the user's own words have settled: the note on the
+   * finding, or a fact or decision they stated (12 Nov). Settles nothing on
+   * any failure.
+   */
+  async agentSettles(
+    req: { inputs: PMInput; items: { id: string; stage: string; text: string; note: string }[]; statements: { id: string; text: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ settled: { id: string; by: string; quote: string; why?: string }[] }> {
+    return apiFetch('/api/agent/settles', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** L-65: is a claim the answer makes about the saved record borne out by it? Fails open. */
   async agentCheckAnswer(
     req: { question: string; answer: string; documents: { label: string; version?: number | null; text: string }[]; model?: string },

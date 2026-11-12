@@ -84,6 +84,7 @@ import {
   type OutstandingItem,
   openFindingsByStage,
   outstandingWork,
+  rowsRequired,
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
@@ -133,7 +134,9 @@ import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { decideRow, isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { carriedRows, carriedText, decideRow, effectiveRenderer, isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { keptOpen, markSettled } from '@/lib/workflow/settled-rows';
+import { describeSettled, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
@@ -158,7 +161,7 @@ import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, chosenFor, withApprovals } from '@/lib/workflow/approvals';
 import { asksForDecision, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
-import { decisionAsFact } from '@/lib/workflow/answers';
+import { decisionAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
 import { useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
@@ -1367,11 +1370,57 @@ export function WorkflowWorkspace({
     [stage, appendStageVersion, project.model, project.mode, headVersion?.content, offerFactUpdates]
   );
 
+  // 12 Nov: a finding the user deferred with a note is read against that note
+  // once it is saved. On the training plan the note was the answer ("There are
+  // no additional absences to account for"), and the row went on counting as
+  // unmet. When the note answers the finding, the row is marked settled, with
+  // "Keep it open instead" beside it, and the note becomes a fact of the
+  // project so every later stage reads it. A note that only postpones changes
+  // nothing. Best effort: a failed read leaves the row as the user saved it.
+  const readOwnNotes = useCallback(
+    async (before: readonly StageItem[], after: readonly StageItem[]) => {
+      if (!stage || !appendStageVersion || effectiveRenderer(stage) !== 'review') return;
+      const schema = itemSchemaFor(stage);
+      const was = new Map(before.map((r) => [r.id, r]));
+      const mine = carriedRows(after, schema, !rowsRequired(stage)).filter((r) => {
+        const old = was.get(r.id);
+        return r.status_source === 'user' && (r.reason ?? '').trim() && !keptOpen(r) && (old?.status !== r.status || (old?.reason ?? '') !== (r.reason ?? ''));
+      });
+      if (!mine.length) return;
+      const label = stage.short_label || stage.label;
+      const items = mine.slice(0, 12).map((r) => ({ id: `${stage.id}::${r.id}`, stage: label, text: carriedText(r).slice(0, 2_400), note: (r.reason ?? '').trim().slice(0, 1_400) }));
+      const { statements, factOf } = userStatements(project.facts);
+      const verdict = await api.agentSettles({ inputs: inputsFrom(project), items, statements, model: project.model }).catch(() => null);
+      const marks = settleMarks(verdict?.settled, items, factOf);
+      const content = withMarks(serializeItems([...after]), stage.id, marks);
+      if (!content) return;
+      await appendStageVersion(stage.id, stage.label, {
+        content, source_operation: 'stage_edit', model: project.model, mode: project.mode,
+        change_summary: describeSettled(marks, () => label), base_content: serializeItems([...after]),
+      });
+      // The note is the user's answer: on record as a fact, once.
+      const have = new Set((project.facts ?? []).filter((f) => !f.retired_at).map((f) => f.statement));
+      const facts = marks
+        .filter((m) => m.source === 'note')
+        .map((m) => {
+          const row = mine.find((r) => r.id === m.rowId);
+          return row ? rowAnswerAsFact(carriedText(row), label, (row.reason ?? '').trim(), { stage_id: stage.id, row_id: row.id }) : null;
+        })
+        .filter((f): f is NonNullable<typeof f> => Boolean(f) && !have.has(f!.statement));
+      if (facts.length) await recordFacts(project, facts);
+      setActiveVersionId(null);
+      await onReload?.();
+    },
+    [stage, appendStageVersion, project, onReload]
+  );
+
   const saveItems = useCallback(
     async (items: StageItem[]) => {
+      const before = parseItems(headVersion?.content) ?? [];
       await saveContent(serializeItems(items));
+      void readOwnNotes(before, items).catch(() => undefined);
     },
-    [saveContent]
+    [saveContent, readOwnNotes, headVersion?.content]
   );
 
   // Look the rows up in OpenAlex (1 Oct, item 12). The rows come back
@@ -1741,6 +1790,30 @@ export function WorkflowWorkspace({
       unblock: () => setBlocked(null),
       tick: (criterionId: string, reason?: string, onStageId?: string) => handleToggleManual(criterionId, true, reason, onStageId),
       decide: decideApproval,
+      // A row carried forward as unmet, settled from Go's stop (12 Nov): by the
+      // user's word alone, or by the answer they typed, which becomes a fact.
+      settleRow: async (rowStageId: string, rowId: string, answer?: string) => {
+        const target = template.stages.find((s) => s.id === rowStageId);
+        const head = bundles?.[rowStageId]?.versions.at(-1);
+        const items = parseItems(head?.content);
+        const row = items?.find((r) => r.id === rowId);
+        if (!target || !items || !row || !appendStageVersion) throw new Error(tr('wserr.noChange'));
+        const label = target.short_label || target.label;
+        const said = (answer ?? '').replace(/\s+/g, ' ').trim();
+        const fact = said ? rowAnswerAsFact(carriedText(row), label, said, { stage_id: rowStageId, row_id: rowId, run_id: goRunId }) : null;
+        const saved = fact ? await recordFacts(project, [fact]) : [];
+        const quote = said || (row.reason ?? '').trim() || 'Settled by you from Go\'s stop.';
+        await appendStageVersion(rowStageId, target.label, {
+          content: serializeItems(markSettled(items, rowId, { quote, source: said ? 'fact' : 'user', ref: saved[0]?.id ?? null })),
+          source_operation: 'stage_edit',
+          instruction: `Settled ${rowId} from Go's stop.`,
+          model: project.model,
+          mode: project.mode,
+          change_summary: `You said ${rowId} is settled${said ? `: "${said.slice(0, 200)}"` : ''}. Its status is unchanged.`,
+          base_content: head?.content ?? '',
+        });
+        await onReload?.();
+      },
       keepStage: async (keepId: string, reason?: string) => {
         const since = state.stages[keepId]?.stale?.since;
         if (!since) return;
@@ -1813,7 +1886,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t, project, goRunId]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked

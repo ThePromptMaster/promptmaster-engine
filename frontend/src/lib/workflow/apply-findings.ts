@@ -91,6 +91,12 @@ export function carryUserFields(before: readonly StageItem[], after: StageItem[]
       kept.status = was.status;
       kept.reason = was.reason;
       kept.status_source = was.status_source;
+      // …and what settled it, or the user's word that it stays open (12 Nov):
+      // the model returns declared fields only, so a rebuilt table would have
+      // the row carried forward as unmet again.
+      for (const key of ['settled_by', 'settled_source', 'settled_ref'] as const) {
+        if ((was[key] ?? '').trim()) kept[key] = was[key];
+      }
       if (was.status_source === 'sandbox') {
         if (was.sandbox_run_id) kept.sandbox_run_id = was.sandbox_run_id;
         if (schema.execution && was[schema.execution.field]) kept[schema.execution.field] = was[schema.execution.field];

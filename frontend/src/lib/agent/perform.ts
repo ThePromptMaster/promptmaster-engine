@@ -99,7 +99,7 @@ import type { Evaluation, Project } from '@/types/project';
 import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
-import { listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
+import { carriedRowsOf, listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
 import { addressedRows, carriedOutReason, describeAddressed, type AddressedRow } from './addressed-rows';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
@@ -2165,7 +2165,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           status: 'succeeded', toolsUsed: [], changes: {},
           output: `${reason} I will not call the objective met while any of it is open.`,
           stop: { status: 'awaiting_decision', reason },
-          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'work_open', items: open.map(describeOutstanding), ...openRowsOf(ctx.template, open) },
+          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'work_open', items: open.map(describeOutstanding), ...openRowsOf(ctx.template, open), ...carriedRowsOf(ctx.template, open) },
         });
       }
       // PM-25: the model's opinion is not enough — the deliverable has to exist.

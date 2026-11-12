@@ -11,6 +11,7 @@ import { translate } from '@/lib/i18n/translate';
 import { shownCheckText } from '@/lib/i18n/check-text';
 import { templateWord } from '@/lib/i18n/templates';
 import type { Locale } from '@/lib/i18n/locales';
+import type { CarriedRow } from './settled-rows';
 import type {
   OpenFindingRow,
   CriterionResult,
@@ -847,7 +848,7 @@ export type OutstandingItem =
    * unmet (C2, 8 Oct): settled as rows, not as work. "Carrying an issue
    * forward should not turn an unmet requirement into 'Objective met'."
    */
-  | { kind: 'carried_forward'; stageId: string; label: string; rows: string[] }
+  | { kind: 'carried_forward'; stageId: string; label: string; rows: string[]; items?: CarriedRow[] }
   | { kind: 'unmet_blocking'; stageId: string; label: string; criteria: string[] }
   | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
   /** Written sections the model stopped at its length limit (8 Nov): the text ends mid-sentence. */
@@ -927,7 +928,10 @@ export function outstandingWork(
     const proposals = Math.max(0, proposed - rest);
     if (proposals > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposals, ...optional });
     const carried = ctx.carriedForward?.[stage.id] ?? [];
-    if (carried.length) out.push({ kind: 'carried_forward', stageId: stage.id, label, rows: carried });
+    if (carried.length) {
+      const items = ctx.carriedRows?.[stage.id];
+      out.push({ kind: 'carried_forward', stageId: stage.id, label, rows: carried, ...(items?.length ? { items } : {}) });
+    }
 
     // Required work still unticked: on the stage the project is on, and on any
     // stage moved past with something left open.

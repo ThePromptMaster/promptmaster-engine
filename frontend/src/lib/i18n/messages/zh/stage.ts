@@ -131,6 +131,8 @@ export const zh: Record<keyof typeof en, string> = {
   'stage.hideEarlier': '隐藏 {count} 个较早的发现项',
   'stage.showEarlier': '较早的发现项（已被取代）——{count} 个，显示',
   'stage.supersededBy': '已被取代：{by}',
+  'stage.rowSettled': '已由你的回答解决：“{quote}”。它不再阻碍完成。',
+  'stage.rowKeepOpen': '仍保持未解决',
   'stage.notLookedAt': '未查看',
   'stage.proposedBy': '由 PromptMaster 提议',
   'stage.awaitsRun': 'PromptMaster 可以执行此项——在交由你定夺这一行之前，Go 会先运行它。选择一个状态即可立即定夺。',
