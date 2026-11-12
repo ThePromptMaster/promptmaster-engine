@@ -164,7 +164,7 @@ import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, chosenFor, earlierDecision, withApprovals } from '@/lib/workflow/approvals';
-import { asksForDecision, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
+import { asksForDecision, decisionForAnswer, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
 import { decisionAsFact, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
 import { useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
@@ -1931,6 +1931,20 @@ export function WorkflowWorkspace({
     return decisionTargets(template, stageBundles, project.manual_checks, waitingQueue.filter((q) => q.kind === 'approval').map((q) => q.stageId)).filter((d) => wanted.has(d.criterionId));
   }, [waitingQueue, template, stageBundles, project.manual_checks]);
   const queueOffers = useDecisionOptions(project, queueTargets);
+  // An answer to Go's own question that names one option of a decision still waiting for its
+  // approval is that decision: it gives the approval, so it is not asked for again.
+  const decideByAnswer = useCallback(
+    async (answer: string): Promise<boolean> => {
+      const pending = waitingQueue
+        .filter((q) => q.kind === 'approval' && q.criterionId)
+        .map((q) => ({ criterionId: q.criterionId!, stageId: q.stageId, options: queueOffers[q.criterionId!]?.options ?? [] }));
+      const made = decisionForAnswer(answer, pending);
+      if (!made) return false;
+      await decideApproval(made.criterionId, made.stageId, made.choice);
+      return true;
+    },
+    [waitingQueue, queueOffers, decideApproval]
+  );
   const answerFromQueue = useCallback(
     async (entry: QueueEntry, answer: QueueAnswer): Promise<{ open: QueueItem[] } | void> => {
       const first = entry.items[0];
@@ -2899,6 +2913,7 @@ export function WorkflowWorkspace({
               otherWork={(id) => otherWorkFor(outstanding, id)}
               decisionOffers={decisionOffers}
               queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
+              decideByAnswer={decideByAnswer}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />

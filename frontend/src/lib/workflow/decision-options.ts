@@ -49,6 +49,52 @@ export function givenByChoosing(offer: DecisionOffer | null | undefined): boolea
 
 export const offerKey = (t: Pick<DecisionTarget, 'criterionId' | 'versionId'>): string => `${t.criterionId}:${t.versionId}`;
 
+/** A decision still waiting for its approval, with the options its stage puts to the user. */
+export interface PendingDecision {
+  criterionId: string;
+  stageId: string;
+  options: readonly DecisionOption[];
+}
+
+/** An option's own name, where its label leads with one: "Option A: take the carrier…" is "Option A". */
+function optionName(label: string): string | null {
+  const lead = /^\s*([^:—–]{1,40}?)\s*(?::|—|–|\s-\s)/.exec(label)?.[1]?.trim();
+  if (!lead || lead.split(/\s+/).length > 3) return null;
+  return lead;
+}
+
+/**
+ * The waiting decision an answer makes, when the answer names exactly one of
+ * its options (12 Nov, production pass). Go asked "Which recovery option do
+ * you choose?" as a question of its own, while the approval "I choose the
+ * recovery option" waited two stages back with the same two options. The
+ * answer "Option A: I approve the $1,400 spending exception" was recorded as
+ * an answer, the approval stayed unticked, and Go went back to ask for it:
+ * the client's "it asked me again".
+ *
+ * Narrow on purpose. Every option of the decision must carry a name of its
+ * own, the answer must name one of them and no other, and only one waiting
+ * decision may be named: anything else is left as an answer.
+ */
+export function decisionForAnswer(
+  answer: string,
+  pending: readonly PendingDecision[]
+): { criterionId: string; stageId: string; choice: string } | null {
+  const said = answer.replace(/\s+/g, ' ').trim();
+  if (!said) return null;
+  const hits: { criterionId: string; stageId: string; choice: string }[] = [];
+  for (const d of pending) {
+    if (d.options.length < 2) continue;
+    const names = d.options.map((o) => optionName(o.label));
+    if (names.some((n) => !n)) continue;
+    const keys = names.map((n) => n!.toLowerCase());
+    if (new Set(keys).size !== keys.length) continue;
+    const named = d.options.filter((_, i) => new RegExp(`(?<![\\p{L}\\p{N}])${names[i]!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(said));
+    if (named.length === 1) hits.push({ criterionId: d.criterionId, stageId: d.stageId, choice: named[0].label });
+  }
+  return hits.length === 1 ? hits[0] : null;
+}
+
 /**
  * An approval worded as a decision, not only a sign-off: "I choose Option A or
  * Option B", "I approve this decision on the cap". With no options read from

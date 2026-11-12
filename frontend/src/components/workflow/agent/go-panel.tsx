@@ -95,8 +95,15 @@ export function GoPanel({
   otherWork,
   decisionOffers,
   queue,
+  decideByAnswer,
 }: {
   go: ReturnType<typeof useGoLoop>;
+  /**
+   * Gives a waiting decision its approval when an answer to Go's own question names one of its
+   * options, and says whether it did (12 Nov: the same choice was asked as a question and then
+   * asked again as the approval).
+   */
+  decideByAnswer?: (answer: string) => Promise<boolean>;
   /**
    * What else in the project waits on the user, shown under Go's stop so it is
    * all asked at once (12 Nov). Answering one records it; the stop itself resumes.
@@ -481,7 +488,11 @@ export function GoPanel({
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
               canLeaveToGo={!(go.run.needs?.kind === 'answer_question' && go.run.needs.repeat) && !asksForApproval(go.run.stop_reason)}
               change={latestChange ?? undefined}
-              onAnswer={(t, contradicted) => go.answer(t, contradicted)}
+              onAnswer={async (t, contradicted) => {
+                // The answer may be the choice a waiting approval asks for: then it gives that approval.
+                const decided = decideByAnswer ? await decideByAnswer(t).catch(() => false) : false;
+                return go.answer(t, contradicted, decided ? { decided: true } : undefined);
+              }}
               checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
               onTick={
