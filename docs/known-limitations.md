@@ -3634,7 +3634,13 @@ for each chapter. A correction named in the reason is confirmed by quote, by one
 either fails, the stage stays reopened and the step fails. The limits:
 - A value that isn't in a fact can't be found in code.
 - The quote check is a model's. If it can't run, it concludes nothing and the repair stands.
-- `arithmeticSlips` only recomputes lines of the form `a op b = c`.
+- `arithmeticSlips` only recomputes lines of the form `a op b = c`. Since 12 Nov it reads a scale said
+  after a figure (`million`, `billion`, `trillion`, `thousand`; `k`, `m`, `mn`, `bn` straight after a
+  money figure) and calls a sum a slip only when it is wrong both with the scales and as the bare
+  figures. Before that, "$3.5 million − $600,000 = $2.9 million" was reported as "works out to
+  -599,996.5", and a workflow that ends each round on this check went round again for it (#665). Any
+  other unit is still read as a word, so a sum that mixes units it does not know is checked as bare
+  figures or not at all.
 
 ### L-214 — Cut chapters (2026-11-08)
 
@@ -3869,3 +3875,141 @@ adding stages to a designed writing workflow while it runs (L-115 stays investig
 production run of an added stage that had to change the deliverable failed, see L-233). A project started before this
 keeps the workflow it has.
 
+
+### L-235 — A decision's options are read from the stage, and one press cannot run twice (2026-11-12)
+
+A reserved approval that is really a choice ("I approve this decision on the cap", "I choose Option A or
+Option B") was one button. The options are now read from the stage's own text by one small model call
+(`POST /api/agent/decision-options`) and shown as buttons on Go's card and under the approval on the stage,
+with a box for a decision that is none of them. An option is kept only when the passage that states it is
+found in the text, fewer than two is none, and any failure is none: the card then shows the plain approval,
+with a box for the decision when the approval is worded as one. On the three saved production stages that
+put a choice to the user, the options came back right in every run, and three plain sign-offs gave none.
+
+What is not done. The options are whatever the stage's text lays out, so a stage that buries a choice in
+prose, or names its options differently in two places, may give none or an odd label; the box takes the
+decision in words either way. They are read again whenever the stage's text changes, and are not stored
+on the run. Choosing records a fact, ticks the approval on its own stage, puts the choice on the decision
+trail (`finalize`) and reopens a prose stage so Go writes the decision in; a table stage is not rewritten.
+The approval stays stamped with the version it was given on. It is not asked for again while every
+version since is Go's own repair, and it is asked for again once the user edits the stage themselves.
+A decision leaves alone the stages before it: they are what it was made from (the first production run
+reopened and reworked three of them, about a dollar, before this was changed the same day). A decision
+made again supersedes the earlier one, which is retired. While an approval's options are shown, the
+pinned copy of the stop reads "Choose an option" and goes to the card; it does not tick the approval.
+"Decision" in an approval's wording is read by a word rule, so an unusual sign-off may get, or miss, the
+optional box for what was decided. If an earlier stage really does need changing after a decision, the
+user reopens it, or the final check says so.
+
+A sign-off is never given options (#667). A proposal written for a client offered that client "Option A"
+and "Option B", and its sign-off, "I approve this proposal to send to the client", was shown those two as
+buttons: the model had read the reader's choice as the user's, on a text where an earlier version had
+rightly been given none. The call now also says how the approval is worded, and only one whose own words
+have the user choose or decide gets options; an English sign-off with no word of choosing in it is not
+sent at all. On the saved texts, three runs each, 36 of 36: the four decision stages kept their options,
+a choice worded in Spanish got them, and the proposal and five other sign-offs got none. What this gives
+up: a stage that leaves a choice to the user under an approval worded as a plain sign-off gets the plain
+button. Letting such a sign-off keep its options when the text "left the decision open" was tried and
+gave a brief's sign-off the later stage's decision in two runs of three. The designer words a choice as
+the decision, so a designed workflow is not in that case. On the stage's own checklist, with no Go
+running, a decision is recorded by choosing one of the options read (or the box beside them); where none
+are read, the tick records the approval alone.
+
+A second press of Go, Resume or an answer while the first is still being handled is dropped. Before this
+a choice pressed twice recorded the answer twice, started a second loop, and ended the run failed.
+
+### L-236 — What settles a finding, and what does not (2026-11-12)
+
+A review row keeps the status the user chose and gains `settled_by` when the user's own words answer it:
+the note they wrote on the row, a fact or decision they stated, or their press of "It is settled" on Go's
+stop. A settled row is not carried forward as unmet. The reading is one small model call
+(`POST /api/agent/settles`), and a row is settled only with the words that settle it, found in code in the
+note or statement named. It runs when the user saves a note on a deferred row that would block, and, with
+routine decisions handed to Go, before Go forces a repair or stops for a carried row. Under "Ask me" Go
+does not apply it: the stop shows the row with its note and offers "It is settled". The note becomes a
+fact of the project, so later stages read it and the change check reopens what relied on the opposite.
+
+What is not done. Only the user's words count: a fact PromptMaster assumed, or one Go recorded under the
+routine-decision policy, settles nothing. A note that postpones ("will confirm next week") and a finding
+that says the work itself is wrong are left open, by instruction to the model, not by a rule in code: on
+the saved production row, postponements and a work defect were never settled in fifteen runs, and the
+user's first note was settled in three of three. His reworded note ("No additional absences were
+confirmed for this baseline") was settled in two of three: it can be read either way, and when it is
+read as open the stop now has the button. A model can still read a note wrongly in the other direction;
+"Keep it open instead" on the row undoes it, and a row kept open is not read again until its note changes.
+A fact outlives the note it came from: on production a row was settled by an answering note, which was
+recorded as a fact, and when the note was later changed to one that only postponed, the row was settled
+again by that earlier fact. The record did say so; "Keep it open instead" overrode it, and taking the fact
+out in the Facts panel would too. At the finish a settled row is named with the answer that settled it.
+A row settled on an undecided or accepted status is not affected: only deferred rows that would block are
+read. A row a later fact superseded (`superseded-rows.ts`) no longer counts as carried forward either.
+
+### L-237 — Lengths are counted for every text a check reads (2026-11-12)
+
+A check stage is given a plain count of each written stage before it, whether or not a limit is attached
+to that stage, and a check row that only estimates a length code has counted is dropped before the table
+is saved. The final check is given the deliverable's count; a change that asks for a length of the whole
+text ("aim for about 500 words", "under 600 words") is decided by counting, and the model judges only the
+rest of that change. A change that asks the text to state its own word count is not one to carry, and a
+not-carried verdict with nothing to show for it is dropped. On the saved production memo the old check
+called the finding not carried in four of four runs and the new one in none of four.
+
+A length is counted on the document it is for, and on nothing else. Where the work goes in rounds, the
+check at the end of a round reads everything the round wrote, before the document exists; a change that
+asks for a length is marked there as "not counted here" and is counted when the document is written
+(#666). Without that, "cut the memo to under 600 words" would have been counted against the round's
+facts, analysis and check together and failed every round.
+
+What is not done. A length of a part ("each note under 40 words") is still judged by the model, with the
+whole text's count beside it. A hedged whole-text figure is met up to the same slack the brief's own
+hedged target gets (L-141). The count follows `COUNTING_RULE`: headings are not counted unless the
+requirement says so. Check tables saved before this keep any estimate rows they already hold.
+
+### L-238 — Asking once: what Go looks across, and what it does not (2026-11-12)
+
+What waits on the user is read as one list from the project's own records (`lib/agent/user-queue.ts`):
+reserved approvals not given on stages already written, findings nobody decided, rows carried forward as
+unmet, and questions Go set aside, across every stage, each with the stages it holds up, most held up
+first. The planner is told the list and told not to ask those again one by one. When Go stops for the
+user, the rest of the list is shown under the stop and each item can be answered there. One small model
+call (`POST /api/agent/group-questions`) says which items one answer would settle; those are asked as one
+question, the answer is recorded once as a fact, and every row and kept question it covers is closed by
+it. A question set aside is also closed when a later answer covers it. Through the fact, an answer reaches
+every later prompt, and the change check reopens finished work that relied on the opposite.
+
+What is not done, said plainly because it is the part still to build:
+
+- **No branches.** A project is one line of work. There is nothing for Go to look across but its stages
+  (assessed 9 Oct: parallel lines of work in one project are about 9 to 12 days by themselves).
+- **The list is asked at a stop, not planned around.** Go does the work it can before stopping, as before
+  (a question is set aside when the stage can move on, an approval offers "carry on with other work first"),
+  but it does not reorder its work to reach the most valuable question sooner, and it does not predict
+  questions a later stage will raise before that stage is written.
+- **"Holds up" is counted from stage order**, not from which text used which fact: an item on an open
+  stage is taken to hold up every unfinished stage after it. Dependencies between stages are still found
+  by reading text, not stored (L-39).
+- **Grouping is a model's reading**, checked only for its ids. A wrong group asks one odd question; it
+  closes nothing by itself, because what an answer closes is still decided by the user's own words (L-236).
+  Approvals and undecided findings are never merged: each is the user's act on one piece of work.
+- **At most eight items** are shown at one stop, and the grouping reads carried rows and kept questions
+  only. Tasks recorded for the real world (L-211) are not in the list: nothing closes them but the user.
+- **An answer from the list closes only what it settles** (#667). It is recorded as a fact either way,
+  and each row and kept question of its entry is then read against that answer by the settle check
+  (L-236). In production two findings were asked as one question about fees, and the choices offered
+  were "Fixed fee per session, figures to follow" and "I'll confirm both next week"; before this any of
+  them would have closed both. On those rows, three runs each, 15 of 15: a postponement closed nothing,
+  the first choice closed the per-session finding and not the fees, the fees with their basis closed
+  both. The list then says what the answer did not settle. If the check cannot run, nothing is closed
+  and the item stays listed. The grouping call is told to offer no choice that puts the question off,
+  which a model may still do.
+- The list is shown while Go is paused and the run can be resumed, with or without the stop's own card
+  (#668; before that the first answer took the rest of the list away until the next stop). It reads every
+  window of the run, so a question set aside before a Resume is still on it.
+- An approval on work that is about to be redone is left off the list until the work is up to date
+  (#669): an approval is of the text as it stands.
+- An answer is a fact, and the change check carries it to every stage that states the opposite. A small
+  edit asked for at the end ("delete the duplicate line") was carried back to the draft and forward
+  again on the test project: three repairs for one line. Telling an edit to one text from a fact about
+  the project is not done.
+- Under "Ask me", Go's own reading of the other open rows against a new answer (L-236) does not run;
+  it runs only with routine decisions handed to Go.

@@ -43,6 +43,9 @@ describe('sums recomputed from the text (8 Nov)', () => {
       // The line a facts register carried: read as 3.5 − 600,000 it "worked out to -599,996.5, not 2.9".
       '"claim": "Calculation: Adjusted EBITDA and margin | Category: financials | Value: $3.5 million − $600,000 = $2.9 million; $2.9 million ÷ $18 million ≈ 16.1% vs the 15% floor",',
       '$3.5 million − $600,000 = $2.9 million',
+      // The same sum as two other stages of that run wrote it.
+      '- Reasoned: adjusted EBITDA = $3.5 million reported − $600,000 insurance recovery = **$2.9 million**.',
+      '| B | Adjusted EBITDA margin | $3.5 million − $600,000 = $2.9 million; $2.9 million ÷ $18 million ≈ 16.1% vs at least 15% | Pass |',
       '$3.5m − $0.6m = $2.9m',
       '$180k + $15k = $195k',
       '£2 billion + £500 million = £2.5 billion',
