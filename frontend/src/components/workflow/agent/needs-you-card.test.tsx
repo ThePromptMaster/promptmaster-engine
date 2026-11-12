@@ -83,3 +83,34 @@ describe('NeedsYouCard: an approval that is a decision offers its options (12 No
     expect(screen.queryByRole('button', { name: 'Option A: raise the cap to $195,000 for both searches' })).toBeNull();
   });
 });
+
+describe('NeedsYouCard: a finding carried forward as unmet can be settled from the stop (12 Nov)', () => {
+  const need = {
+    kind: 'objective_check', stageId: 'records', finding: 'work_open',
+    items: ['Coverage check: carried forward, still unmet — "The no-absence assumption is untested."'],
+    carried: [{ stageId: 'check', stageLabel: 'Coverage check', id: 'i5', text: 'The no-absence assumption is untested.', note: 'There are no additional absences to account for.' }],
+  } as const;
+
+  it('shows the note recorded on it and offers to settle it, work on it again, or stop', () => {
+    render(<NeedsYouCard need={need as never} stageLabel={() => 'Current records'} onAction={async () => undefined} />);
+    expect(screen.getByText(/Your note on i5: "There are no additional absences to account for\."/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'It is settled: carry on' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Have Go work on it again' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Stop here' })).toBeTruthy();
+  });
+
+  it('sends the typed answer with "It is settled", and nothing with the other buttons', () => {
+    const onAction = vi.fn(async () => undefined);
+    render(<NeedsYouCard need={need as never} stageLabel={() => 'Current records'} onAction={onAction} />);
+    fireEvent.change(screen.getByLabelText('Your answer to it (optional). It is recorded as a fact of the project.'), { target: { value: 'None expected this week.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'It is settled: carry on' }));
+    expect(onAction).toHaveBeenCalledWith('settle_row', 'None expected this week.');
+  });
+
+  it('several carried rows keep the two buttons they had: the table is where each is decided', () => {
+    const many = { ...need, items: [...need.items, 'Check: carried forward, still unmet — "Budget not shown."'], carried: [...need.carried, { ...need.carried[0], id: 'i6' }] };
+    render(<NeedsYouCard need={many as never} stageLabel={() => 'Current records'} onAction={async () => undefined} />);
+    expect(screen.queryByRole('button', { name: 'It is settled: carry on' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Carry on with the open work' })).toBeTruthy();
+  });
+});

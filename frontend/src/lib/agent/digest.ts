@@ -18,6 +18,7 @@
  * manuscript come from that same read (1 Oct, item 1).
  */
 
+import { isSettled } from '@/lib/workflow/settled-rows';
 import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
@@ -289,7 +290,7 @@ export function buildAgentState(input: {
     // A proposal is marked as one: "[accepted]" on a row the user never
     // confirmed let the planner write "accepted review findings" (Sean, 10 Oct, email 6.4).
     excerpt = items
-      .map((i, n) => `${schema.execution ? `${n + 1}. ` : i.id ? `${i.id} ` : ''}[${isProposed(i) ? `proposed, not confirmed: ${i.status}` : i.status || 'undecided'}] ${firstField(i)}`)
+      .map((i, n) => `${schema.execution ? `${n + 1}. ` : i.id ? `${i.id} ` : ''}[${isProposed(i) ? `proposed, not confirmed: ${i.status}` : i.status || 'undecided'}${isSettled(i) ? ", settled by the user's own answer: not open" : ''}] ${firstField(i)}`)
       .join('\n');
     if (schema.execution && items.length && dataFiles.length) {
       excerpt +=

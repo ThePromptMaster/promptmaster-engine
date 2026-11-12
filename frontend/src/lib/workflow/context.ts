@@ -21,7 +21,8 @@ import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { MeasuredLine } from '@/types';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { carriedForwardUnmet, carriedRows, carriedText, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { keptOpen, type CarriedRow } from './settled-rows';
 import type { OpenFindingRow, StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage, rowsRequired } from './engine';
 import { currentFacts } from './facts';
@@ -97,6 +98,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const sections: StageContext['sections'] = {};
   const findings: StageContext['findings'] = {};
   const carriedForward: Record<string, string[]> = {};
+  const carriedDetail: Record<string, CarriedRow[]> = {};
   const deferred: Record<string, { row: string; reason: string }[]> = {};
   const openUnmetRows: Record<string, number> = {};
   const openRows: Record<string, OpenFindingRow[]> = {};
@@ -157,7 +159,15 @@ export function buildStageContext(input: BuildContextInput): StageContext {
       findings[s.id] = { total: items.length, triaged: items.length - itemsMissingStatus[s.id] };
       const optional = !rowsRequired(s);
       const carried = carriedForwardUnmet(items, schema, optional);
-      if (carried.length) carriedForward[s.id] = carried;
+      if (carried.length) {
+        carriedForward[s.id] = carried;
+        // The same rows, each with the note recorded on it: a stop shows it, a check reads it (12 Nov).
+        carriedDetail[s.id] = carriedRows(items, schema, optional).map((i) => ({
+          id: i.id, text: carriedText(i).slice(0, 600), note: (i.reason ?? '').trim().slice(0, 600),
+          ...(i.severity ? { severity: i.severity } : {}), ...(i.status_source ? { source: i.status_source } : {}),
+          ...(keptOpen(i) ? { keptOpen: true } : {}),
+        }));
+      }
       const later = deferredNotBlocking(items, schema, optional);
       if (later.length) deferred[s.id] = later;
       const unmet = openUnmet(items, schema);
@@ -183,6 +193,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     measured,
     ...(Object.keys(unverified).length ? { unverified } : {}),
     carriedForward,
+    carriedRows: carriedDetail,
     deferred,
     openUnmet: openUnmetRows,
     openRows,

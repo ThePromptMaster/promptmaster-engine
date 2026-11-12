@@ -129,6 +129,8 @@ export const sw: Record<keyof typeof en, string> = {
   'stage.hideEarlier': 'Ficha matokeo {count} ya awali',
   'stage.showEarlier': 'Matokeo ya awali (yaliyopitwa) — {count}, onyesha',
   'stage.supersededBy': 'Imepitwa na: {by}',
+  'stage.rowSettled': 'Limetatuliwa na jibu lako: "{quote}". Halizuii tena kumaliza.',
+  'stage.rowKeepOpen': 'Liache wazi badala yake',
   'stage.notLookedAt': 'Haijaangaliwa',
   'stage.proposedBy': 'Imependekezwa na PromptMaster',
   'stage.awaitsRun': 'PromptMaster inaweza kutekeleza hili — Go inaliendesha kabla safu hii haijawa yako kuamua. Chagua hali ili uiamue sasa.',

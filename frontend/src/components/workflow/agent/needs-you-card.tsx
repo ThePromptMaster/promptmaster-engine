@@ -60,7 +60,11 @@ export function NeedsYouCard({
   const needsWhy = need.kind === 'tick_criterion' && (need.openRows ?? []).some(isMajorRow);
   const approves = (option?: StuckOption) => need.kind === 'tick_criterion' && (!option || option === 'resume');
   const waitingForWhy = (option?: StuckOption) => needsWhy && approves(option) && !why.trim();
-  const noteFor = (option?: StuckOption) => (option === 'retry' ? note.trim() : needsWhy && approves(option) ? why.trim() : '') || undefined;
+  // A carried finding can be answered where it is settled (12 Nov): the answer becomes a fact.
+  const [rowAnswer, setRowAnswer] = useState('');
+  const settles = need.kind === 'objective_check' && Boolean(options?.some((o) => o.id === 'settle_row'));
+  const noteFor = (option?: StuckOption) =>
+    (option === 'retry' ? note.trim() : option === 'settle_row' ? rowAnswer.trim() : needsWhy && approves(option) ? why.trim() : '') || undefined;
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);
@@ -116,6 +120,20 @@ export function NeedsYouCard({
             disabled={busy}
             rows={2}
             maxLength={1000}
+            className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
+          />
+        </label>
+      )}
+      {settles && (
+        <label className="mt-3 block">
+          <span className="text-label text-[var(--on-surface-variant)]">{t('need.rowAnswer')}</span>
+          <textarea
+            data-row-answer
+            value={rowAnswer}
+            onChange={(e) => setRowAnswer(e.target.value)}
+            disabled={busy}
+            rows={2}
+            maxLength={600}
             className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] disabled:opacity-50"
           />
         </label>

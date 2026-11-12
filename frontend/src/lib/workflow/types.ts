@@ -484,6 +484,8 @@ export interface StageContext {
    * work for "Objective met", whatever its row status.
    */
   carriedForward?: Record<string, string[]>;
+  /** The same rows with their ids and the note recorded on each (`carriedRows`, 12 Nov). */
+  carriedRows?: Record<string, import('./settled-rows').CarriedRow[]>;
   /** Per review stage id: deferred rows that do not block, with why each was deferred (`deferredNotBlocking`). */
   deferred?: Record<string, { row: string; reason: string }[]>;
   /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */

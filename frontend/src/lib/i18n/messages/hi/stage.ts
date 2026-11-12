@@ -135,6 +135,8 @@ export const hi: Record<keyof typeof en, string> = {
   'stage.hideEarlier': 'पहले के {count} निष्कर्ष छिपाएँ',
   'stage.showEarlier': 'पहले के निष्कर्ष (प्रतिस्थापित) — {count}, दिखाएँ',
   'stage.supersededBy': 'इससे प्रतिस्थापित: {by}',
+  'stage.rowSettled': 'आपके उत्तर से सुलझा: "{quote}"। अब यह समापन को नहीं रोकता।',
+  'stage.rowKeepOpen': 'इसे खुला ही रखें',
   'stage.notLookedAt': 'देखा नहीं गया',
   'stage.proposedBy': 'PromptMaster द्वारा प्रस्तावित',
   'stage.awaitsRun': 'PromptMaster इसे पूरा कर सकता है — यह पंक्ति आपके तय करने के लिए आने से पहले Go इसे चलाता है। इसे अभी तय करने के लिए एक स्थिति चुनें।',

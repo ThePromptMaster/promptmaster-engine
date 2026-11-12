@@ -40,7 +40,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type AnswerContradiction } from '@/lib/api/client';
 import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objective-fixes';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
+import { describeSettled, nothingSaid, settleItems, settleKey, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
@@ -353,6 +354,8 @@ export function useGoLoop(opts: Options) {
   // the same run, which closed the first loop's step and ended the run failed.
   const pressRef = useRef(onePress());
   const goingRef = useRef(false);
+  // What the settle check was last asked: the same rows and words are not asked about twice.
+  const settleAskedRef = useRef('');
   const followRef = useRef<StepOutcome['followUp'] | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   // The call ceiling (4 Nov): set when a run paused at it, so no window starts on its own past it.
@@ -777,6 +780,62 @@ export function useGoLoop(opts: Options) {
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
+
+        // 12 Nov: a row carried forward as unmet that the user has since
+        // answered — in the note on the row, or as a fact or decision — is
+        // marked settled before a repair is forced for it or the run stops on
+        // it. On the training plan the note read "There are no additional
+        // absences to account for" and Go repaired the deliverable twice, then
+        // stopped on the row. With routine decisions handed to Go; under "Ask
+        // me" the stop offers it instead.
+        const openRowsToRead = o.project.routine_decisions === 'handle' && o.appendStageVersion ? settleItems(o.template, context.carriedRows) : [];
+        if (openRowsToRead.length) {
+          const { statements, factOf } = userStatements(o.project.facts);
+          const asked = settleKey(openRowsToRead, statements);
+          if (asked !== settleAskedRef.current && !nothingSaid(openRowsToRead, statements)) {
+            settleAskedRef.current = asked;
+            const verdict = await api.agentSettles({ inputs: inputsFrom(o.project), items: openRowsToRead, statements, model: o.project.model }, signal).catch(() => null);
+            if (signal.aborted) throw new Stopped();
+            const marks = settleMarks(verdict?.settled, openRowsToRead, factOf);
+            if (marks.length) {
+              const step = await startAgentStep({
+                runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+                stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: SETTLED_STEP,
+                params: { settled: marks.map((m) => ({ stage_id: m.stageId, row_id: m.rowId, source: m.source })) },
+                rationale: 'A finding still counted as open was answered in your own words, so it is read against them before anything is repaired or asked again.',
+                expectedOutcome: 'The rows your answer settles marked as settled; the status you set on each is kept.', needsDecision: false, decisionQuestion: null,
+              });
+              upsertStep(step);
+              const saved: typeof marks = [];
+              for (const stageId of [...new Set(marks.map((m) => m.stageId))]) {
+                const table = o.template.stages.find((s) => s.id === stageId);
+                const head = o.bundles[stageId]?.versions.at(-1);
+                const content = withMarks(head?.content, stageId, marks);
+                if (!table || !content) continue;
+                const here = marks.filter((m) => m.stageId === stageId);
+                try {
+                  await o.appendStageVersion!(stageId, table.label, {
+                    content, source_operation: 'agent_triage', base_content: head?.content ?? '',
+                    instruction: 'Marked as settled by the user\'s own answer; no status changed.',
+                    model: o.project.model, mode: modeForStage(o.project, table),
+                    change_summary: describeSettled(here, stageLabelFor),
+                  });
+                  saved.push(...here);
+                } catch {
+                  // Not saved: the rows stay open and are put to the user, as before.
+                }
+              }
+              upsertStep(await finishAgentStep(step.id, saved.length
+                ? { status: 'succeeded', label: null, output: describeSettled(saved, stageLabelFor) }
+                : { status: 'failed', label: null, output: 'Could not save the rows your answer settles; they stay open.' }));
+              if (saved.length) {
+                await o.onRefresh?.();
+                await settle();
+                continue;
+              }
+            }
+          }
+        }
 
         // After a performed move, what the project is now. Three moves that
         // left it exactly as it was is a run going round in circles — the

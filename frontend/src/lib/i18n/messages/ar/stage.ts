@@ -135,6 +135,8 @@ export const ar: Record<keyof typeof en, string> = {
   'stage.hideEarlier': 'إخفاء الملاحظات السابقة ({count})',
   'stage.showEarlier': 'ملاحظات سابقة (مستبدلة) — {count}، عرض',
   'stage.supersededBy': 'استُبدلت بـ: {by}',
+  'stage.rowSettled': 'حُسم بإجابتك: «{quote}». لم يعد يعطّل الإنهاء.',
+  'stage.rowKeepOpen': 'أبقِه مفتوحًا',
   'stage.notLookedAt': 'لم يُنظر فيه',
   'stage.proposedBy': 'اقترحه PromptMaster',
   'stage.awaitsRun': 'يستطيع PromptMaster تنفيذ هذا — يشغّله Go قبل أن يصبح حسم هذا الصف بيدك. اختر حالة لحسمه الآن.',

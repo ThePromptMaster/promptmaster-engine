@@ -335,6 +335,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import agent, audit_findings, continuity, deliverable_check, evaluator, guidance, long_form, setup_suggester
     from promptmaster import question_screen
     from promptmaster import decision_options
+    from promptmaster import settled_items
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
@@ -700,6 +701,12 @@ def _json_reply(system: str, prompt: str) -> dict:
     if system.startswith(question_screen.SCREEN_INSTRUCTION[:60]):
         # Scripted questions are asked, as an unscripted one would be.
         return {"verdict": "business_decision", "reason": "Mock: asked."}
+    if system.startswith(settled_items.SETTLES_INSTRUCTION[:60]):
+        # A note that begins "Answer:" settles its finding; any other note postpones it.
+        out = []
+        for m in re.finditer(r"^\[([^\]]+)\] [^\n]*\nFINDING: [^\n]*\nTHE USER'S NOTE ON IT: (Answer:[^\n]*)$", prompt, re.M):
+            out.append({"id": m.group(1), "by": "note", "quote": m.group(2)[:200], "why": "Mock: the note answers it."})
+        return {"settled": out}
     if system.startswith(decision_options.OPTIONS_INSTRUCTION[:60]):
         # The lines of the stage text that name an option, as the text names them.
         text = prompt.split("STAGE TEXT:\n<<<\n", 1)[-1].rsplit("\n>>>", 1)[0]

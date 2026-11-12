@@ -172,6 +172,30 @@ export function decisionAsFact(
   };
 }
 
+/**
+ * The fact an answer to a review finding records (12 Nov): the user's own
+ * words on the row, so every later prompt reads them and not only the table.
+ * `via` is an answer's, so the table it was given on is not reopened for it.
+ */
+export function rowAnswerAsFact(
+  finding: string,
+  stageLabel: string,
+  answer: string,
+  ref: { stage_id: string; row_id: string; run_id?: string | null }
+): NewFact | null {
+  const text = answer.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const about = questionOf(finding);
+  const statement = `Decided by the user — on the finding "${about}"${stageLabel ? ` (${stageLabel})` : ''}: ${text}`;
+  return {
+    statement: statement.slice(0, STATEMENT_MAX),
+    subject: 'Decision',
+    kind: 'fact',
+    source_kind: 'user_edit',
+    source_ref: { via: 'go answer', question: about, ...ref },
+  };
+}
+
 /** Per stage, at most this much of its latest saved text goes to the answer check (L-65). */
 const ANSWER_DOC_MAX = 20_000;
 const ANSWER_DOCS_MAX = 120_000;

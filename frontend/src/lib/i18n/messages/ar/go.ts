@@ -39,6 +39,7 @@ export const ar: Record<keyof typeof en, string> = {
   'goAction.userAnswer': 'إجابتك',
   'goAction.awaitSections': 'انتظار الأقسام قيد الكتابة',
   'goAction.routineDefault': 'اعتماد الخيار الافتراضي الروتيني',
+  'goAction.settledByAnswer': 'إغلاق ما حسمته إجابتك',
   'goAction.measured': 'إصلاح متطلب مقيس',
   'goAction.lastComplete': 'تعليم المرحلة الأخيرة مكتملة',
   'exec.discussed': 'حُلّل',

@@ -39,6 +39,7 @@ export const zh: Record<keyof typeof en, string> = {
   'goAction.userAnswer': '你的回答',
   'goAction.awaitSections': '等待正在撰写的小节',
   'goAction.routineDefault': '采用常规默认选项',
+  'goAction.settledByAnswer': '关闭你的回答已解决的事项',
   'goAction.measured': '修复一项可度量的要求',
   'goAction.lastComplete': '将最后一个阶段标记为完成',
   'exec.discussed': '已分析',

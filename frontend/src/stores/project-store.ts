@@ -46,6 +46,7 @@ import { laterDoneStages, laterOf, projectState } from '@/lib/workflow/engine';
 import { onlyConfirmsProposals } from '@/lib/workflow/stage-artifact';
 import { onlyRewords } from '@/lib/workflow/rewording';
 import { onlyRecordsCarriedOut } from '@/lib/workflow/triage';
+import { onlySettles } from '@/lib/workflow/settled-rows';
 import {
   ProjectConflictError,
   type Artifact,
@@ -832,7 +833,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const state = projectState(template, events);
       // Nor does one that only records review rows the deliverable already
       // carries out (4 Nov): reopening the deliverable would revise it again.
-      const later = options?.keepLaterStages || onlyConfirmsProposals(head?.content, version.content) || onlyRewords(head?.content, version.content) || onlyRecordsCarriedOut(head?.content, version.content)
+      // Nor does one that only says a row is settled by the user's answer (12 Nov).
+      const later = options?.keepLaterStages || onlyConfirmsProposals(head?.content, version.content) || onlyRewords(head?.content, version.content) || onlyRecordsCarriedOut(head?.content, version.content) || onlySettles(head?.content, version.content)
         ? []
         : laterDoneStages(template, state, laterOf(template, stageId, options?.writtenFor), drafted);
       // A reopened draft in progress is answered by this version (13 Oct); the

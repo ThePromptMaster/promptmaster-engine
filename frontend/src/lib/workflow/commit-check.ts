@@ -54,7 +54,7 @@ function userDecided(row: StageItem): boolean {
 
 /** The words of a row a reader would recognise it by: every field that isn't bookkeeping. */
 function rowWords(row: StageItem): Set<string> {
-  const skip = new Set(['id', 'status', 'reason', 'status_source', 'superseded_by']);
+  const skip = new Set(['id', 'status', 'reason', 'status_source', 'superseded_by', 'settled_by', 'settled_source', 'settled_ref']);
   const text = Object.entries(row)
     .filter(([k, v]) => !skip.has(k) && typeof v === 'string')
     .map(([, v]) => v)

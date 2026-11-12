@@ -737,16 +737,31 @@ const UNMET =
  * met. A carried-forward note about polish is not one of these.
  */
 export function carriedForwardUnmet(items: readonly StageItem[], schema: StageItemSchema, optional = false): string[] {
+  return carriedRows(items, schema, optional).map((i) => {
+    const text = rowText(i);
+    return text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
+  });
+}
+
+/** What the user's own answer settled (`settled-rows.ts`), or a later fact replaced (`superseded-rows.ts`). */
+const closedSince = (i: StageItem) => Boolean(i.settled_by?.trim() || i.superseded_by?.trim());
+
+/**
+ * The rows `carriedForwardUnmet` names, as rows (12 Nov): a stop shows each
+ * with the note recorded on it, and a check reads that note. A row the user's
+ * answer settled, or one a later fact replaced, is not carried: it no longer
+ * says anything is unmet.
+ */
+export function carriedRows(items: readonly StageItem[], schema: StageItemSchema, optional = false): StageItem[] {
   return items
-    .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
+    .filter((i) => i.status === 'deferred' && isTriaged(i, schema) && !closedSince(i))
     // On a table whose rows do not block finishing (Final review's open items:
     // "marking them does not block finishing"), only a major finding does (12 Oct).
-    .filter((i) => (optional ? i.severity === 'major' : deferralBlocks(i, schema)))
-    .map((i) => {
-      const text = rowText(i);
-      return text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
-    });
+    .filter((i) => (optional ? i.severity === 'major' : deferralBlocks(i, schema)));
 }
+
+/** A carried row's wording for a stop or a check: what it says, less its bookkeeping. */
+export const carriedText = (i: StageItem): string => rowText(i);
 
 /**
  * Rows deferred that do not hold "Objective met" up, with the reason given
@@ -757,7 +772,8 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
 export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema, optional = false): { row: string; reason: string }[] {
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
-    .filter((i) => !(optional ? i.severity === 'major' : deferralBlocks(i, schema)))
+    // A row the user's answer settled is named here with that answer, not counted as open.
+    .filter((i) => closedSince(i) || !(optional ? i.severity === 'major' : deferralBlocks(i, schema)))
     .map((i) => ({ row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200) }));
 }
 
@@ -850,7 +866,7 @@ export function decideRow(items: readonly StageItem[], id: string, status: strin
 
 function rowText(item: StageItem): string {
   return Object.entries(item)
-    .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history', 'severity'].includes(key) && typeof value === 'string' && value.trim())
+    .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history', 'severity', 'superseded_by', 'settled_by', 'settled_source', 'settled_ref'].includes(key) && typeof value === 'string' && value.trim())
     .map(([, value]) => String(value).trim())
     .join(' — ');
 }

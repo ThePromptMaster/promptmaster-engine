@@ -39,6 +39,7 @@ export const sw: Record<keyof typeof en, string> = {
   'goAction.userAnswer': 'Jibu lako',
   'goAction.awaitSections': 'Subiri sehemu zinazoandikwa',
   'goAction.routineDefault': 'Chukua chaguo-msingi la kawaida',
+  'goAction.settledByAnswer': 'Funga kile ambacho jibu lako limetatua',
   'goAction.measured': 'Rekebisha hitaji linalopimika',
   'goAction.lastComplete': 'Weka alama kuwa hatua ya mwisho imekamilika',
   'exec.discussed': 'Imechambuliwa',

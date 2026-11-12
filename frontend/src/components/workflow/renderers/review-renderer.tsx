@@ -21,6 +21,7 @@
  */
 
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
+import { isSettled, unsettle } from '@/lib/workflow/settled-rows';
 import { findingRisk, isTriageTable } from '@/lib/workflow/triage';
 import { useEffect, useMemo, useState, useRef } from 'react';
 
@@ -191,8 +192,19 @@ export function ReviewRenderer({
         if (known) Object.assign(next, { reason: known, reason_source: 'row' });
       }
       if (key === 'reason') delete next.reason_source;
+      // New words on the row are read afresh when it is saved (12 Nov).
+      if (key === 'status' || key === 'reason') {
+        delete next.settled_by;
+        delete next.settled_source;
+        delete next.settled_ref;
+      }
       return next;
     }));
+  }
+
+  /** "Keep it open instead": the row counts as open work again, and stays so until the user closes it. */
+  function keepOpen(id: string) {
+    setRows((prev) => unsettle(prev, id));
   }
 
   /**
@@ -462,6 +474,7 @@ export function ReviewRenderer({
                     schema={schema}
                     readOnly={readOnly}
                     onPatch={patch}
+                    onKeepOpen={keepOpen}
                     sameMissing={missingReasonFor(row.status, row.id)}
                     onApplyReasonToSame={() => applyReasonToSame(row.id)}
                   />
@@ -495,6 +508,7 @@ export function ReviewRenderer({
                       schema={schema}
                       readOnly={readOnly}
                       onPatch={patch}
+                      onKeepOpen={keepOpen}
                       sameMissing={missingReasonFor(row.status, row.id)}
                       onApplyReasonToSame={() => applyReasonToSame(row.id)}
                     />
@@ -528,6 +542,7 @@ export function ReviewRenderer({
                       schema={schema}
                       readOnly={readOnly}
                       onPatch={patch}
+                      onKeepOpen={keepOpen}
                       sameMissing={missingReasonFor(row.status, row.id)}
                       onApplyReasonToSame={() => applyReasonToSame(row.id)}
                     />
@@ -573,12 +588,14 @@ interface ReviewRowProps {
   schema: StageRendererProps['schema'];
   readOnly: boolean;
   onPatch: (id: string, key: string, value: string) => void;
+  /** Reopen a row the user's answer was read as settling. */
+  onKeepOpen?: (id: string) => void;
   /** Other rows with this row's status and no reason yet. */
   sameMissing?: number;
   onApplyReasonToSame?: () => void;
 }
 
-function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMissing = 0, onApplyReasonToSame }: ReviewRowProps) {
+function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, onKeepOpen, sameMissing = 0, onApplyReasonToSame }: ReviewRowProps) {
   const option = statusOption(schema, row.status);
   const needsReason = Boolean(option?.requiresReason);
   const reasonMissing = needsReason && !(row.reason ?? '').trim();
@@ -596,6 +613,16 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
             {row[c.key] || <span className="text-[var(--on-surface-variant)]">—</span>}
             {c === columns[0] && isSuperseded(row) && (
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('stage.supersededBy', { by: row.superseded_by ?? '' })}</span>
+            )}
+            {c === columns[0] && isSettled(row) && (
+              <span data-row-settled className="mt-1 block text-label text-[var(--pm-secondary)]">
+                {t('stage.rowSettled', { quote: row.settled_by ?? '' })}
+                {!readOnly && onKeepOpen && (
+                  <button type="button" onClick={() => onKeepOpen(row.id)} className="ms-2 text-label text-[var(--pm-primary)] underline">
+                    {t('stage.rowKeepOpen')}
+                  </button>
+                )}
+              </span>
             )}
           </td>
         ))}

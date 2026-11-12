@@ -36,7 +36,7 @@ function escape(text: string): string {
 }
 
 function rowLine(prefix: string, item: Record<string, string | undefined>): string {
-  const field = Object.entries(item).find(([k, v]) => !['id', 'status', 'reason', 'status_source', 'status_history'].includes(k) && (v ?? '').trim());
+  const field = Object.entries(item).find(([k, v]) => !['id', 'status', 'reason', 'status_source', 'status_history', 'superseded_by', 'settled_by', 'settled_source', 'settled_ref'].includes(k) && (v ?? '').trim());
   const text = (field?.[1] ?? '').replace(/\s+/g, ' ').trim();
   const reason = (item.reason ?? '').replace(/\s+/g, ' ').trim();
   const line = `${prefix} ${item.id}: [${item.status || 'undecided'}] ${text}${reason ? ` — reason: ${reason}` : ''}`;

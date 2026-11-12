@@ -227,7 +227,7 @@ export function documentText(stage: StageDefinition, content: string | null | un
   return items
     .map((item, i) => {
       const fields = Object.entries(item)
-        .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history'].includes(key) && typeof value === 'string' && value.trim())
+        .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history', 'settled_by', 'settled_source', 'settled_ref'].includes(key) && typeof value === 'string' && value.trim())
         .map(([key, value]) => `${labels.get(key) ?? key}: ${String(value).trim()}`);
       const status = item.status
         ? ` [status: ${item.status_source === 'proposed' ? 'proposed, not yet decided: ' : ''}${item.status}${item.reason ? ` — ${String(item.reason).trim()}` : ''}]`

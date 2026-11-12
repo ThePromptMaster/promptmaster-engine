@@ -111,10 +111,30 @@ type Need =
        * stop itself.
        */
       rows?: OpenRow[];
+      /**
+       * `work_open`: rows carried forward as unmet, each with the note recorded
+       * on it (12 Nov: Go stopped on a deferred finding whose note was the
+       * user's answer, and the stop offered no way to say it was settled).
+       */
+      carried?: CarriedOpenRow[];
     };
 
 /** An undecided review row on some stage, by id and wording, for a request that names it. */
 export interface OpenRow { stageId: string; stageLabel: string; id: string; text: string; severity?: string; suggested_change?: string }
+
+/** A row carried forward as unmet, by id and wording, with the note on it. */
+export interface CarriedOpenRow { stageId: string; stageLabel: string; id: string; text: string; note: string }
+
+/** The carried rows the open work names, for a stop that shows them and lets one be settled. */
+export function carriedRowsOf(template: WorkflowTemplate, open: readonly OutstandingItem[]): { carried?: CarriedOpenRow[] } {
+  const carried = open.flatMap((item) => {
+    if (item.kind !== 'carried_forward' || !item.items?.length) return [];
+    const stage = template.stages.find((s) => s.id === item.stageId);
+    const stageLabel = stage ? stage.short_label || stage.label : item.label;
+    return item.items.map((r) => ({ stageId: item.stageId, stageLabel, id: r.id, text: r.text.slice(0, 600), note: r.note.slice(0, 600) }));
+  });
+  return carried.length ? { carried: carried.slice(0, 12) } : {};
+}
 
 /**
  * The undecided rows the open work names, for a stop that should show them
@@ -928,7 +948,7 @@ export function needStillHolds(
  * lifts the block and leaves the user on the stage — what the More menu's
  * "Continue this stage" does — without Go resuming.
  */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open' | 'finish' | 'accept_row' | 'reject_row';
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open' | 'finish' | 'accept_row' | 'reject_row' | 'settle_row';
 
 /** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
 export const STUCK_OPTIONS_MAX = 3;
@@ -1230,6 +1250,21 @@ function describeObjectiveCheck(
         ];
         return {
           message: `${t('need.workOpen', { stage, list })} ${t('need.rowEffect', { id: only.id, where: only.stageLabel })}`,
+          action: options[0].label, options,
+        };
+      }
+      // One row carried forward is all that is open (12 Nov): its note is
+      // shown, and it is settled here — by saying so, or by answering it.
+      const carried = need.carried?.length === 1 && need.items.length === 1 && !need.rows?.length ? need.carried[0] : null;
+      if (carried) {
+        const options = [
+          { id: 'settle_row' as const, label: t('need.settleRow') },
+          { id: 'resume' as const, label: t('need.goDealRow') },
+          { id: 'stop' as const, label: t('need.stopHere') },
+        ];
+        const noted = carried.note ? ` ${t('need.rowNote', { id: carried.id, note: carried.note })}` : '';
+        return {
+          message: `${t('need.workOpen', { stage, list })}${noted} ${t('need.rowSettleEffect', { id: carried.id, where: carried.stageLabel })}`,
           action: options[0].label, options,
         };
       }
