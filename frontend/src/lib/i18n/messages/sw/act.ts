@@ -125,6 +125,8 @@ export const sw: Record<keyof typeof en, string> = {
   'cl.majorOpen': 'Hoja kubwa bado iko wazi: {list}. Kuidhinisha kunaiacha wazi. Sema sababu; itarekodiwa pamoja na idhini yako.',
   'cl.approveAnyway': 'Idhinisha kwa sababu hii',
   'cl.notYet': 'Bado',
+  'cl.decided': 'Imeamuliwa: {choice}',
+  'cl.recordDecision': 'Rekodi uamuzi wangu',
   'cl.optional': 'hiari',
   'cl.cantCheck': 'PromptMaster haiwezi kukagua hiki hapa — ni chako kuthibitisha.',
   'cl.routine': 'cha kawaida',

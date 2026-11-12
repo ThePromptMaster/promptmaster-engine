@@ -112,6 +112,9 @@ class UserApproval(BaseModel):
     #: The version it was given on, and the stage's current one; equal when current.
     version: int = 0
     current: int = 0
+    #: The option the user chose when giving it (12 Nov): a decision between
+    #: options was a bare tick, so no prompt was told which one was chosen.
+    choice: str = Field(default="", max_length=400)
 
 
 class ThirdPartyItem(BaseModel):

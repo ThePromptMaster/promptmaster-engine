@@ -125,6 +125,8 @@ export const zh: Record<keyof typeof en, string> = {
   'cl.majorOpen': '仍有重大问题未解决：{list}。批准后它仍未解决。请说明原因，原因将与你的批准一起记录。',
   'cl.approveAnyway': '按此原因批准',
   'cl.notYet': '暂不',
+  'cl.decided': '已决定：{choice}',
+  'cl.recordDecision': '记录我的决定',
   'cl.optional': '可选',
   'cl.cantCheck': 'PromptMaster 无法在这里检查此项——需要由你确认。',
   'cl.routine': '常规',

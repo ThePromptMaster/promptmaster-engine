@@ -125,6 +125,8 @@ export const hi: Record<keyof typeof en, string> = {
   "cl.majorOpen": "एक बड़ी समस्या अब भी खुली है: {list}। स्वीकृति देने पर यह खुली रहेगी। कारण बताएँ; वह आपकी स्वीकृति के साथ दर्ज होगा।",
   "cl.approveAnyway": "इस कारण के साथ स्वीकृति दें",
   "cl.notYet": "अभी नहीं",
+  "cl.decided": "तय किया गया: {choice}",
+  "cl.recordDecision": "मेरा निर्णय दर्ज करें",
   "cl.optional": "वैकल्पिक",
   "cl.cantCheck": "PromptMaster इसे यहाँ जाँच नहीं सकता — इसकी पुष्टि आपको करनी है।",
   "cl.routine": "नियमित",

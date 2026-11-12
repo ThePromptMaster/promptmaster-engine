@@ -147,6 +147,31 @@ export function answerAsFact(
   };
 }
 
+/**
+ * The fact a decision made on an approval records (12 Nov): which option the
+ * user chose, beside the approval it gives. `via` is the same as an answer's,
+ * so the stage it was decided on is left to Go's own revision and is not
+ * reopened a second time by the change check (`answeredOnStages`).
+ */
+export function decisionAsFact(
+  approval: string,
+  stageLabel: string,
+  choice: string,
+  ref: { criterion_id: string; stage_id: string; version_id?: string | null; run_id?: string | null }
+): NewFact | null {
+  const text = choice.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const on = approval.replace(/\s+/g, ' ').trim().replace(/[.。]+$/, '');
+  const statement = `Decided by the user — on "${on}"${stageLabel ? ` (${stageLabel})` : ''}: ${text}`;
+  return {
+    statement: statement.slice(0, STATEMENT_MAX),
+    subject: 'Decision',
+    kind: 'fact',
+    source_kind: 'user_edit',
+    source_ref: { via: 'go answer', question: on, choice: text.slice(0, 400), ...ref },
+  };
+}
+
 /** Per stage, at most this much of its latest saved text goes to the answer check (L-65). */
 const ANSWER_DOC_MAX = 20_000;
 const ANSWER_DOCS_MAX = 120_000;

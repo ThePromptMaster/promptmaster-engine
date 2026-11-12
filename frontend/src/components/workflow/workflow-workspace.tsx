@@ -156,7 +156,10 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
-import { approvalsOnEarlierVersion, withApprovals } from '@/lib/workflow/approvals';
+import { approvalsOnEarlierVersion, chosenFor, withApprovals } from '@/lib/workflow/approvals';
+import { asksForDecision, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
+import { decisionAsFact } from '@/lib/workflow/answers';
+import { useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
@@ -1210,7 +1213,11 @@ export function WorkflowWorkspace({
   });
 
   const handleToggleManual = useCallback(
-    async (id: string, checked: boolean, reason?: string) => {
+    async (id: string, checked: boolean, reason?: string, onStageId?: string) => {
+      // The stage the approval belongs to. Go's card can ask for one while
+      // another stage is on the page, and the tick used to be stamped with the
+      // viewed stage's version (12 Nov).
+      const at = onStageId ?? stageId;
       // From the store's latest copy, as commitCriterion does: a tick built on
       // this render's \`project\` wiped an approval Go had committed since (2 Nov,
       // prod: "This list matches the requirements I gave" vanished after three
@@ -1218,7 +1225,7 @@ export function WorkflowWorkspace({
       const latest = useProjectStore.getState().project ?? project;
       const manual_checks = { ...(latest.manual_checks ?? {}), [id]: checked };
       // Which version the approval was given on (19 Oct).
-      const head = stageBundles[stageId]?.versions.at(-1)?.id;
+      const head = stageBundles[at]?.versions.at(-1)?.id;
       const others = Object.fromEntries(Object.entries(latest.manual_check_versions ?? {}).filter(([k]) => k !== id));
       onPatchProject({ manual_checks, manual_check_versions: checked && head ? { ...others, [id]: head } : others });
       // Approved with a major finding open: the reason goes on the decision trail.
@@ -1233,6 +1240,9 @@ export function WorkflowWorkspace({
       // it. The tick is the user's declaration, so the event is theirs
       // (actor 'user'); the cursor stays where it is. The patch is flushed
       // first so a reload never shows a completed stage with an unticked box.
+      // Only for the stage on the page: its context is the one in hand. Another
+      // stage's approval is Go's to act on when it resumes.
+      if (at !== stageId) return;
       if (!checked || !tickClosesStage(template, state, stageId, { ...context, manualChecks: manual_checks })) return;
       setTransitionError(null);
       try {
@@ -1667,6 +1677,45 @@ export function WorkflowWorkspace({
 
   // What Go can ask the user for, done from its card with one click (B4):
   // the same writes the stage's own controls make.
+  // A reserved approval given by choosing (12 Nov, "Where am I supposed to
+  // select A?"). The choice is a fact of the project, the approval is ticked on
+  // its own stage with the choice on the decision trail, and a prose stage is
+  // reopened so the decision is written where it said "awaiting the user's
+  // decision". Used by Go's card and by the stage's checklist.
+  const goRunId = go.run?.id ?? null;
+  const decideApproval = useCallback(
+    async (criterionId: string, onStageId: string, choice: string) => {
+      const target = getStage(template, onStageId);
+      const criterion = target?.exit_criteria.find((c) => c.id === criterionId);
+      const text = decisionText(choice);
+      if (!target || !criterion || !text) throw new Error(tr('wserr.noChange'));
+      const head = stageBundles[onStageId]?.versions.at(-1);
+      const fact = decisionAsFact(criterion.label, target.short_label || target.label, text, {
+        criterion_id: criterionId, stage_id: onStageId, version_id: head?.id ?? null, run_id: goRunId,
+      });
+      if (fact) await recordFacts(project, [fact]);
+      await handleToggleManual(criterionId, true, `Decided: ${text}`, onStageId);
+      if (target.renderer === 'prose' && head) {
+        await appendEvent({
+          type: 'brief_changed', stage_id: onStageId, reason: `Your decision: ${text}`.slice(0, 300),
+          payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: onStageId, reason: recordDecisionReason(text) }] },
+        });
+      }
+      await onReload?.();
+    },
+    [template, stageBundles, project, goRunId, handleToggleManual, appendEvent, onReload]
+  );
+  // Read for Go's waiting approval, and for a decision-worded approval on the
+  // stage in view; a plain sign-off costs no call.
+  const waitingApproval = go.needs?.kind === 'tick_criterion' ? go.needs : null;
+  const decisionTargetsNow = useMemo(() => {
+    if (project.status === 'finalized' || !isEditable) return [];
+    return decisionTargets(template, stageBundles, project.manual_checks, [stageId, waitingApproval?.stageId])
+      .filter((d) => d.criterionId === waitingApproval?.criterionId || asksForDecision(d.approval));
+  }, [template, stageBundles, project.manual_checks, project.status, isEditable, stageId, waitingApproval?.stageId, waitingApproval?.criterionId]);
+  const decisionOffers = useDecisionOptions(project, decisionTargetsNow);
+  const decidedChoices = useMemo(() => Object.fromEntries(chosenFor(project.facts)), [project.facts]);
+
   const goNeedsActions = useMemo(
     () => ({
       approveOutline: async (outlineStageId: string) => {
@@ -1690,7 +1739,8 @@ export function WorkflowWorkspace({
         if (draft) onReload?.();
       },
       unblock: () => setBlocked(null),
-      tick: (criterionId: string, reason?: string) => handleToggleManual(criterionId, true, reason),
+      tick: (criterionId: string, reason?: string, onStageId?: string) => handleToggleManual(criterionId, true, reason, onStageId),
+      decide: decideApproval,
       keepStage: async (keepId: string, reason?: string) => {
         const since = state.stages[keepId]?.stale?.since;
         if (!since) return;
@@ -1763,7 +1813,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked
@@ -2676,6 +2726,7 @@ export function WorkflowWorkspace({
               latestChange={goLatestChange}
               onApplyAnyway={applyAnyway}
               otherWork={(id) => otherWorkFor(outstanding, id)}
+              decisionOffers={decisionOffers}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />
@@ -3019,6 +3070,9 @@ export function WorkflowWorkspace({
               committedByPolicy={committedByPolicy}
               approvedVersions={approvedVersions(stageBundles[stageId]?.versions ?? [], project.manual_check_versions)}
               onToggleManual={(id, checked, reason) => void handleToggleManual(id, checked, reason)}
+              offers={decisionOffers}
+              decided={decidedChoices}
+              onDecide={(id, choice) => decideApproval(id, stageId, choice)}
               openMajors={openMajorFindings(outstanding)}
               headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
               readOnly={!isEditable}

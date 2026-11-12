@@ -22,6 +22,7 @@ import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
+import type { DecisionOffer } from '@/lib/workflow/decision-options';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
@@ -36,7 +37,14 @@ import { doingNow } from '@/lib/agent/doing';
 export interface NeedsActions {
   approveOutline: (stageId: string) => Promise<void>;
   unblock: () => Promise<void>;
-  tick: (criterionId: string, reason?: string) => Promise<void>;
+  /** `onStageId`: the stage the approval belongs to, when it is not the one on the page. */
+  tick: (criterionId: string, reason?: string, onStageId?: string) => Promise<void>;
+  /**
+   * Give a reserved approval by choosing (12 Nov): the tick on that stage, the
+   * choice recorded as a fact, and the stage reopened for the decision to be
+   * written into it.
+   */
+  decide?: (criterionId: string, stageId: string, choice: string) => Promise<void>;
   /** Skip the current stage, with the reason given. */
   skip?: (reason: string) => Promise<void>;
   /** Start the next round of a looping workflow: the user's return to its first stage. */
@@ -77,8 +85,11 @@ export function GoPanel({
   stageName,
   stageByEnglish,
   otherWork,
+  decisionOffers,
 }: {
   go: ReturnType<typeof useGoLoop>;
+  /** The options each waiting reserved approval offers, by criterion id (`useDecisionOptions`). */
+  decisionOffers?: Record<string, DecisionOffer>;
   /**
    * A stage's name as the page says it, by id (client, 22 Oct: "Hasta ahora:
    * … Question, Literature" under Español). Go's own `stageLabelFor` is the
@@ -198,7 +209,7 @@ export function GoPanel({
           await go.go();
           return;
         }
-        await needsActions?.tick(need.criterionId, note);
+        await needsActions?.tick(need.criterionId, note, need.stageId);
         await go.go();
         return;
       case 'skip_stage':
@@ -404,6 +415,15 @@ export function GoPanel({
               key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={shownStage} onAction={act} context={needContext}
               onCarryOn={need.kind === 'tick_criterion' && canResume && otherWork?.(need.stageId) ? () => void go.go() : undefined}
               nothingElse={need.kind === 'tick_criterion' && canResume && !otherWork?.(need.stageId)}
+              offer={need.kind === 'tick_criterion' ? decisionOffers?.[need.criterionId] ?? null : null}
+              onChoose={
+                need.kind === 'tick_criterion' && needsActions?.decide
+                  ? async (choice) => {
+                      await needsActions.decide!(need.criterionId, need.stageId, choice);
+                      await go.go();
+                    }
+                  : undefined
+              }
             />
           )}
           {go.phase === 'watching' && (

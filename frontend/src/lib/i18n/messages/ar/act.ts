@@ -125,6 +125,8 @@ export const ar: Record<keyof typeof en, string> = {
   'cl.majorOpen': 'ما زالت هناك ملاحظة جوهرية مفتوحة: {list}. الموافقة تبقيها مفتوحة. اذكر السبب، وسيُسجَّل مع موافقتك.',
   'cl.approveAnyway': 'وافق بهذا السبب',
   'cl.notYet': 'ليس بعد',
+  'cl.decided': 'تقرَّر: {choice}',
+  'cl.recordDecision': 'سجّل قراري',
   'cl.optional': 'اختياري',
   'cl.cantCheck': 'لا يستطيع PromptMaster التحقق من هذا البند هنا — تأكيده لك.',
   'cl.routine': 'روتيني',

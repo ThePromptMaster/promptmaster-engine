@@ -126,6 +126,7 @@ Go mode (the loop itself runs in the browser; see [`architecture.md`](architectu
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
 | POST | `/api/agent/next-action` | `agentNextAction` | `agent.py` | **Live** — chooses ONE move from `allowed_actions`; anything else becomes `request_user_decision` |
+| POST | `/api/agent/decision-options` | `agentDecisionOptions` | `agent.py` | **Live** — the options a stage's text puts to the user for one reserved approval, each with the passage that states it (12 Nov). One Sonnet call; an option is kept only when its passage is found in the text, fewer than two is none, and any error is none, so the plain approval is shown. Read when Go's card or the stage's checklist shows the approval; nothing is stored on the run. |
 | POST | `/api/agent/screen-question` | `agentScreenQuestion` | `agent.py` | **Live** — under autonomous and handle, whether a question Go wants to ask is a routine repair, a real-world action, a business decision, a reserved approval or a missing input. One Sonnet call; any error means ask (L-210). |
 | POST | `/api/agent/reason` | `agentReason` | `agent.py` | **Live** — performs a reasoning move (label `discussed`); 422 for non-reasoning actions |
 | POST | `/api/agent/write-code` | `agentWriteCode` | `agent.py` | **Live** — code only, never claimed output (label `code_written`). Told the project's data files by name, columns and first rows |

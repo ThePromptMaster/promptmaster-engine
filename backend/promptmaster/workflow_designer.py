@@ -193,6 +193,13 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "supplied (an extraction matches its source, every requirement is covered, a structure or a "
         "plan fits the brief, the format is followed), which can be checked against the material. "
         "Most sign-offs before the last stage are routine\n"
+        # 12 Nov, production: "I choose Option A or Option B (stating which one)." was a tick box,
+        # with nowhere to state anything. The page now offers the options the stage sets out.
+        "When a sign-off is a choice between options, word it as the decision itself (\"I decide whether "
+        "the cap is raised\", \"I choose the recovery option\") and have the stage's instruction set the "
+        "options out side by side for the user: the page reads them from the stage and offers each as a "
+        "button. Never add an instruction to the user inside an approval (\"stating which one\", "
+        "\"state which\")\n"
         "- decision: when a stage both extracts what the user supplied AND may introduce new "
         "commitments (a deadline, a budget, a promise, a scope change not in the source), keep "
         "those apart — approval is the routine check of the extraction, and decision is the "
