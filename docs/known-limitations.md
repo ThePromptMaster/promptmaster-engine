@@ -4002,7 +4002,14 @@ What is not done, said plainly because it is the part still to build:
   both. The list then says what the answer did not settle. If the check cannot run, nothing is closed
   and the item stays listed. The grouping call is told to offer no choice that puts the question off,
   which a model may still do.
-- The list is shown when Go has stopped for the user. After the user changes an earlier stage the stop is
-  replaced by "Ready to carry on", and the list comes back at the next stop.
+- The list is shown while Go is paused and the run can be resumed, with or without the stop's own card
+  (#668; before that the first answer took the rest of the list away until the next stop). It reads every
+  window of the run, so a question set aside before a Resume is still on it.
+- An approval on work that is about to be redone is left off the list until the work is up to date
+  (#669): an approval is of the text as it stands.
+- An answer is a fact, and the change check carries it to every stage that states the opposite. A small
+  edit asked for at the end ("delete the duplicate line") was carried back to the draft and forward
+  again on the test project: three repairs for one line. Telling an edit to one text from a fact about
+  the project is not done.
 - Under "Ask me", Go's own reading of the other open rows against a new answer (L-236) does not run;
   it runs only with routine decisions handed to Go.

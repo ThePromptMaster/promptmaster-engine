@@ -96,3 +96,45 @@ Not run by hand: "Have Go work on it again" and "Stop here" on the new card (the
 - Deciding a length in code had a side effect where the work goes in rounds: the check at the end of a round reads everything the round wrote, so "cut the memo to under 600 words" would have been counted against the round's 2,900 words and failed every round. It had not happened yet. On a round's working text the length is now marked "not counted here" and counted when the document is written (#666).
 
 Not run by hand: a not-carried verdict with nothing to show for it being dropped (unit tests, and the 0 of 4 above); and #666 on production, because the round in the resumed run was closed by the two-rounds rule before its check ran (unit test only).
+
+## 4. Asking once, first version (#662, #667, #668, L-238)
+
+| Change | Where |
+|---|---|
+| One list of everything waiting on the user across the stages: approvals not given, findings nobody decided, rows carried forward as unmet, questions Go set aside; each with the stages it holds up | `lib/agent/user-queue.ts` (`userQueue`) |
+| Items one answer would settle are asked as one question | `promptmaster/question_groups.py`, `POST /api/agent/group-questions`, `mergeQueue` |
+| The list is shown under Go's stop, and each item is answered there | `question-queue.tsx`, `go-panel.tsx` |
+| An answer is recorded once as a fact, and closes the rows and kept questions the settle check says it settles | `workflow-workspace.tsx` (`answerFromQueue`), `user-queue.ts` (`closedByAnswer`) |
+| A question set aside is closed by a later answer that covers it; the planner is told what is already waiting and not to ask it again | `use-go-loop.ts`, `agent.py` (`waiting_on_user`) |
+
+All on one test project on production: a proposal that had stopped on the old build at its final sign-off, with one question set aside two stages earlier ("Should the headings be numbered or left unnumbered?").
+
+| Check | How | Result |
+|---|---|---|
+| A run paused before the change shows the list when reopened | By hand: the old build listed the question and gave nowhere to answer it (`media/nov12/08-…`); reopened after the deploy | "Also waiting on you", the question, an answer box (`media/nov12/09-…`), with no re-run |
+| Carried findings join the list | By hand: two major findings set to Deferred with notes that only postpone ("I will confirm them next week") | Saving ran the settle check, which settled neither; both were on the list at the next stop with their notes and "holds up Check, Final and the finish" |
+| One question for what one answer settles | By hand, real model | The two findings came back as one entry, "One answer settles 2 things", asking for the fees and their basis; the headings question stayed its own (`media/nov12/10-…`). On the next build the same call left the two separate; they do need different answers. Either is allowed: a group is a model's reading |
+| The list still works when grouping fails | **Forced:** the grouping call answered with an error in the page | The three items listed one by one, in order (`media/nov12/12-…`) |
+| An answer that settles part of a merged question | By hand; **forced** only in that the earlier grouping was put back as the reply. The settle check was real | "Fixed fee per session; the figures will follow." closed the per-session finding and left the fees finding open. Database: one fact naming one row; that row `settled_by` the answer with the fact's id; the other untouched |
+| An answer that settles the rest | By hand, nothing forced | "Option A is $4,800 and Option B is $6,200, each a fixed fee per session." closed the fees finding ("the user supplied Fee A and Fee B, the figures the finding asked for") |
+| The answer reaches the work | Database read | The change check reopened the draft that had been written "without knowing whether fees are fixed per session or per participant"; Go repaired the draft, the check and the final proposal, then stopped for the sign-off |
+| The list stays after an answer, and keeps a question from an earlier window | By hand, after #668 | With the stop replaced by "Ready to carry on — press Resume", the list was still there, and the headings question set aside two windows earlier was back on it (`media/nov12/13-…`). "Unnumbered" closed it, and the list stayed with what was left |
+| One stop at the end | By hand | After Resume, Go redid the draft, the check and the final proposal with the fees and the headings, and stopped once, for the sign-off, with nothing else on the list |
+| The finish says what settled each deferred finding | By hand | "…settled by your answer: "Option A is $4,800 and Option B is $6,200, each a fixed fee per session"; … settled by your answer: "Fixed fee per session; the figures will follow"" (`media/nov12/14-…`) |
+
+**Found in the pass, and fixed the same day:**
+
+- A sign-off was offered a client's options. The proposal offers its client "Option A" and "Option B"; the sign-off "I approve this proposal to send to the client" was shown them as buttons (`media/nov12/10-…`). A sign-off is never given options now, and a plain English one is not sent to a model at all (#667; `media/nov12/12-…` shows it plain again). Real model on the saved texts, three runs each: 36 of 36.
+- Any answer closed every item of its entry, including "figures to follow" and "I'll confirm next week". What an answer closes is now read item by item (#667). Real model on those rows: 15 of 15.
+- The first answer took the rest of the list away until the next stop, and a question set aside in an earlier window was gone from it after the next Resume (#668).
+- The list offered the final sign-off while the draft was still waiting to take the new answers in (#669).
+- The run's account said "Question kept for you" three times for one question (#670).
+
+**Seen in the pass, and left as it is:** after the sign-off Go asked one more question, whether to delete a duplicate line in the final proposal. "Yes" was recorded as a fact, the change check found the same line in the draft, and Go redid the draft, the check and the final proposal for it: three repairs for one deleted line, and the check, written again, raised a new major finding that needed one more press. That is the change check working as built (a change reaches every stage that states the opposite), and it is the costly side of it. Telling an edit to one text from a fact about the project is not something this work changed.
+
+Not run by hand: an approval given, or decided, from the list, and an undecided finding accepted or rejected from it (component tests); the planner being told what is already waiting (prompt test); a question set aside being closed by Go's own reading of a later answer (unit test: on the test project the two readings that ran settled nothing, rightly).
+
+## What this cost to check
+
+About $26 of model calls on five test projects on a test account, and under $2 for the scripts run against the saved texts.
+
