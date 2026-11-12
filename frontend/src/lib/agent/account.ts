@@ -94,7 +94,9 @@ export function runAccount(
   stageLabel: (id: string) => string,
   locale: Locale = 'en',
   /** A stage's English name, as the screen says it: for the names inside a recorded reason. */
-  stageByEnglish?: (english: string) => string
+  stageByEnglish?: (english: string) => string,
+  /** The approval Go waits for is given by choosing one of the options on its card: there is no "Approve and resume" there. */
+  choosing = false
 ): RunAccount | null {
   if (!run) return null;
   const t = (key: string, vars?: Vars) => translate(locale, key, vars);
@@ -177,7 +179,7 @@ export function runAccount(
       // A cleared request asks nothing (15 Oct screenshot: "Your decision is
       // needed: That is done. Press Resume and I will carry on.").
       if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: shown, setAside };
-      return { did, kind: 'decision', now: t('acct.decision', { what: decisionAsked(run.needs ?? null, shown, stageLabel, locale) }), setAside };
+      return { did, kind: 'decision', now: t('acct.decision', { what: decisionAsked(run.needs ?? null, shown, stageLabel, locale, choosing) }), setAside };
     case 'completed':
       // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).
       return {
@@ -194,10 +196,13 @@ export function runAccount(
 }
 
 /** What the user is asked to decide, in one line: the request's own buttons when it has them. */
-function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: string) => string, locale: Locale): string {
+function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: string) => string, locale: Locale, choosing = false): string {
   if (need && need.kind !== 'answer_question') {
     const d = describeNeed(need, stageLabel, {}, locale);
-    const choices = d.options?.map((o) => o.label) ?? (d.action ? [d.action] : []);
+    // A decision's card has its options and no "Approve and resume": name the press it does have (12 Nov).
+    const choices = choosing && need.kind === 'tick_criterion'
+      ? [translate(locale, 'nyc.chooseOnCard')]
+      : d.options?.map((o) => o.label) ?? (d.action ? [d.action] : []);
     if (choices.length) return `${choices.map((c) => `“${c}”`).join(translate(locale, 'acct.or'))}. ${firstSentence(d.message)}`;
   }
   return firstSentence(reason) || translate(locale, 'acct.seeBelow');

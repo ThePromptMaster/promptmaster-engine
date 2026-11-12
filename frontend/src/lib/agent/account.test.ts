@@ -77,6 +77,16 @@ describe('11 Oct, survey brief: "Your decision is needed" names the decision', (
     expect(now).toMatch(/^Your decision is needed: “Have Go fix Output and check again” or “I will fix it myself”\./);
     expect(now).toContain('not met: Output: at most 200 words — measured 214 words');
   });
+
+  it('an approval given by choosing an option names that press, not a button its card does not have (12 Nov)', () => {
+    const r = {
+      status: 'awaiting_decision', stop_reason: 'Needs your approval: "I choose the recovery option.".',
+      needs: { kind: 'tick_criterion', stageId: 'options', onStage: 'options', criterionId: 'options.approved', label: 'I choose the recovery option.', authority: 'reserved' },
+    } as never;
+    const stage = (id: string) => (id === 'options' ? 'Options' : id);
+    expect(runAccount(r, [], stage)!.now).toMatch(/^Your decision is needed: “Approve and resume”\./);
+    expect(runAccount(r, [], stage, 'en', undefined, true)!.now).toMatch(/^Your decision is needed: “Choose an option”\. Needs your approval: "I choose the recovery option\."/);
+  });
 });
 
 it('a finish names what was deferred and why it does not block', () => {

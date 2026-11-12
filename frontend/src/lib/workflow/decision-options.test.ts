@@ -178,4 +178,23 @@ describe('a decision made again replaces the earlier one', () => {
     expect(earlierDecision(facts, 'brief.approved')).toBeNull();
     expect(earlierDecision(undefined, 'cap.approved')).toBeNull();
   });
+
+  it('finds what replaced the decision when the text from before it was restored (12 Nov, production pass)', () => {
+    // "Option A" was decided; the earlier text was restored and the fact updated to "Not yet decided…";
+    // the new decision has to replace that one, or both stay current.
+    const reopened = [
+      { id: 'a', source_ref: { criterion_id: 'options.approved', choice: 'Option A' }, retired_at: '2026-11-12T18:19:51Z', supersedes: null },
+      { id: 'n', source_ref: { via: 'restore' }, retired_at: null, supersedes: 'a' },
+      { id: 'x', source_ref: { via: 'front door' }, retired_at: null, supersedes: null },
+      { id: 'y', source_ref: { via: 'chat' }, retired_at: null, supersedes: 'x0' },
+    ] as unknown as ProjectFact[];
+    expect((earlierDecision(reopened, 'options.approved') as ProjectFact).id).toBe('n');
+    expect(earlierDecision(reopened, 'final.approved')).toBeNull();
+    // Replaced twice over: still found.
+    const twice = [...reopened.map((f) => (f.id === 'n' ? { ...f, retired_at: '2026-11-12T18:20:00Z' } : f)), { id: 'n2', source_ref: {}, retired_at: null, supersedes: 'n' }] as unknown as ProjectFact[];
+    expect((earlierDecision(twice, 'options.approved') as ProjectFact).id).toBe('n2');
+    // A current decision for the approval wins over anything else.
+    const both = [...reopened, { id: 'b', source_ref: { criterion_id: 'options.approved', choice: 'Option B' }, retired_at: null, supersedes: null }] as unknown as ProjectFact[];
+    expect((earlierDecision(both, 'options.approved') as ProjectFact).id).toBe('b');
+  });
 });
