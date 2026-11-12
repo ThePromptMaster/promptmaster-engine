@@ -716,7 +716,13 @@ def _json_reply(system: str, prompt: str) -> dict:
         # The lines of the stage text that name an option, as the text names them.
         text = prompt.split("STAGE TEXT:\n<<<\n", 1)[-1].rsplit("\n>>>", 1)[0]
         named = [ln.strip(" -*#>") for ln in text.splitlines() if re.match(r"^[\s\-*#>]*Option [A-D]\b", ln)]
-        return {"question": "Which option do you choose?" if named else "", "options": [{"label": ln[:120], "quote": ln[:300]} for ln in named]}
+        # How the approval is worded: a sign-off has no options, whatever the text names.
+        approval = re.search(r"^THE APPROVAL: (.*)$", prompt, re.M)
+        asks = "choice" if approval and re.search(r"\b(choose|decide|decision|option)\b", approval.group(1), re.I) else "sign_off"
+        return {
+            "approval_asks": asks,
+            "question": "Which option do you choose?" if named else "", "options": [{"label": ln[:120], "quote": ln[:300]} for ln in named],
+        }
     if system.startswith(deliverable_check._INSTRUCTION[:60]):
         # Nothing missing, nothing contradictory: the scripted deliverable passes.
         return {"findings": [], "contradictions": []}

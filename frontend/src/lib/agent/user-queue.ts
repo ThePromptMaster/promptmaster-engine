@@ -164,6 +164,48 @@ export function answeredKept(
   return out;
 }
 
+/** A kept question's id where rows and questions are read against the user's words. */
+export const KEPT_PREFIX = 'kept::';
+
+const settleId = (item: QueueItem): string | null =>
+  item.kind === 'carried' && item.rowId ? `${item.stageId}::${item.rowId}`
+    : item.kind === 'kept_question' && item.stepId ? `${KEPT_PREFIX}${item.stepId}`
+      : null;
+
+/**
+ * The rows and kept questions of one entry, as the settle check reads them.
+ * The note on a row is not sent: only the answer just given may close it here.
+ */
+export function answerItems(entry: Pick<QueueEntry, 'items'>): { id: string; stage: string; text: string; note: string }[] {
+  return entry.items.flatMap((item) => {
+    const id = settleId(item);
+    return id ? [{ id, stage: item.stageLabel, text: item.text.slice(0, 2_400), note: '' }] : [];
+  });
+}
+
+/**
+ * Which of an entry's items the answer settles, by the check's own verdicts
+ * (12 Nov, production pass). An answer used to close every item of its entry.
+ * Two findings were asked as one question, "what are the fees, and are they
+ * per session or per head?", and the choices offered included "Fixed fee per
+ * session, figures to follow" and "I'll confirm both next week": the first
+ * answers one finding and not the other, and the second answers neither.
+ * A verdict counts only when it names the answer and quotes it. With no
+ * verdicts (the check failed) nothing is closed: the answer is still recorded.
+ */
+export function closedByAnswer(
+  entry: Pick<QueueEntry, 'items'>,
+  verdicts: readonly { id: string; by: string; quote: string }[] | null | undefined,
+  statementId: string
+): { closed: QueueItem[]; open: QueueItem[] } {
+  const settled = new Set((verdicts ?? []).filter((v) => v.by === statementId && v.quote?.trim()).map((v) => v.id));
+  const answerable = entry.items.filter((item) => settleId(item));
+  return {
+    closed: answerable.filter((item) => settled.has(settleId(item)!)),
+    open: answerable.filter((item) => !settled.has(settleId(item)!)),
+  };
+}
+
 /** The queue without the item a stop is already asking about. */
 export function restOfQueue(queue: readonly QueueItem[], asking: { criterionId?: string; rowIds?: readonly string[]; question?: string } | null): QueueItem[] {
   if (!asking) return [...queue];

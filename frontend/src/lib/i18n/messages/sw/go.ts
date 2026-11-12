@@ -220,6 +220,7 @@ export const sw: Record<keyof typeof en, string> = {
   'qq.settled': 'Limetatuliwa',
   'qq.answerLabel': 'Jibu lako',
   'qq.answer': 'Jibu',
+  'qq.stillOpen': 'Jibu lako limerekodiwa. Halitatui hili, ambalo bado linasubiri jibu lake lenyewe: {list}.',
   'qp.asks': 'Hali ya Go inauliza',
   'qp.answers': 'Majibu',
   'qp.tick': 'Weka tiki: “{label}”',

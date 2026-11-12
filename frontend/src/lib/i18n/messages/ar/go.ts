@@ -220,6 +220,7 @@ export const ar: Record<keyof typeof en, string> = {
   'qq.settled': 'تم حسمها',
   'qq.answerLabel': 'إجابتك',
   'qq.answer': 'أجب',
+  'qq.stillOpen': 'تم تسجيل إجابتك. لكنها لا تحسم ما يلي، وهو ما زال ينتظر إجابته الخاصة: {list}.',
   'qp.asks': 'وضع Go يسأل',
   'qp.answers': 'الإجابات',
   'qp.tick': 'علّم: «{label}»',

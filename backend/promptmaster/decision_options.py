@@ -13,9 +13,22 @@ kept only when its passage is found in the text, and fewer than two that can be
 traced is no choice at all. Any failure returns none: the card then shows the
 plain approval and a box for the decision, so nothing is ever invented for the
 user to press.
+
+Whose choice it is (12 Nov, production pass). A proposal written for a client
+offered that client "Option A" and "Option B"; its sign-off, "I approve this
+proposal to send to the client", was shown those two as buttons, as if the
+user were picking the client's package. Options a document offers its own
+reader are the work, not the user's decision. So the call also says how the
+approval is worded, and one that only signs the work off is never given
+options: an English sign-off with no word of choosing in it is not even sent.
+(Letting a sign-off keep options when the text "left the decision open" was
+tried against the saved texts: it gave a brief's sign-off the later stage's
+decision in two runs of three.)
 """
 
 from __future__ import annotations
+
+import re
 
 from pydantic import BaseModel, Field
 
@@ -46,7 +59,18 @@ OPTIONS_INSTRUCTION = (
     "Return no options when the text does not put a choice between alternatives to the user: an approval that "
     "only accepts or signs off the text as it stands (\"I approve this brief\", \"I accept this as final\") "
     "has none. Never write an option the text does not state, and never recommend one.\n\n"
-    "Return JSON only: {\"question\": the decision the user is asked to make, in one short sentence, or empty, "
+    "WHOSE CHOICE IT IS. The user is the person who owns this project and gives THE APPROVAL. A document often "
+    "offers options to someone else: a proposal offers its client two packages, a memo puts alternatives to a "
+    "board, a letter gives its reader ways to reply. Those are the document's content and its reader's choice. "
+    "They are not the user's decision, whoever THE AUDIENCE is: return no options for them. Options count only "
+    "when the choice is the user's own and still open.\n\n"
+    "Also say how THE APPROVAL itself is worded, as approval_asks: \"choice\" when its own words have the "
+    "user choose or decide something (\"I choose Option A or Option B\", \"I approve this decision on the "
+    "cap\"); \"sign_off\" when it approves, accepts or releases the work as it stands (\"I approve this "
+    "proposal to send to the client\", \"I accept this analysis\", \"I approve this brief as accurate\"). "
+    "A sign-off has no options, whatever the text lays out.\n\n"
+    "Return JSON only: {\"approval_asks\": \"choice\" or \"sign_off\", "
+    "\"question\": the decision the user is asked to make, in one short sentence, or empty, "
     f"\"options\": [{{\"label\": \"...\", \"quote\": \"...\"}}]}} with at most {MAX_OPTIONS} options."
 )
 
@@ -82,6 +106,7 @@ def build_options_prompt(req: DecisionOptionsRequest) -> tuple[str, str]:
     context = context_block(req.inputs)
     user = (
         f"OBJECTIVE: {req.inputs.objective}\n"
+        + (f"THE AUDIENCE (who the work is written for): {req.inputs.audience}\n" if req.inputs.audience else "")
         + (f"CONSTRAINTS: {req.inputs.constraints}\n" if req.inputs.constraints else "")
         + (f"\n{context}\n" if context else "")
         + f"\nTHE STAGE: {req.stage_label or '(unnamed)'}\n"
@@ -93,8 +118,12 @@ def build_options_prompt(req: DecisionOptionsRequest) -> tuple[str, str]:
 
 def parse_options(result: object, content: str) -> DecisionOptionsResponse:
     """An option stays only with its passage found in the stage's text; one
-    option, or none, is not a choice."""
+    option, or none, is not a choice. An approval that only signs the work off
+    has none: a reply that does not say the approval asks for a choice is read
+    as a sign-off."""
     if not isinstance(result, dict):
+        return DecisionOptionsResponse()
+    if str(result.get("approval_asks") or "").strip().lower() != "choice":
         return DecisionOptionsResponse()
     kept: list[DecisionOption] = []
     seen: set[str] = set()
@@ -116,8 +145,20 @@ def parse_options(result: object, content: str) -> DecisionOptionsResponse:
     return DecisionOptionsResponse(question=question, options=kept)
 
 
+_SIGNS_OFF = re.compile(r"^\W*I\s+(?:approve|accept|agree|confirm|have\s+(?:read|reviewed|checked))\b", re.I)
+_CHOOSING = re.compile(r"\b(?:choose|chosen|choice|select|decide|decision|which|options?)\b", re.I)
+
+
+def plainly_signs_off(approval: str) -> bool:
+    """An English sign-off with no word of choosing in it: "I approve this
+    proposal to send to the client". Decided here, so it costs no call and no
+    model can read a choice into it. Any other wording, in any language, is
+    read by the call."""
+    return bool(_SIGNS_OFF.search(approval)) and not _CHOOSING.search(approval)
+
+
 async def decision_options(client: OpenRouterClient, req: DecisionOptionsRequest) -> DecisionOptionsResponse:
-    if not req.content.strip():
+    if not req.content.strip() or plainly_signs_off(req.approval):
         return DecisionOptionsResponse()
     system, user = build_options_prompt(req)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=700, model=OPTIONS_MODEL)

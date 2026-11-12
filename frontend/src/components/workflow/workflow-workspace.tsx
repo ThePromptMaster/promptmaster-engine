@@ -137,7 +137,7 @@ import type { OutlineDocument } from '@/types/outline';
 import { carriedRows, carriedText, decideRow, effectiveRenderer, isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { keptOpen, markSettled } from '@/lib/workflow/settled-rows';
 import { describeSettled, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
-import { answeredKept, mergeQueue, restOfQueue, userQueue, type QueueEntry } from '@/lib/agent/user-queue';
+import { answerItems, answeredKept, closedByAnswer, mergeQueue, restOfQueue, userQueue, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
 import { keptQuestions } from '@/lib/agent/account';
 import { useQuestionGroups } from './agent/use-question-groups';
 import type { QueueAnswer } from './agent/question-queue';
@@ -1927,7 +1927,7 @@ export function WorkflowWorkspace({
   }, [waitingQueue, template, stageBundles, project.manual_checks]);
   const queueOffers = useDecisionOptions(project, queueTargets);
   const answerFromQueue = useCallback(
-    async (entry: QueueEntry, answer: QueueAnswer) => {
+    async (entry: QueueEntry, answer: QueueAnswer): Promise<{ open: QueueItem[] } | void> => {
       const first = entry.items[0];
       if (!first) return;
       if (entry.items.length === 1 && first.kind === 'approval' && first.criterionId) {
@@ -1942,11 +1942,21 @@ export function WorkflowWorkspace({
       }
       if (answer.kind === 'settle' && entry.items.length === 1 && first.kind === 'carried' && first.rowId) return goNeedsActions.settleRow(first.stageId, first.rowId);
       if (answer.kind !== 'answer' && answer.kind !== 'choose') return;
-      // An answer in words: one fact, and every row and kept question it answers is closed by that fact.
+      // An answer in words: one fact. What it closes is read from the answer itself, item by item:
+      // "per session, figures to follow" settles the basis of a fee and not the fee, and "I'll
+      // confirm next week" settles nothing. If the check cannot run, the answer is recorded and
+      // nothing is closed.
       const said = (answer.kind === 'choose' ? answer.choice : answer.text).replace(/\s+/g, ' ').trim();
-      const rows = entry.items.filter((i) => i.kind === 'carried' && i.rowId);
-      const kept = entry.items.filter((i) => i.kind === 'kept_question' && i.stepId);
-      const fact = queueAnswerAsFact(entry.question ?? first.text, said, {
+      const asked = entry.question ?? first.text;
+      const draft = queueAnswerAsFact(asked, said, { stage_id: first.stageId, run_id: goRunId });
+      if (!draft) return;
+      const verdict = await api
+        .agentSettles({ inputs: inputsFrom(project), items: answerItems(entry), statements: [{ id: 'f1', text: draft.statement }], model: project.model })
+        .catch(() => null);
+      const { closed, open } = closedByAnswer(entry, verdict?.settled, 'f1');
+      const rows = closed.filter((i) => i.kind === 'carried');
+      const kept = closed.filter((i) => i.kind === 'kept_question');
+      const fact = queueAnswerAsFact(asked, said, {
         stage_id: first.stageId, run_id: goRunId,
         ...(kept.length ? { kept_step_ids: kept.map((k) => k.stepId!) } : {}),
         ...(rows.length ? { row_ids: rows.map((r) => `${r.stageId}::${r.rowId}`) } : {}),
@@ -1967,6 +1977,7 @@ export function WorkflowWorkspace({
         });
       }
       await onReload?.();
+      return { open };
     },
     [decideApproval, handleToggleManual, goNeedsActions, goRunId, project, template, bundles, appendStageVersion, onReload]
   );

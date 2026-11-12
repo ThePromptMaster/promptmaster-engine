@@ -34,20 +34,27 @@ export function QuestionQueue({
   entries: readonly QueueEntry[];
   /** The options a reserved approval offers, by criterion id. */
   offers?: Record<string, DecisionOffer>;
-  onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<void>;
+  /** Resolves with the items the answer was recorded for and did not settle, when there are any. */
+  onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<{ open: QueueItem[] } | void>;
 }) {
   const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
   const [text, setText] = useState<Record<string, string>>({});
+  /** What the last answer left open: it was recorded, and those still wait. */
+  const [stillOpen, setStillOpen] = useState<QueueItem[]>([]);
   if (!entries.length) return null;
 
   const send = (entry: QueueEntry, answer: QueueAnswer) => {
     if (busy) return;
     setBusy(entry.key);
     setFailed(null);
+    setStillOpen([]);
     onAnswer(entry, answer)
-      .then(() => setText((prev) => ({ ...prev, [entry.key]: '' })))
+      .then((result) => {
+        setText((prev) => ({ ...prev, [entry.key]: '' }));
+        setStillOpen(result?.open ?? []);
+      })
       .catch((e: unknown) => setFailed({ key: entry.key, message: e instanceof Error && e.message ? e.message : t('nyc.failed') }))
       .finally(() => setBusy(null));
   };
@@ -65,6 +72,11 @@ export function QuestionQueue({
     <section aria-label={t('qq.heading')} data-question-queue className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('qq.heading')}</p>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('qq.lead')}</p>
+      {stillOpen.length > 0 && (
+        <p role="status" data-queue-still-open className="mt-2 text-label text-[var(--on-surface)]">
+          {t('qq.stillOpen', { list: stillOpen.map(what).join('; ') })}
+        </p>
+      )}
       <ol className="mt-3 space-y-4">
         {entries.map((entry, n) => {
           const first = entry.items[0];

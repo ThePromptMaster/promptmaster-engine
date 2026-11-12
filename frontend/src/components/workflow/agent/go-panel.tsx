@@ -23,7 +23,7 @@ import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
 import { givenByChoosing, type DecisionOffer } from '@/lib/workflow/decision-options';
-import type { QueueEntry } from '@/lib/agent/user-queue';
+import type { QueueEntry, QueueItem } from '@/lib/agent/user-queue';
 import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
@@ -101,7 +101,7 @@ export function GoPanel({
    * What else in the project waits on the user, shown under Go's stop so it is
    * all asked at once (12 Nov). Answering one records it; the stop itself resumes.
    */
-  queue?: { entries: readonly QueueEntry[]; offers?: Record<string, DecisionOffer>; onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<void> };
+  queue?: { entries: readonly QueueEntry[]; offers?: Record<string, DecisionOffer>; onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<{ open: QueueItem[] } | void> };
   /** The options each waiting reserved approval offers, by criterion id (`useDecisionOptions`). */
   decisionOffers?: Record<string, DecisionOffer>;
   /**

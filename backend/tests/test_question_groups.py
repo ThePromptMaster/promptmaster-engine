@@ -41,6 +41,9 @@ def test_prompt_lists_each_item_by_id_and_stage_and_asks_for_one_question_per_gr
     assert "one answer really settles together" in system
     assert "When in doubt, leave an item out" in system
     assert "do not recommend an answer" in system
+    # 12 Nov, production: a merged question offered "I'll confirm both next week" as a button.
+    assert "Every choice must answer the question in full" in system
+    assert "Never offer a choice that puts it off" in system
 
 
 def test_a_group_is_kept_with_two_or_more_ids_that_were_sent():

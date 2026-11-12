@@ -90,4 +90,19 @@ describe('the list of what else waits on the user', () => {
     const { container } = render(<QuestionQueue entries={[]} onAnswer={async () => undefined} />);
     expect(container.firstChild).toBeNull();
   });
+
+  it('says what an answer was recorded for and did not settle', async () => {
+    const merged: QueueEntry = { key: 'c|k', items: [carried, kept], question: 'Are any absences expected that week?', choices: ['None', 'I will confirm later'] };
+    const onAnswer = vi.fn(async () => ({ open: [carried] }));
+    render(<QuestionQueue entries={[merged]} onAnswer={onAnswer} />);
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'I will confirm later' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(
+      'Your answer is recorded. It does not settle this, which still waits for its own answer: Finding i5 on Coverage check, carried forward as unmet.'
+    ));
+    // An answer that settles all of it says nothing more.
+    onAnswer.mockResolvedValueOnce({ open: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'None' }));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  });
 });
