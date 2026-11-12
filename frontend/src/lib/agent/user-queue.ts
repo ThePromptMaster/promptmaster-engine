@@ -59,7 +59,8 @@ const idOf = (kind: QueueKind, stageId: string, ref: string) => `${kind}:${stage
  * - a question Go set aside and has not had answered.
  *
  * With routine decisions handed to Go, an approval it may give itself is not
- * the user's wait and is left out.
+ * the user's wait and is left out. So is an approval on work that is about to
+ * be redone.
  */
 export function userQueue(input: {
   template: Pick<WorkflowTemplate, 'stages'>;
@@ -88,10 +89,16 @@ export function userQueue(input: {
     return at < 0 || !open(stageId) ? [] : order.slice(at).filter(open).map(label);
   };
   const out: QueueItem[] = [];
+  // An approval is of the text as it stands. Where a stage, or one before it, is waiting to be
+  // redone, that text is about to change: the approval is asked for when the work is up to date.
+  // A sign-off was offered from the list while the draft two stages back still had the user's
+  // new answers to take in (12 Nov, production pass).
+  const outOfDate = input.outstanding.filter((o) => o.kind === 'stale_stage').map((o) => order.indexOf(o.stageId)).filter((at) => at >= 0);
+  const firstOutOfDate = outOfDate.length ? Math.min(...outOfDate) : Infinity;
 
   for (const stage of template.stages) {
     const written = Boolean((input.bundles?.[stage.id]?.versions.at(-1)?.content ?? '').trim());
-    if (!written || !open(stage.id)) continue;
+    if (!written || !open(stage.id) || order.indexOf(stage.id) >= firstOutOfDate) continue;
     for (const c of stage.exit_criteria) {
       if (c.check !== 'manual' || input.manualChecks?.[c.id]) continue;
       if (c.authority === 'delegable' && input.routine === 'handle') continue;

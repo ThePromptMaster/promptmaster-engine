@@ -28,7 +28,8 @@ describe('one list of what waits on the user, across every stage', () => {
   const outstanding: OutstandingItem[] = [
     { kind: 'open_findings', stageId: 'check', label: 'Coverage check', count: 1, rows: [{ id: 'i2', text: 'Named lists are missing.', severity: 'major', suggested_change: 'Add them.' }] } as never,
     { kind: 'carried_forward', stageId: 'check', label: 'Coverage check', rows: ['The no-absence assumption is untested.'], items: [{ id: 'i5', text: 'The no-absence assumption is untested.', note: 'No absences.' }] },
-    { kind: 'stale_stage', stageId: 'baseline', label: 'Baseline', reason: 'x' },
+    // Not the user's wait, and listed nowhere: a check's own reading of the draft.
+    { kind: 'check_says', stageId: 'options', label: 'Options A/B', says: 'x' },
   ];
   const kept = [{ stepId: 'k1', stageId: 'baseline', question: 'Is one trainer enough?', choices: ['Yes', 'No, two'] }];
   const queue = userQueue({
@@ -67,6 +68,20 @@ describe('one list of what waits on the user, across every stage', () => {
       template, state: state({ options: 'in_progress' }), outstanding: [], bundles: written('options'), manualChecks: { 'options.choice': true }, routine: 'handle',
     });
     expect(given).toEqual([]);
+  });
+
+  it('does not offer an approval on work that is about to be redone', () => {
+    const base = { template, bundles: written('baseline', 'check', 'options', 'final'), manualChecks: {}, routine: 'handle' as const };
+    const working = state({ baseline: 'complete', check: 'complete', options: 'in_progress', final: 'in_progress' });
+    const approvals = (outstanding: OutstandingItem[]) => userQueue({ ...base, state: working, outstanding }).filter((q) => q.kind === 'approval').map((q) => q.criterionId);
+    expect(approvals([])).toEqual(['options.choice', 'final.accept']);
+    // The final stage waits to be redone: its own approval is held back, the one before it is not.
+    expect(approvals([{ kind: 'stale_stage', stageId: 'final', label: 'Final package', reason: 'x' }])).toEqual(['options.choice']);
+    // An earlier stage waits to be redone: everything after it will change too.
+    expect(approvals([{ kind: 'stale_stage', stageId: 'check', label: 'Coverage check', reason: 'x' }])).toEqual([]);
+    // What is asked as a question is still asked: an answer is what the redo is waiting for.
+    const kept = [{ stepId: 'k1', stageId: 'baseline', question: 'Is one trainer enough?', choices: [] }];
+    expect(userQueue({ ...base, state: working, kept, outstanding: [{ kind: 'stale_stage', stageId: 'baseline', label: 'Baseline', reason: 'x' }] }).map((q) => q.kind)).toEqual(['kept_question']);
   });
 
   it('is the rest of the list once the stop\'s own question is taken out', () => {
