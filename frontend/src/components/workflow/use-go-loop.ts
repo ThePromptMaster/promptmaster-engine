@@ -97,6 +97,7 @@ import type { AgentRun, AgentRunStatus, AgentStep, ExecutionPolicy } from '@/typ
 import type { OutlineSection } from '@/types';
 import type { Evaluation, Project } from '@/types/project';
 import { repeatedQuestion, repeatPause } from '@/lib/agent/repeat-question';
+import { drivingHere, onePress } from '@/lib/agent/one-press';
 
 export const HEARTBEAT_MS = 10_000;
 const WATCHING_ELSEWHERE = 'Go is running this project in another tab. It will carry on here if that tab closes; stop it there to start again here.';
@@ -348,6 +349,10 @@ export function useGoLoop(opts: Options) {
   const runRef = useRef<AgentRun | null>(null);
   const stepsRef = useRef<AgentStep[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  // One press at a time (12 Nov): an answer pressed twice started a second loop on
+  // the same run, which closed the first loop's step and ended the run failed.
+  const pressRef = useRef(onePress());
+  const goingRef = useRef(false);
   const followRef = useRef<StepOutcome['followUp'] | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   // The call ceiling (4 Nov): set when a run paused at it, so no window starts on its own past it.
@@ -1427,10 +1432,16 @@ export function useGoLoop(opts: Options) {
   }, []);
 
   const go = useCallback(async () => {
+    // This tab's loop is already running, or a Go is still being started: a
+    // second one found the run "running", matched no resume, started a new run,
+    // and adopting the first closed its step in flight as interrupted (12 Nov).
+    if (abortRef.current || goingRef.current) return;
+    goingRef.current = true;
     setError(null);
     freshAllowance();
     if (phaseRef.current === 'watching') {
       setError(WATCHING_ELSEWHERE);
+      goingRef.current = false;
       return;
     }
     let live = runRef.current;
@@ -1468,6 +1479,8 @@ export function useGoLoop(opts: Options) {
       else await authorizeAndStart(policy);
     } catch (e) {
       setError(asError(e, 'Could not start Go mode.').message);
+    } finally {
+      goingRef.current = false;
     }
   }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun, authorizeAndStart, freshAllowance]);
 
@@ -1478,48 +1491,50 @@ export function useGoLoop(opts: Options) {
    * a nearly spent window is closed and the next one opened instead.
    */
   const update = useCallback(async (chosen: ExecutionPolicy = policy) => {
-    // Decisions chosen in the table but not saved: as far as Go can read, the
-    // rows are still undecided, so Resume stopped again at once and said nothing
-    // (6 Nov, production, book test). They are saved first, as an outline's
-    // unsaved edits are before its approval.
-    const unsaved = latest.current.unsavedRows;
-    if (unsaved && waitingOnTable(runRef.current?.needs, unsaved.stageId)) {
-      try {
-        await unsaved.save();
-      } catch (e) {
-        setError(asError(e, 'Could not save your decisions, so Go has not resumed.').message);
+    await pressRef.current.run(async () => {
+      // Decisions chosen in the table but not saved: as far as Go can read, the
+      // rows are still undecided, so Resume stopped again at once and said nothing
+      // (6 Nov, production, book test). They are saved first, as an outline's
+      // unsaved edits are before its approval.
+      const unsaved = latest.current.unsavedRows;
+      if (unsaved && waitingOnTable(runRef.current?.needs, unsaved.stageId)) {
+        try {
+          await unsaved.save();
+        } catch (e) {
+          setError(asError(e, 'Could not save your decisions, so Go has not resumed.').message);
+          return;
+        }
+      }
+      if (phaseRef.current === 'watching') {
+        setError(WATCHING_ELSEWHERE);
         return;
       }
-    }
-    if (phaseRef.current === 'watching') {
-      setError(WATCHING_ELSEWHERE);
-      return;
-    }
-    freshAllowance();
-    const live = runRef.current;
-    const left = live ? live.budget_steps - stepsRef.current.length : 0;
-    if (live && !live.ended_at && live.policy === chosen && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
-      try {
-        await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
-        commitRun({ ...live, status: 'budget_exhausted', needs: null });
-        await continueRun();
-        return;
-      } catch (e) {
-        setError(asError(e, 'Could not start updating the affected work.').message);
+      freshAllowance();
+      const live = runRef.current;
+      const left = live ? live.budget_steps - stepsRef.current.length : 0;
+      if (live && !live.ended_at && live.policy === chosen && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
+        try {
+          await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
+          commitRun({ ...live, status: 'budget_exhausted', needs: null });
+          await continueRun();
+          return;
+        } catch (e) {
+          setError(asError(e, 'Could not start updating the affected work.').message);
+          return;
+        }
+      }
+      if (chosen !== policy) {
+        setError(null);
+        setPolicy(chosen);
+        try {
+          await authorizeAndStart(chosen as Exclude<ExecutionPolicy, 'guided'>);
+        } catch (e) {
+          setError(asError(e, 'Could not start updating the affected work.').message);
+        }
         return;
       }
-    }
-    if (chosen !== policy) {
-      setError(null);
-      setPolicy(chosen);
-      try {
-        await authorizeAndStart(chosen as Exclude<ExecutionPolicy, 'guided'>);
-      } catch (e) {
-        setError(asError(e, 'Could not start updating the affected work.').message);
-      }
-      return;
-    }
-    await go();
+      await go();
+    });
   }, [policy, pendingStepId, commitRun, continueRun, go, authorizeAndStart, freshAllowance]);
 
   /**
@@ -1607,6 +1622,9 @@ export function useGoLoop(opts: Options) {
     }
     const controller = new AbortController();
     abortRef.current = controller;
+    // The loop takes over with a controller of its own; on every other way out
+    // this one is let go, or Go and Resume would read "still running" (12 Nov).
+    let handedOn = false;
     try {
       await setAgentStepStatus(step.id, 'running');
       await setRunStatus('running', null);
@@ -1615,10 +1633,13 @@ export function useGoLoop(opts: Options) {
         setPhase('ended');
         return;
       }
+      handedOn = true;
       void loop();
     } catch (e) {
       if (e instanceof Stopped) return;
       setError(asError(e, 'That step failed.').message);
+    } finally {
+      if (!handedOn && abortRef.current === controller) abortRef.current = null;
     }
   }, [pendingStepId, perform, loop, setRunStatus, upsertStep]);
 
@@ -1683,11 +1704,13 @@ export function useGoLoop(opts: Options) {
   /** "Try once more" on a repair that did not settle: one more try for that stage, then Go carries on (13 Oct). */
   const retryRepair = useCallback(
     async (stageId: string, note?: string) => {
-      // What the user said to fix goes with that one repair (8 Nov: "a way to
-      // request a specific repair and rerun the relevant check").
-      if (note?.trim()) repairNotesRef.current.set(stageId, note.trim().slice(0, 1_000));
-      allowOneMoreRepair(stageId);
-      await go();
+      await pressRef.current.run(async () => {
+        // What the user said to fix goes with that one repair (8 Nov: "a way to
+        // request a specific repair and rerun the relevant check").
+        if (note?.trim()) repairNotesRef.current.set(stageId, note.trim().slice(0, 1_000));
+        allowOneMoreRepair(stageId);
+        await go();
+      });
     },
     [go, allowOneMoreRepair]
   );
@@ -1699,16 +1722,19 @@ export function useGoLoop(opts: Options) {
         setError(WATCHING_ELSEWHERE);
         return;
       }
-      try {
-        const unmet = await reopenJudged(
-          FIX_OBJECTIVE_REASON,
-          `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`
-        );
-        if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
-        await go();
-      } catch (e) {
-        setError(asError(e, 'Could not reopen the deliverable.').message);
-      }
+      if (abortRef.current) return;
+      await pressRef.current.run(async () => {
+        try {
+          const unmet = await reopenJudged(
+            FIX_OBJECTIVE_REASON,
+            `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`
+          );
+          if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
+          await go();
+        } catch (e) {
+          setError(asError(e, 'Could not reopen the deliverable.').message);
+        }
+      });
     },
     [go, reopenJudged]
   );
@@ -1722,58 +1748,64 @@ export function useGoLoop(opts: Options) {
         setError(WATCHING_ELSEWHERE);
         return;
       }
-      try {
-        const step = await startAgentStep({
-          runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-          stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: USER_ANSWER_STEP, params: {},
-          rationale: '', expectedOutcome: '', needsDecision: false, decisionQuestion: null,
-        });
-        upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: text.trim() }));
-        // The answer is a decision of record, not only a line in this run
-        // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
-        // objective check read the project's facts, never the run's steps.
-        const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
-        const fact = answerAsFact(asked, text, {
-          run_id: current.id, step_id: step.id, stage_id: o.stage.id,
-          // Recorded knowing the record says otherwise: kept with the fact.
-          ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
-        });
-        if (fact) await recordFacts(o.project, [fact]);
-        // A stage stuck on that decision is no longer stuck.
-        const st = o.state.stages[o.stage.id];
-        if (st?.status === 'blocked' && st.blocked?.kind === 'needs_decision') {
-          await appendWorkflowEvent(o.project.id, o.project.user_id, {
-            type: 'stage_unblocked', stage_id: o.stage.id, actor: 'user', reason: `Answered: ${text.trim().slice(0, 300)}`,
+      // The run is already carrying on, or this answer is still being recorded:
+      // a second press would record it twice and start a second loop (12 Nov).
+      if (abortRef.current) return;
+      const stage = o.stage;
+      await pressRef.current.run(async () => {
+        try {
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: stage.id, mode: modeForStage(o.project, stage), actionKey: USER_ANSWER_STEP, params: {},
+            rationale: '', expectedOutcome: '', needsDecision: false, decisionQuestion: null,
           });
-        }
-        // L-64 (9 Oct): an answer to "the objective is not met" corrects the
-        // deliverable that was judged, so it is reopened with the answer as the
-        // reason, and Go's repair revises it. Matching the answer to the text
-        // it corrects is not possible in code; the judged stage is known.
-        const leftToGo = isDelegatedAnswer(text);
-        const onObjective = /objective is not met/i.test(current.stop_reason ?? '');
-        // "Do whatever is best" on a question the text can settle: the stage is
-        // reopened to decide it, so the repair comes before any check (5 Nov).
-        const head = o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '';
-        const reopensForChoice = leftToGo && !onObjective && o.stage.renderer === 'prose' && st?.status !== 'blocked' &&
-          settlesInTheText(asked, current.needs?.kind === 'answer_question' ? current.needs.choices : undefined, head);
-        if (reopensForChoice) {
-          await appendWorkflowEvent(o.project.id, o.project.user_id, {
-            type: 'brief_changed', stage_id: o.stage.id, actor: 'user', reason: 'Left to Go to decide',
-            payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: o.stage.id, reason: delegatedWhy(asked) }] },
+          upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: text.trim() }));
+          // The answer is a decision of record, not only a line in this run
+          // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
+          // objective check read the project's facts, never the run's steps.
+          const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
+          const fact = answerAsFact(asked, text, {
+            run_id: current.id, step_id: step.id, stage_id: stage.id,
+            // Recorded knowing the record says otherwise: kept with the fact.
+            ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
           });
+          if (fact) await recordFacts(o.project, [fact]);
+          // A stage stuck on that decision is no longer stuck.
+          const st = o.state.stages[stage.id];
+          if (st?.status === 'blocked' && st.blocked?.kind === 'needs_decision') {
+            await appendWorkflowEvent(o.project.id, o.project.user_id, {
+              type: 'stage_unblocked', stage_id: stage.id, actor: 'user', reason: `Answered: ${text.trim().slice(0, 300)}`,
+            });
+          }
+          // L-64 (9 Oct): an answer to "the objective is not met" corrects the
+          // deliverable that was judged, so it is reopened with the answer as the
+          // reason, and Go's repair revises it. Matching the answer to the text
+          // it corrects is not possible in code; the judged stage is known.
+          const leftToGo = isDelegatedAnswer(text);
+          const onObjective = /objective is not met/i.test(current.stop_reason ?? '');
+          // "Do whatever is best" on a question the text can settle: the stage is
+          // reopened to decide it, so the repair comes before any check (5 Nov).
+          const head = o.bundles[stage.id]?.versions.at(-1)?.content ?? '';
+          const reopensForChoice = leftToGo && !onObjective && stage.renderer === 'prose' && st?.status !== 'blocked' &&
+            settlesInTheText(asked, current.needs?.kind === 'answer_question' ? current.needs.choices : undefined, head);
+          if (reopensForChoice) {
+            await appendWorkflowEvent(o.project.id, o.project.user_id, {
+              type: 'brief_changed', stage_id: stage.id, actor: 'user', reason: 'Left to Go to decide',
+              payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: stage.id, reason: delegatedWhy(asked) }] },
+            });
+          }
+          // Left to Go is not the user's word on how to fix it, so it does not start the repair count again.
+          const unmet = onObjective
+            ? await reopenJudged(leftToGo ? FIX_OBJECTIVE_REASON : ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
+            : objectiveUnmet(o.events);
+          if (fact || st?.status === 'blocked' || unmet || reopensForChoice) {
+            await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
+          }
+          await go();
+        } catch (e) {
+          setError(asError(e, 'Could not record your answer.').message);
         }
-        // Left to Go is not the user's word on how to fix it, so it does not start the repair count again.
-        const unmet = onObjective
-          ? await reopenJudged(leftToGo ? FIX_OBJECTIVE_REASON : ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
-          : objectiveUnmet(o.events);
-        if (fact || st?.status === 'blocked' || unmet || reopensForChoice) {
-          await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
-        }
-        await go();
-      } catch (e) {
-        setError(asError(e, 'Could not record your answer.').message);
-      }
+      });
     },
     [go, upsertStep, reopenJudged]
   );
@@ -1805,6 +1837,8 @@ export function useGoLoop(opts: Options) {
   /** Adopt a live run found on load (or left by a tab that went away). */
   const adopt = useCallback(
     async (found: AgentRun) => {
+      // The run this tab's own loop is driving: its step in flight is alive (12 Nov).
+      if (drivingHere(found, runRef.current, Boolean(abortRef.current))) return;
       const list = await listAgentSteps(found.id).catch(() => []);
       autoLeftRef.current = await autoWindowsLeft(found).catch(() => 0);
       setAutoPending(autoLeftRef.current > 0);
