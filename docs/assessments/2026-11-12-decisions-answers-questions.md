@@ -69,3 +69,30 @@ Not run by hand: choosing from the stage's own checklist without Go (the only de
 **Seen in the pass, and left as it is:** after an answer was on record as a fact, a later note that only postponed was settled by that earlier fact. The record did say there were no absences; "Keep it open instead" overrode it. It is noted in L-236.
 
 Not run by hand: "Have Go work on it again" and "Stop here" on the new card (they are the buttons the stop had before, renamed), and Go leaving a readable row alone under "Ask me" (the row in that run had been kept open, which no policy reads; the policy branch is in code only).
+
+## 3. A length is counted, never estimated (#661, #666, L-237)
+
+| Change | Where |
+|---|---|
+| A check stage is given the counted length of each text it checks, as a plain line that is neither met nor unmet | `stage-requests.ts` (`checkedCounts`), `measured.py` (`info`) |
+| A check row that only estimates a length code has counted is dropped before the table is saved | `stage.py`, `measured.py` (`is_hand_count`) |
+| The final check is given the document's count, and is told a length is never its to judge and a text is never asked to state its own word count | `perform.ts` (`checkDeliverable`), `deliverable_check.py` |
+| An accepted change that asks for a length of the whole text is decided by counting it; the model reads only the rest of the change | `lib/agent/deliverable-check.ts` (`lengthRows`) |
+| A not-carried verdict with nothing to show for it is dropped; the stop line leads with the accepted change and what is missing | `deliverable-check.ts` (`issuesFrom`) |
+| On a round's working text a length is marked "not counted here" and counted when the document is written | `lengthRows(…, working)` (#666) |
+
+| Check | How | Result |
+|---|---|---|
+| The client's saved check rows and final memo | Real model, local script, 4 runs before and after | The word-count finding called not carried 4 of 4 before, 0 of 4 after |
+| The check stage is sent the counts | By hand on production: the same brief on a test account, on a six-stage workflow that works in rounds; the page's own requests read as they left (read only) | The check's request carried "Screening brief — length: 441 words" and "Screening analysis — length: 597 words", and again on the second round with the new count (638) |
+| No row estimates a length | Database read of both saved check tables on that project | No row mentions a word count |
+| The final check is sent the count | By hand on production, same run | At the end of each round the request carried the round's count; on the written memo it carried "Screening package — length: 184 words" and the brief's own limit, "Memo: at most 600 words: 184 words" |
+| A text really over a length an accepted change asks for is flagged with its count | By hand on production. **Forced:** no check row asked for a length, so one row ("Cut the memo to under 150 words", accepted) was added to the check's model reply in the page; everything after was real | The row went to the final check marked "NOT met: 184 words, counted in code, against "under 150 words""; the assessment read "Accepted change i19 (Check) is not carried into Screening package: Cut the memo to under 150 words … its length is NOT met: 184 words, counted in code"; Go trimmed the memo; the next check marked it "met: 127 words" |
+| No length stop, no word count in the sandbox | Database read of the finished run | "Met: every requirement holds; the measured ones were counted in code", with "Memo: at most 600 words — 127 words"; no code was run in the project |
+
+**Found in the pass, and fixed the same day:**
+
+- The round check read "$3.5 million − $600,000 = $2.9 million" as 3.5 − 600,000, reported "works out to -599,996.5, not 2.9", and sent the work round again twice before the run was stopped by hand. The arithmetic check now reads a scale said after a figure (#665). After the deploy the same memo, with the same sum in it, finished with no slip reported.
+- Deciding a length in code had a side effect where the work goes in rounds: the check at the end of a round reads everything the round wrote, so "cut the memo to under 600 words" would have been counted against the round's 2,900 words and failed every round. It had not happened yet. On a round's working text the length is now marked "not counted here" and counted when the document is written (#666).
+
+Not run by hand: a not-carried verdict with nothing to show for it being dropped (unit tests, and the 0 of 4 above); and #666 on production, because the round in the resumed run was closed by the two-rounds rule before its check ran (unit test only).

@@ -3898,8 +3898,22 @@ reopened and reworked three of them, about a dollar, before this was changed the
 made again supersedes the earlier one, which is retired. While an approval's options are shown, the
 pinned copy of the stop reads "Choose an option" and goes to the card; it does not tick the approval.
 "Decision" in an approval's wording is read by a word rule, so an unusual sign-off may get, or miss, the
-optional box for what was decided; the options themselves do not depend on that rule on Go's card. If an earlier
-stage really does need changing after a decision, the user reopens it, or the final check says so.
+optional box for what was decided. If an earlier stage really does need changing after a decision, the
+user reopens it, or the final check says so.
+
+A sign-off is never given options (#667). A proposal written for a client offered that client "Option A"
+and "Option B", and its sign-off, "I approve this proposal to send to the client", was shown those two as
+buttons: the model had read the reader's choice as the user's, on a text where an earlier version had
+rightly been given none. The call now also says how the approval is worded, and only one whose own words
+have the user choose or decide gets options; an English sign-off with no word of choosing in it is not
+sent at all. On the saved texts, three runs each, 36 of 36: the four decision stages kept their options,
+a choice worded in Spanish got them, and the proposal and five other sign-offs got none. What this gives
+up: a stage that leaves a choice to the user under an approval worded as a plain sign-off gets the plain
+button. Letting such a sign-off keep its options when the text "left the decision open" was tried and
+gave a brief's sign-off the later stage's decision in two runs of three. The designer words a choice as
+the decision, so a designed workflow is not in that case. On the stage's own checklist, with no Go
+running, a decision is recorded by choosing one of the options read (or the box beside them); where none
+are read, the tick records the approval alone.
 
 A second press of Go, Resume or an answer while the first is still being handled is dropped. Before this
 a choice pressed twice recorded the answer twice, started a second loop, and ended the run failed.
@@ -3979,5 +3993,16 @@ What is not done, said plainly because it is the part still to build:
   Approvals and undecided findings are never merged: each is the user's act on one piece of work.
 - **At most eight items** are shown at one stop, and the grouping reads carried rows and kept questions
   only. Tasks recorded for the real world (L-211) are not in the list: nothing closes them but the user.
-- Under "Ask me", an answer given from the list is recorded and closes what it names; Go's own reading of
-  the other open rows against it (L-236) runs only with routine decisions handed to Go.
+- **An answer from the list closes only what it settles** (#667). It is recorded as a fact either way,
+  and each row and kept question of its entry is then read against that answer by the settle check
+  (L-236). In production two findings were asked as one question about fees, and the choices offered
+  were "Fixed fee per session, figures to follow" and "I'll confirm both next week"; before this any of
+  them would have closed both. On those rows, three runs each, 15 of 15: a postponement closed nothing,
+  the first choice closed the per-session finding and not the fees, the fees with their basis closed
+  both. The list then says what the answer did not settle. If the check cannot run, nothing is closed
+  and the item stays listed. The grouping call is told to offer no choice that puts the question off,
+  which a model may still do.
+- The list is shown when Go has stopped for the user. After the user changes an earlier stage the stop is
+  replaced by "Ready to carry on", and the list comes back at the next stop.
+- Under "Ask me", Go's own reading of the other open rows against a new answer (L-236) does not run;
+  it runs only with routine decisions handed to Go.
