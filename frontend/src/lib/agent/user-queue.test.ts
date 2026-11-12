@@ -190,4 +190,19 @@ describe('items one answer settles are asked as one question', () => {
     expect(closedByAnswer(entry, null, 'f1').open).toHaveLength(3);
     expect(closedByAnswer(entry, [{ id: 'check::i1', by: 'f1', quote: 'a' }, { id: 'check::i2', by: 'f1', quote: 'b' }, { id: 'kept::k1', by: 'f1', quote: 'c' }], 'f1').open).toEqual([]);
   });
+
+  it('the list stays while the run can be resumed, so one answer does not take the rest away', async () => {
+    const { showsQueue } = await import('./user-queue');
+    const paused = { entries: 2, active: false, pendingStep: false, need: true, canResume: true };
+    expect(showsQueue(paused)).toBe(true);
+    // An answer changed the project: the stop's card became "Ready to carry on — press Resume".
+    expect(showsQueue({ ...paused, need: false })).toBe(true);
+    // A used-up window has its own card and no Resume.
+    expect(showsQueue({ ...paused, canResume: false })).toBe(true);
+    // Not while Go works, proposes a step, or after the run has ended; and never empty.
+    expect(showsQueue({ ...paused, active: true })).toBe(false);
+    expect(showsQueue({ ...paused, pendingStep: true })).toBe(false);
+    expect(showsQueue({ ...paused, need: false, canResume: false })).toBe(false);
+    expect(showsQueue({ ...paused, entries: 0 })).toBe(false);
+  });
 });
