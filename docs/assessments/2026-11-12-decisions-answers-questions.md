@@ -134,7 +134,33 @@ All on one test project on production: a proposal that had stopped on the old bu
 
 Not run by hand: an approval given, or decided, from the list, and an undecided finding accepted or rejected from it (component tests); the planner being told what is already waiting (prompt test); a question set aside being closed by Go's own reading of a later answer (unit test: on the test project the two readings that ran settled nothing, rightly).
 
+## 5. A further pass on fresh copies (#672, #673)
+
+The same day, after everything above was live: three fresh projects on production from the client's briefs (the A-or-B operations brief, the training brief, the acquisition memo), run end to end, and each item above that had only been tested in code looked at by hand.
+
+| Check | How | Result |
+|---|---|---|
+| A decision, start to finish, on the final build | By hand: the operations brief, a new project | Go stopped at "I choose the recovery option" with Option A and Option B and the pinned "Choose an option" (`media/nov12/15-…`). A double click on Option A recorded one fact and one line on the decision trail. The next stop was the last, the final sign-off; no second A-or-B question |
+| The "decision package" sign-off | By hand, same run | "I approve this decision package for internal use" was a plain "Approve and resume", with no options and no box (`media/nov12/16-…`) |
+| An ordinary run | By hand: the training brief, a new project | Four sign-offs, "Finished: the objective is verified as met". Its coverage check raised no major finding, so the answered-finding case could not be repeated without forcing one (section 2 stands) |
+| An approval given from the list | By hand: two approvals unticked on an earlier stage while Go waited on a later one | Both were listed with what they hold up (`media/nov12/17-…`); "Approve" on each gave it (database read) |
+| An approval is held off the list while earlier work is out of date (#669), and a decision is made from the list | By hand: the decision reopened on the operations project | With the brief out of date the list was empty. Once it was current the list showed the decision with its two options and left the final sign-off off (`media/nov12/18-…`). Option B chosen there: the approval given, the fact, the line on the decision trail (database read) |
+| A finding accepted from the list | By hand. **Forced:** one major finding was added to the check's model reply so that one was undecided | Listed as "Finding i29 on Check · holds up the finish" with Accept and Reject (`media/nov12/19-…`); Accept set the row accepted by the user (database read) |
+| A length on a round's working text (#666) | By hand on the round workflow. **Forced:** the length finding was added to the check's reply; it was accepted by hand | At the end of the round the finding went to the check marked "not counted here: this text is the working of a round…", and was not reported |
+| An unsupported "not carried" is dropped | **Forced:** one verdict in the check's reply set to not carried with no quote and no note | It appears nowhere in the round's verdict; the one real not-carried verdict, with its quote, does |
+
+**Found in this pass, and fixed the same day:**
+
+- Restoring the text from before a decision offers "Update the fact", and "Not yet decided…" then stands where the decision stood. Deciding again left it current beside the new decision, and a repair of the final package then failed its own check against the two. A new decision now replaces whatever replaced the earlier one (#672). Checked by hand afterwards: the new decision's fact supersedes the "not yet decided" one, which is retired.
+- Under a decision's card the summary line said "Your decision is needed: "Approve and resume"", a button that card does not have. It says "Choose an option" (#672; seen by hand in `media/nov12/21-…`).
+- With a decision reopened, Go did the other work first and then asked "Which recovery option do you choose?" as a question of its own, with the approval for the same choice on the list under it (`media/nov12/20-…`). Answering Go's question recorded an answer and left the approval unticked, and Go came back asking for the choice on the approval's card (`media/nov12/21-…`): the client's "it asked me again", in the other order. An answer that names one option of a waiting decision now gives that decision (#673). Checked by hand afterwards, nothing forced, on a fourth fresh project: the decision reopened the same way, Go again asked it as its own question (`media/nov12/23-…`), and the answer "Option B: …" gave the approval and was recorded once, as the decision, replacing "not yet decided". Go went on without asking again.
+- A decision made again had begun to break repairs. Since it supersedes the earlier decision (#664), the check for old values still stated as current read the figures of the option not chosen as leftovers. After Option A ("take the carrier's 20 units for $2,400") became Option B, the brief and the decision stage, which rightly state the carrier's quote, failed their repairs on "$2,400", and the run ended "The last 2 steps failed". A decision, or the fact standing where one stood, now yields no superseded values (#674).
+
+**Seen in this pass, and left as it is:** after a decision is made again, the stages before it are marked for a recheck where the text of one states the earlier decision. The first decision leaves them alone (#660); a replaced one goes through the older rule that a stage stating a replaced fact is rechecked. The rechecks are cheap next to rewrites, and they are the only thing that corrects a stage that did write the old choice in.
+
+Not seen by hand: one question listed once in the run's account (#670). No fresh run set the same question aside twice, and it cannot be made to.
+
 ## What this cost to check
 
-About $26 of model calls on five test projects on a test account, and under $2 for the scripts run against the saved texts.
+About $26 of model calls on five test projects on a test account for the first passes, about $20 more on four fresh projects for the last one, and under $2 for the scripts run against the saved texts.
 
