@@ -507,7 +507,7 @@ export function GoPanel({
               {t('go.useMyMode', { mode: shownModeName(mode, MODE_DISPLAY[mode as ModeType]?.display_name ?? mode) })}
             </label>
           )}
-          <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} />
+          <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} choosing={choosesOnCard} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
               run={go.run}

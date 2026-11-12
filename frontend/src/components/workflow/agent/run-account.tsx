@@ -17,15 +17,18 @@ export function RunAccountCard({
   steps,
   stageLabel,
   stageByEnglish,
+  choosing = false,
 }: {
   run: AgentRun | null;
   steps: readonly AgentStep[];
   stageLabel: (id: string) => string;
   stageByEnglish?: (english: string) => string;
+  /** The waiting approval is given by choosing an option on its card. */
+  choosing?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
-  const account = runAccount(run, steps, stageLabel, locale, stageByEnglish);
+  const account = runAccount(run, steps, stageLabel, locale, stageByEnglish, choosing);
   if (!account || (!account.did && account.kind === 'working')) return null;
   return (
     <section aria-label={t('acc.label')} data-kind={account.kind} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">

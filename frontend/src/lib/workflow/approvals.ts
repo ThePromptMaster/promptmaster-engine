@@ -42,11 +42,29 @@ export function chosenFor(facts: readonly Pick<ProjectFact, 'source_ref' | 'reti
  * current. A decision made again replaces it: two current facts saying "Option
  * B" and "Option A" for the same approval would both reach every prompt.
  */
-export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'retired_at'>>(facts: readonly F[] | null | undefined, criterionId: string): F | null {
+export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'retired_at'> & Partial<Pick<ProjectFact, 'id' | 'supersedes'>>>(
+  facts: readonly F[] | null | undefined,
+  criterionId: string
+): F | null {
+  const all = facts ?? [];
+  const decides = (f: F) => (f.source_ref as { criterion_id?: unknown } | null | undefined)?.criterion_id === criterionId;
   let found: F | null = null;
-  for (const f of facts ?? []) {
+  for (const f of all) if (!f.retired_at && decides(f)) found = f;
+  if (found) return found;
+  // What stands where the decision stood. Restoring the text from before a decision offers to
+  // update the fact to match, and "Not yet decided…" then replaces "Option A". Deciding again
+  // left that fact current beside "Option B" (12 Nov, production pass): it is the one to replace.
+  const byId = new Map(all.filter((f) => f.id).map((f) => [f.id as string, f]));
+  for (const f of all) {
     if (f.retired_at) continue;
-    if ((f.source_ref as { criterion_id?: unknown } | null | undefined)?.criterion_id === criterionId) found = f;
+    let earlier = f.supersedes ? byId.get(f.supersedes) : undefined;
+    for (let hops = 0; earlier && hops < 20; hops += 1) {
+      if (decides(earlier)) {
+        found = f;
+        break;
+      }
+      earlier = earlier.supersedes ? byId.get(earlier.supersedes) : undefined;
+    }
   }
   return found;
 }
