@@ -23,6 +23,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import { webAccessOf } from '@/lib/workflow/web-found';
 import { measuredLines, type MeasuredLine } from '@/lib/workflow/context';
+import { countWords } from '@/lib/workflow/measurable';
 import type { AuditFinding } from '@/types';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
@@ -142,7 +143,7 @@ const HAND_COUNT = /\b(?:about|roughly|approximately|around|an? estimated?|estim
  * an estimate beside it can only disagree with it.
  */
 export function withoutHandCounts(response: EvaluateStageArtifactResponse, lines: readonly MeasuredLine[]): EvaluateStageArtifactResponse {
-  const counted = lines.some((l) => l.met !== null && /\bwords\b/.test(l.label));
+  const counted = lines.some((l) => (l.met !== null || l.info) && /\bwords\b/.test(`${l.label} ${l.value}`));
   const findings = response.evaluation.findings;
   if (!counted || !findings?.length) return response;
   const kept = findings.filter((f) => !HAND_COUNT.test(`${f.summary ?? ''} ${f.suggested_change ?? ''}`));
@@ -164,7 +165,17 @@ export function checkedCounts(
   return template.stages
     .slice(0, Math.max(0, at))
     .filter((s) => s.renderer === 'prose')
-    .flatMap((s) => measuredLines(project, template, s, bundles[s.id]?.versions.at(-1)?.content ?? '', s.label));
+    .flatMap((s) => {
+      const content = bundles[s.id]?.versions.at(-1)?.content ?? '';
+      const lines = measuredLines(project, template, s, content, s.label);
+      // 12 Nov: a limit is attached to the stage that names its subject, or to
+      // the deliverable, and a check often reads a draft that is neither. With
+      // no count to go on it estimated one "by hand reading only", and asked
+      // the memo to state its word count. Every text a check reads is counted.
+      if (!content.trim() || lines.some((l) => l.met !== null && /\bwords\b/.test(`${l.label} ${l.value}`))) return lines;
+      return [...lines, { label: `${s.label} — length`, value: `${countWords(content).toLocaleString('en-US')} words`, met: null, info: true }];
+    })
+    .slice(0, 24);
 }
 
 /**

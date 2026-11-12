@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 
 from .limits import clip_by_section
 from .llm_client import OpenRouterClient
+from .measured import MeasuredLine, measured_block
 from .project_context import context_block
 from .schemas import PMInput
 
@@ -46,6 +47,9 @@ class AcceptedFinding(BaseModel):
     stage_label: str = Field(default="", max_length=200)
     finding: str = Field(default="", max_length=1_000)
     suggested_change: str = Field(default="", max_length=1_000)
+    #: The length the change asks for, counted in code on the deliverable (12 Nov):
+    #: "met: 473 words against about 500". The model judges only the rest of the change.
+    length_decided: str = Field(default="", max_length=300)
 
 
 class RecordedTable(BaseModel):
@@ -94,7 +98,15 @@ _INSTRUCTION = (
     "(quote the passage that shows it); \"not_carried\" when the deliverable still has the problem or lacks "
     "the change (quote the passage that still has it, if there is one, and say in a few words what is "
     "missing); \"not_applicable\" when the finding is about another document and has no bearing on this one. "
-    "A finding a later accepted fact or requirement overrides is \"not_applicable\".\n"
+    "A finding a later accepted fact or requirement overrides is \"not_applicable\". "
+    # 12 Nov (an acquisition memo): a check row had estimated the draft's length by eye and
+    # suggested "state the word count, labelled as an estimate". The final memo was shorter and
+    # stated none, so this check called the finding not carried three times and Go stopped on it.
+    "Length is never yours to judge: where MEASURED IN CODE gives a count, a change that asks for a "
+    "length is carried or not by that count alone, and a line marked LENGTH DECIDED IN CODE has "
+    "already settled it, so judge only the rest of that change. A change that asks the document to "
+    "state, add or estimate its own word count is \"not_applicable\": the count is shown by the page, "
+    "not claimed by the text. Never answer \"not_carried\" without saying what the text lacks.\n"
     "2. CONTRADICTIONS. A rule, gate, threshold, condition or recommendation that the deliverable's own "
     "assumptions, caveats, figures or the ACCEPTED PROJECT FACTS AND REQUIREMENTS make wrong or unsafe — for "
     "example: a gate that clears on an action whose restart rule lets the risk return unchecked; a threshold "
@@ -189,12 +201,15 @@ def build_prompt(
     findings: list[AcceptedFinding],
     tables: list[RecordedTable] | None = None,
     note_quotes: list[str] | None = None,
+    measured: list[MeasuredLine] | None = None,
 ) -> tuple[str, str]:
     rows = "\n".join(
         f"- {f.id}{f' ({f.stage_label})' if f.stage_label else ''}: {' '.join(f.finding.split())}"
         + (f" — suggested change: {' '.join(f.suggested_change.split())}" if f.suggested_change.strip() else "")
+        + (f" — LENGTH DECIDED IN CODE: {' '.join(f.length_decided.split())}" if f.length_decided.strip() else "")
         for f in findings[:MAX_FINDINGS]
     )
+    counts = measured_block(measured or [], "THE DELIVERABLE")
     facts = context_block(inputs)
     # 9 Nov (a finished package): the check was never shown the brief's constraints, so what the
     # brief required read as unsupported, and a date it never gave passed as ordinary.
@@ -206,6 +221,7 @@ def build_prompt(
         + f"\nACCEPTED FINDINGS:\n{rows or '(none)'}\n\n"
         + _tables_block(tables)
         + _note_quotes_block(note_quotes)
+        + (f"{counts}\n\n" if counts else "")
         + f"THE DELIVERABLE — {label}:\n{clip_by_section(content, MAX_CHECK_CONTENT)[0]}"
     )
     return _INSTRUCTION, user
@@ -244,6 +260,9 @@ def parse(
         if verdict == "carried" and not quote:
             # Said to be made, with nothing to show where: not shown.
             continue
+        if verdict == "not_carried" and not quote and not " ".join(str(item.get("note") or "").split()):
+            # Said to be missing, with no passage and no word of what is lacking (12 Nov): not shown either.
+            continue
         checks.append(FindingCheck(id=fid, verdict=verdict, quote=quote, note=" ".join(str(item.get("note") or "").split())[:300]))
     # What the user supplied is a source a conflict may quote, the brief as much as a fact.
     record = " ".join([*(f.statement for f in (inputs.facts or [])), inputs.constraints or "", inputs.context or ""])
@@ -280,10 +299,11 @@ async def check_deliverable(
     findings: list[AcceptedFinding],
     tables: list[RecordedTable] | None = None,
     note_quotes: list[str] | None = None,
+    measured: list[MeasuredLine] | None = None,
 ) -> DeliverableCheck:
     if not content.strip():
         return DeliverableCheck()
-    system, user = build_prompt(inputs, label, content, findings, tables, note_quotes)
+    system, user = build_prompt(inputs, label, content, findings, tables, note_quotes, measured)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=3_000, model=model)
     parsed = parse(raw, inputs, content, findings, tables)
     parsed.read_chars = clip_by_section(content, MAX_CHECK_CONTENT)[1]

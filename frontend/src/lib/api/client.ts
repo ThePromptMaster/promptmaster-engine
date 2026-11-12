@@ -1,6 +1,7 @@
 import type { QuestionScreen } from '@/lib/agent/question-screen';
 import type {
   PMInput,
+  MeasuredLine,
   AssembledPrompt,
   Iteration,
   EvaluationResult,
@@ -1004,7 +1005,9 @@ export const api = {
       inputs: PMInput;
       deliverable_label: string;
       content: string;
-      accepted: { id: string; stage_label: string; finding: string; suggested_change: string }[];
+      accepted: { id: string; stage_label: string; finding: string; suggested_change: string; length_decided?: string }[];
+      /** What code counted on the deliverable (12 Nov): its length is judged from these. */
+      measured?: MeasuredLine[];
       tables?: { label: string; rows: string }[];
       /** Passages the document's own review note quotes that the rest of it does not hold (5 Nov). */
       note_quotes?: string[];

@@ -614,6 +614,8 @@ export interface MeasuredLine {
   label: string;
   value: string;
   met: boolean | null;
+  /** A plain count with no limit attached (12 Nov): told to a check so it never estimates one. */
+  info?: boolean;
 }
 
 export interface GenerateStageArtifactResponse extends WebUse {

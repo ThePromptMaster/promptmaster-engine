@@ -1886,7 +1886,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t, project, goRunId]
+    [project, goRunId, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, decideApproval, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked
