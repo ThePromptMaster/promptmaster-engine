@@ -436,7 +436,7 @@ export function GoPanel({
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
               canLeaveToGo={!(go.run.needs?.kind === 'answer_question' && go.run.needs.repeat) && !asksForApproval(go.run.stop_reason)}
               change={latestChange ?? undefined}
-              onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
+              onAnswer={(t, contradicted) => go.answer(t, contradicted)}
               checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
               onTick={

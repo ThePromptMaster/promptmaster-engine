@@ -74,3 +74,32 @@ describe('a question about an applied finding shows what it changed (19 Oct, Res
     expect(screen.queryByLabelText('What changed')).not.toBeInTheDocument();
   });
 });
+
+describe('an answer is sent once (12 Nov, production: a choice pressed twice ended the run failed)', () => {
+  it('ignores a second press of a choice while the first is still being recorded', async () => {
+    let recorded: () => void = () => {};
+    const onAnswer = vi.fn(() => new Promise<void>((resolve) => {
+      recorded = resolve;
+    }));
+    render(<QuestionPrompt question="Option A or Option B?" choices={['I choose Option A', 'I choose Option B']} onAnswer={onAnswer} />);
+    const b = screen.getByRole('button', { name: 'I choose Option B' });
+    fireEvent.click(b);
+    fireEvent.click(b);
+    fireEvent.click(screen.getByRole('button', { name: 'I choose Option A' }));
+    expect(onAnswer).toHaveBeenCalledTimes(1);
+    expect(onAnswer).toHaveBeenCalledWith('I choose Option B');
+    await waitFor(() => expect((b as HTMLButtonElement).disabled).toBe(true));
+    recorded();
+    await waitFor(() => expect((b as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('a typed answer is sent once too', async () => {
+    const onAnswer = vi.fn(() => new Promise<void>(() => {}));
+    render(<QuestionPrompt question="q" onAnswer={onAnswer} />);
+    fireEvent.change(screen.getByLabelText('Your answer'), { target: { value: 'Option B' } });
+    const send = screen.getByRole('button', { name: 'Answer and continue' });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    expect(onAnswer).toHaveBeenCalledTimes(1);
+  });
+});

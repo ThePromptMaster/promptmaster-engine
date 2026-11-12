@@ -2,7 +2,7 @@
 
 import { shownActionLabel } from '@/lib/i18n/go';
 import { useT } from '@/lib/i18n/i18n-provider';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { DiffText, useWordDiff } from '@/components/workflow/revised-preview';
@@ -95,7 +95,7 @@ export function QuestionPrompt({
   /** Q3a: the package prepared for an expert's review, as markdown. */
   expertPackage?: string;
   /** With the contradiction the user chose to record the answer over (L-65). */
-  onAnswer: (text: string, contradicted?: AnswerContradiction) => void;
+  onAnswer: (text: string, contradicted?: AnswerContradiction) => void | Promise<void>;
   /** Reads the answer against the saved record first; null when nothing contradicts it. */
   checkAnswer?: (text: string) => Promise<AnswerContradiction | null>;
   /** Approvals the question asks for, offered as the tick itself (4 Oct). */
@@ -107,13 +107,33 @@ export function QuestionPrompt({
   const [checking, setChecking] = useState(false);
   const [contradiction, setContradiction] = useState<AnswerContradiction | null>(null);
   const [ticking, setTicking] = useState<string | null>(null);
+  // An answer is sent once (12 Nov, production: a choice pressed twice was
+  // recorded twice and the run ended failed). The ref covers two presses
+  // before the first render; the state greys the buttons.
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  function send(answer: string, contradicted?: AnswerContradiction) {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    const done = () => {
+      sendingRef.current = false;
+      setSending(false);
+    };
+    try {
+      void Promise.resolve(contradicted ? onAnswer(answer, contradicted) : onAnswer(answer)).catch(() => undefined).finally(done);
+    } catch (e) {
+      done();
+      throw e;
+    }
+  }
   async function submit() {
-    if (!checkAnswer) return onAnswer(text);
+    if (!checkAnswer) return send(text);
     setChecking(true);
     try {
       const found = await checkAnswer(text);
       if (found) setContradiction(found);
-      else onAnswer(text);
+      else send(text);
     } finally {
       setChecking(false);
     }
@@ -131,8 +151,8 @@ export function QuestionPrompt({
             <button
               key={c}
               type="button"
-              disabled={checking}
-              onClick={() => onAnswer(c)}
+              disabled={checking || sending}
+              onClick={() => send(c)}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-start text-title text-[var(--on-primary)] disabled:opacity-60"
             >
               {c}
@@ -141,8 +161,8 @@ export function QuestionPrompt({
           {canLeaveToGo && (
             <button
               type="button"
-              disabled={checking}
-              onClick={() => onAnswer(DELEGATED_ANSWER)}
+              disabled={checking || sending}
+              onClick={() => send(DELEGATED_ANSWER)}
               title={t('qp.bestHint')}
               className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-start text-title text-[var(--pm-primary)] disabled:opacity-60"
             >
@@ -156,7 +176,7 @@ export function QuestionPrompt({
             <button
               key={a.id}
               type="button"
-              disabled={ticking !== null}
+              disabled={ticking !== null || sending}
               onClick={() => {
                 setTicking(a.id);
                 setTickError(null);
@@ -190,7 +210,8 @@ export function QuestionPrompt({
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => onAnswer(text, contradiction)}
+              disabled={sending}
+              onClick={() => send(text, contradiction)}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
             >
               {t('qp.recordAnyway')}
@@ -219,7 +240,7 @@ export function QuestionPrompt({
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <button
           onClick={() => void submit()}
-          disabled={!text.trim() || checking || contradiction !== null}
+          disabled={!text.trim() || checking || sending || contradiction !== null}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
           {checking ? t('qp.checking') : t('qp.answerContinue')}
