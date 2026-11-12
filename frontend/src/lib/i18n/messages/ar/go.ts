@@ -168,6 +168,7 @@ export const ar: Record<keyof typeof en, string> = {
   'nyc.somethingElse': 'أو اذكر ما تقرره بدلًا من ذلك',
   'nyc.decideResume': 'سجّل قراري واستأنف',
   'nyc.sayDecision': 'ما تقرره (اختياري). يُسجَّل مع موافقتك.',
+  'nyc.chooseOnCard': 'اختر خيارًا',
   'nyc.thenResume': 'ثم اضغط «استئناف».',
   'gt.label': 'ما يجوز لـ Go فعله',
   'gt.auto': 'يمضي Go عبر المراحل ويتوقف حين يحتاج إليك. وإنهاء المشروع دائمًا بنقرة منك.',

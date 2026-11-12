@@ -22,7 +22,7 @@ import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
-import type { DecisionOffer } from '@/lib/workflow/decision-options';
+import { givenByChoosing, type DecisionOffer } from '@/lib/workflow/decision-options';
 import type { QueueEntry } from '@/lib/agent/user-queue';
 import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
@@ -319,8 +319,15 @@ export function GoPanel({
   // find it (14 Oct, Sean: "the new go button for revisions doesn't show up
   // sometimes" — it was on the card, scrolled out of view, with Resume hidden).
   const needed = need ? describeNeed(need, shownStage, needContext, locale) : null;
+  // An approval that is a decision is given on the card, where its options
+  // are (12 Nov, production pass): the pinned copy still read "Approve and
+  // resume" and ticked it bare, which on an iPad is the only button in view.
+  const offer = need?.kind === 'tick_criterion' && !(need.openRows ?? []).length && needsActions?.decide ? decisionOffers?.[need.criterionId] : undefined;
+  const choosesOnCard = givenByChoosing(offer);
   const dockAction: { label: string; option?: StuckOption; acts: boolean } | null =
-    needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
+    choosesOnCard
+      ? { label: t('nyc.chooseOnCard'), acts: false }
+      : needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
       ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
       : askingUser
         ? { label: t('controls.answerGo'), acts: false }
