@@ -206,6 +206,18 @@ export function closedByAnswer(
   };
 }
 
+/**
+ * Whether the list is on the page: while Go is paused for the user and not
+ * working. It used to need the stop's own card, and an answer given from the
+ * list changes the project, which replaces that card with "Ready to carry on —
+ * press Resume": the first answer took the rest of the list away until the
+ * next stop (12 Nov, production pass). The list stays for as long as the run
+ * can be resumed, so everything on it can be answered before Resume.
+ */
+export function showsQueue(at: { entries: number; active: boolean; pendingStep: boolean; need: boolean; canResume: boolean }): boolean {
+  return at.entries > 0 && !at.active && !at.pendingStep && (at.need || at.canResume);
+}
+
 /** The queue without the item a stop is already asking about. */
 export function restOfQueue(queue: readonly QueueItem[], asking: { criterionId?: string; rowIds?: readonly string[]; question?: string } | null): QueueItem[] {
   if (!asking) return [...queue];

@@ -23,7 +23,7 @@ import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
 import { givenByChoosing, type DecisionOffer } from '@/lib/workflow/decision-options';
-import type { QueueEntry, QueueItem } from '@/lib/agent/user-queue';
+import { showsQueue, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
 import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
@@ -494,7 +494,7 @@ export function GoPanel({
               }
             />
           )}
-          {queue && queue.entries.length > 0 && !go.active && !go.pendingStep && (need || (askingUser && !cleared)) && (
+          {queue && showsQueue({ entries: queue.entries.length, active: go.active, pendingStep: Boolean(go.pendingStep), need: Boolean(need), canResume }) && (
             <QuestionQueue entries={queue.entries} offers={queue.offers} onAnswer={queue.onAnswer} />
           )}
           {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (

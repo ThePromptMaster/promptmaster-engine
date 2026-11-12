@@ -1903,7 +1903,12 @@ export function WorkflowWorkspace({
   const queueStopHere = Boolean(go.run && !go.active && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked'));
   const goNeed = go.needs;
   const goStopReason = go.run?.stop_reason ?? '';
-  const keptNow = useMemo(() => keptQuestions(go.steps, answeredKept(project.facts, go.steps)), [go.steps, project.facts]);
+  // Every window of this run, not only the one open now: answering from the list closes the window to
+  // update the work, and the question set aside before it was gone from the list after the next Resume.
+  const keptNow = useMemo(() => {
+    const all = [...go.priorSteps, ...go.steps];
+    return keptQuestions(all, answeredKept(project.facts, all));
+  }, [go.priorSteps, go.steps, project.facts]);
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =

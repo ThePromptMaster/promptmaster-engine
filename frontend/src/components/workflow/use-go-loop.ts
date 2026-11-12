@@ -372,6 +372,13 @@ export function useGoLoop(opts: Options) {
   }, []);
   /** Steps of the windows this run continues (B4): the planner reads them as history. */
   const priorStepsRef = useRef<AgentStep[]>([]);
+  // The same steps for the page: a question set aside in an earlier window is still waiting on the
+  // user in this one, and the list of what waits read this window alone (12 Nov, production pass).
+  const [priorSteps, setPriorSteps] = useState<AgentStep[]>([]);
+  const setPrior = useCallback((earlier: AgentStep[]) => {
+    priorStepsRef.current = earlier;
+    setPriorSteps(earlier);
+  }, []);
   /** The user said "draft them anyway" for this many sections (FR-18). */
   const largeJobOkRef = useRef<number | null>(null);
   /**
@@ -1401,7 +1408,7 @@ export function useGoLoop(opts: Options) {
       }
       commitRun(created);
       commitSteps([]);
-      priorStepsRef.current = carried;
+      setPrior(carried);
       largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
@@ -1412,7 +1419,7 @@ export function useGoLoop(opts: Options) {
       setAutoPending(autoLeftRef.current > 0);
       void loop();
     },
-    [budget, autoWindows, commitRun, commitSteps, loop]
+    [budget, autoWindows, commitRun, commitSteps, loop, setPrior]
   );
 
   /**
@@ -1457,7 +1464,7 @@ export function useGoLoop(opts: Options) {
           metadata: { continues_run_id: prev.id, window: windows, auto },
         }).catch(() => undefined);
       }
-      priorStepsRef.current = [...priorStepsRef.current, ...stepsRef.current];
+      setPrior([...priorStepsRef.current, ...stepsRef.current]);
       setPolicy(prev.policy);
       setBudget(prev.budget_steps);
       commitRun(created);
@@ -1474,7 +1481,7 @@ export function useGoLoop(opts: Options) {
       if (auto) autoLeftRef.current = 0;
       else setError(asError(e, 'Could not continue Go mode.').message);
     }
-  }, [commitRun, commitSteps, loop, freshAllowance]);
+  }, [commitRun, commitSteps, loop, freshAllowance, setPrior]);
   continueRef.current = continueRun;
 
   /**
@@ -1954,7 +1961,7 @@ export function useGoLoop(opts: Options) {
       commitSteps(repaired);
       // The windows this run continues: the planner keeps their history
       // across a reload instead of starting from this window alone.
-      priorStepsRef.current = await listChainSteps(found).catch(() => []);
+      setPrior(await listChainSteps(found).catch(() => []));
       // The no-progress guard counts from here, as it does after Resume.
       sinceRef.current = repaired.length;
       fingerprintsRef.current = [];
@@ -1970,7 +1977,7 @@ export function useGoLoop(opts: Options) {
         void loop();
       } else setPhase('ended');
     },
-    [commitRun, commitSteps, loop]
+    [commitRun, commitSteps, loop, setPrior]
   );
   adoptRef.current = adopt;
 
@@ -1996,10 +2003,10 @@ export function useGoLoop(opts: Options) {
       setBudget(last.budget_steps);
       commitRun(last);
       commitSteps(await listAgentSteps(last.id));
-      priorStepsRef.current = await listChainSteps(last).catch(() => []);
+      setPrior(await listChainSteps(last).catch(() => []));
       setPhase('ended');
     })().catch(() => undefined);
-  }, [opts.enabled, opts.project.id, adopt, commitRun, commitSteps]);
+  }, [opts.enabled, opts.project.id, adopt, commitRun, commitSteps, setPrior]);
 
   // Heartbeat while this tab drives a running run; poll while watching another tab.
   useEffect(() => {
@@ -2139,7 +2146,7 @@ export function useGoLoop(opts: Options) {
     stepLabel,
     stepEffect,
     autoWindows, setAutoWindows, autoPending,
-    policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
+    policy, setPolicy, budget, setBudget, run, steps, priorSteps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, update, applyAndContinue, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer,
     handsOff,
     dismissError: useCallback(() => setError(null), []),
