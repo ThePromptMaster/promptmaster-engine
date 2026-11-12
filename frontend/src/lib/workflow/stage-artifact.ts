@@ -769,12 +769,17 @@ export const carriedText = (i: StageItem): string => rowText(i);
  * not block (Sean, 10 Oct, 6.6: deferred rows must be named, not silently
  * counted as resolved).
  */
-export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema, optional = false): { row: string; reason: string }[] {
+export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema, optional = false): { row: string; reason: string; settled?: string }[] {
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
     // A row the user's answer settled is named here with that answer, not counted as open.
     .filter((i) => closedSince(i) || !(optional ? i.severity === 'major' : deferralBlocks(i, schema)))
-    .map((i) => ({ row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200) }));
+    // A settled row is named with the words that settled it: its note may be an older one
+    // that only postponed it (12 Nov, production pass).
+    .map((i) => ({
+      row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200),
+      ...(i.settled_by?.trim() ? { settled: i.settled_by.trim().slice(0, 200) } : {}),
+    }));
 }
 
 /**

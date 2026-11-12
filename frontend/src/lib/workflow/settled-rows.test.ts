@@ -37,7 +37,15 @@ describe('a row the user answered is settled, with its status kept', () => {
 
   it('is still named at the finish, with the answer as its reason', () => {
     const [row] = markSettled([absence()], 'i5', { quote: QUOTE, source: 'note' });
-    expect(deferredNotBlocking([row], schema)).toEqual([{ row: expect.stringContaining('no-absence assumption'), reason: NOTE }]);
+    expect(deferredNotBlocking([row], schema)).toEqual([{ row: expect.stringContaining('no-absence assumption'), reason: NOTE, settled: QUOTE }]);
+  });
+
+  it('the finish names it by the answer that settled it, not by an older note that postponed it', async () => {
+    const { deferredNote } = await import('@/lib/agent/perform');
+    const [row] = markSettled([absence({ reason: 'Will confirm with HR next week.' })], 'i5', { quote: 'HR has confirmed there are no absences.', source: 'fact', ref: 'f1' });
+    const note = deferredNote({ template: T, context: { deferred: { summary: deferredNotBlocking([row], schema) } } } as never);
+    expect(note).toContain('— settled by your answer: "HR has confirmed there are no absences"');
+    expect(note).not.toContain('deferred because Will confirm');
   });
 
   it('a fact that settles it is named by its id; an empty quote settles nothing', () => {
