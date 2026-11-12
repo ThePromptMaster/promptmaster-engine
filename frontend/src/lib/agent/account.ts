@@ -138,13 +138,14 @@ export function runAccount(
   ].filter(Boolean);
   const did = parts.length ? `${parts.join('; ')}.`.replace(/^./, (c) => c.toUpperCase()) : '';
 
-  const setAside = [
+  // Each said once: a question Go set aside at three steps running was listed three times (12 Nov).
+  const setAside = [...new Set([
     ...steps
       .filter((s, i) => typeof s.params?.set_aside_question === 'string' && !answeredSince(steps, i, String(s.params!.set_aside_question)))
       .map((s) => t('acct.questionKept', { question: String(s.params!.set_aside_question).slice(0, 300) })),
     ...steps.filter((s) => typeof s.changes?.set_aside === 'string').map((s) => t('acct.couldNot', { what: String(s.changes!.set_aside) })),
     ...steps.filter((s) => s.action_key === ROUTINE_DEFAULT_STEP && s.status === 'succeeded').map((s) => firstSentence(s.output).replace(/^Routine default taken by Go under your routine-decision policy \(yours to change\): /, t('acct.routine'))),
-  ];
+  ])];
 
   // Read as recorded (English); said as shown.
   const reason = run.stop_reason?.trim() ?? '';
