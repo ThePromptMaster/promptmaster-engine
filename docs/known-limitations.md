@@ -3857,7 +3857,11 @@ longer shown anywhere in the project, though its versions stay in the database. 
 applies before the press. Where the draft is carried, it becomes the first version of the last stage, and
 the stages before it are shown it until that stage is written again (`buildStageDigest`): before 12 Nov
 they were not, and on production a drafting stage asked the user to attach "the existing proposal draft"
-that was two stages further on in the same project. On the first production run it said "Your draft is carried in" for a chapters
+that was two stages further on in the same project. The setup and the designer are shown only the
+first 4,000 characters of the draft at the switch; until 12 Nov nothing said so, and the setup wrote "it
+stops partway through Day 4, so continue from there" into a project's constraints. The brief now says the
+draft is complete and only its opening is shown. Projects switched before that keep the constraint they
+were given, which the user can edit in the project brief. On the first production run it said "Your draft is carried in" for a chapters
 workflow, which was false; the line was corrected the same day.
 
 Not built: shrinking a designed workflow once it is running beyond Go skipping optional stages (L-69), and
