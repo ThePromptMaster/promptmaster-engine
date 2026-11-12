@@ -156,6 +156,20 @@ describe('a length is counted, never judged (12 Nov, an acquisition memo)', () =
     expect(lengthRows([firm], memo).get('i9')?.met).toBe(true);
   });
 
+  it('does not count a length on a round\'s working text, and says so', async () => {
+    const { lengthRows, LENGTH_FOR_LATER } = await import('./deliverable-check');
+    const long = Array.from({ length: 2900 }, (_, i) => `word${i}`).join(' ');
+    const firm = { ...i5, id: 'i9', suggested_change: 'Cut the memo to under 600 words.' };
+    const decided = lengthRows([i5, firm, { ...i5, id: 'i8', suggested_change: 'Drop the status line.' }], long, true);
+    expect([...decided.keys()]).toEqual(['i5', 'i9']);
+    expect(decided.get('i5')).toEqual({ met: true, later: true, line: LENGTH_FOR_LATER });
+    expect(decided.get('i9')).toEqual({ met: true, later: true, line: LENGTH_FOR_LATER });
+    // Nothing is reported for length: the same rows on the document itself would be.
+    const said = { findings: [{ id: 'i5', verdict: 'carried' as const, quote: 'word1 word2', note: '' }], contradictions: [] };
+    expect(issuesFrom(said, [i5, firm], 'the round that ended at Next round', decided)).toEqual([]);
+    expect(issuesFrom(said, [i5, firm], 'Final memo', lengthRows([i5, firm], long))).toHaveLength(2);
+  });
+
   it('leaves a length of a part, and a change with no length, to the check', async () => {
     const { lengthRows } = await import('./deliverable-check');
     expect(lengthRows([{ ...i5, suggested_change: 'Keep each note under 40 words.' }], memo).size).toBe(0);
