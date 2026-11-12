@@ -35,3 +35,37 @@ No migration: the choice reuses `brief_changed`, `finalize` and the facts table.
 | No second question, no re-confirm | By hand on production | One more stop only, the final sign-off; the run ended "Objective met." with no re-confirm line |
 | A sign-off with no options is the button it was | By hand on production, twice | "Approve and resume", no options, no box |
 | The designer's wording | By hand on production: a new project from the A-or-B brief | The approval read "I choose the recovery option." and the card listed Option A and Option B with their figures |
+| A typed decision, and two fast presses | By hand on production: "Option B, and customer service phones East…" typed, the button double-clicked | One fact, one `finalize` row, no answer recorded twice; the run carried on and finished "Objective met." |
+| The stages before a decision are left alone | Database read on that run | The change check named one earlier stage and left it (`left_to_go`); nothing before the decision was reopened |
+
+**Found in the pass, and fixed the same day:**
+
+- The first run reopened the three stages written before the decision and reworked them, about a dollar of model calls (#660).
+- The pinned copy of the stop still read "Approve and resume" beside a card of options, and ticked the approval bare (#663).
+- A final sign-off on "this decision package" was offered a box for what was decided; and a decision made a second time would have left two decision facts current (#664).
+
+Not run by hand: choosing from the stage's own checklist without Go (the only decision stage left unticked already recorded its decision, so it rightly showed a plain box; component test only until the next pass), and the pinned bar on an iPad-width screen.
+
+## 2. An answer closes what it answers (#659, L-236)
+
+| Change | Where |
+|---|---|
+| A row gains `settled_by` with the words that settle it; its status stays what the user chose; a settled or superseded row is not carried forward as unmet | `lib/workflow/settled-rows.ts`, `stage-artifact.ts` (`carriedRows`) |
+| Each open finding is read against the user's own note, facts and decisions; settled only with words found there | `promptmaster/settled_items.py`, `POST /api/agent/settles` |
+| Read when the user saves a note on a deferred row, and by Go before it repairs or stops for a carried row | `workflow-workspace.tsx` (`readOwnNotes`), `use-go-loop.ts`, `lib/agent/settle.ts` |
+| The note becomes a fact; a version that only settles rows reopens nothing | `answers.ts` (`rowAnswerAsFact`), `settled-rows.ts` (`onlySettles`) |
+| The stop on one carried row shows its note, an answer box, and "It is settled: carry on" | `needs.ts`, `needs-you-card.tsx` |
+
+| Check | How | Result |
+|---|---|---|
+| The client's own row and notes | Real model, local script, 3 runs each | 20 of 21: his first note settled it 3 of 3; his reworded note 2 of 3; two postponements, a work defect and unrelated facts never; an answer recorded as a fact 3 of 3 |
+| The stop he saw, reproduced | By hand on production, old build: the training brief on a test account, the finding deferred with his note. **Forced:** the check on that copy raised no such finding by itself, so one model reply was altered in the page to include it; everything after was real | Go repaired the brief twice for the row and stopped asking for a steer (`media/nov12/03-deferred-finding-stops-before.jpg`) |
+| Resume after the deploy settles it | By hand on production, same project | A step "Close what your answer settled"; the row kept Deferred and gained `settled_by` "There are no additional absences to account for."; saved as `agent_triage`; no stage reopened by that version; the run went on (`media/nov12/05-settled-by-your-answer.jpg`) |
+| "Keep it open instead" | By hand on production | The row was open work again, and neither a save nor an earlier fact closed it a second time |
+| A note that only postpones | By hand on production: "Will confirm with HR next week." | Not settled on save |
+| A note that answers | By hand on production | Settled on save, with "Keep it open instead" beside it; the note recorded as a fact (`media/nov12/06-note-saved-settles-keep-open.jpg`) |
+| The stop on an open carried row | By hand on production, under "Ask me" | The row, "Your note on c13: …", an answer box and three buttons (`media/nov12/07-stop-card-settle-from-here.jpg`); "It is settled: carry on" with a typed answer recorded the fact, settled the row by it, and the change check reopened the brief that had relied on the open question; the run finished "Objective met." |
+
+**Seen in the pass, and left as it is:** after an answer was on record as a fact, a later note that only postponed was settled by that earlier fact. The record did say there were no absences; "Keep it open instead" overrode it. It is noted in L-236.
+
+Not run by hand: "Have Go work on it again" and "Stop here" on the new card (they are the buttons the stop had before, renamed), and Go leaving a readable row alone under "Ask me" (the row in that run had been kept open, which no policy reads; the policy branch is in code only).
