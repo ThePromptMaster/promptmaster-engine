@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { decisionAsFact } from './answers';
 import { approvalsGiven, approvalsOnEarlierVersion, chosenFor } from './approvals';
 import { answeredOnStages } from './brief-change';
-import { asksForDecision, decisionTargets, decisionText, offerKey, recordDecisionReason } from './decision-options';
+import { asksForDecision, decisionTargets, decisionText, givenByChoosing, offerKey, recordDecisionReason } from './decision-options';
 import type { StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
 import type { ProjectFact } from '@/types/project';
@@ -139,5 +139,16 @@ describe('the approval carries its choice', () => {
   it('a plain sign-off on an earlier version is still said, as before', () => {
     const moved = bundles([version('v1', 1, AWAITING)], [version('f1', 1, 'Final.'), version('f2', 2, 'Final, revised.', 'agent_revise')]);
     expect(approvalsOnEarlierVersion(project, template, moved).map((a) => a.stageId)).toEqual(['final']);
+  });
+});
+
+describe('an approval given by choosing is never offered as a bare tick (12 Nov, production pass)', () => {
+  // The pinned copy of Go's stop still read "Approve and resume" beside a card that listed Option A and Option B.
+  it('is so while its options are shown or still being read, and not otherwise', () => {
+    expect(givenByChoosing({ loading: false, question: '', options: [{ label: 'Option A', quote: 'q' }, { label: 'Option B', quote: 'q' }] })).toBe(true);
+    expect(givenByChoosing({ loading: true, question: '', options: [] })).toBe(true);
+    expect(givenByChoosing({ loading: false, question: '', options: [] })).toBe(false);
+    expect(givenByChoosing(null)).toBe(false);
+    expect(givenByChoosing(undefined)).toBe(false);
   });
 });

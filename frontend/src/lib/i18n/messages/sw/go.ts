@@ -168,6 +168,7 @@ export const sw: Record<keyof typeof en, string> = {
   'nyc.somethingElse': 'Au sema unachoamua badala yake',
   'nyc.decideResume': 'Rekodi uamuzi wangu na uendelee',
   'nyc.sayDecision': 'Unachoamua (si lazima). Kinarekodiwa pamoja na idhini yako.',
+  'nyc.chooseOnCard': 'Chagua chaguo',
   'nyc.thenResume': 'Kisha bonyeza Endelea tena.',
   'gt.label': 'Go inaruhusiwa kufanya nini',
   'gt.auto': 'Go inapitia hatua na kusimama inapokuhitaji. Kumaliza mradi daima ni kubofya kwako.',
