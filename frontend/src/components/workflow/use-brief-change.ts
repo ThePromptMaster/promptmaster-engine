@@ -119,7 +119,7 @@ export function useBriefChange({
             // An answer given to Go is judged against every finished stage, and
             // the stage it was given on is then left to Go, which acts on it
             // there (4 Nov).
-            const { affected, left } = leftToGo(impact.affected, field === 'facts' ? answeredOnStages(before, p.facts) : null);
+            const { affected, left } = leftToGo(impact.affected, field === 'facts' ? answeredOnStages(before, p.facts, t.stages.map((st) => st.id)) : null);
             // Recorded from a side-chat reply: offered, and nothing reopens until the user says so (5 Nov).
             const onlyOffered = field === 'facts' && onlyFromTheChat(before, p.facts);
             await append({

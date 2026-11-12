@@ -201,8 +201,16 @@ export function settledChange(
  * judge name the stages before it: "make Section 7 a single sentence" reopened
  * Draft proposal and Check, whose repairs reopened Final proposal anyway
  * (16:36, $0.64).
+ *
+ * A decision made on an approval (its fact names the approval, 12 Nov) also
+ * leaves the stages before it alone: they are what the decision was made from.
+ * On production, choosing the $195,000 cap reopened the shortlists written
+ * under the $180,000 cap, the brief comparing the two and the check of both —
+ * each written to inform that decision — and Go set about revising all three.
+ * What the decision changes is written by the stage it was made on and the
+ * stages after it. `order` is the workflow's stages, first to last.
  */
-export function answeredOnStages(before: string, facts: readonly ProjectFact[] | undefined): Set<string> | null {
+export function answeredOnStages(before: string, facts: readonly ProjectFact[] | undefined, order: readonly string[] = []): Set<string> | null {
   const had = new Set(before.split('\n'));
   const added = currentFacts(facts).filter((f) => !had.has(factLine(f)));
   if (!added.length) return null;
@@ -211,6 +219,8 @@ export function answeredOnStages(before: string, facts: readonly ProjectFact[] |
     const ref = f.source_ref ?? {};
     if (ref.via !== 'go answer' || typeof ref.stage_id !== 'string' || !ref.stage_id) return null;
     stages.add(ref.stage_id);
+    const at = typeof ref.criterion_id === 'string' && ref.criterion_id ? order.indexOf(ref.stage_id) : -1;
+    for (const earlier of order.slice(0, Math.max(0, at))) stages.add(earlier);
   }
   return stages;
 }
