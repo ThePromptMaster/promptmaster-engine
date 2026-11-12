@@ -96,6 +96,26 @@ Second pass, by hand on production, after #650 and #651 were deployed (CI green 
 | The corrected panel | "The request asks for 12 chapters, which is long work"; for the chapters workflow, the draft is said not to be carried (`media/nov11/p3-chapters-workflow-says-draft-not-carried.jpg`) |
 | The manual "Take this into the full PromptMaster process" on a concise project | Still there, and works |
 
+## Third pass, 12 November: what had not been seen live, forced
+
+The user asked again whether everything had been verified by hand. Three things had not, and they do not come up on their own, so they were forced in the page on production: the page's own requests were answered or altered in the browser, and everything after that was the real system. Deployed without waiting for CI, by instruction; CI ran last.
+
+| Item | How it was forced | Result |
+|---|---|---|
+| A model's flag on "Move to the next stage" | The planner's real reply had its flag switched on | Go advanced without pausing; the step is recorded with the flag set and succeeded |
+| A routine choice | The planner's reply was replaced with a layout question | The live screen answered `routine_choice`; Go did not stop and listed it as "Question kept for you". The stage was already complete, so the question was set aside and not decided in the text |
+| The note "could not be checked" | The check call was answered with an error | Shown; the draft was left as it was |
+| The note "still open" | The check was made to find an issue twice | Shown, with the corrected point and the one left (`media/nov11/p2-final-check-still-open-forced.jpg`). Seen unforced the same day on a real draft |
+
+Not reached even when forced: Go deciding a routine choice in the text and recording "Chosen by Go". Under Handle the planner is asked only when a stage starts and after it is complete, and in neither state can a stage be revised. That step has a unit test (#654), and the screen's verdict and the "Do whatever is best" path it shares were both seen live.
+
+**Found in this pass, and fixed:**
+
+- After the one-press switch the carried draft sits on the last stage, and the stages before it could not see it. Go stopped under Handle to ask for "the existing proposal draft". Fixed in #653; on a fresh project both earlier stages' writers were handed the draft (9,458 characters), and Go drafted without asking.
+- At the switch the setup and the designer saw the first 4,000 characters of the draft with nothing saying it was cut, and wrote "it stops partway through Day 4, so continue from there" into the project's constraints. Fixed in #655; on a fresh project the constraint read "The draft is finished, so nothing in it needs continuing or filling in."
+
+**Seen in this pass, as designed.** Under Handle a designed workflow can still stop before the end: for major findings on a check stage, which are the user's; and for a routine sign-off that Go's own check refuses after its two rounds of fixes.
+
 ## What was not done
 
 - Sign-offs on projects already running are unchanged (section 2).
