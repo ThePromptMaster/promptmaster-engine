@@ -98,3 +98,40 @@ describe('a question left to Go is decided by the repair', () => {
     expect(recordFacts).not.toHaveBeenCalled();
   });
 });
+
+describe('a routine choice Go settles itself is recorded as its choice (8 Nov)', () => {
+  const ASKED = 'Should the headings in this document be numbered or left unnumbered? Either way keeps all of the content.';
+  function revising() {
+    const { c, saved } = ctx();
+    Object.assign(c, {
+      state: { current_stage_id: 'output', stages: { output: { status: 'in_progress' } } },
+      step: { action_key: 'revise_stage', params: { instruction: `Settle this question yourself rather than asking it: "${ASKED}". DECIDE IT NOW.`, left_to_go: ASKED }, rationale: 'Instead of asking.' },
+    });
+    return { c, saved };
+  }
+
+  it('saves the revision and records "Chosen by Go" with the question it settled', async () => {
+    generateStageArtifact.mockResolvedValue({
+      content: '# 1. Thread\n\nThe argument.\n', note_to_user: 'Chosen: numbered headings. Why: the document is long.',
+      items: [], finish_reason: 'stop', model_used: 'm',
+    });
+    const { c, saved } = revising();
+    const out = await performStep(c);
+    expect(out.status).toBe('succeeded');
+    expect(saved).toHaveLength(1);
+    expect(recordFacts).toHaveBeenCalledTimes(1);
+    const [, facts] = recordFacts.mock.calls[0] as unknown as [unknown, { statement: string; origin: string; source_ref: { delegated: boolean; version_id: string } }[]];
+    expect(facts[0].statement).toContain('Chosen by Go when you left it to Go');
+    expect(facts[0].statement).toContain('numbered headings');
+    expect(facts[0].origin).toBe('model_assumed');
+    expect(facts[0].source_ref).toMatchObject({ delegated: true, version_id: 'v4' });
+  });
+
+  it('an ordinary revision records no choice', async () => {
+    const { c } = revising();
+    (c.step as { params: Record<string, unknown> }).params = { instruction: 'Tighten the opening paragraph.' };
+    await performStep(c);
+    expect(recordFacts).not.toHaveBeenCalled();
+  });
+});
+
