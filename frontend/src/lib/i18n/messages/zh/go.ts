@@ -168,6 +168,7 @@ export const zh: Record<keyof typeof en, string> = {
   'nyc.somethingElse': '或者说明你另外的决定',
   'nyc.decideResume': '记录我的决定并继续',
   'nyc.sayDecision': '你的决定（可选）。它会与你的批准一起记录。',
+  'nyc.chooseOnCard': '选择一个选项',
   'nyc.thenResume': '然后按“继续”。',
   'gt.label': 'Go 可以做什么',
   'gt.auto': 'Go 会推进各阶段，需要你时就停下。完成项目始终需要你亲自点击。',

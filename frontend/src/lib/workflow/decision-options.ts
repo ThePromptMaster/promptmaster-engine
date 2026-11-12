@@ -38,6 +38,15 @@ export interface DecisionTarget {
   versionId: string;
 }
 
+/**
+ * Whether an approval is to be given by choosing: its options are on the card,
+ * or still being read. While that is so, nothing offers a bare tick for it —
+ * not the card's own button, and not the pinned copy of it.
+ */
+export function givenByChoosing(offer: DecisionOffer | null | undefined): boolean {
+  return Boolean(offer && (offer.loading || offer.options.length > 0));
+}
+
 export const offerKey = (t: Pick<DecisionTarget, 'criterionId' | 'versionId'>): string => `${t.criterionId}:${t.versionId}`;
 
 /**
