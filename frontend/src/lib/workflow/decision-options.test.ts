@@ -67,6 +67,8 @@ describe('an approval worded as a decision', () => {
     'I confirm the shortlists and brief are accurate and ready for my decision.',
     'I approve the final shortlists and the decision record.',
     'I accept this decision package as final.',
+    'I approve this decision package for internal use.',
+    'I approve the decision record as written.',
     'I approve this leadership brief.',
   ])('not: %s', (label) => expect(asksForDecision(label)).toBe(false));
 });
