@@ -23,6 +23,8 @@ import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
 import { givenByChoosing, type DecisionOffer } from '@/lib/workflow/decision-options';
+import type { QueueEntry } from '@/lib/agent/user-queue';
+import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
@@ -92,8 +94,14 @@ export function GoPanel({
   stageByEnglish,
   otherWork,
   decisionOffers,
+  queue,
 }: {
   go: ReturnType<typeof useGoLoop>;
+  /**
+   * What else in the project waits on the user, shown under Go's stop so it is
+   * all asked at once (12 Nov). Answering one records it; the stop itself resumes.
+   */
+  queue?: { entries: readonly QueueEntry[]; offers?: Record<string, DecisionOffer>; onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<void> };
   /** The options each waiting reserved approval offers, by criterion id (`useDecisionOptions`). */
   decisionOffers?: Record<string, DecisionOffer>;
   /**
@@ -485,6 +493,9 @@ export function GoPanel({
                   : undefined
               }
             />
+          )}
+          {queue && queue.entries.length > 0 && !go.active && !go.pendingStep && (need || (askingUser && !cleared)) && (
+            <QuestionQueue entries={queue.entries} offers={queue.offers} onAnswer={queue.onAnswer} />
           )}
           {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
             <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">

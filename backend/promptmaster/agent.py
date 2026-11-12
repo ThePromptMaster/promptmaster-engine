@@ -232,6 +232,9 @@ class AgentState(BaseModel):
     latest_change: AgentLatestChange | None = None
     #: Undecided rows on review stages other than this one, with their wording.
     open_findings_elsewhere: list[AgentOpenFinding] = Field(default_factory=list, max_length=12)
+    #: Everything across the project that waits on the user, one line each (12 Nov): reserved
+    #: approvals, findings nobody decided, rows carried forward, questions set aside.
+    waiting_on_user: list[str] = Field(default_factory=list, max_length=8)
     #: Polishing moves on this stage since the user's last direction, when the
     #: run's cap has taken revising away (4 Nov, Sean, Lakeside). 0 when it has not.
     polish_paused: int = Field(default=0, ge=0, le=500)
@@ -548,6 +551,18 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
                 + (f" — suggested change: {f.suggested_change.strip()}" if f.suggested_change.strip() else "")
                 for f in state.open_findings_elsewhere
             )
+        )
+    if state.waiting_on_user:
+        # 12 Nov (a client): "If one answer clears three blockers, Go should ask once, apply the
+        # answer everywhere it matters, and keep going." The planner saw one stage and asked
+        # one question at a time, so each of these came up as its own stop.
+        facts.append(
+            "ALREADY WAITING ON THE USER, ACROSS THE WHOLE PROJECT. The page shows them all of these together "
+            "the next time the run stops, and each answer is recorded as a fact and applied wherever it matters. "
+            "Do not ask any of them again in other words, and do not stop for one while there is work that does "
+            "not depend on it: do that work first. When nothing else can go ahead, choose request_user_decision "
+            "and ask the ONE question whose answer unblocks the most, in a way that settles as many of these as "
+            "it can at once:\n" + "\n".join(f"- {' '.join(line.split())[:300]}" for line in state.waiting_on_user)
         )
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))

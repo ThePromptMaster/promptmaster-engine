@@ -63,6 +63,8 @@ export interface AgentStateDigest {
    * table words them (1 Nov: "I can't see the Check table from this stage").
    */
   open_findings_elsewhere?: { stage_id: string; stage_label: string; id: string; text: string; severity: string; suggested_change: string; proposed: string }[];
+  /** Everything across the project that waits on the user, a line each (`queueLines`, 12 Nov). */
+  waiting_on_user?: string[];
   /**
    * `complete` counts the sections that hold text. `own` is true on the
    * long-form stage that writes the chapters; on a stage after drafting that
@@ -168,6 +170,8 @@ export function buildAgentState(input: {
   steps: readonly AgentStep[];
   /** Per-stage facts (A1): the review counts come from here. */
   context?: StageContext;
+  /** What waits on the user across the whole project, a line each: the planner does not ask these itself. */
+  waitingOnUser?: readonly string[];
   /** The approved outline drafting is bound to, if any. */
   approvedOutline?: readonly OutlineSection[];
   /**
@@ -384,6 +388,7 @@ export function buildAgentState(input: {
     ...(manuscript ? { manuscript } : {}),
     ...(findings ? { findings } : {}),
     ...(elsewhere.length ? { open_findings_elsewhere: elsewhere } : {}),
+    ...(input.waitingOnUser?.length ? { waiting_on_user: input.waitingOnUser.slice(0, 8).map((l) => l.slice(0, 300)) } : {}),
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place], ...(c.does ? { does: c.does } : {}) })) } : {}),
