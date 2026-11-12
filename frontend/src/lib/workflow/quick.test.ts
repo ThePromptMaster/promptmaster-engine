@@ -50,7 +50,16 @@ describe('Quick answer, then the full process (Sean, 26 Oct)', () => {
   it('tells the designer what was asked and what was made', () => {
     const brief = switchBrief('A note to the board', 'Dear board, …');
     expect(brief).toContain('A note to the board');
-    expect(brief).toContain('The answer so far');
+    expect(brief).toContain('A first draft of the whole piece already exists. Build on it:');
+    expect(brief).not.toContain('only its opening fits here');
     expect(switchBrief('Just this', '  ')).toBe('Just this');
+  });
+
+  it('says a long draft is finished when only its opening is shown (12 Nov)', () => {
+    const long = `${'A day of the plan. '.repeat(400)}THE END.`;
+    const brief = switchBrief('An onboarding plan', long);
+    expect(brief).toContain('it is finished; only its opening fits here');
+    expect(brief).toContain('It is complete, not cut off: nothing has to be continued or supplied.');
+    expect(brief).not.toContain('THE END.');
   });
 });

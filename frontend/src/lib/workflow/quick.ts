@@ -23,8 +23,21 @@ const ANSWER_FOR_DESIGN = 4_000;
  * so the workflow fits the work already made rather than the ask alone.
  */
 export function switchBrief(objective: string, answer: string, max = 8_000): string {
-  const so_far = answer.trim() ? `The answer so far (keep building on it):\n${answer.trim().slice(0, ANSWER_FOR_DESIGN)}` : '';
-  return [objective.trim(), so_far].filter(Boolean).join('\n\n').slice(0, max);
+  const draft = answer.trim();
+  // Only the opening of a long draft fits here, and it has to say so. Shown cut
+  // with no word about it, the setup read the draft as unfinished and wrote
+  // "it stops partway through Day 4, so continue from there" into the project's
+  // constraints; every stage after was told to continue a draft that was whole
+  // (12 Nov, production).
+  const cut = draft.length > ANSWER_FOR_DESIGN;
+  const so_far = draft
+    ? `A first draft of the whole piece already exists${cut ? ' (it is finished; only its opening fits here)' : ''}. Build on it:\n` +
+      draft.slice(0, ANSWER_FOR_DESIGN) +
+      (cut ? '\n[The draft goes on from here to its end. It is complete, not cut off: nothing has to be continued or supplied.]' : '')
+    : '';
+  // The note about the cut outranks the last lines of the opening when room is short.
+  const head = objective.trim();
+  return [head, so_far].filter(Boolean).join('\n\n').slice(0, Math.max(max, head.length + so_far.length));
 }
 
 /**
