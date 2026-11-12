@@ -89,6 +89,17 @@ describe('what a chosen option records', () => {
     expect(answeredOnStages('', [saved])).toEqual(new Set(['cap']));
   });
 
+  it('leaves the stages before the decision alone too: they are what it was made from (12 Nov, production)', () => {
+    // Choosing the $195,000 cap reopened the shortlists under $180,000, the brief and the check.
+    const saved = { ...fact, id: 'f1', retired_at: null } as unknown as ProjectFact;
+    expect(answeredOnStages('', [saved], ['shortlists', 'brief', 'check', 'cap', 'final'])).toEqual(new Set(['shortlists', 'brief', 'check', 'cap']));
+  });
+
+  it('an answer to a question of Go\'s still leaves only its own stage', () => {
+    const answer = { id: 'f2', retired_at: null, statement: 'Decided by the user — asked "Shorter?", answered: Yes', kind: 'fact', source_ref: { via: 'go answer', stage_id: 'cap' } } as unknown as ProjectFact;
+    expect(answeredOnStages('', [answer], ['shortlists', 'brief', 'check', 'cap', 'final'])).toEqual(new Set(['cap']));
+  });
+
   it('tells the repair to write the decision in and change nothing else', () => {
     expect(recordDecisionReason('Option A')).toContain('the user has decided: "Option A"');
     expect(recordDecisionReason('Option A')).toContain('Change nothing else');
