@@ -3888,7 +3888,11 @@ trail (`finalize`) and reopens a prose stage so Go writes the decision in; a tab
 The approval stays stamped with the version it was given on. It is not asked for again while every
 version since is Go's own repair, and it is asked for again once the user edits the stage themselves.
 A decision leaves alone the stages before it: they are what it was made from (the first production run
-reopened and reworked three of them, about a dollar, before this was changed the same day). If an earlier
+reopened and reworked three of them, about a dollar, before this was changed the same day). A decision
+made again supersedes the earlier one, which is retired. While an approval's options are shown, the
+pinned copy of the stop reads "Choose an option" and goes to the card; it does not tick the approval.
+"Decision" in an approval's wording is read by a word rule, so an unusual sign-off may get, or miss, the
+optional box for what was decided; the options themselves do not depend on that rule on Go's card. If an earlier
 stage really does need changing after a decision, the user reopens it, or the final check says so.
 
 A second press of Go, Resume or an answer while the first is still being handled is dropped. Before this
@@ -3913,6 +3917,10 @@ user's first note was settled in three of three. His reworded note ("No addition
 confirmed for this baseline") was settled in two of three: it can be read either way, and when it is
 read as open the stop now has the button. A model can still read a note wrongly in the other direction;
 "Keep it open instead" on the row undoes it, and a row kept open is not read again until its note changes.
+A fact outlives the note it came from: on production a row was settled by an answering note, which was
+recorded as a fact, and when the note was later changed to one that only postponed, the row was settled
+again by that earlier fact. The record did say so; "Keep it open instead" overrode it, and taking the fact
+out in the Facts panel would too. At the finish a settled row is named with the answer that settled it.
 A row settled on an undecided or accepted status is not affected: only deferred rows that would block are
 read. A row a later fact superseded (`superseded-rows.ts`) no longer counts as carried forward either.
 
