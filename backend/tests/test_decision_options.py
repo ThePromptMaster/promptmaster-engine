@@ -10,6 +10,7 @@ from deps import get_client
 from main import app
 from promptmaster.decision_options import (
     MAX_OPTIONS, OPTIONS_INSTRUCTION, OPTIONS_MODEL, DecisionOptionsRequest, build_options_prompt, parse_options,
+    plainly_signs_off,
 )
 from promptmaster.mock_llm import _json_reply
 from promptmaster.schemas import PMInput
@@ -52,7 +53,7 @@ def test_prompt_carries_the_approval_the_stage_text_and_the_users_facts():
 
 
 def test_an_option_is_kept_only_with_its_passage_found_in_the_text():
-    out = parse_options({"question": "Raise the cap or keep it?", "options": [
+    out = parse_options({"approval_asks": "choice", "question": "Raise the cap or keep it?", "options": [
         {"label": "Option A: raise the cap to $195,000 for both searches", "quote": "Option A: raise the cap to $195,000 per hire for both searches."},
         {"label": "Option B: keep the $180,000 cap", "quote": "Option B: keep the approved cap of $180,000 per hire."},
         {"label": "Option C: raise it for the Controller search only", "quote": "Option C: raise the cap for the Controller search only."},
@@ -62,7 +63,7 @@ def test_an_option_is_kept_only_with_its_passage_found_in_the_text():
 
 
 def test_one_traceable_option_is_no_choice():
-    out = parse_options({"question": "?", "options": [
+    out = parse_options({"approval_asks": "choice", "question": "?", "options": [
         {"label": "Option A", "quote": "Option A: raise the cap to $195,000 per hire for both searches."},
         {"label": "Something else entirely", "quote": "A passage the stage does not hold at all."},
     ]}, STAGE)
@@ -71,11 +72,65 @@ def test_one_traceable_option_is_no_choice():
 
 def test_the_same_option_twice_is_one_and_there_are_never_more_than_four():
     quote = "Option A: raise the cap to $195,000 per hire for both searches."
-    out = parse_options({"options": [{"label": "Option A", "quote": quote}, {"label": "option a.", "quote": quote}]}, STAGE)
+    out = parse_options({"approval_asks": "choice", "options": [{"label": "Option A", "quote": quote}, {"label": "option a.", "quote": quote}]}, STAGE)
     assert out.options == []
     text = "\n".join(f"Option {n}: do the thing numbered {n} for this plan." for n in "ABCDEF")
-    out = parse_options({"options": [{"label": f"Option {n}", "quote": f"Option {n}: do the thing numbered {n} for this plan."} for n in "ABCDEF"]}, text)
+    out = parse_options({"approval_asks": "choice", "options": [{"label": f"Option {n}", "quote": f"Option {n}: do the thing numbered {n} for this plan."} for n in "ABCDEF"]}, text)
     assert len(out.options) == MAX_OPTIONS
+
+
+PROPOSAL = (
+    "# Proposal: Supervisor Workshop\n\n"
+    "## 4. Options and fees\n\n"
+    "- Option A: Core Workshop. A three-hour workshop with all participant materials for 28 supervisors.\n"
+    "- Option B: Workshop with Preparation and Follow-Up. Option A plus a briefing call, a survey and a follow-up session.\n\n"
+    "The client selects one option by signing the acceptance below.\n"
+)
+_BOTH = [
+    {"label": "Option A: Core Workshop", "quote": "Option A: Core Workshop. A three-hour workshop with all participant materials for 28 supervisors."},
+    {"label": "Option B: Workshop with Preparation and Follow-Up", "quote": "Option B: Workshop with Preparation and Follow-Up."},
+]
+
+
+def test_a_sign_off_is_not_offered_the_options_a_document_gives_its_reader():
+    """12 Nov, production: "I approve this proposal to send to the client" was shown the client's two packages."""
+    out = parse_options({"approval_asks": "sign_off", "question": "Which option does the client choose?", "options": _BOTH}, PROPOSAL)
+    assert out.options == [] and out.question == ""
+    # A reply that does not say the approval asks for a choice is read as a sign-off.
+    assert parse_options({"question": "Which?", "options": _BOTH}, PROPOSAL).options == []
+    assert parse_options({"approval_asks": "Choice", "options": _BOTH}, PROPOSAL).options != []
+
+
+def test_an_english_sign_off_with_no_word_of_choosing_is_never_sent(client_for_app):
+    for plain in [
+        "I approve this proposal to send to the client.",
+        "I approve this brief as an accurate comparison of the two caps.",
+        "I accept this analysis and its provisional recommendation.",
+        "I have reviewed the plan and agree it is ready.",
+    ]:
+        assert plainly_signs_off(plain), plain
+    for asks in [
+        "I approve this decision on the cap.",
+        "I choose Option A or Option B (stating which one).",
+        "I choose the recovery option.",
+        "I accept this decision package as final.",  # worded with "decision": the call reads it, and says sign-off
+        "Elijo la opción de recuperación.",
+    ]:
+        assert not plainly_signs_off(asks), asks
+    http, mock = client_for_app
+    res = http.post("/api/agent/decision-options", json={"inputs": _inputs(), "approval": "I approve this proposal to send to the client.", "stage_label": "Final proposal", "content": PROPOSAL})
+    assert res.status_code == 200 and res.json() == {"question": "", "options": []}
+    assert mock.generate_json.await_count == 0
+
+
+def test_the_prompt_says_whose_choice_it_is_and_names_the_audience():
+    system, user = build_options_prompt(_req(inputs=PMInput(**_inputs(audience="The client commissioning the workshop"))))
+    assert "THE AUDIENCE (who the work is written for): The client commissioning the workshop" in user
+    assert "WHOSE CHOICE IT IS" in system
+    assert "a proposal offers its client two packages" in system
+    assert "They are not the user's decision" in system
+    assert "\"approval_asks\": \"choice\" or \"sign_off\"" in system
+    assert "A sign-off has no options, whatever the text lays out." in system
 
 
 def test_anything_but_an_object_gives_no_options():
@@ -86,7 +141,7 @@ def test_anything_but_an_object_gives_no_options():
 
 def test_the_route_returns_the_traced_options_from_one_small_call(client_for_app):
     http, mock = client_for_app
-    mock.generate_json.return_value = ({"question": "Raise the cap?", "options": [
+    mock.generate_json.return_value = ({"approval_asks": "choice", "question": "Raise the cap?", "options": [
         {"label": "Option A: $195,000 for both searches", "quote": "Option A: raise the cap to $195,000 per hire for both searches."},
         {"label": "Option B: keep $180,000", "quote": "Option B: keep the approved cap of $180,000 per hire."},
     ]}, {})
@@ -100,7 +155,7 @@ def test_the_route_returns_the_traced_options_from_one_small_call(client_for_app
 def test_a_failed_call_or_an_empty_stage_answers_with_none_and_never_an_error(client_for_app):
     http, mock = client_for_app
     mock.generate_json.side_effect = RuntimeError("upstream down")
-    res = http.post("/api/agent/decision-options", json={"inputs": _inputs(), "approval": "I approve this.", "content": STAGE})
+    res = http.post("/api/agent/decision-options", json={"inputs": _inputs(), "approval": "I approve this decision.", "content": STAGE})
     assert res.status_code == 200 and res.json() == {"question": "", "options": []}
     mock.generate_json.reset_mock(side_effect=True)
     res = http.post("/api/agent/decision-options", json={"inputs": _inputs(), "approval": "I approve this.", "content": "  "})
@@ -113,3 +168,8 @@ def test_the_mock_offers_the_options_the_stage_text_names():
     assert [o.label[:8] for o in out.options] == ["Option A", "Option B"]
     system, user = build_options_prompt(_req(content="# Brief\n\nThe brief is complete."))
     assert parse_options(_json_reply(system, user), "# Brief\n\nThe brief is complete.").options == []
+    # A sign-off gets none, whatever its text names.
+    system, user = build_options_prompt(_req(approval="I approve this proposal to send to the client.", content=PROPOSAL))
+    assert parse_options(_json_reply(system, user), PROPOSAL).options == []
+    system, user = build_options_prompt(_req(approval="I approve this stage."))
+    assert parse_options(_json_reply(system, user), STAGE).options == []

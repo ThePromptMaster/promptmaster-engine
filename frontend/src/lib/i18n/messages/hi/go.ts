@@ -220,6 +220,7 @@ export const hi: Record<keyof typeof en, string> = {
   "qq.settled": "यह सुलझ गया है",
   "qq.answerLabel": "आपका उत्तर",
   "qq.answer": "उत्तर दें",
+  "qq.stillOpen": "आपका उत्तर दर्ज हो गया है। इससे यह तय नहीं होता, जो अब भी अपने उत्तर की प्रतीक्षा में है: {list}।",
   "qp.asks": "Go मोड पूछता है",
   "qp.answers": "उत्तर",
   "qp.tick": "टिक करें: “{label}”",

@@ -220,6 +220,7 @@ export const zh: Record<keyof typeof en, string> = {
   'qq.settled': '已解决',
   'qq.answerLabel': '你的回答',
   'qq.answer': '回答',
+  'qq.stillOpen': '你的回答已记录。它没有解决以下事项，这些仍在等待各自的回答：{list}。',
   'qp.asks': 'Go 模式提问',
   'qp.answers': '回答',
   'qp.tick': '勾选：“{label}”',

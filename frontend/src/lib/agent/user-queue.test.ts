@@ -162,4 +162,32 @@ describe('items one answer settles are asked as one question', () => {
     );
     expect([...covered].sort()).toEqual(['k1', 'k3']);
   });
+
+  it('an answer closes only the items the check says it settles (12 Nov, production pass)', async () => {
+    const { answerItems, closedByAnswer, mergeQueue } = await import('./user-queue');
+    const fees = [
+      item({ id: 'carried:check:i1', rowId: 'i1', text: 'Section 4 gives no fees.', note: 'Fees to be agreed next week.' }),
+      item({ id: 'carried:check:i2', rowId: 'i2', text: 'Per session or per head is left open.' }),
+      item({ id: 'kept_question:draft:k1', kind: 'kept_question', stageId: 'draft', stageLabel: 'Draft', stepId: 'k1', text: 'Numbered headings or not?', blocksFinish: false }),
+      item({ id: 'approval:final:c', kind: 'approval', stageId: 'final', stageLabel: 'Final', text: 'I approve this proposal', criterionId: 'c' }),
+    ];
+    const [entry] = mergeQueue(fees.slice(0, 3), [{ ids: fees.slice(0, 3).map((f: { id: string }) => f.id), question: 'What are the fees, and on what basis?', choices: [] }]);
+    // The rows by stage and row, the kept question by its step; the note on a row is not sent.
+    expect(answerItems(entry)).toEqual([
+      { id: 'check::i1', stage: 'Coverage check', text: 'Section 4 gives no fees.', note: '' },
+      { id: 'check::i2', stage: 'Coverage check', text: 'Per session or per head is left open.', note: '' },
+      { id: 'kept::k1', stage: 'Draft', text: 'Numbered headings or not?', note: '' },
+    ]);
+    expect(answerItems({ items: [fees[3]] })).toEqual([]);
+    // "Fixed fee per session, figures to follow" answers the basis and not the fees.
+    const part = closedByAnswer(entry, [{ id: 'check::i2', by: 'f1', quote: 'Fixed fee per session' }], 'f1');
+    expect(part.closed.map((i) => i.rowId)).toEqual(['i2']);
+    expect(part.open.map((i) => i.rowId ?? i.stepId)).toEqual(['i1', 'k1']);
+    // A verdict that names another statement, quotes nothing, or names nothing sent closes nothing.
+    const none = closedByAnswer(entry, [{ id: 'check::i1', by: 'note', quote: 'Fees to be agreed' }, { id: 'check::i2', by: 'f1', quote: ' ' }, { id: 'check::i9', by: 'f1', quote: 'x' }], 'f1');
+    expect(none.closed).toEqual([]);
+    // The check could not run: the answer is recorded, and nothing is closed.
+    expect(closedByAnswer(entry, null, 'f1').open).toHaveLength(3);
+    expect(closedByAnswer(entry, [{ id: 'check::i1', by: 'f1', quote: 'a' }, { id: 'check::i2', by: 'f1', quote: 'b' }, { id: 'kept::k1', by: 'f1', quote: 'c' }], 'f1').open).toEqual([]);
+  });
 });

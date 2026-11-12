@@ -41,7 +41,9 @@ GROUPS_INSTRUCTION = (
     "- question: the one question to ask, in the user's terms, in at most two sentences. Say what is at "
     "stake, not which document raised it. Do not answer it and do not recommend an answer\n"
     "- choices: two to four short answers the user might give, in their voice, when the question has "
-    "natural ones; otherwise an empty list\n\n"
+    "natural ones; otherwise an empty list. Every choice must answer the question in full. Never offer a "
+    "choice that puts it off or leaves part of it for later (\"I'll confirm next week\", \"figures to "
+    "follow\"): the user can always leave it unanswered, and a button that settles nothing reads as an answer\n\n"
     "Return JSON only: {\"groups\": [{\"ids\": [\"...\"], \"question\": \"...\", \"choices\": [\"...\"]}]}. "
     "Return an empty list when nothing belongs together."
 )
