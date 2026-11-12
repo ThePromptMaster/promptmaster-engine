@@ -487,7 +487,7 @@ export interface StageContext {
   /** The same rows with their ids and the note recorded on each (`carriedRows`, 12 Nov). */
   carriedRows?: Record<string, import('./settled-rows').CarriedRow[]>;
   /** Per review stage id: deferred rows that do not block, with why each was deferred (`deferredNotBlocking`). */
-  deferred?: Record<string, { row: string; reason: string }[]>;
+  deferred?: Record<string, { row: string; reason: string; settled?: string }[]>;
   /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */
   openUnmet?: Record<string, number>;
   /**

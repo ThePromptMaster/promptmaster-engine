@@ -159,7 +159,7 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
-import { approvalsOnEarlierVersion, chosenFor, withApprovals } from '@/lib/workflow/approvals';
+import { approvalsOnEarlierVersion, chosenFor, earlierDecision, withApprovals } from '@/lib/workflow/approvals';
 import { asksForDecision, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
 import { decisionAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
 import { useDecisionOptions } from './agent/use-decision-options';
@@ -1742,7 +1742,10 @@ export function WorkflowWorkspace({
       const fact = decisionAsFact(criterion.label, target.short_label || target.label, text, {
         criterion_id: criterionId, stage_id: onStageId, version_id: head?.id ?? null, run_id: goRunId,
       });
-      if (fact) await recordFacts(project, [fact]);
+      // Decided again: the new decision replaces the earlier one, which is retired, not kept beside it.
+      const earlier = earlierDecision(project.facts, criterionId);
+      if (fact && earlier) await supersedeFact(project, earlier, fact.statement, fact.source_ref ?? {}, 'user_edit');
+      else if (fact) await recordFacts(project, [fact]);
       await handleToggleManual(criterionId, true, `Decided: ${text}`, onStageId);
       if (target.renderer === 'prose' && head) {
         await appendEvent({

@@ -2380,7 +2380,9 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
 export function deferredNote(ctx: Pick<PerformContext, 'context' | 'template'>): string {
   const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
   const rows = Object.entries(ctx.context.deferred ?? {}).flatMap(([id, rs]) =>
-    rs.map((r) => `${label(id)}: "${r.row}"${r.reason ? ` — deferred because ${r.reason.replace(/[.\s]+$/, '')}` : ''}`)
+    rs.map((r) => `${label(id)}: "${r.row}"${
+      r.settled ? ` — settled by your answer: "${r.settled.replace(/[.\s]+$/, '')}"` : r.reason ? ` — deferred because ${r.reason.replace(/[.\s]+$/, '')}` : ''
+    }`)
   );
   if (!rows.length) return '';
   return ` Deferred, not blocking (none says a requirement is unmet): ${rows.slice(0, 8).join('; ')}${rows.length > 8 ? `; and ${rows.length - 8} more` : ''}.`;

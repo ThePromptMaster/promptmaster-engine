@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { decisionAsFact } from './answers';
-import { approvalsGiven, approvalsOnEarlierVersion, chosenFor } from './approvals';
+import { approvalsGiven, approvalsOnEarlierVersion, chosenFor, earlierDecision } from './approvals';
 import { answeredOnStages } from './brief-change';
 import { asksForDecision, decisionTargets, decisionText, givenByChoosing, offerKey, recordDecisionReason } from './decision-options';
 import type { StageArtifactBundle } from './digest';
@@ -67,6 +67,8 @@ describe('an approval worded as a decision', () => {
     'I confirm the shortlists and brief are accurate and ready for my decision.',
     'I approve the final shortlists and the decision record.',
     'I accept this decision package as final.',
+    'I approve this decision package for internal use.',
+    'I approve the decision record as written.',
     'I approve this leadership brief.',
   ])('not: %s', (label) => expect(asksForDecision(label)).toBe(false));
 });
@@ -150,5 +152,20 @@ describe('an approval given by choosing is never offered as a bare tick (12 Nov,
     expect(givenByChoosing({ loading: false, question: '', options: [] })).toBe(false);
     expect(givenByChoosing(null)).toBe(false);
     expect(givenByChoosing(undefined)).toBe(false);
+  });
+});
+
+describe('a decision made again replaces the earlier one', () => {
+  const facts = [
+    { id: 'a', source_ref: { criterion_id: 'cap.approved', choice: 'Option A' }, retired_at: '2026-11-12T10:00:00Z' },
+    { id: 'b', source_ref: { criterion_id: 'cap.approved', choice: 'Option B' }, retired_at: null },
+    { id: 'c', source_ref: { criterion_id: 'final.approved', choice: 'x' }, retired_at: null },
+    { id: 'd', source_ref: { via: 'front door' }, retired_at: null },
+  ] as unknown as ProjectFact[];
+
+  it('finds the current decision fact for that approval, and none for another', () => {
+    expect((earlierDecision(facts, 'cap.approved') as ProjectFact).id).toBe('b');
+    expect(earlierDecision(facts, 'brief.approved')).toBeNull();
+    expect(earlierDecision(undefined, 'cap.approved')).toBeNull();
   });
 });

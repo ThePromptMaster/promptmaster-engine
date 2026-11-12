@@ -55,8 +55,10 @@ export const offerKey = (t: Pick<DecisionTarget, 'criterionId' | 'versionId'>): 
  * the text, it still gets a place to say what was decided.
  */
 export function asksForDecision(label: string): boolean {
-  // "ready for my decision" and "the decision record" are sign-offs on other work, not the decision.
-  return /\b(?:choose|chosen|choice|select|decide|which one|options?)\b|\b(?:this|the|my) decision (?:on|about|to|whether|between|is)\b|\bapprove (?:this|the|my) decision\b/i.test(label);
+  // "ready for my decision", "the decision record" and "this decision package"
+  // are sign-offs on other work, not the decision (the last was offered a box
+  // on a final sign-off, 12 Nov, production pass).
+  return /\b(?:choose|chosen|choice|select|decide|which one|options?)\b|\b(?:this|the|my) decision (?:on|about|to|whether|between|is)\b|\bapprove (?:this|the|my) decision\b(?!\s+(?:package|pack|record|log|memo|brief|document|report|paper|file)\b)/i.test(label);
 }
 
 /**
