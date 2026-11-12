@@ -37,6 +37,20 @@ export function chosenFor(facts: readonly Pick<ProjectFact, 'source_ref' | 'reti
   return out;
 }
 
+/**
+ * The fact that records the decision already made on an approval, if one is
+ * current. A decision made again replaces it: two current facts saying "Option
+ * B" and "Option A" for the same approval would both reach every prompt.
+ */
+export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'retired_at'>>(facts: readonly F[] | null | undefined, criterionId: string): F | null {
+  let found: F | null = null;
+  for (const f of facts ?? []) {
+    if (f.retired_at) continue;
+    if ((f.source_ref as { criterion_id?: unknown } | null | undefined)?.criterion_id === criterionId) found = f;
+  }
+  return found;
+}
+
 export function approvalsGiven(
   project: Pick<Project, 'manual_checks' | 'manual_check_versions' | 'facts'>,
   template: Pick<WorkflowTemplate, 'stages'>,
