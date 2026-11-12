@@ -37,6 +37,16 @@ describe('the run account (Q3c; Sean, 9 Oct: "a short account of what it did, wh
     expect(runAccount(run('completed'), other, label)?.setAside).toHaveLength(1);
   });
 
+  it('a question set aside at several steps is listed once (12 Nov, production)', () => {
+    const asked = 'Should I make one more edit to the final proposal to delete the duplicate line?';
+    const thrice = [1, 2, 3].map(() => step('recheck_stage', { params: { set_aside_question: asked } }));
+    const another = step('advance_stage', { params: { set_aside_question: 'Numbered headings or not?' } });
+    expect(runAccount(run('awaiting_decision'), [...thrice, another], label)?.setAside).toEqual([
+      `Question kept for you: ${asked}`,
+      'Question kept for you: Numbered headings or not?',
+    ]);
+  });
+
   it('a window used up is a resource pause, not a problem', () => {
     const a = runAccount(run('budget_exhausted'), steps, label)!;
     expect(a.kind).toBe('window');
