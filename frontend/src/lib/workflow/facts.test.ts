@@ -90,3 +90,36 @@ describe('what the brief drafter assumed (S2b)', () => {
       .toBe('from your conversation, assumed by PromptMaster (you did not say it)');
   });
 });
+
+describe('a decision made again changes no value (12 Nov, production pass)', () => {
+  const A = 'Decided by the user — on "I choose the recovery option" (Choice): Option A: take the carrier\'s 20 units for $2,400, keep all deadlines, $1,400 over the cap';
+  const PENDING = 'Not yet decided by the user — on "I choose the recovery option" (Choice): awaiting the user\'s choice between Option A (take the carrier\'s 20 units for $2,400, keep all deadlines, $1,400 over the cap) and Option B (no added spend)';
+  const B = 'Decided by the user — on "I choose the recovery option" (Choice): Option B: no added spend, East moves to end of Wednesday and West to end of Thursday';
+  const decided = { via: 'go answer', criterion_id: 'choice.approved', stage_id: 'choice' };
+  const retired = { retired_at: '2026-11-12T19:05:46Z', retired_reason: 'superseded' };
+
+  it('the carrier quote in the option not chosen is not a value to remove', async () => {
+    const { replacedValues } = await import('./superseded-rows');
+    // A, then the text from before it restored ("not yet decided"), then B: the run that failed on "$2,400".
+    const chain = [
+      fact({ id: 'a', statement: A, source_ref: { ...decided, choice: 'Option A' }, ...retired }),
+      fact({ id: 'n', statement: PENDING, supersedes: 'a', source_ref: { via: 'revision' }, ...retired }),
+      fact({ id: 'b', statement: B, supersedes: 'n', source_ref: { ...decided, choice: 'Option B' } }),
+    ];
+    expect(supersededFactValues(chain)).toEqual([]);
+    expect(replacedValues(chain)).toEqual([]);
+    // A straight to B, and the stand-in while it is current.
+    const direct = [chain[0], fact({ id: 'b', statement: B, supersedes: 'a', source_ref: { ...decided, choice: 'Option B' } })];
+    expect(supersededFactValues(direct)).toEqual([]);
+    expect(replacedValues(direct)).toEqual([]);
+    const pending = [chain[0], fact({ id: 'n', statement: PENDING, supersedes: 'a', source_ref: { via: 'revision' } })];
+    expect(supersededFactValues(pending)).toEqual([]);
+  });
+
+  it('an ordinary fact that replaces another still names what it made untrue', () => {
+    const was = fact({ id: 'q1', statement: 'The carrier quoted $2,400 for 20 extra units.', ...retired });
+    const now = fact({ id: 'q2', statement: 'The carrier quoted $2,900 for 20 extra units.', supersedes: 'q1' });
+    expect(supersededFactValues([was, now]).map((v) => v.value)).toEqual(['2400']);
+  });
+});
+

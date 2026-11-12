@@ -105,6 +105,27 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
 }
 
 /**
+ * A decision made on an approval, or the fact standing where one stood (12
+ * Nov). Its wording describes options: "Option A: take the carrier's 20 units
+ * for $2,400…". Choosing B instead does not make the carrier's quote untrue,
+ * and every stage rightly goes on stating it. When a decision made again began
+ * to supersede the earlier one, the figures of the option not chosen were
+ * read as values a repair must remove: on production the repairs of two
+ * stages failed on "$2,400" and the run ended failed. Whether a text follows
+ * the new decision is read from the text, not from its figures.
+ */
+export function replacesADecision(f: Pick<ProjectFact, 'source_ref' | 'supersedes'>, byId: ReadonlyMap<string, Pick<ProjectFact, 'source_ref' | 'supersedes'>>): boolean {
+  const decides = (x: Pick<ProjectFact, 'source_ref'> | undefined) => typeof (x?.source_ref as { criterion_id?: unknown } | null | undefined)?.criterion_id === 'string';
+  if (decides(f)) return true;
+  let earlier = f.supersedes ? byId.get(f.supersedes) : undefined;
+  for (let hops = 0; earlier && hops < 20; hops += 1) {
+    if (decides(earlier)) return true;
+    earlier = earlier.supersedes ? byId.get(earlier.supersedes) : undefined;
+  }
+  return false;
+}
+
+/**
  * The values the user's fact changes made untrue: for each current fact that
  * superseded another, what the old one stated that the new one does not.
  * A repair must not leave any of these in place (D2, 8 Oct).
@@ -119,6 +140,8 @@ export function supersededFactValues(facts: readonly ProjectFact[] | undefined):
   // What each fact states now: not the earlier value it names as replaced.
   const live = current.map((f) => factValues(replacedClause(f.statement)?.now ?? f.statement));
   return current.flatMap((f) => {
+    // A choice between options changes no value: the other option's figures are still true.
+    if (replacesADecision(f, byId)) return [];
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
     if (old) return supersededValues(old.statement, f.statement);
     // "…to $27 million, superseding the earlier $30 million": the brief's
