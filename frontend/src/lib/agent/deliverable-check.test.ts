@@ -44,7 +44,7 @@ describe('what the check finds becomes unmet work', () => {
       'Final memo'
     );
     expect(issues).toEqual([
-      'Accepted finding i4 (Check) is not carried into Final memo: Setup recovery is confused with break-even. — accepted change: Separate the two. — the text still says "adopt B on a continuing basis"',
+      'Accepted change i4 (Check) is not carried into Final memo: Separate the two. (what the check had found in the text it read: "Setup recovery is confused with break-even.") — the text still says "adopt B on a continuing basis"',
       'Final memo contradicts itself: "adopt B at $8,000 a month" against "does not recover the setup" — The rule ignores the setup cost. Fix: Raise the threshold.',
     ]);
   });
@@ -129,5 +129,60 @@ describe("a manuscript's own later reviews reach the check (5 Nov)", () => {
 
   it('without the state, as before', () => {
     expect(acceptedRowsBefore(BOOK_V1, bundles, 'drafting')).toEqual([]);
+  });
+});
+
+describe('a length is counted, never judged (12 Nov, an acquisition memo)', () => {
+  const memo = `# Screening memo\n\n${Array.from({ length: 470 }, (_, i) => `word${i}`).join(' ')}`;
+  const i5 = {
+    id: 'i5', stage_label: 'Check',
+    finding: 'The memo states no word count. Estimate, by hand reading only and not counted by a tool: the body runs to roughly 560–600 words.',
+    suggested_change: 'Trim before the final memo, aiming for about 500 words. Shorten each "What the answer would change" note to one sentence. Then state the word count, labelled as an estimate.',
+  };
+
+  it('decides a change that asks for a whole-text length by counting the text', async () => {
+    const { lengthRows } = await import('./deliverable-check');
+    const decided = lengthRows([i5, { id: 'i7', stage_label: 'Check', finding: 'LaTeX in the calculation.', suggested_change: 'Replace the LaTeX with plain lines.' }], memo);
+    expect([...decided.keys()]).toEqual(['i5']);
+    expect(decided.get('i5')).toEqual({ met: true, line: 'met: 470 words, counted in code, against about 500 words' });
+  });
+
+  it('says so when the text is over, with the count', async () => {
+    const { lengthRows } = await import('./deliverable-check');
+    const long = Array.from({ length: 640 }, (_, i) => `word${i}`).join(' ');
+    expect(lengthRows([i5], long).get('i5')).toEqual({ met: false, line: 'NOT met: 640 words, counted in code, against about 500 words' });
+    const firm = { ...i5, id: 'i9', suggested_change: 'Cut the memo to under 600 words.' };
+    expect(lengthRows([firm], long).get('i9')?.met).toBe(false);
+    expect(lengthRows([firm], memo).get('i9')?.met).toBe(true);
+  });
+
+  it('leaves a length of a part, and a change with no length, to the check', async () => {
+    const { lengthRows } = await import('./deliverable-check');
+    expect(lengthRows([{ ...i5, suggested_change: 'Keep each note under 40 words.' }], memo).size).toBe(0);
+    expect(lengthRows([{ ...i5, suggested_change: 'Drop the status line.' }], memo).size).toBe(0);
+    expect(lengthRows([i5], '   ').size).toBe(0);
+  });
+
+  it('a not-carried verdict with nothing to show for it is not an issue', () => {
+    expect(issuesFrom({ findings: [{ id: 'i5', verdict: 'not_carried', quote: '', note: '' }], contradictions: [] }, [i5], 'Final memo')).toEqual([]);
+  });
+
+  it('leads with the accepted change and what is missing, the finding kept as history, and the count beside it', async () => {
+    const { lengthRows } = await import('./deliverable-check');
+    const [line] = issuesFrom(
+      { findings: [{ id: 'i5', verdict: 'not_carried', quote: '', note: 'two notes still run to three sentences' }], contradictions: [] },
+      [i5], 'Final memo', lengthRows([i5], memo)
+    );
+    expect(line.startsWith('Accepted change i5 (Check) is not carried into Final memo: Trim before the final memo, aiming for about 500 words.')).toBe(true);
+    expect(line).toContain('(what the check had found in the text it read: "The memo states no word count.');
+    expect(line).toContain('— still missing: two notes still run to three sentences');
+    expect(line).toContain('— its length is met: 470 words, counted in code, against about 500 words');
+  });
+
+  it('a length the count says is not met is reported even when the model said nothing of it', async () => {
+    const { lengthRows } = await import('./deliverable-check');
+    const long = Array.from({ length: 640 }, (_, i) => `word${i}`).join(' ');
+    const issues = issuesFrom({ findings: [{ id: 'i5', verdict: 'carried', quote: 'word1 word2', note: '' }], contradictions: [] }, [i5], 'Final memo', lengthRows([i5], long));
+    expect(issues).toEqual([expect.stringContaining('its length is NOT met: 640 words, counted in code, against about 500 words')]);
   });
 });

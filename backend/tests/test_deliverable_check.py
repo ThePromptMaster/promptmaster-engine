@@ -244,3 +244,31 @@ def test_a_conflict_may_quote_the_brief():
     assert len(parse(raw, inputs, MEMO, []).contradictions) == 1
     # A quote from nothing supplied is still dropped.
     assert parse(raw, INPUTS.model_copy(update={"constraints": ""}), MEMO, []).contradictions == []
+
+
+def test_length_is_codes_to_judge_and_a_bare_not_carried_is_not_a_finding():
+    # 12 Nov (an acquisition memo): "state the word count, labelled as an estimate" was called
+    # not carried three times on a memo that had been trimmed, and Go stopped on it.
+    from promptmaster.deliverable_check import AcceptedFinding, build_prompt, parse
+    from promptmaster.measured import MeasuredLine
+    from promptmaster.schemas import PMInput
+
+    inputs = PMInput(objective="A screening memo.", constraints="Keep the memo under 600 words.", mode="analyst")
+    findings = [
+        AcceptedFinding(id="i5", stage_label="Check", finding="The memo states no word count.", suggested_change="Trim, aiming for about 500 words. Then state the word count.", length_decided="met: 473 words, counted in code, against about 500 words"),
+        AcceptedFinding(id="i7", stage_label="Check", finding="LaTeX in the calculation.", suggested_change="Replace the LaTeX with plain lines."),
+    ]
+    content = "# Memo\n\nAdjusted EBITDA = $3.5m − $0.6m = $2.9m. The screen fails on customer concentration."
+    system, user = build_prompt(inputs, "Final memo", content, findings, measured=[MeasuredLine(label="Final memo — length", value="473 words", met=None, info=True)])
+    assert "LENGTH DECIDED IN CODE: met: 473 words, counted in code, against about 500 words" in user
+    assert "MEASURED IN CODE ON THE DELIVERABLE" in user
+    assert "- Final memo — length: 473 words (counted in code)" in user
+    assert "Length is never yours to judge" in system
+    assert 'state, add or estimate its own word count is "not_applicable"' in system
+    assert 'Never answer "not_carried" without saying what the text lacks' in system
+
+    out = parse({"findings": [
+        {"id": "i5", "verdict": "not_carried", "quote": "", "note": ""},
+        {"id": "i7", "verdict": "not_carried", "quote": "", "note": "the LaTeX block is still there"},
+    ]}, inputs, content, findings)
+    assert [(f.id, f.verdict) for f in out.findings] == [("i7", "not_carried")]

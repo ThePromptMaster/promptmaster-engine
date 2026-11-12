@@ -34,7 +34,7 @@ from .limits import whole_document_block
 from .work_form import FICTION_CHECK_RULE, FICTION_CLAIMS_RULE, form_of
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
-from .measured import MeasuredLine, measured_block
+from .measured import MeasuredLine, counted_words, is_hand_count, measured_block
 from .schemas import (
     format_data_files,
     GenerateStageArtifactResponse,
@@ -814,6 +814,12 @@ async def generate_stage_artifact(
                 raise
             return GenerateStageArtifactResponse(items=[], finish_reason="error")
         items = _parse_items(result, item_schema)
+        # 12 Nov: a check row estimated "roughly 560-600 words, by hand reading only" beside a
+        # text code had counted, and asked the memo to state its word count. The count is on
+        # the page; an estimate beside it can only disagree with it.
+        if stage.renderer == "review" and counted_words(measured):
+            first = next((f.key for f in (item_schema.fields if item_schema else []) if f.key != "severity"), "finding")
+            items = [i for i in items if not is_hand_count(str(i.model_dump().get(first) or ""))]
         if stage.renderer == "review":
             # A check row saying something is missing, when the saved documents
             # hold the words it quotes, is wrong (A1, 8 Oct: TeamNotes).

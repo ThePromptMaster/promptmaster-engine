@@ -71,3 +71,39 @@ describe('a check is given the count code made, and a limit it could not count i
     expect(countWords(noted)).toBe(countWords(memo));
   });
 });
+
+describe('every text a check reads is counted, limit or not (12 Nov, an acquisition memo)', () => {
+  // The limit named the final memo, the check read the draft: with no count it
+  // estimated "roughly 560–600 words, by hand reading only".
+  const screening = stage('draft_memo_and_questions', 'Draft memo and diligence questions');
+  const recommendation = stage('recommendation', 'Recurring revenue and recommendation');
+  const check = stage('check_the_memo', 'Check the memo', 'review');
+  const t = { key: 'custom_y', stages: [recommendation, screening, check, stage('final_screening_memo', 'Final screening memo')] } as unknown as WorkflowTemplate;
+  const p = { objective: 'Prepare a concise acquisition-screening note.', constraints: 'Use only the facts supplied.', output_format: '' };
+  const bundles = {
+    recommendation: { versions: [{ content: Array.from({ length: 120 }, () => 'word').join(' ') }] },
+    draft_memo_and_questions: { versions: [{ content: `# Memo\n\n${Array.from({ length: 588 }, () => 'word').join(' ')}` }] },
+  } as never;
+
+  it('gives the check a plain count of each written stage before it', async () => {
+    const { checkedCounts } = await import('./stage-requests');
+    expect(checkedCounts(p as never, t, bundles, check)).toEqual([
+      { label: 'Recurring revenue and recommendation — length', value: '120 words', met: null, info: true },
+      { label: 'Draft memo and diligence questions — length', value: '588 words', met: null, info: true },
+    ]);
+  });
+
+  it('adds none where a limit was already counted on that text, or the stage is empty', async () => {
+    const { checkedCounts } = await import('./stage-requests');
+    const lines = checkedCounts(project as never, template, { draft_decision_memo: { versions: [{ content: memo }] } } as never, template.stages[1]);
+    expect(lines.some((l) => l.info)).toBe(false);
+    expect(lines.some((l) => l.met !== null && /words/.test(l.value))).toBe(true);
+    expect(checkedCounts(p as never, t, {} as never, check)).toEqual([]);
+  });
+
+  it('a plain count is enough for a finding that only estimates the length to be dropped', () => {
+    const response = { evaluation: { findings: [{ summary: 'The body runs to roughly 560–600 words, by hand reading only.' }, { summary: 'The table omits the threshold.' }] } } as unknown as EvaluateStageArtifactResponse;
+    const kept = withoutHandCounts(response, [{ label: 'Draft memo — length', value: '588 words', met: null, info: true }]);
+    expect(kept.evaluation.findings?.map((f) => f.summary)).toEqual(['The table omits the threshold.']);
+  });
+});

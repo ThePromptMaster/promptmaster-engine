@@ -86,3 +86,44 @@ def test_the_routes_carry_the_counts():
         assert FINDINGS_TABLE_RULE in prompt and "487 words — met" in prompt
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_plain_count_is_told_as_counted_and_a_check_never_asks_the_text_to_state_one():
+    # 12 Nov (an acquisition memo): with no count to go on, a check estimated the
+    # draft "by hand reading only" and asked the memo to "state the word count,
+    # labelled as an estimate".
+    from promptmaster.measured import MeasuredLine, counted_words, is_hand_count, measured_block
+    block = measured_block([MeasuredLine(label="Draft memo — length", value="588 words", met=None, info=True)], "THE WRITTEN WORK THIS CHECK READS")
+    assert "- Draft memo — length: 588 words (counted in code)" in block
+    assert "length: NOT VERIFIED" not in block
+    assert "never ask the text to state its own word count" in block
+    assert counted_words([MeasuredLine(label="Draft memo — length", value="588 words", met=None, info=True)])
+    assert not counted_words([MeasuredLine(label="Memo: under 600 words", value="", met=None)])
+    assert is_hand_count("Estimate, by hand reading only and not counted by a tool: the body runs to roughly 560–600 words.")
+    assert is_hand_count("The memo states no word count.")
+    assert not is_hand_count("Trim the memo, aiming for under 600 words.")
+    assert not is_hand_count("The table omits the threshold.")
+
+
+def test_a_check_table_drops_a_row_that_only_estimates_a_counted_length():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from promptmaster.measured import MeasuredLine
+    from promptmaster.schemas import PMInput, StageDescriptor, StageDigest, StageItemField, StageItemSchema
+    from promptmaster.stage import generate_stage_artifact
+
+    client = AsyncMock()
+    client.generate_json.return_value = ({"items": [
+        {"id": "i5", "finding": "The memo states no word count. Estimate, by hand reading only: roughly 560–600 words.", "suggested_change": "State the word count, labelled as an estimate.", "severity": "moderate"},
+        {"id": "i7", "finding": "The calculation block uses LaTeX.", "suggested_change": "Replace it with plain lines.", "severity": "minor"},
+    ]}, {})
+    schema = StageItemSchema(item_label="finding", fields=[StageItemField(key="finding", label="Finding"), StageItemField(key="suggested_change", label="Suggested change"), StageItemField(key="severity", label="Severity")], min_items=0, max_items=12)
+    kwargs = dict(
+        client=client, model=None, inputs=PMInput(objective="Screening memo under 600 words.", mode="analyst"),
+        stage=StageDescriptor(id="check", label="Check the memo", renderer="review"), digest=StageDigest(objective="Screening memo under 600 words."), item_schema=schema,
+    )
+    counted = asyncio.run(generate_stage_artifact(**kwargs, measured=[MeasuredLine(label="Draft memo — length", value="588 words", met=None, info=True)]))
+    assert [i.id for i in counted.items] == ["i7"]
+    uncounted = asyncio.run(generate_stage_artifact(**kwargs, measured=[]))
+    assert [i.id for i in uncounted.items] == ["i5", "i7"]

@@ -26,7 +26,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
-import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement, describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
+import { COUNTING_RULE, countWords, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement, describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
@@ -65,7 +65,7 @@ import { createTask, listTasks } from '@/lib/supabase/tasks';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
-import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
+import { acceptedRowsBefore, lengthRows, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -3060,12 +3060,20 @@ async function checkDeliverable(
   const rows = acceptedRowsBefore(ctx.template, ctx.bundles, holder.id, ctx.state);
   const noteQuotes = noteQuotesNotInText(content);
   const claim = noAccessClaim(content);
+  // 12 Nov: a length is counted, never judged. The check is given the count,
+  // and a change that asks for a length is decided by it before the call.
+  const lengths = lengthRows(rows, content);
+  const sent = rows.map((r) => (lengths.has(r.id) ? { ...r, length_decided: lengths.get(r.id)!.line } : r));
+  const measured = [
+    { label: `${label} — length`, value: `${countWords(content).toLocaleString('en-US')} words`, met: null, info: true },
+    ...measuredLines(ctx.project, ctx.template, holder, content, label),
+  ].slice(0, 24);
   try {
     const res = await api.agentCheckDeliverable(
-      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), ...(noteQuotes.length ? { note_quotes: noteQuotes } : {}), model: ctx.project.model },
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: sent, measured, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), ...(noteQuotes.length ? { note_quotes: noteQuotes } : {}), model: ctx.project.model },
       ctx.signal
     );
-    const issues = [...issuesFrom(res, rows, label), ...(claim ? [claim] : []), ...ownChecks(content, label)];
+    const issues = [...issuesFrom(res, rows, label, lengths), ...(claim ? [claim] : []), ...ownChecks(content, label)];
     const carried = res.findings.filter((f) => f.verdict === 'carried').length;
     const accepted = rows.length - res.findings.filter((f) => f.verdict === 'not_applicable').length;
     const part = res.total_chars && (res.read_chars ?? res.total_chars) < res.total_chars ? { read: { chars: res.read_chars ?? 0, total: res.total_chars } } : {};

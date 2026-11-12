@@ -12,6 +12,7 @@
  * bounded review process … explain the remaining issue and stop predictably").
  */
 
+import { countWords, isPart, measure, parseRequirements, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { effectiveRenderer, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { isTriageTable } from '@/lib/workflow/triage';
@@ -26,6 +27,55 @@ export interface AcceptedRow {
   stage_label: string;
   finding: string;
   suggested_change: string;
+  /** The length the change asks for, as counted in code on the deliverable (`lengthRows`). */
+  length_decided?: string;
+}
+
+/** A whole-document length an accepted change asks for, counted on the deliverable. */
+export interface LengthDecision {
+  met: boolean;
+  /** "met: 473 words, counted in code, against about 500 words". */
+  line: string;
+}
+
+/**
+ * Accepted rows whose change asks for a length of the whole text, decided by
+ * counting it (12 Nov). On an acquisition memo a check suggested "Trim before
+ * the final memo, aiming for about 500 words", the final memo came to fewer,
+ * and a model still called the change not carried, three times. A length is
+ * counted, never judged: the row goes to the check with the count's verdict,
+ * and the check reads only the rest of the change. A length of a part ("each
+ * note under 40 words") is left to the check.
+ */
+export function lengthRows(rows: readonly AcceptedRow[], content: string): Map<string, LengthDecision> {
+  const out = new Map<string, LengthDecision>();
+  if (!content.trim()) return out;
+  for (const row of rows) {
+    const change = row.suggested_change;
+    if (!/\bwords?\b/i.test(change)) continue;
+    // A hedged figure first ("about 500 words"), as the brief's own is read…
+    const hedged = wholeLengthTarget({ constraints: change }, content);
+    if (hedged) {
+      out.set(row.id, {
+        met: !hedged.over,
+        line: `${hedged.over ? 'NOT met' : 'met'}: ${hedged.count.toLocaleString('en-US')} words, counted in code, against ${hedged.said}`,
+      });
+      continue;
+    }
+    // …then a firm one ("under 600 words", "500 to 600 words"). A sentence
+    // about each of several parts ("keep each note under 40 words") is not
+    // about the whole text, whatever subject the parser gives it.
+    const whole = change.split(/(?<=[.;\n])\s+/).filter((sentence) => !/\b(?:per|each|every)\b/i.test(sentence));
+    const firm = parseRequirements(whole).find((r) => r.kind === 'words' && !r.per && !r.retires && !isPart(r));
+    const measured = firm ? measure(firm, content, true) : null;
+    if (measured) {
+      out.set(row.id, {
+        met: measured.satisfied,
+        line: `${measured.satisfied ? 'met' : 'NOT met'}: ${countWords(content, { headings: Boolean(firm?.headings) }).toLocaleString('en-US')} words, counted in code, against "${firm!.source.trim().slice(0, 120)}"`,
+      });
+    }
+  }
+  return out;
 }
 
 export interface CheckResult {
@@ -120,16 +170,36 @@ export function outcomeTablesBefore(template: WorkflowTemplate, bundles: Record<
   }).slice(-4);
 }
 
-/** The check's result as lines the objective check reads as unmet. */
-export function issuesFrom(result: CheckResult, rows: readonly AcceptedRow[], label: string): string[] {
+/**
+ * The check's result as lines the objective check reads as unmet.
+ *
+ * Each leads with the change that was accepted and what the text still lacks.
+ * It used to lead with the row's own finding, which describes the earlier
+ * draft: "…is not carried into Final memo: The memo states no word count…"
+ * read, to Go and to the user, as a demand that the memo state one (12 Nov).
+ * A change whose length code has counted as met is not reported for length.
+ */
+export function issuesFrom(result: CheckResult, rows: readonly AcceptedRow[], label: string, lengths: ReadonlyMap<string, LengthDecision> = new Map()): string[] {
   const byId = new Map(rows.map((r) => [r.id, r]));
+  const from = (row: AcceptedRow | undefined, id: string) => `Accepted change ${id}${row?.stage_label ? ` (${row.stage_label})` : ''} is not carried into ${label}`;
+  const reported = new Set<string>();
   const missing = result.findings
-    .filter((f) => f.verdict === 'not_carried')
+    .filter((f) => f.verdict === 'not_carried' && (f.quote.trim() || f.note.trim()))
     .map((f) => {
       const row = byId.get(f.id);
-      const what = row ? `${row.finding}${row.suggested_change ? ` — accepted change: ${row.suggested_change}` : ''}` : f.id;
-      return `Accepted finding ${f.id}${row?.stage_label ? ` (${row.stage_label})` : ''} is not carried into ${label}: ${what}${f.quote ? ` — the text still says "${f.quote}"` : ''}${f.note ? ` (${f.note})` : ''}`;
+      reported.add(f.id);
+      const what = row ? (row.suggested_change || row.finding) : f.id;
+      // What the check had found is history: it describes the text the check read, not this one.
+      const found = row?.suggested_change && row.finding ? ` (what the check had found in the text it read: "${row.finding}")` : '';
+      const length = lengths.get(f.id);
+      return `${from(row, f.id)}: ${what}${found}${f.note ? ` — still missing: ${f.note}` : ''}${f.quote ? ` — the text still says "${f.quote}"` : ''}${length ? ` — its length is ${length.line}` : ''}`;
     });
+  // A length the count says is not met is an issue whatever the model said of the rest.
+  for (const [id, length] of lengths) {
+    if (length.met || reported.has(id)) continue;
+    const row = byId.get(id);
+    missing.push(`${from(row, id)}: ${row?.suggested_change || id} — its length is ${length.line}`);
+  }
   const contradictions = result.contradictions.map(
     (c) => (c.conflicts_quote
       ? `${label} contradicts itself: "${c.rule_quote}" against "${c.conflicts_quote}" — ${c.problem}`

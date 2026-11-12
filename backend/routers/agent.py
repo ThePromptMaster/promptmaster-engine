@@ -423,6 +423,8 @@ class CheckDeliverableRequest(BaseModel):
     tables: list[RecordedTable] = Field(default_factory=list, max_length=MAX_TABLES)
     #: Passages the document's own review note quotes that the rest of it does not hold (5 Nov).
     note_quotes: list[str] = Field(default_factory=list, max_length=MAX_NOTE_QUOTES)
+    #: What code counted on the deliverable (12 Nov): its length is judged from these, never by eye.
+    measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
     model: str = ""
 
 
@@ -435,7 +437,7 @@ async def api_check_deliverable(req: CheckDeliverableRequest, client: OpenRouter
     """Whether the deliverable carries the accepted findings and holds together
     (1 Nov). 1 LLM call; a check — writes nothing, never searches the web."""
     try:
-        result = await check_deliverable(client, req.model or None, req.inputs, req.deliverable_label or "the deliverable", req.content, req.accepted, req.tables, req.note_quotes)
+        result = await check_deliverable(client, req.model or None, req.inputs, req.deliverable_label or "the deliverable", req.content, req.accepted, req.tables, req.note_quotes, req.measured)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return CheckDeliverableResponse(**result.model_dump(), model_used=_model_used(req.model, client))
