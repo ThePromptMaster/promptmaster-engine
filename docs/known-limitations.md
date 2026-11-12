@@ -3914,7 +3914,7 @@ confirmed for this baseline") was settled in two of three: it can be read either
 read as open the stop now has the button. A model can still read a note wrongly in the other direction;
 "Keep it open instead" on the row undoes it, and a row kept open is not read again until its note changes.
 A row settled on an undecided or accepted status is not affected: only deferred rows that would block are
-read. A superseded row (L-88) no longer counts as carried forward either.
+read. A row a later fact superseded (`superseded-rows.ts`) no longer counts as carried forward either.
 
 ### L-237 — Lengths are counted for every text a check reads (2026-11-12)
 
