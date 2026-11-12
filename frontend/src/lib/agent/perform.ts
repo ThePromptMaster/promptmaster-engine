@@ -2972,7 +2972,8 @@ async function judgeObjective(
   if (lengthLine) measured.push(`Length of the whole text — ${lengthLine}`);
   // The accepted findings and the text's own consistency, checked first: what
   // fails goes to the assessment as failed checks (1 Nov).
-  const check = holder ? await checkDeliverable(ctx, holder, content, label, saved) : null;
+  // A label of its own means the text is a round's working, not the delivered document.
+  const check = holder ? await checkDeliverable(ctx, holder, content, label, saved, labelOverride !== undefined) : null;
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -3048,7 +3049,9 @@ async function checkDeliverable(
   holder: StageDefinition,
   content: string,
   label: string,
-  saved?: { version: { id: string; version_number: number } | null }
+  saved?: { version: { id: string; version_number: number } | null },
+  /** The text is what a round wrote, not the document: a length a change asks for is not counted on it. */
+  working = false
 ): Promise<DeliverableCheckRecord | null> {
   if (!content.trim()) return null;
   const head = saved ? saved.version : ctx.bundles[holder.id]?.versions.at(-1);
@@ -3062,7 +3065,7 @@ async function checkDeliverable(
   const claim = noAccessClaim(content);
   // 12 Nov: a length is counted, never judged. The check is given the count,
   // and a change that asks for a length is decided by it before the call.
-  const lengths = lengthRows(rows, content);
+  const lengths = lengthRows(rows, content, working);
   const sent = rows.map((r) => (lengths.has(r.id) ? { ...r, length_decided: lengths.get(r.id)!.line } : r));
   const measured = [
     { label: `${label} — length`, value: `${countWords(content).toLocaleString('en-US')} words`, met: null, info: true },

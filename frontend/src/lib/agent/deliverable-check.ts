@@ -36,7 +36,12 @@ export interface LengthDecision {
   met: boolean;
   /** "met: 473 words, counted in code, against about 500 words". */
   line: string;
+  /** The text read is a round's working, not the document the length is for: nothing was counted. */
+  later?: true;
 }
+
+/** What a length row says when the text read is a round's working. */
+export const LENGTH_FOR_LATER = 'not counted here: this text is the working of a round, not the document the length is for; it is counted when that document is written';
 
 /**
  * Accepted rows whose change asks for a length of the whole text, decided by
@@ -46,8 +51,14 @@ export interface LengthDecision {
  * counted, never judged: the row goes to the check with the count's verdict,
  * and the check reads only the rest of the change. A length of a part ("each
  * note under 40 words") is left to the check.
+ *
+ * `working`: the text is everything a round wrote, read before another round,
+ * and the document the length is for comes later. Counting a memo's "under
+ * 600 words" on 2,900 words of facts, analysis and check would fail every
+ * round. The row is still marked, so no model judges the length by eye, and
+ * it says nothing was counted.
  */
-export function lengthRows(rows: readonly AcceptedRow[], content: string): Map<string, LengthDecision> {
+export function lengthRows(rows: readonly AcceptedRow[], content: string, working = false): Map<string, LengthDecision> {
   const out = new Map<string, LengthDecision>();
   if (!content.trim()) return out;
   for (const row of rows) {
@@ -55,6 +66,10 @@ export function lengthRows(rows: readonly AcceptedRow[], content: string): Map<s
     if (!/\bwords?\b/i.test(change)) continue;
     // A hedged figure first ("about 500 words"), as the brief's own is read…
     const hedged = wholeLengthTarget({ constraints: change }, content);
+    if ((hedged || firmLength(change, content)) && working) {
+      out.set(row.id, { met: true, later: true, line: LENGTH_FOR_LATER });
+      continue;
+    }
     if (hedged) {
       out.set(row.id, {
         met: !hedged.over,
@@ -65,9 +80,9 @@ export function lengthRows(rows: readonly AcceptedRow[], content: string): Map<s
     // …then a firm one ("under 600 words", "500 to 600 words"). A sentence
     // about each of several parts ("keep each note under 40 words") is not
     // about the whole text, whatever subject the parser gives it.
-    const whole = change.split(/(?<=[.;\n])\s+/).filter((sentence) => !/\b(?:per|each|every)\b/i.test(sentence));
-    const firm = parseRequirements(whole).find((r) => r.kind === 'words' && !r.per && !r.retires && !isPart(r));
-    const measured = firm ? measure(firm, content, true) : null;
+    const found = firmLength(change, content);
+    const firm = found?.firm;
+    const measured = found?.measured;
     if (measured) {
       out.set(row.id, {
         met: measured.satisfied,
@@ -76,6 +91,14 @@ export function lengthRows(rows: readonly AcceptedRow[], content: string): Map<s
     }
   }
   return out;
+}
+
+/** A firm length of the whole text in a change, and how the text measures against it. */
+function firmLength(change: string, content: string) {
+  const whole = change.split(/(?<=[.;\n])\s+/).filter((sentence) => !/\b(?:per|each|every)\b/i.test(sentence));
+  const firm = parseRequirements(whole).find((r) => r.kind === 'words' && !r.per && !r.retires && !isPart(r));
+  const measured = firm ? measure(firm, content, true) : null;
+  return firm && measured ? { firm, measured } : null;
 }
 
 export interface CheckResult {
