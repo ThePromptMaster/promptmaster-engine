@@ -10,7 +10,7 @@
  * Pure.
  */
 
-import { currentFacts, REPLACING, replacedClause } from './facts';
+import { currentFacts, REPLACING, replacedClause, replacesADecision } from './facts';
 import { factValues, supersededValues, type SupersededValue } from './fact-values';
 import type { StageItem } from './stage-artifact';
 import type { ProjectFact } from '@/types/project';
@@ -26,6 +26,8 @@ export function replacedValues(facts: readonly ProjectFact[] | undefined): Super
   const current = currentFacts(facts);
   const out: SupersededValue[] = [];
   for (const f of current) {
+    // A decision made again changes no value (`replacesADecision`).
+    if (replacesADecision(f, byId)) continue;
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
     if (old) out.push(...supersededValues(old.statement, f.statement));
     const clause = replacedClause(f.statement);
