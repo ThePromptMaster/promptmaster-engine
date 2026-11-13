@@ -23,7 +23,7 @@ import html
 import logging
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Awaitable, Callable, Literal
@@ -570,6 +570,10 @@ HUBSPOT_OBJECTS: dict[str, CrmObject] = {
 }
 _HUBSPOT_NAMES = {"contact": ("firstname", "lastname"), "company": ("name",), "deal": ("dealname",)}
 _HUBSPOT_MODIFIED = ("lastmodifieddate", "hs_lastmodifieddate")
+#: Asked for with a deal and written into its other lines: the currency of the amount, and whether it is open.
+_HUBSPOT_ALSO = {"deal": ("deal_currency_code", "hs_is_closed", "hs_is_closed_won")}
+#: What an account calls its pipelines and stages. A deal holds only their ids, and in a new account those are numbers.
+HUBSPOT_PIPELINES = "HUBSPOT_RETRIEVE_ALL_PIPELINES_FOR_SPECIFIED_OBJECT_TYPE"
 #: A Salesforce id is 15 or 18 letters and digits; a HubSpot one is digits. Checked before either goes into a query.
 SALESFORCE_ID = re.compile(r"^[A-Za-z0-9]{15,18}$")
 HUBSPOT_ID = re.compile(r"^\d{1,20}$")
@@ -582,7 +586,8 @@ def salesforce_fields(obj: CrmObject, full: bool = True) -> list[str]:
 
 
 def hubspot_properties(obj: CrmObject) -> list[str]:
-    return [*_HUBSPOT_NAMES[obj.name], *(f for _label, f in obj.fields), *([obj.long] if obj.long else []), *_HUBSPOT_MODIFIED]
+    return [*_HUBSPOT_NAMES[obj.name], *(f for _label, f in obj.fields), *([obj.long] if obj.long else []),
+            *_HUBSPOT_ALSO.get(obj.name, ()), *_HUBSPOT_MODIFIED]
 
 
 def crm_id(obj: CrmObject, record_id: str) -> str:
@@ -640,6 +645,81 @@ def salesforce_items(data: Any, default: str = "") -> list[PreviewItem]:
 def _hubspot_properties(record: dict[str, Any]) -> dict[str, Any]:
     props = record.get("properties")
     return props if isinstance(props, dict) else record
+
+
+@dataclass(frozen=True)
+class DealNames:
+    """An account's own names for its pipelines, and for each pipeline's stages."""
+
+    pipelines: dict[str, str] = field(default_factory=dict)
+    #: By (pipeline id, stage id), and by ("", stage id) for a deal that does not say its pipeline.
+    stages: dict[tuple[str, str], str] = field(default_factory=dict)
+
+
+def deal_names(data: Any) -> DealNames:
+    """The names in HubSpot's list of pipelines, whatever wraps it."""
+    pipelines: dict[str, str] = {}
+    stages: dict[tuple[str, str], str] = {}
+    for p in find_records(data, ("stages",)):
+        pid = str(p.get("id") or "")
+        if pid and p.get("label"):
+            pipelines[pid] = _short(p["label"], 120)
+        listed = p.get("stages")
+        for stage in listed if isinstance(listed, list) else []:
+            if isinstance(stage, dict) and stage.get("id") and stage.get("label"):
+                name = _short(stage["label"], 120)
+                stages[(pid, str(stage["id"]))] = name
+                stages.setdefault(("", str(stage["id"])), name)
+    return DealNames(pipelines, stages)
+
+
+async def hubspot_deal_names(c: Composio, sid: str) -> DealNames:
+    """One call for however many deals are read. Without it a deal is still read, with less on its stage line."""
+    try:
+        data = await c.execute(sid, HUBSPOT_PIPELINES, {"objectType": "deals"})
+    except ComposioError as e:
+        logger.warning("CONNECTIONS_TOOL_FAILED tool=%s error=%s", HUBSPOT_PIPELINES, e)
+        return DealNames()
+    names = deal_names(data)
+    if not names.stages:
+        _log_empty(HUBSPOT_PIPELINES, data)
+    return names
+
+
+def _named(value: Any, names: dict[str, str]) -> str | None:
+    """A choice by the name the account gives it. An id that is only a number tells a reader nothing, so it is left out."""
+    key = str(value or "").strip()
+    if not key:
+        return None
+    return names.get(key) or (None if key.isdigit() else key)
+
+
+def _deal_state(props: dict[str, Any]) -> str | None:
+    """Open, won or lost, from HubSpot's own flags: what is said of a stage whose name could not be read."""
+    closed, won = (str(props.get(k) or "").strip().lower() for k in ("hs_is_closed", "hs_is_closed_won"))
+    if won == "true":
+        return "Closed won"
+    if closed == "true":
+        return "Closed lost"
+    return "Open" if closed == "false" else None
+
+
+def hubspot_readable(obj: CrmObject, props: dict[str, Any], names: DealNames) -> dict[str, Any]:
+    """HubSpot's values as a person reads them: a stage by its name, an amount with its currency, a close date as a day."""
+    out = dict(props)
+    if obj.name == "contact":
+        out["lifecyclestage"] = _named(props.get("lifecyclestage"), {})
+    if obj.name != "deal":
+        return out
+    pipeline, stage = (str(props.get(k) or "").strip() for k in ("pipeline", "dealstage"))
+    out["pipeline"] = _named(pipeline, names.pipelines)
+    out["dealstage"] = names.stages.get((pipeline, stage)) or names.stages.get(("", stage)) or _named(stage, {}) or _deal_state(props)
+    amount, currency = props.get("amount"), str(props.get("deal_currency_code") or "").strip()
+    if amount not in (None, "") and currency:
+        out["amount"] = f"{amount} {currency}"
+    if props.get("closedate"):
+        out["closedate"] = human_when(_when(props["closedate"])[:10])
+    return out
 
 
 def _hubspot_title(obj: CrmObject, props: dict[str, Any]) -> str:
@@ -1071,6 +1151,14 @@ async def _read_file(c: Composio, sid: str, item: PickedItem, toolkit: str) -> C
                          text=clean_text(_as_text(content)))
 
 
+def _host(value: Any) -> Any:
+    """A website as its host alone ("northwind.example"): every link is taken out of what is read, and a host is not one."""
+    if not isinstance(value, str) or not value.strip():
+        return value
+    host = re.sub(r"^[a-z][a-z0-9+.-]*://", "", value.strip(), flags=re.IGNORECASE)
+    return re.sub(r"^www\.", "", re.split(r"[/?#\s]", host, maxsplit=1)[0], flags=re.IGNORECASE)
+
+
 async def _read_salesforce(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
     obj, rid = split_crm_id(item.id, SALESFORCE_OBJECTS, SALESFORCE_ID)
     data = await salesforce_query(c, sid, obj, f"WHERE Id = '{rid}'", "LIMIT 1")
@@ -1078,13 +1166,15 @@ async def _read_salesforce(c: Composio, sid: str, item: PickedItem) -> Connected
     if record is None:
         _log_empty(SALESFORCE_QUERY, data)
         raise ComposioError("That record is no longer there.", 404)
+    if "Website" in record:
+        record = {**record, "Website": _host(record["Website"])}
     title = _short(_first(record, "Name") or item.title)
     when = human_when(_when(_first(record, "LastModifiedDate")))
     return ConnectedText(id=item.id, toolkit=SALESFORCE, kind="crm_record", source=_source("Salesforce", obj.label, when),
                          title=title, text=_record_text(obj, title, record, when))
 
 
-async def _read_hubspot(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
+async def _read_hubspot(c: Composio, sid: str, item: PickedItem, names: Awaitable[DealNames] | None = None) -> ConnectedText:
     obj, rid = split_crm_id(item.id, HUBSPOT_OBJECTS, HUBSPOT_ID)
     data = await c.execute(sid, obj.tool, {
         "filterGroups": [{"filters": [{"propertyName": "hs_object_id", "operator": "EQ", "value": rid}]}],
@@ -1098,13 +1188,22 @@ async def _read_hubspot(c: Composio, sid: str, item: PickedItem) -> ConnectedTex
     props = _hubspot_properties(record)
     title = _hubspot_title(obj, props) or item.title
     when = human_when(_when(_first(props, *_HUBSPOT_MODIFIED) or record.get("updatedAt")))
+    known = await names if names is not None and obj.name == "deal" else DealNames()
     return ConnectedText(id=item.id, toolkit=HUBSPOT, kind="crm_record", source=_source("HubSpot", obj.label, when),
-                         title=title, text=_record_text(obj, title, props, when))
+                         title=title, text=_record_text(obj, title, hubspot_readable(obj, props, known), when))
 
 
-async def _read_one(c: Composio, sid: str, item: PickedItem) -> ConnectedText | ConnectedFile:
+def _is_hubspot_deal(item: PickedItem) -> bool:
+    """A deal that will be read: an id that is not one is refused before anything is asked on its account."""
+    kind, _, record_id = item.id.partition(":")
+    return item.toolkit == HUBSPOT and item.kind == "crm_record" and kind == "deal" and bool(HUBSPOT_ID.match(record_id))
+
+
+async def _read_one(c: Composio, sid: str, item: PickedItem, names: Awaitable[DealNames] | None = None) -> ConnectedText | ConnectedFile:
     if item.kind == "crm_record":
-        return await (_read_salesforce if item.toolkit == SALESFORCE else _read_hubspot)(c, sid, item)
+        if item.toolkit == SALESFORCE:
+            return await _read_salesforce(c, sid, item)
+        return await _read_hubspot(c, sid, item, names)
     if item.kind == "email":
         return await (_read_gmail if item.toolkit == GMAIL else _read_outlook_mail)(c, sid, item)
     if item.kind == "calendar_event":
@@ -1126,7 +1225,9 @@ async def read(c: Composio, user_id: str, picked: list[PickedItem]) -> tuple[lis
     if not valid:
         return [], [], skipped
     session = await c.create_session(user_id, sorted({p.toolkit for p in valid}))
-    results = await asyncio.gather(*(_read_one(c, session, p) for p in valid), return_exceptions=True)
+    # Asked once and shared: every deal read here is named from the same list of pipelines.
+    names = asyncio.ensure_future(hubspot_deal_names(c, session)) if any(_is_hubspot_deal(p) for p in valid) else None
+    results = await asyncio.gather(*(_read_one(c, session, p, names) for p in valid), return_exceptions=True)
     texts: list[ConnectedText] = []
     files: list[ConnectedFile] = []
     budget = MAX_FILES_BYTES
