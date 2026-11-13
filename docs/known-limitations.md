@@ -4028,3 +4028,45 @@ What is not done, said plainly because it is the part still to build:
   the project is not done.
 - Under "Ask me", Go's own reading of the other open rows against a new answer (L-236) does not run;
   it runs only with routine decisions handed to Go.
+
+### L-239 — An approver nobody named, and one repair for a refused routine approval (2026-11-13)
+
+A client's run stopped on a routine approval under "Handle them for me". The draft's decision log said
+"Approved; approver not recorded" about a plan the brief called the "original approved plan". The stage
+check's code rule for approvers (`lib/workflow/approver-support.ts`) read the fact "Original approved
+plan: …" as a person called Original who had approved it, and raised "Approver on record: name the
+approver the project records". Applying that wrote "Approver: to confirm". Go's check of the routine
+approval refused it over that placeholder, the stage's polishing moves were used up, and the approval
+was handed to the user with no word of why.
+
+What changed:
+
+- **"Approved" in front of the thing it describes names nobody.** "Original approved plan", "Revised
+  approved budget": the word before the participle is not an approver. A word after "Approver:" is a
+  name only when it is written as one, so "Approver: unknown" and "Approver: TBD" name nobody either.
+- **The record is "approver not specified".** Where the user's material calls something approved and
+  names nobody, that is what a writer writes and what every check accepts: the stage writer's history
+  rule, the rule that what the user supplied is given (`project_context.SUPPLIED_RULE`), the routine
+  approval check (`criterion_check.APPROVER_RULE`), and the screen for Go's questions (who approved
+  something already called approved is not asked).
+- **A refused routine approval gets one repair.** Go revises the stage for what the check named, and
+  nothing else, then checks the approval again (`refusedCommits`, `refusalToRepair` in
+  `lib/agent/needs.ts`). This repair is allowed even when the polishing cap has taken Revise away. If
+  the check refuses again, the user is asked as before, and the card now says what the check said.
+
+What it does not do:
+
+- **The approver rule is still lexical.** "Elena approved budget changes", with no "the" after the verb,
+  is read as describing the changes, so Elena is not recognised as an approver there. That costs a
+  finding, never adds a false one. "Elena has approved…", "approved by Elena" and "Elena approved the…"
+  are read as before. It still checks the name, not the item (L-89).
+- **One repair, counted since the user's last direction.** It can make a fifth polishing move on a stage
+  whose cap is four. A second refusal is the user's.
+- **The check is still a judgment** (L-49). With the client's own text and the real model: the version
+  that said "approver not recorded" was approved 5 times of 5; the one that said "Approver: to confirm"
+  was refused 3 of 3, each time naming "approver not specified" as the record; after the one repair,
+  which changed that one cell, it was approved 3 of 3. That is one case.
+- **A version saved before this still says "approver not recorded".** It is read the same way as "not
+  specified"; nothing rewrites it.
+- The rule for Go's questions is a prompt rule; a live question about who approved something has not been
+  seen since.

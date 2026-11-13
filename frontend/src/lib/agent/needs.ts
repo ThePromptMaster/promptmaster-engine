@@ -14,6 +14,7 @@ import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
+import { USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { awaitsAttempt, confirmableProposals } from '@/lib/workflow/stage-artifact';
@@ -35,6 +36,12 @@ type Need =
        * 'policy_ask': routine, but routine decisions are set to Ask me.
        */
       authority?: 'reserved' | 'policy_ask';
+      /**
+       * A routine approval Go's own check refused, and what the check said
+       * (12 Nov, a client: Go called an approval routine, then asked for it
+       * with no word of why).
+       */
+      checkReason?: string;
       /**
        * Undecided findings on other stages that block finishing (2 Nov, after
        * Sean's 1 Nov recruitment plan: Go asked "I approve this plan" while
@@ -582,6 +589,77 @@ export function delegableToCommit(
   return null;
 }
 
+/** Repairs Go makes, unasked, toward one refused routine approval since the user last gave a direction. */
+export const COMMIT_REPAIRS = 1;
+
+/** A routine approval whose check failed on the current version: what the check said, and the repairs it has had. */
+export interface RefusedCommit {
+  criterionId: string;
+  reason: string;
+  repairs: number;
+}
+
+const REFUSED_TAIL = / (?:I will revise toward it rather than ask you; it|It) is committed only once it holds\.$/;
+
+/**
+ * The routine approvals Go's check refused on the current version (12 Nov).
+ *
+ * A client, on an executive-search simulation: "Go marked a draft approval as
+ * routine, then stopped and asked me to approve it". The check had refused it
+ * over one line; two rounds of check-and-apply had used the stage's polishing
+ * moves, so nothing was left to revise with and the approval went to the user.
+ * A refusal names what to change, so it gets one repair of its own, counted
+ * here from the steps: `repairs` since the user last gave a direction.
+ */
+export function refusedCommits(
+  steps: readonly Pick<AgentStep, 'action_key' | 'stage_id' | 'status' | 'params' | 'output' | 'changes' | 'started_at' | 'finished_at'>[],
+  stageId: string,
+  headAt: string
+): RefusedCommit[] {
+  const since = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP) + 1;
+  const out: RefusedCommit[] = [];
+  for (const s of steps) {
+    if (s.action_key !== 'commit_delegated' || s.stage_id !== stageId || s.status !== 'failed') continue;
+    if ((s.finished_at ?? s.started_at ?? '') < headAt) continue;
+    const criterionId = String(s.params?.criterion_id ?? '');
+    if (!criterionId || out.some((r) => r.criterionId === criterionId)) continue;
+    const said = typeof s.changes?.check_reason === 'string' ? s.changes.check_reason : (s.output ?? '').split(': not met — ')[1]?.replace(REFUSED_TAIL, '') ?? '';
+    const repairs = steps.slice(since).filter(
+      (r) => r.action_key === 'revise_stage' && r.stage_id === stageId && r.params?.repairs_criterion === criterionId
+    ).length;
+    out.push({ criterionId, reason: said.trim(), repairs });
+  }
+  return out;
+}
+
+/** The refused routine approval Go may still repair on this stage, or null. Only under "handle them for me". */
+export function refusalToRepair(
+  stage: StageDefinition,
+  stageEvaluation: StageEvaluation,
+  routine: RoutineDecisions | undefined,
+  refused: readonly RefusedCommit[] = []
+): (RefusedCommit & { label: string }) | null {
+  if (routine !== 'handle') return null;
+  for (const unmet of stageEvaluation.unmet) {
+    if (!unmet.blocking || !unmet.manual) continue;
+    const r = refused.find((x) => x.criterionId === unmet.id);
+    if (!r || !r.reason || r.repairs >= COMMIT_REPAIRS) continue;
+    const c = stage.exit_criteria.find((x) => x.id === unmet.id);
+    if (c?.check === 'manual' && c.authority === 'delegable') return { ...r, label: unmet.label };
+  }
+  return null;
+}
+
+/** What the repair is told: the one thing the check named, and nothing else. */
+export function refusalInstruction(label: string, reason: string): string {
+  return (
+    `The approval "${label}" was checked against this version and did not hold. The check said: ${reason} ` +
+    'Change only what that names, so the approval holds, and keep everything else exactly as it is. ' +
+    'Where it is about who approved something the project states as approved and names nobody for, write "approver not specified": ' +
+    'that is the complete record, never something to confirm.'
+  );
+}
+
 /**
  * What the stage itself still requires, in order, before anything optional:
  * finish a cut-off draft; then — once only the user's approval is left —
@@ -601,6 +679,8 @@ export function requiredWork(input: {
   /** The project's "Routine decisions", and approvals whose check failed on the current version. */
   routine?: RoutineDecisions;
   commitTried?: readonly string[];
+  /** Those refusals with what the check said (`refusedCommits`): one of them may get a repair. */
+  commitRefused?: readonly RefusedCommit[];
   /**
    * The stage's rows name sources Go has not yet looked up and read in this
    * run (5 Oct: verify what it legitimately can before asking).
@@ -711,7 +791,29 @@ export function requiredWork(input: {
       expected: 'A check of the current version against the objective.',
     };
   }
-  return commitRoutine(stage, stageEvaluation, input, can);
+  return commitRoutine(stage, stageEvaluation, input, can) ?? (input.asItStands ? null : repairRefused(stage, stageEvaluation, input, can));
+}
+
+/**
+ * A routine approval the check refused: revised for what the check named, once,
+ * and checked again (12 Nov). Left to the planner this was a revision of its
+ * own wording, or a question; with the polishing moves used up it was neither,
+ * and the user was asked to approve what Go had just refused.
+ */
+function repairRefused(
+  stage: StageDefinition,
+  stageEvaluation: StageEvaluation,
+  input: { routine?: RoutineDecisions; commitRefused?: readonly RefusedCommit[] },
+  can: (k: string) => boolean
+): RequiredMove | null {
+  const refused = refusalToRepair(stage, stageEvaluation, input.routine, input.commitRefused);
+  if (!refused || !can('revise_stage')) return null;
+  return {
+    key: 'revise_stage',
+    rationale: `"${refused.label}" did not hold on this version: ${refused.reason} Changing ${stage.label} for that and nothing else, then checking the approval again.`,
+    expected: 'A new version that changes only what the check named; the approval is then checked against it.',
+    params: { instruction: refusalInstruction(refused.label, refused.reason), repairs_criterion: refused.criterionId },
+  };
 }
 
 /** A routine approval, under "handle them for me": checked, then committed (5 Oct). */
@@ -755,6 +857,8 @@ export function needsUser(input: {
   /** The project's "Routine decisions", and approvals whose check failed on the current version. */
   routine?: RoutineDecisions;
   commitTried?: readonly string[];
+  /** Those refusals with what the check said (`refusedCommits`). */
+  commitRefused?: readonly RefusedCommit[];
   /**
    * How many more computations the run may try against this stage's table:
    * above zero only when the table's rows are things a sandbox run can carry
@@ -848,7 +952,7 @@ export function needsUser(input: {
     allowed.includes('return_to_stage') ||
     // An optional automatic item still open is something a lookup or a run may settle.
     (!onlyApprovalLeft(stageEvaluation) && allowed.some((k) => REASONING_MOVES.has(k))) ||
-    requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried, asItStands: input.asItStands }) !== null;
+    requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried, commitRefused: input.commitRefused, asItStands: input.asItStands }) !== null;
   // A routine approval whose check failed is repaired, not asked about: Go
   // revises toward it and checks again (Sean, 5 Oct: "'Ask the user' should
   // not be the default response to every failed check").
@@ -860,10 +964,14 @@ export function needsUser(input: {
     // The user's own decisions first; a routine one is asked only when the policy says ask.
     const c = [...blockingUnmet].sort((a, b) => Number(authorityOf(stage, a.id) === 'delegable') - Number(authorityOf(stage, b.id) === 'delegable'))[0];
     const authority = authorityOf(stage, c.id) === 'delegable' ? (input.routine === 'handle' ? undefined : 'policy_ask') : 'reserved';
+    // A routine approval reaches the user under "handle them for me" only once
+    // Go's check has refused it: the card says what the check said (12 Nov).
+    const refusal = authority ? '' : (input.commitRefused ?? []).find((r) => r.criterionId === c.id)?.reason ?? '';
     return {
       kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label,
       ...(c.hint ? { hint: c.hint } : {}),
       ...(authority ? { authority } : {}),
+      ...(refusal ? { checkReason: refusal } : {}),
       ...(input.openElsewhere?.length ? { openRows: input.openElsewhere.slice(0, 12) } : {}),
     };
   }
@@ -1070,7 +1178,8 @@ export function describeNeed(
     case 'tick_criterion': {
       // What is needed, why the policy cannot cover it, and what answering unlocks (5 Oct).
       const why =
-        need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk') : '';
+        need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk')
+          : need.checkReason ? t('need.approvalRefused', { reason: need.checkReason }) : '';
       const message = [t('need.approval', { label: word(need.label) }), why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
       const open = need.openRows ?? [];
       if (open.length === 0) return { message, action: t('need.approveResume') };

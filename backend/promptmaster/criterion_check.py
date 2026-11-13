@@ -53,6 +53,18 @@ FINDINGS_TABLE_RULE = (
 )
 
 
+#: 12 Nov (a client, an executive-search simulation): "I approve these drafts as
+#: the common base for both options" was refused because the decision log said
+#: "Approver: to confirm" about a plan the brief called approved and named nobody
+#: for. Who approved is a record the project either has or does not have.
+APPROVER_RULE = (
+    "WHO APPROVED IS A RECORD, NOT THIS STAGE'S WORK. Where the project states something as approved and "
+    "names nobody as approving it, text that says the approver is not specified (or not recorded) is the "
+    "accurate record: not a placeholder, and never a reason for \"not met\". Never require the text to name "
+    "an approver the project does not name."
+)
+
+
 def setup_block(inputs: PMInput) -> str:
     """The project's setup, which the stage's text is written to follow (4 Nov).
 
@@ -91,6 +103,7 @@ def build_check_prompt(
         + setup_block(inputs)
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"STAGE: {stage_label}\n"
+        + f"{APPROVER_RULE}\n"
         + (f"{FINDINGS_TABLE_RULE}\n" if findings_table else "")
         + (f"{measured_block(measured)}\n" if measured else "")
         + f"THE APPROVAL, as the user would state it: \"{criterion}\"\n\n"

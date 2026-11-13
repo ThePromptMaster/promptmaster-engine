@@ -38,7 +38,12 @@ SUPPLIED_RULE = (
     "it is not. A result that a supplied rule and a supplied figure fix between them (a threshold missed, a "
     "limit exceeded, a must-have failed) is that result: say it plainly. Only a different figure or a "
     "changed rule would change it. Never say that answers, explanations or documents which leave the figure "
-    "and the rule as they are could reverse it, and never call it conditional."
+    "and the rule as they are could reverse it, and never call it conditional. "
+    # 12 Nov (a client): a plan the brief called approved, with nobody named, became
+    # "Approver: to confirm" in the draft, and the run stopped to ask about it.
+    "Something the user's material calls approved, authorised or agreed is approved, whoever approved it. "
+    "Where the material names nobody as approving it, the record is \"approver not specified\": never "
+    "something to confirm, a question for the user, or a finding."
 )
 
 

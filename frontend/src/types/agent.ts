@@ -81,7 +81,7 @@ export interface AgentStep {
   execution_label: ExecutionLabel | null;
   block_kind: BlockKind | null;
   tools_used: string[];
-  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number; set_aside?: string; source_ids?: string[]; /** A repair: whether its stage closed again. Absent on steps from before 9 Nov. */ stage_closed?: boolean };
+  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number; set_aside?: string; source_ids?: string[]; /** A repair: whether its stage closed again. Absent on steps from before 9 Nov. */ stage_closed?: boolean; /** A refused routine approval: what the check said (13 Nov). */ check_reason?: string };
   output: string;
   cost_usd: number | null;
   started_at: string;

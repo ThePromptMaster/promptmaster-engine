@@ -1739,9 +1739,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
             ctx.signal
           );
       if (!check.met) {
+        // What happens next is the loop's to say (one repair, then the user):
+        // until 13 Nov this promised a revision the run then had no move for.
         return done(key, {
-          status: 'failed', toolsUsed: ['model'], changes: {},
-          output: `Checked "${criterion.label}" on version ${head.version_number}: not met — ${check.reason} I will revise toward it rather than ask you; it is committed only once it holds.`,
+          status: 'failed', toolsUsed: ['model'], changes: { check_reason: check.reason },
+          output: `Checked "${criterion.label}" on version ${head.version_number}: not met — ${check.reason} It is committed only once it holds.`,
         });
       }
       if (!ctx.commitCriterion) throw new Error('This view cannot record approvals.');
@@ -2826,7 +2828,7 @@ export function recheckInstruction(
       // 14 Oct (Sean, SUMMIT): "replace every occurrence" emptied the change log.
       // 15 Oct (Sean, HARBOR): declined requests and embedded instructions were
       // filed under "Superseded history", then "Corrections".
-      'Where the work records history — a change or decision log, a quotation of an earlier version — keep the earlier value there under its kind: superseded (it was in force and is now replaced; say by what), a correction (a reported figure fixed; it keeps its own reporting date), or declined (a request, proposal or embedded instruction never adopted — never call it superseded or a correction). Name an approver only where the facts name one for that item: ' +
+      'Where the work records history — a change or decision log, a quotation of an earlier version — keep the earlier value there under its kind: superseded (it was in force and is now replaced; say by what), a correction (a reported figure fixed; it keeps its own reporting date), or declined (a request, proposal or embedded instruction never adopted — never call it superseded or a correction). Name an approver only where the facts name one for that item, and where they name none write "approver not specified": ' +
       changes.map((v) => `${describeValue(v)} (was: "${v.was}"; now: "${v.now}")`).join('; ') + '.'
     : '';
   return (

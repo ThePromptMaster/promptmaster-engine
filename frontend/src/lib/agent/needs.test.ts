@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, waitingOnTable, type NeedsUser } from './needs';
+import { approvedAsItStands, COMMIT_REPAIRS, delegableToCommit, refusalToRepair, refusedCommits, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, waitingOnTable, type NeedsUser } from './needs';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
@@ -460,6 +460,75 @@ describe('routine decisions (Sean, 5 Oct): delegated, validated, and the user as
     expect(needsUser(tried)).toBeNull();
     // With no revision left to try, it is the user's after all.
     expect(needsUser({ ...tried, allowed: ['advance_stage'] })).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator' });
+  });
+
+  // 12 Nov (a client, an executive-search simulation): "Go marked a draft
+  // approval as routine, then stopped and asked me to approve it because the
+  // original plan didn't name an approver." The check had refused it over
+  // "Approver: to confirm"; two rounds of check-and-apply had used the stage's
+  // polishing moves, so there was no Revise left and the approval went to him.
+  describe('a refused routine approval gets one repair before the user is asked', () => {
+    const reason = 'The decision log\'s entry for the original plan contains an open placeholder, "Approver: to confirm".';
+    const refused = (repairs: number) => [{ criterionId: 'pos.differentiator', reason, repairs }];
+    const first = args({ routine: 'handle', commitTried: ['pos.differentiator'], commitRefused: refused(0) });
+
+    it('revises for what the check said, and nothing else', () => {
+      const move = requiredWork(first);
+      expect(move).toMatchObject({ key: 'revise_stage', params: { repairs_criterion: 'pos.differentiator' } });
+      const instruction = String(move!.params!.instruction);
+      expect(instruction).toContain('"Approver: to confirm"');
+      expect(instruction).toContain('Change only what that names');
+      expect(instruction).toContain('write "approver not specified"');
+      expect(move!.rationale).toContain('did not hold on this version');
+      expect(needsUser(first)).toBeNull();
+    });
+
+    it('commits first when the check has not refused the current version', () => {
+      expect(requiredWork(args({ routine: 'handle', commitRefused: [] }))).toMatchObject({ key: 'commit_delegated' });
+    });
+
+    it('is the user\'s after that one repair, and the card says what the check said', () => {
+      expect(COMMIT_REPAIRS).toBe(1);
+      const second = args({ routine: 'handle', allowed: ['advance_stage'], commitTried: ['pos.differentiator'], commitRefused: refused(1) });
+      expect(requiredWork(second)).toBeNull();
+      const need = needsUser(second);
+      expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator', checkReason: reason });
+      const message = describeNeed(need!, label).message;
+      expect(message).toContain('Needs your approval: "I confirm the one-sentence differentiator is stated".');
+      expect(message).toContain('The check did not hold: The decision log');
+    });
+
+    it('never repairs under "Ask me", a reserved approval, or a version the user approved as it stands', () => {
+      expect(refusalToRepair(stage('positioning'), evaluation('positioning', differentiator), 'ask', refused(0))).toBeNull();
+      expect(requiredWork({ ...first, asItStands: true })).toBeNull();
+      const research = RESEARCH_V1.stages.find((s) => s.id === 'method')!;
+      const plan = [{ id: 'meth.analysisplan', label: 'I approve this analysis plan for execution', satisfied: false, blocking: true, manual: true }];
+      expect(refusalToRepair(research, evaluation('method', plan), 'handle', [{ criterionId: 'meth.analysisplan', reason, repairs: 0 }])).toBeNull();
+    });
+
+    it('reads the refusals, their reasons and their repairs from the steps', () => {
+      const step = (over: Partial<AgentStep>) => ({ stage_id: 'positioning', status: 'succeeded', params: {}, output: '', changes: {}, started_at: '2026-11-12T23:46:00Z', finished_at: '2026-11-12T23:46:18Z', ...over }) as AgentStep;
+      const failed = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason } });
+      // A step saved before the reason was kept: read from what it printed.
+      const older = step({
+        action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' },
+        output: `Checked "X" on version 3: not met — ${reason} I will revise toward it rather than ask you; it is committed only once it holds.`,
+      });
+      const repair = step({ action_key: 'revise_stage', params: { repairs_criterion: 'pos.differentiator' }, started_at: '2026-11-12T23:47:00Z', finished_at: '2026-11-12T23:47:30Z' });
+      const head = '2026-11-12T23:46:16Z';
+      expect(refusedCommits([failed], 'positioning', head)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
+      expect(refusedCommits([older], 'positioning', head)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
+      // The repair made a new version: the old refusal is about the version before it.
+      expect(refusedCommits([failed, repair], 'positioning', '2026-11-12T23:47:29Z')).toEqual([]);
+      // Refused again on the repaired version: one repair is on record.
+      const again = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason }, started_at: '2026-11-12T23:48:00Z', finished_at: '2026-11-12T23:48:10Z' });
+      expect(refusedCommits([failed, repair, again], 'positioning', '2026-11-12T23:47:29Z')).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 1 }]);
+      // The user's own direction starts the count again.
+      const answer = step({ action_key: 'user_answer', started_at: '2026-11-12T23:47:40Z', finished_at: '2026-11-12T23:47:40Z' });
+      expect(refusedCommits([failed, repair, answer, again], 'positioning', '2026-11-12T23:47:29Z')[0].repairs).toBe(0);
+      // Another stage's refusal is not this stage's.
+      expect(refusedCommits([failed], 'outline', head)).toEqual([]);
+    });
   });
 
   it('a reserved approval is never delegated, and the card says it is the user\'s alone', () => {

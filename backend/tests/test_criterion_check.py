@@ -19,6 +19,19 @@ def test_the_prompt_judges_only_the_statement_from_the_text(basic_inputs):
     assert "Success is 40 schools by June." in user
 
 
+def test_an_unnamed_approver_is_never_a_reason_for_not_met(basic_inputs):
+    """12 Nov (a client, an executive-search simulation): a routine approval was refused
+    because the decision log did not name who had approved a plan the brief called approved."""
+    from promptmaster.criterion_check import APPROVER_RULE
+
+    _, user = build_check_prompt(basic_inputs, "Drafts", "I approve these drafts as the common base", "Original plan: approved; approver not specified.")
+    assert APPROVER_RULE in user
+    assert user.index(APPROVER_RULE) < user.index("THE APPROVAL, as the user would state it")
+    for phrase in ("names nobody as approving it", "approver is not specified (or not recorded)", 'never a reason for "not met"',
+                   "Never require the text to name an approver the project does not name"):
+        assert phrase in APPROVER_RULE
+
+
 def test_a_long_stage_is_cut_and_says_so(basic_inputs):
     _, user = build_check_prompt(basic_inputs, "S", "c", "x" * (MAX_CHECK_CONTENT * 2))
     stage_text = user.split("--- THE STAGE'S TEXT ---")[1].split("--- END ---")[0]
