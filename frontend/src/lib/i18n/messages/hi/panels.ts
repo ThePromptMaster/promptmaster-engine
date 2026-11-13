@@ -177,6 +177,8 @@ export const hi: Record<keyof typeof en, string> = {
   'pnl.exportMd': 'Markdown निर्यात करें',
   'pnl.building': 'बनाया जा रहा है…',
   'pnl.exportWord': 'Word निर्यात करें',
+  'pnl.exportExcel': 'Excel निर्यात करें',
+  'pnl.excelFailed': 'Excel फ़ाइल नहीं बन सकी।',
   'pnl.exportPdf': 'PDF निर्यात करें',
   'pnl.editNoun': '{noun} संपादित करें',
   'pnl.newVersionFailed': 'नया संस्करण शुरू नहीं किया जा सका।',

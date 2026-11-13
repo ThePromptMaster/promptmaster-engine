@@ -177,6 +177,8 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.exportMd': '导出 Markdown',
   'pnl.building': '正在生成…',
   'pnl.exportWord': '导出 Word',
+  'pnl.exportExcel': '导出 Excel',
+  'pnl.excelFailed': '无法生成 Excel 文件。',
   'pnl.exportPdf': '导出 PDF',
   'pnl.editNoun': '编辑{noun}',
   'pnl.newVersionFailed': '无法开始新版本。',

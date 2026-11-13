@@ -654,6 +654,7 @@ it (their calls see the first 12,000 characters); on a stage when the user press
 its text to the project context". A scanned PDF has no text layer and is refused with
 that reason: there is no OCR. Tables, images and layout inside a document are not kept,
 only its words; the file itself is stored and copied into `/data` like any other.
+Since 13 Nov a PowerPoint deck (.pptx) is a document too: see L-240.
 
 **A run that executed settles its row (2026-10-01).** When the planner names the row of
 the stage's table a computation carries out (`params.row`) and the code exits cleanly,
@@ -4080,3 +4081,47 @@ What it does not do:
   takes, a routine approval refused once was not checked again after Go revised the stage. The
   repeated-question guard (`repeat-question.ts`) compares the same finish times with versions and facts;
   it now gets database times too, but steps saved before this keep the times they have.
+
+### L-240 — Office files: what is read, what is exported, and what is not (2026-11-13)
+
+A client asked whether PromptMaster can be hooked up to Word, Office and Excel. Word already worked
+(a .docx can be attached, read from Drive or OneDrive, and exported). Looking at the rest found a
+defect: a spreadsheet or a deck handed over from Drive or OneDrive was decoded as if it were text, so
+the project received the bytes of a zip file as its "words". `extractText` had readers for PDF and Word
+and decoded everything else.
+
+What changed:
+
+- **Excel from Drive or OneDrive is read as its rows.** Each sheet that holds anything arrives as CSV
+  text under the sheet's name (`spreadsheetToText`, `lib/data/spreadsheet.ts`), with the same reader an
+  attached workbook uses.
+- **PowerPoint is read for the words on its slides**, in the deck's own order, from Drive or OneDrive
+  and as an attachment (`pptxText`, `lib/data/extract-text.ts`). It is a document: its text goes to the
+  project context like a Word file's.
+- **Bytes that are not text are never passed on as words.** A zip, or anything holding NULs, under a
+  name there is no reader for is refused with the usual "could not be read".
+- **Excel export.** The export menu and the finished panel offer "Excel" when the work holds a table:
+  one sheet a table, named after the heading it sits under (`lib/export/xlsx-export.ts`). The assessment
+  table downloads as .xlsx beside CSV.
+
+What it does not do:
+
+- **A deck's text only.** Hidden slides and speaker notes are left out on purpose (a model is given
+  what a person presenting it shows). Pictures, charts, SmartArt and anything drawn rather than typed do
+  not arrive. Text comes in the order the file holds it, which is usually but not always reading order.
+  At most 300 slides, and a slide whose file is over 2 MB is skipped.
+- **A workbook's values only**, as before: formulas arrive as their last results; formatting, charts and
+  merged cells do not arrive. The old .xls, .doc and .ppt formats are refused with a sentence saying
+  what to save them as.
+- **An attached workbook is still data, not a document**: it becomes one CSV per sheet for the sandbox.
+  Only a workbook read from an account becomes text.
+- **The export writes tables and nothing else.** A document with no table gets no Excel button. A cell
+  is a number only when the whole of it is one, so "1,200", "12%" and "007" stay text exactly as
+  written; nothing is written as a formula, so "=SUM(A1)" in a table arrives as those characters.
+  No colours, merged cells or charts. Tables inside a code block are not tables.
+- **Where the deliverable has no table, the stages' tables are used.** The export menu then reads the
+  full Markdown record, so a review table from an earlier stage can be what the workbook holds.
+- **In the side chat and in drafts, PDF and Office files from an account are still only named**
+  (L-203): those searches run on the server, which has no reader for them.
+- **There is no Word, Excel or PowerPoint connection of its own.** Files reach PromptMaster from
+  OneDrive or Drive, or by attaching them. Nothing is written back to a file in either.

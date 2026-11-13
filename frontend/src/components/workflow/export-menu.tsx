@@ -17,10 +17,11 @@
 import { nounText, unitsText } from '@/lib/i18n/templates';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { deliverableNouns } from '@/lib/workflow/labels';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { downloadBlob, downloadFile } from '@/lib/utils';
 import { deckFromMarkdown, deckToPptx, isDeck } from '@/lib/export/pptx-export';
+import { workbookFrom } from '@/lib/export/xlsx-export';
 import {
   exportFilename,
   toJson,
@@ -73,6 +74,18 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   async function exportDeck() {
     const blob = await deckToPptx(deckFromMarkdown(manuscript), bundle.project.title || 'Untitled project');
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.pptx'));
+    setOpen(false);
+  }
+
+  // The work's tables as a workbook, one sheet a table (13 Nov). The deliverable's
+  // tables where it has any; otherwise the tables its stages hold. No table, no button.
+  const sheets = useMemo(() => {
+    const inWork = workbookFrom(manuscript);
+    return inWork.length ? inWork : workbookFrom(toMarkdown(bundle));
+  }, [manuscript, bundle]);
+  async function exportExcel() {
+    const { workbookToXlsx } = await import('@/lib/export/xlsx-export');
+    downloadBlob(await workbookToXlsx(sheets), exportFilename(bundle.project, 'md').replace(/\.md$/, '.xlsx'));
     setOpen(false);
   }
 
@@ -150,6 +163,16 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
               {t('export.notebookHint')}
             </span>
           </button>
+          {sheets.length > 0 && (
+            <button
+              role="menuitem"
+              onClick={() => void exportExcel()}
+              className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
+            >
+              <span className="block text-body text-[var(--on-surface)]">{t('export.xlsx')}</span>
+              <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">{t('export.xlsxHint')}</span>
+            </button>
+          )}
           {manuscript && (
             <>
               <button

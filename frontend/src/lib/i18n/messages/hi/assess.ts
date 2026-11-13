@@ -53,6 +53,7 @@ export const hi: Record<keyof typeof en, string> = {
   "assess.sortBest": "सबसे अच्छे पहले",
   "assess.sortNewest": "सबसे नए पहले",
   "assess.csv": "CSV डाउनलोड करें",
+  "assess.xlsx": "Excel डाउनलोड करें",
   "assess.batchCol": "बैच",
   "assess.dateCol": "आकलन की तारीख",
   "assess.rowActions": "पंक्ति की कार्रवाइयाँ",

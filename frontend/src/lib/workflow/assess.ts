@@ -226,6 +226,12 @@ export function assessmentCsv(items: StageItem[], headers: Record<(typeof CSV_CO
   return [CSV_COLUMNS.map((c) => cell(headers[c])).join(','), ...items.map((i) => CSV_COLUMNS.map((c) => cell(i[c])).join(','))].join('\n');
 }
 
+/** The table as rows of plain cells, headers first, for a workbook. */
+export function assessmentRows(items: StageItem[], headers: Record<(typeof CSV_COLUMNS)[number], string>): string[][] {
+  const cell = (v: string | undefined) => (v ?? '').replace(/\r?\n/g, ' ').trim();
+  return [CSV_COLUMNS.map((c) => cell(headers[c])), ...items.map((i) => CSV_COLUMNS.map((c) => cell(i[c])))];
+}
+
 /** The scale as the server takes it. */
 export function scaleForRequest(scale: AssessScale): { levels: { value: string; label: string; meaning: string }[] } {
   return { levels: scale.levels.map((l) => ({ value: l.label, label: l.label, meaning: l.meaning ?? '' })) };

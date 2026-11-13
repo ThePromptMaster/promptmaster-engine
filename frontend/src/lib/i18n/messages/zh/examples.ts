@@ -46,6 +46,8 @@ export const zh: Record<keyof typeof en, string> = {
   "ex.useBatch": "使用样例批次",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "每个标题变成一张幻灯片，带上要点、表格和演讲备注。",
+  "export.xlsx": "Excel",
+  "export.xlsxHint": "每个表格变成一个工作表，以其标题命名。",
   "ex.startFrom": "从示例开始",
   "prompty.name": "Prompty",
   "prompty.hello": "想先看个示例，还是从你自己的项目开始？",

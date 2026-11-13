@@ -4,7 +4,8 @@ import type { en } from '../areas/files';
 export const sw: Record<keyof typeof en, string> = {
   'file.oldExcel': '{name} iko katika muundo wa zamani wa Excel. Ihifadhi kama .xlsx au CSV kwanza.',
   'file.oldWord': '{name} iko katika muundo wa zamani wa Word. Ihifadhi kama .docx au PDF kwanza.',
-  'file.unsupported': '{name} si faili la PDF, Word (.docx), Markdown, maandishi, jedwali (.xlsx), CSV, TSV, JSON wala picha (PNG, JPEG, WebP, GIF, HEIC).',
+  'file.oldPowerPoint': '{name} iko katika muundo wa zamani wa PowerPoint. Ihifadhi kama .pptx au PDF kwanza.',
+  'file.unsupported': '{name} si faili la PDF, Word (.docx), PowerPoint (.pptx), Markdown, maandishi, jedwali (.xlsx), CSV, TSV, JSON wala picha (PNG, JPEG, WebP, GIF, HEIC).',
   'file.tooLarge': '{name} ni kubwa kuliko MB {mb}.',
   'file.empty': '{name} ni tupu.',
   'file.duplicate': 'Faili linaloitwa {name} tayari limeambatishwa. Liondoe kwanza ili kulibadilisha.',

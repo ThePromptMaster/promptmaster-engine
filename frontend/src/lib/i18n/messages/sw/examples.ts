@@ -46,6 +46,8 @@ export const sw: Record<keyof typeof en, string> = {
   "ex.useBatch": "Tumia kundi la mfano",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "Kila kichwa kinakuwa slaidi, pamoja na vidokezo, majedwali na maelezo ya mzungumzaji.",
+  "export.xlsx": "Excel",
+  "export.xlsxHint": "Kila jedwali linakuwa karatasi, lenye jina la kichwa chake.",
   "ex.startFrom": "Anza na mfano",
   "prompty.name": "Prompty",
   "prompty.hello": "Ungependa kuona mfano, au kuanza na mradi wako mwenyewe?",

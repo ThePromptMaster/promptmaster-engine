@@ -61,9 +61,29 @@ export function sheetsToCsv(fileName: string, sheets: readonly { sheet: string; 
   return filled.map((s, i) => ({ name: names[i], csv: s.csv }));
 }
 
-/** Read an .xlsx in the browser. The reader is loaded only when a spreadsheet is attached. */
-export async function spreadsheetToCsvFiles(file: File): Promise<File[]> {
+/** Every sheet of an .xlsx, read in the browser. The reader is loaded only when a spreadsheet is opened. */
+async function readSheets(input: File | ArrayBuffer): Promise<{ sheet: string; data: Cell[][] }[]> {
   const { default: readExcelFile } = await import('read-excel-file/browser');
-  const sheets = (await readExcelFile(file)) as unknown as { sheet: string; data: Cell[][] }[];
-  return sheetsToCsv(file.name, sheets).map((s) => new File([s.csv], s.name, { type: 'text/csv' }));
+  return (await readExcelFile(input)) as unknown as { sheet: string; data: Cell[][] }[];
+}
+
+/** Read an attached .xlsx: one CSV file per sheet that holds anything. */
+export async function spreadsheetToCsvFiles(file: File): Promise<File[]> {
+  return sheetsToCsv(file.name, await readSheets(file)).map((s) => new File([s.csv], s.name, { type: 'text/csv' }));
+}
+
+/**
+ * A workbook as text someone can read: each sheet's rows as CSV, under the
+ * sheet's name when there are several (12 Nov: a spreadsheet read from Drive
+ * or OneDrive is words for the project, not a data file, and its raw bytes
+ * had been decoded as if they were text).
+ */
+export function sheetsToText(sheets: readonly { sheet: string; data: readonly (readonly Cell[])[] }[]): string {
+  const filled = sheets.map((s) => ({ sheet: s.sheet, csv: sheetToCsv(s.data) })).filter((s) => s.csv.trim());
+  if (filled.length <= 1) return filled[0]?.csv ?? '';
+  return filled.map((s) => `Sheet: ${s.sheet}\n${s.csv}`).join('\n');
+}
+
+export async function spreadsheetToText(data: ArrayBuffer): Promise<string> {
+  return sheetsToText(await readSheets(data));
 }

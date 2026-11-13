@@ -16,7 +16,7 @@ export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
  * (lib/data/extract-text.ts) and offered as project context; the file itself
  * is kept like any other.
  */
-export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.md', '.ics', '.eml'] as const;
+export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.md', '.ics', '.eml'] as const;
 /**
  * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
  * placed in the work, never shown to a model: a prompt gets each one's name,
@@ -75,7 +75,10 @@ export function rejectReason(name: string, bytes: number, existing: readonly str
     !(DOCUMENT_ONLY_EXTENSIONS as readonly string[]).includes(ext) &&
     !isImage(name)
   ) {
-    return ext === '.xls' ? tr('file.oldExcel', { name }) : ext === '.doc' ? tr('file.oldWord', { name }) : tr('file.unsupported', { name });
+    return ext === '.xls' ? tr('file.oldExcel', { name })
+      : ext === '.doc' ? tr('file.oldWord', { name })
+        : ext === '.ppt' ? tr('file.oldPowerPoint', { name })
+          : tr('file.unsupported', { name });
   }
   if (bytes > MAX_FILE_BYTES) return tr('file.tooLarge', { name, mb: MAX_FILE_BYTES / 1_000_000 });
   if (bytes === 0) return tr('file.empty', { name });

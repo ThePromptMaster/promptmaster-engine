@@ -53,6 +53,7 @@ export const sw: Record<keyof typeof en, string> = {
   "assess.sortBest": "Bora kwanza",
   "assess.sortNewest": "Mpya kwanza",
   "assess.csv": "Pakua CSV",
+  "assess.xlsx": "Pakua Excel",
   "assess.batchCol": "Kundi",
   "assess.dateCol": "Tarehe ya tathmini",
   "assess.rowActions": "Vitendo vya safu",

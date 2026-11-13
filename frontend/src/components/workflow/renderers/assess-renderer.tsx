@@ -17,6 +17,7 @@ import {
   SCALE_LIMITS,
   SCALE_PRESETS,
   assessmentCsv,
+  assessmentRows,
   customScale,
   levelOf,
   parseAssessment,
@@ -29,7 +30,7 @@ import {
   type AssessScale,
 } from '@/lib/workflow/assess';
 import type { StageItem } from '@/lib/workflow/stage-artifact';
-import { downloadFile } from '@/lib/utils';
+import { downloadBlob, downloadFile } from '@/lib/utils';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { CustomSelect } from '@/components/shared/custom-select';
 import { LimitCounter } from '@/components/shared/limit-counter';
@@ -127,12 +128,18 @@ export function AssessRenderer({
     }
   }
 
+  const columnHeads = () => ({
+    subject: label('subject'), verdict: label('verdict'), rationale: label('rationale'), evidence: label('evidence'),
+    gaps: label('gaps'), batch: t('assess.batchCol'), assessed_at: t('assess.dateCol'),
+  });
+  const fileStem = () => stage.label.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase() || 'table';
   function download() {
-    const csv = assessmentCsv(sortByVerdict(scale, items), {
-      subject: label('subject'), verdict: label('verdict'), rationale: label('rationale'), evidence: label('evidence'),
-      gaps: label('gaps'), batch: t('assess.batchCol'), assessed_at: t('assess.dateCol'),
-    });
-    downloadFile(csv, `${stage.label.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase() || 'table'}.csv`, 'text/csv');
+    downloadFile(assessmentCsv(sortByVerdict(scale, items), columnHeads()), `${fileStem()}.csv`, 'text/csv');
+  }
+  // The same table as a workbook (13 Nov): what a recruiter or an analyst opens it in.
+  async function downloadExcel() {
+    const { sheetFrom, workbookToXlsx } = await import('@/lib/export/xlsx-export');
+    downloadBlob(await workbookToXlsx(sheetFrom(stage.label, assessmentRows(sortByVerdict(scale, items), columnHeads()))), `${fileStem()}.xlsx`);
   }
 
   const verdictOptions = scale.levels.map((l) => ({ value: l.label, label: word(l.label) }));
@@ -248,6 +255,14 @@ export function AssessRenderer({
               >
                 <span aria-hidden className="material-symbols-outlined text-[16px]">download</span>
                 {t('assess.csv')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void downloadExcel()}
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-label text-[var(--pm-primary)] hover:bg-[var(--surface-container-low)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[16px]">table_view</span>
+                {t('assess.xlsx')}
               </button>
             </div>
           </div>

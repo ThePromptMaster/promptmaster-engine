@@ -177,6 +177,8 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.exportMd': 'تصدير Markdown',
   'pnl.building': 'جارٍ الإنشاء…',
   'pnl.exportWord': 'تصدير Word',
+  'pnl.exportExcel': 'تصدير Excel',
+  'pnl.excelFailed': 'تعذّر إنشاء ملف Excel.',
   'pnl.exportPdf': 'تصدير PDF',
   'pnl.editNoun': 'تحرير {noun}',
   'pnl.newVersionFailed': 'تعذّر بدء نسخة جديدة.',

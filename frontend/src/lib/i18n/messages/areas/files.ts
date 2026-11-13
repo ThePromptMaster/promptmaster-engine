@@ -6,7 +6,8 @@
 export const en = {
   'file.oldExcel': '{name} is in the old Excel format. Save it as .xlsx or CSV first.',
   'file.oldWord': '{name} is in the old Word format. Save it as .docx or PDF first.',
-  'file.unsupported': '{name} is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF, HEIC) file.',
+  'file.oldPowerPoint': '{name} is in the old PowerPoint format. Save it as .pptx or PDF first.',
+  'file.unsupported': '{name} is not a PDF, Word (.docx), PowerPoint (.pptx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF, HEIC) file.',
   'file.tooLarge': '{name} is larger than {mb} MB.',
   'file.empty': '{name} is empty.',
   'file.duplicate': 'A file called {name} is already attached. Remove it first to replace it.',
@@ -40,7 +41,8 @@ type Keys = Record<keyof typeof en, string>;
 export const es: Keys = {
   'file.oldExcel': '{name} está en el formato antiguo de Excel. Guárdalo primero como .xlsx o CSV.',
   'file.oldWord': '{name} está en el formato antiguo de Word. Guárdalo primero como .docx o PDF.',
-  'file.unsupported': '{name} no es un archivo PDF, Word (.docx), Markdown, de texto, hoja de cálculo (.xlsx), CSV, TSV, JSON ni imagen (PNG, JPEG, WebP, GIF, HEIC).',
+  'file.oldPowerPoint': '{name} está en el formato antiguo de PowerPoint. Guárdalo primero como .pptx o PDF.',
+  'file.unsupported': '{name} no es un archivo PDF, Word (.docx), PowerPoint (.pptx), Markdown, de texto, hoja de cálculo (.xlsx), CSV, TSV, JSON ni imagen (PNG, JPEG, WebP, GIF, HEIC).',
   'file.tooLarge': '{name} ocupa más de {mb} MB.',
   'file.empty': '{name} está vacío.',
   'file.duplicate': 'Ya hay un archivo adjunto llamado {name}. Quítalo primero para sustituirlo.',
@@ -72,7 +74,8 @@ export const es: Keys = {
 export const fr: Keys = {
   'file.oldExcel': '{name} est dans l’ancien format Excel. Enregistrez-le d’abord en .xlsx ou CSV.',
   'file.oldWord': '{name} est dans l’ancien format Word. Enregistrez-le d’abord en .docx ou PDF.',
-  'file.unsupported': '{name} n’est pas un fichier PDF, Word (.docx), Markdown, texte, tableur (.xlsx), CSV, TSV, JSON ou image (PNG, JPEG, WebP, GIF, HEIC).',
+  'file.oldPowerPoint': '{name} est dans l’ancien format PowerPoint. Enregistrez-le d’abord en .pptx ou PDF.',
+  'file.unsupported': '{name} n’est pas un fichier PDF, Word (.docx), PowerPoint (.pptx), Markdown, texte, tableur (.xlsx), CSV, TSV, JSON ou image (PNG, JPEG, WebP, GIF, HEIC).',
   'file.tooLarge': '{name} dépasse {mb} Mo.',
   'file.empty': '{name} est vide.',
   'file.duplicate': 'Un fichier nommé {name} est déjà joint. Retirez-le d’abord pour le remplacer.',
@@ -104,7 +107,8 @@ export const fr: Keys = {
 export const pt: Keys = {
   'file.oldExcel': '{name} está no formato antigo do Excel. Salve primeiro como .xlsx ou CSV.',
   'file.oldWord': '{name} está no formato antigo do Word. Salve primeiro como .docx ou PDF.',
-  'file.unsupported': '{name} não é um arquivo PDF, Word (.docx), Markdown, texto, planilha (.xlsx), CSV, TSV, JSON nem imagem (PNG, JPEG, WebP, GIF, HEIC).',
+  'file.oldPowerPoint': '{name} está no formato antigo do PowerPoint. Salve primeiro como .pptx ou PDF.',
+  'file.unsupported': '{name} não é um arquivo PDF, Word (.docx), PowerPoint (.pptx), Markdown, texto, planilha (.xlsx), CSV, TSV, JSON nem imagem (PNG, JPEG, WebP, GIF, HEIC).',
   'file.tooLarge': '{name} tem mais de {mb} MB.',
   'file.empty': '{name} está vazio.',
   'file.duplicate': 'Já há um arquivo anexado chamado {name}. Remova-o primeiro para substituí-lo.',

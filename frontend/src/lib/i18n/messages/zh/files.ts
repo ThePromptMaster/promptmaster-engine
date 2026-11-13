@@ -4,7 +4,8 @@ import type { en } from '../areas/files';
 export const zh: Record<keyof typeof en, string> = {
   'file.oldExcel': '{name} 是旧版 Excel 格式。请先另存为 .xlsx 或 CSV。',
   'file.oldWord': '{name} 是旧版 Word 格式。请先另存为 .docx 或 PDF。',
-  'file.unsupported': '{name} 不是 PDF、Word (.docx)、Markdown、文本、电子表格 (.xlsx)、CSV、TSV、JSON 或图片（PNG、JPEG、WebP、GIF、HEIC）文件。',
+  'file.oldPowerPoint': '{name} 是旧版 PowerPoint 格式。请先另存为 .pptx 或 PDF。',
+  'file.unsupported': '{name} 不是 PDF、Word (.docx)、PowerPoint (.pptx)、Markdown、文本、电子表格 (.xlsx)、CSV、TSV、JSON 或图片（PNG、JPEG、WebP、GIF、HEIC）文件。',
   'file.tooLarge': '{name} 大于 {mb} MB。',
   'file.empty': '{name} 是空文件。',
   'file.duplicate': '已附加名为 {name} 的文件。如需替换，请先将其移除。',

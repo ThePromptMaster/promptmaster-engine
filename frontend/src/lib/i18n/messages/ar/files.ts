@@ -4,7 +4,8 @@ import type { en } from '../areas/files';
 export const ar: Record<keyof typeof en, string> = {
   'file.oldExcel': '{name} بصيغة Excel القديمة. احفظه أولًا بصيغة .xlsx أو CSV.',
   'file.oldWord': '{name} بصيغة Word القديمة. احفظه أولًا بصيغة .docx أو PDF.',
-  'file.unsupported': '{name} ليس ملف PDF أو Word (.docx) أو Markdown أو نصًا أو جدول بيانات (.xlsx) أو CSV أو TSV أو JSON أو صورة (PNG أو JPEG أو WebP أو GIF أو HEIC).',
+  'file.oldPowerPoint': '{name} بصيغة PowerPoint القديمة. احفظه أولًا بصيغة .pptx أو PDF.',
+  'file.unsupported': '{name} ليس ملف PDF أو Word (.docx) أو PowerPoint (.pptx) أو Markdown أو نصًا أو جدول بيانات (.xlsx) أو CSV أو TSV أو JSON أو صورة (PNG أو JPEG أو WebP أو GIF أو HEIC).',
   'file.tooLarge': '{name} أكبر من {mb} MB.',
   'file.empty': '{name} فارغ.',
   'file.duplicate': 'يوجد ملف مرفق باسم {name} بالفعل. أزله أولًا لاستبداله.',

@@ -46,6 +46,8 @@ export const hi: Record<keyof typeof en, string> = {
   "ex.useBatch": "नमूना खेप इस्तेमाल करें",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "हर शीर्षक एक स्लाइड बनता है, अपने बिंदुओं, तालिकाओं और वक्ता नोट्स के साथ।",
+  "export.xlsx": "Excel",
+  "export.xlsxHint": "हर तालिका एक शीट बनती है, जिसका नाम उसके शीर्षक पर होता है।",
   "ex.startFrom": "किसी उदाहरण से शुरू करें",
   "prompty.name": "Prompty",
   "prompty.hello": "क्या आप कोई उदाहरण देखना चाहेंगे, या अपनी परियोजना से शुरू करना चाहेंगे?",
