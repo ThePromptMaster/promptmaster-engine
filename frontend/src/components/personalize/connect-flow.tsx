@@ -317,7 +317,23 @@ export function ConnectFlow({ briefing = false, into }: { briefing?: boolean; in
         <p key={p} role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">{p}</p>
       ))}
       {searched && !chosen.length && !busy && !error && (
-        <p role="status" className="mt-4 text-body text-[var(--on-surface)]">{t(into ? 'conn.noneNew' : 'conn.noneFound')}</p>
+        <>
+          <p role="status" className="mt-4 text-body text-[var(--on-surface)]">{t(into ? 'conn.noneNew' : 'conn.noneFound')}</p>
+          {/* Found but not read is not "nothing": a file that could not be opened is named, with why (13 Nov). */}
+          {skipped.length > 0 && (
+            <section className="mt-5">
+              <h3 className="text-title text-[var(--on-surface)]">{t('conn.skippedTitle')}</h3>
+              <ul className="mt-2 space-y-1">
+                {skipped.map((s) => (
+                  <li key={`${s.id}-${s.reason}`} dir="auto" className="text-label text-[var(--on-surface-variant)]">
+                    {s.title ? `${s.title}: ` : ''}
+                    {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
 
       {phase === 'suggestions' && result && (

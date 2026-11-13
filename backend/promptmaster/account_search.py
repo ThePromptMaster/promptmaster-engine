@@ -122,10 +122,11 @@ _DECIDE_SYSTEM = (
     "three, never a sentence, with no search operators. Keep names as written, in their own language.\n"
     "sender: a name or address, only if they said who it came from; leave its name out of the keywords. "
     "after and before: YYYY-MM-DD, only if they gave a time.\n"
-    f"names: each person, company or deal they named, whole and as written (\"Dana Whitfield\", \"Northwind Traders\"), "
-    "without a word that only says what kind of thing it is (deal, account, contact, company), "
-    f"at most {MAX_NAMES}, and none when they named none. A CRM keeps each as a record of its own, so each is looked up "
-    "by itself.\n"
+    f"names: each person, company, deal, project or document they named, whole and as written (\"Dana Whitfield\", "
+    "\"Northwind Traders\", \"Kestrel supplier review\"), without a word that only says what kind of thing it is "
+    "(deal, account, contact, company, deck, workbook, report, file), "
+    f"at most {MAX_NAMES}, and none when they named none. Each is kept as a record or a file of its own, so each can "
+    "be looked up by itself.\n"
     'Return JSON only: {"search": true, "words": "...", "names": [], "sender": "", "after": "", "before": ""} or {"search": false}'
 )
 _TYPED_LINE = "\nThe person typed this into a search box, so always search."
@@ -408,7 +409,34 @@ async def search_everything(
 ) -> tuple[list[PreviewItem], list[Problem]]:
     """Every connected account searched at once. No contents yet: titles, senders and dates."""
     at = now or datetime.now(timezone.utc)
-    return await across_accounts(c, user_id, toolkits, lambda t, session: SEARCHES[t](c, session, q, at))
+    return await across_accounts(c, user_id, toolkits, lambda t, session: _search_one(c, session, t, q, at))
+
+
+async def _search_one(c: Composio, sid: str, toolkit: str, q: Search, now: datetime) -> list[PreviewItem]:
+    """One account. Mail, meetings and files match every word of a search inside one item, so a request for two
+    things at once ("the supplier review deck and the churn workbook") finds neither, or only the first (seen
+    on a real Drive, 13 Nov). So when the words together find nothing, each name is searched for by itself; and
+    when several things were named, so is each name the words do not already hold. A CRM always searches by
+    name (`crm_terms`)."""
+    found = await SEARCHES[toolkit](c, sid, q, now)
+    if toolkit in (SALESFORCE, HUBSPOT):
+        return found
+    said = {w.lower() for w in q.words.split()}
+    names = [n for n in dict.fromkeys(n.strip() for n in q.names) if n and n.lower() != q.words.strip().lower()]
+    if found:
+        # One thing named and found: the words were the search. Several named: the ones still unlooked-for.
+        names = [n for n in names if not all(w.lower() in said for w in n.split())] if len(names) > 1 or len(q.names) > 1 else []
+    names = names[:MAX_NAMES]
+    if not names:
+        return found
+    again = await asyncio.gather(
+        *(SEARCHES[toolkit](c, sid, q.model_copy(update={"words": n, "names": []}), now) for n in names), return_exceptions=True
+    )
+    for r in again:
+        if isinstance(r, BaseException) and not isinstance(r, ComposioError):
+            raise r
+    # The first search answered, so the account works: a name that fails costs only that name.
+    return _once(found + [i for r in again if not isinstance(r, BaseException) for i in r])
 
 
 async def active_toolkits(c: Composio, user_id: str) -> list[str]:
@@ -442,6 +470,31 @@ def build_pick_prompt(task: str, found: list[PreviewItem], nonce: str | None = N
         "Which should be opened?"
     )
     return _PICK_SYSTEM, user
+
+
+_KINDS = ("calendar_event", "email", "file", "crm_record")
+
+
+def with_each_kind(chosen: list[PreviewItem], found: list[PreviewItem], limit: int) -> list[PreviewItem]:
+    """What is going on is a little of everything the person connected. A kind the choice left out entirely is
+    given its first item (the next meeting, the newest of the rest), in place of the last of the kind that has
+    most: on a busy mailbox all eight places went to mail and no record was read (13 Nov). A choice of nothing
+    stays nothing."""
+    out = list(chosen)
+    if not out:
+        return out
+    for kind in _KINDS:
+        first = next((i for i in found if i.kind == kind), None)
+        if first is None or any(i.kind == kind for i in out):
+            continue
+        if len(out) >= limit:
+            counts = {k: sum(1 for i in out if i.kind == k) for k in _KINDS}
+            most = max(counts, key=lambda k: counts[k])
+            if counts[most] <= 1:
+                continue
+            out.pop(max(n for n, i in enumerate(out) if i.kind == most))
+        out.append(first)
+    return out
 
 
 def _newest_of_each(found: list[PreviewItem], limit: int) -> list[PreviewItem]:
@@ -497,12 +550,16 @@ async def _open(
     task: str,
     server_only: bool = False,
     limit: int = MAX_OPENED,
+    each_kind: bool = False,
 ) -> Opened:
-    """Pick and read. `server_only` leaves PDFs and Office files unopened: only a browser can read those."""
+    """Pick and read. `server_only` leaves PDFs and Office files unopened: only a browser can read those.
+    `each_kind` gives every kind of thing found a place (`with_each_kind`)."""
     readable = [i for i in found if i.readable]
     can_open = [i for i in readable if not (server_only and i.ref.get("mime") in BROWSER_TYPES)]
     unopened = [i.title for i in readable if i not in can_open][:3]
     chosen = await pick_best(client, can_open, task, limit)
+    if each_kind:
+        chosen = with_each_kind(chosen, can_open, limit)
     if not chosen:
         return Opened(matches=len(found), unopened=unopened)
     when = {(i.toolkit, i.id): i.when for i in chosen}
@@ -541,7 +598,7 @@ async def search_accounts(
         return await _for_meeting(client, c, user_id, toolkits, meeting, people, own_address)
     if not words.strip():
         found, problems = await preview(c, user_id, toolkits)
-        opened = await _open(client, c, user_id, found, RECENT_TASK)
+        opened = await _open(client, c, user_id, found, RECENT_TASK, each_kind=True)
         opened.problems = problems
         return opened
     q = await write_search(client, words)
