@@ -1742,7 +1742,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // What happens next is the loop's to say (one repair, then the user):
         // until 13 Nov this promised a revision the run then had no move for.
         return done(key, {
-          status: 'failed', toolsUsed: ['model'], changes: { check_reason: check.reason },
+          status: 'failed', toolsUsed: ['model'], changes: { check_reason: check.reason, checked_version_id: head.id },
           output: `Checked "${criterion.label}" on version ${head.version_number}: not met — ${check.reason} It is committed only once it holds.`,
         });
       }

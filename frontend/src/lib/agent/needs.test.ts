@@ -507,27 +507,46 @@ describe('routine decisions (Sean, 5 Oct): delegated, validated, and the user as
     });
 
     it('reads the refusals, their reasons and their repairs from the steps', () => {
-      const step = (over: Partial<AgentStep>) => ({ stage_id: 'positioning', status: 'succeeded', params: {}, output: '', changes: {}, started_at: '2026-11-12T23:46:00Z', finished_at: '2026-11-12T23:46:18Z', ...over }) as AgentStep;
-      const failed = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason } });
-      // A step saved before the reason was kept: read from what it printed.
+      const step = (over: Partial<AgentStep>) => ({ stage_id: 'positioning', status: 'succeeded', params: {}, output: '', changes: {}, started_at: '2026-11-12T23:46:17Z', finished_at: '2026-11-12T23:46:18Z', ...over }) as AgentStep;
+      const v3 = { id: 'v3', created_at: '2026-11-12T23:46:16Z' };
+      const v4 = { id: 'v4', created_at: '2026-11-12T23:47:29Z' };
+      const failed = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason, checked_version_id: 'v3' } });
+      // A step saved before the reason was kept: read from what it printed, and placed by when it started.
       const older = step({
         action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' },
         output: `Checked "X" on version 3: not met — ${reason} I will revise toward it rather than ask you; it is committed only once it holds.`,
       });
       const repair = step({ action_key: 'revise_stage', params: { repairs_criterion: 'pos.differentiator' }, started_at: '2026-11-12T23:47:00Z', finished_at: '2026-11-12T23:47:30Z' });
-      const head = '2026-11-12T23:46:16Z';
-      expect(refusedCommits([failed], 'positioning', head)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
-      expect(refusedCommits([older], 'positioning', head)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
-      // The repair made a new version: the old refusal is about the version before it.
-      expect(refusedCommits([failed, repair], 'positioning', '2026-11-12T23:47:29Z')).toEqual([]);
+      expect(refusedCommits([failed], 'positioning', v3)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
+      expect(refusedCommits([older], 'positioning', v3)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 0 }]);
+      // The repair made a new version: the old refusal is of the version before it.
+      expect(refusedCommits([failed, repair], 'positioning', v4)).toEqual([]);
+      expect(refusedCommits([older, repair], 'positioning', v4)).toEqual([]);
       // Refused again on the repaired version: one repair is on record.
-      const again = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason }, started_at: '2026-11-12T23:48:00Z', finished_at: '2026-11-12T23:48:10Z' });
-      expect(refusedCommits([failed, repair, again], 'positioning', '2026-11-12T23:47:29Z')).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 1 }]);
+      const again = step({ action_key: 'commit_delegated', status: 'failed', params: { criterion_id: 'pos.differentiator' }, changes: { check_reason: reason, checked_version_id: 'v4' }, started_at: '2026-11-12T23:48:00Z', finished_at: '2026-11-12T23:48:10Z' });
+      expect(refusedCommits([failed, repair, again], 'positioning', v4)).toEqual([{ criterionId: 'pos.differentiator', reason, repairs: 1 }]);
       // The user's own direction starts the count again.
       const answer = step({ action_key: 'user_answer', started_at: '2026-11-12T23:47:40Z', finished_at: '2026-11-12T23:47:40Z' });
-      expect(refusedCommits([failed, repair, answer, again], 'positioning', '2026-11-12T23:47:29Z')[0].repairs).toBe(0);
-      // Another stage's refusal is not this stage's.
-      expect(refusedCommits([failed], 'outline', head)).toEqual([]);
+      expect(refusedCommits([failed, repair, answer, again], 'positioning', v4)[0].repairs).toBe(0);
+      // Another stage's refusal is not this stage's; and with no version there is nothing refused.
+      expect(refusedCommits([failed], 'outline', v3)).toEqual([]);
+      expect(refusedCommits([], 'positioning', undefined)).toEqual([]);
+    });
+
+    // 13 Nov, production, forcing this very case: the browser's clock was 31
+    // seconds ahead of the database's. The step's finish (browser) was later
+    // than the repaired version (database), so the refusal of version 3 read
+    // as a refusal of version 4: it was never checked again, and the user was
+    // asked. The times below are the ones that run recorded.
+    it('places a refusal by the version it checked, never by a time the browser wrote', () => {
+      const step = (over: Partial<AgentStep>) => ({ stage_id: 'brief', status: 'succeeded', params: {}, output: '', changes: {}, ...over }) as AgentStep;
+      const refusedV3 = { action_key: 'commit_delegated', status: 'failed' as const, params: { criterion_id: 'brief.approved' }, started_at: '2026-11-13T16:30:36.195Z', finished_at: '2026-11-13T16:31:07.946Z' };
+      const repair = step({ action_key: 'revise_stage', params: { repairs_criterion: 'brief.approved' }, started_at: '2026-11-13T16:30:37.105Z', finished_at: '2026-11-13T16:31:26.710Z' });
+      const v4 = { id: 'v4', created_at: '2026-11-13T16:30:54.810Z' };
+      // As the step is saved now, naming the version it checked.
+      expect(refusedCommits([step({ ...refusedV3, changes: { check_reason: reason, checked_version_id: 'v3' } }), repair], 'brief', v4)).toEqual([]);
+      // As it was saved in that run, with no version named: placed by its start, which the database stamped.
+      expect(refusedCommits([step({ ...refusedV3, changes: { check_reason: reason } }), repair], 'brief', v4)).toEqual([]);
     });
   });
 
