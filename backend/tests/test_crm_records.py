@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from deps import get_composio
 from main import app
 from promptmaster import account_search, composio_mock_data
-from promptmaster.account_search import SEARCHES, Search, _newest_of_each, search_everything, sosl_for
+from promptmaster.account_search import SEARCHES, Search, _newest_of_each, crm_terms, search_everything, sosl_for
+from promptmaster.composio_client import ComposioError
 from promptmaster.connections import (
     _VALID,
     HUBSPOT,
@@ -116,6 +117,56 @@ async def test_a_search_reaches_both_crms_with_the_words_alone(fake):
         [asked] = _calls(fake, kind.tool)
         assert asked["query"] == "Northwind renewal" and asked["limit"] == MAX_RECORDS
         assert "hs_object_id" not in str(asked) and set(asked) == {"query", "limit", "properties"}
+
+
+@pytest.mark.asyncio
+async def test_each_name_is_searched_for_by_itself(fake):
+    """13 Nov, a real account: a person, their company and the deal are three records, and a CRM matches every
+    word of a search inside one. "Northwind Whitfield renewal" found none of them."""
+    together = Search(words="Northwind Whitfield renewal")
+    found, _ = await search_everything(fake, TEST_USER_ID, [SALESFORCE, HUBSPOT], together, NOW)
+    assert found == []
+    named = together.model_copy(update={"names": ["Dana Whitfield", "Northwind Holdings"]})
+    found, problems = await search_everything(fake, TEST_USER_ID, [SALESFORCE], named, NOW)
+    assert problems == []
+    # The contact answers to both names and is listed once.
+    assert sorted(i.id for i in found) == sorted(["Contact:003Hs00000Q7w6vIAB", "Account:001Hs00000Z9y8xIAB", OPPORTUNITY])
+    assert [c["q"] for c in _calls(fake, "SALESFORCE_POST_PARAMETERIZED_SEARCH")][-2:] == ["Dana Whitfield", "Northwind Holdings"]
+    before = len(fake.calls)
+    found, _ = await search_everything(fake, TEST_USER_ID, [HUBSPOT], Search(words="lease", names=["Sam Okafor", "Okafor Estates"]), NOW)
+    assert sorted(i.id for i in found) == ["company:9001", "contact:501", "deal:9001"]
+    asked = [args["query"] for kind, (_tool, args) in fake.calls[before:] if kind == "execute"]
+    assert sorted(asked) == ["Okafor Estates"] * 3 + ["Sam Okafor"] * 3
+    # With no name given the words are searched for, as before; never more than three names.
+    assert crm_terms(Search(words="Northwind renewal")) == ["Northwind renewal"]
+    assert crm_terms(Search(words="x", names=["A1", "B2", "C3", "D4", "A1", " "])) == ["A1", "B2", "C3"]
+    assert crm_terms(Search(sender="Okafor")) == ["Okafor"] and crm_terms(Search()) == []
+
+
+@pytest.mark.asyncio
+async def test_one_name_failing_costs_only_that_name(fake):
+    real = fake.execute
+
+    async def execute(session_id: str, tool: str, arguments: dict[str, Any]) -> Any:
+        if "Whitfield" in str(arguments.get("q") or ""):
+            raise ComposioError(f"{tool} failed")
+        return await real(session_id, tool, arguments)
+
+    fake.execute = execute  # type: ignore[method-assign]
+    q = Search(words="renewal", names=["Dana Whitfield", "Northwind Holdings"])
+    found, problems = await search_everything(fake, TEST_USER_ID, [SALESFORCE], q, NOW)
+    assert problems == [] and OPPORTUNITY in {i.id for i in found}
+    found, problems = await search_everything(fake, TEST_USER_ID, [SALESFORCE], Search(words="x", names=["Dana Whitfield"]), NOW)
+    assert found == [] and [p.toolkit for p in problems] == [SALESFORCE]
+
+
+def test_the_names_the_model_gives_are_cleaned_and_capped():
+    q = account_search._to_search({"search": True, "words": "renewal", "names": ['Dana "Whitfield"', "Northwind Traders", 7, "", "A", "B", "Dana Whitfield"]})
+    assert q is not None and q.names == ["Dana Whitfield", "Northwind Traders", "A"]
+    assert account_search._to_search({"search": True, "words": "renewal", "names": "Dana"}).names == []
+    assert account_search._to_search({"search": True, "words": "renewal"}).names == []
+    system, _user = account_search.build_decide_prompt("", "Call Dana Whitfield about the Northwind Traders renewal")
+    assert '"names": []' in system and "by itself" in system
 
 
 @pytest.mark.asyncio
