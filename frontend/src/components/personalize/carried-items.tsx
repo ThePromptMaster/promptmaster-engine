@@ -1,11 +1,10 @@
 'use client';
 
 import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
-import { shortWhen, toolkitFromSource } from '@/lib/connections/items';
+import { KIND_ICON, shortWhen, toolkitFromSource } from '@/lib/connections/items';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { ThirdPartyItem } from '@/types';
 
-const ICON: Record<ThirdPartyItem['kind'], string> = { email: 'mail', calendar_event: 'event', file: 'description' };
 
 /**
  * The items "Start this" carried from the person's accounts (7 Nov), on the start
@@ -30,7 +29,7 @@ export function CarriedItems({
       <ul className="mt-1 space-y-1">
         {items.map((item, i) => (
           <li key={`${i}-${item.title}`} className="flex items-center gap-2 text-label text-[var(--on-surface)]">
-            <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={ICON[item.kind]} size={16} className="text-[var(--on-surface-variant)]" />
+            <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={KIND_ICON[item.kind]} size={16} className="text-[var(--on-surface-variant)]" />
             <span dir="auto" className="min-w-0 flex-1 truncate">
               {item.title}
               {item.when ? <span className="text-[var(--on-surface-variant)]"> · {shortWhen(item.when, locale)}</span> : null}

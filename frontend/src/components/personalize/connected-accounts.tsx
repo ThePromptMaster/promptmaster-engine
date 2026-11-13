@@ -148,6 +148,7 @@ export function ConnectedAccounts({
         })}
       </ul>
       <p className="mt-3 text-label text-[var(--on-surface-variant)]">{t('conn.disconnectNote')}</p>
+      <p className="mt-3 text-label text-[var(--on-surface-variant)]">{t('conn.crmNote')}</p>
       {error && (
         <p role="alert" className="mt-3 rounded-xl bg-[var(--surface-container-high)] px-4 py-3 text-body text-[var(--pm-error)]">{error}</p>
       )}

@@ -3,14 +3,20 @@ import type { ThirdPartyItem } from '@/types';
 /**
  * Connected accounts (the client's call, 7 Nov): Gmail, Google Calendar, Google
  * Drive, Outlook and OneDrive, through Composio (`backend/routers/connections.py`).
+ * Since 13 Nov, Salesforce and HubSpot too: their contacts, companies and deals are
+ * one more kind of item, `crm_record`, read only (L-241).
  *
  * Since 8 Nov a search covers the whole account and nothing is ticked (L-203): the
  * backend reads the best matches and the browser lists exactly what was read
  * (`toThirdParty`, `toSharedItems`). Pure, apart from sessionStorage.
  */
 
-export type ToolkitSlug = 'gmail' | 'googlecalendar' | 'googledrive' | 'outlook' | 'one_drive';
+export type ToolkitSlug = 'gmail' | 'googlecalendar' | 'googledrive' | 'outlook' | 'one_drive' | 'salesforce' | 'hubspot';
 export type ItemKind = ThirdPartyItem['kind'];
+
+/** Every kind of item an account gives, and the icon that stands for it where its account's logo cannot. */
+export const KIND_ICON: Record<ItemKind, string> = { email: 'mail', calendar_event: 'event', file: 'description', crm_record: 'contact_page' };
+export const KINDS = Object.keys(KIND_ICON) as ItemKind[];
 
 export const TOOLKITS: readonly { slug: ToolkitSlug; label: string; icon: string }[] = [
   { slug: 'gmail', label: 'Gmail', icon: 'mail' },
@@ -18,6 +24,8 @@ export const TOOLKITS: readonly { slug: ToolkitSlug; label: string; icon: string
   { slug: 'googledrive', label: 'Google Drive', icon: 'folder_open' },
   { slug: 'outlook', label: 'Outlook', icon: 'inbox' },
   { slug: 'one_drive', label: 'OneDrive', icon: 'cloud' },
+  { slug: 'salesforce', label: 'Salesforce', icon: 'handshake' },
+  { slug: 'hubspot', label: 'HubSpot', icon: 'hub' },
 ];
 
 export function toolkitLabel(slug: string): string {
@@ -151,7 +159,7 @@ function isItem(x: unknown): x is ThirdPartyItem {
   const o = x as Record<string, unknown> | null;
   return (
     !!o &&
-    (o.kind === 'calendar_event' || o.kind === 'email' || o.kind === 'file') &&
+    (KINDS as readonly unknown[]).includes(o.kind) &&
     typeof o.title === 'string' &&
     typeof o.text === 'string' &&
     typeof o.source === 'string' &&

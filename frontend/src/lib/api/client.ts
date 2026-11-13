@@ -681,7 +681,7 @@ export const api = {
    * through `searchConnections`. One model call; nothing is saved.
    */
   async suggestWorkflows(req: {
-    items: { kind: 'note' | 'file' | 'email' | 'calendar_event'; source?: string; title: string; text: string }[];
+    items: { kind: 'note' | 'file' | 'email' | 'calendar_event' | 'crm_record'; source?: string; title: string; text: string }[];
     catalog: { key: string; title: string; description: string }[];
     profile?: Record<string, string>;
   }): Promise<{
