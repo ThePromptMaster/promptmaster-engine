@@ -65,6 +65,9 @@ confirmed to be the caller's before it is used. Since 8 Nov a search covers the 
 every connected account (`promptmaster/account_search.py`, L-203): the chat and a draft the
 person asked for run it through `with_accounts` while the project's `account_search` switch
 is on, written from the person's own words only, and at most 8 items are opened. Go does not.
+Since 13 Nov Composio also holds a person's Salesforce and HubSpot connection (L-241). A CRM
+record is one more kind of item (`crm_record`): contacts, companies and deals are searched and
+read through the same two steps, as a fixed list of fields, and nothing is ever written to a CRM.
 The browser shows each account's logo from Composio's logo service
 (`logos.composio.dev`, no referrer sent; `ToolkitLogo`), so Composio sees the viewer's
 IP address when those pages load. A Material icon stands in if the service is

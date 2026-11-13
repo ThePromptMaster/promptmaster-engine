@@ -1,4 +1,4 @@
-"""Reading a person's own mail, calendar and files, through Composio (7 Nov).
+"""Reading a person's own mail, calendar, files and CRM records, through Composio (7 Nov; CRM 13 Nov).
 
 Two steps. `account_search` (8 Nov, L-203) decides what goes through them:
 
@@ -35,7 +35,7 @@ from promptmaster.composio_client import Composio, ComposioError
 
 logger = logging.getLogger(__name__)
 
-Kind = Literal["email", "calendar_event", "file"]
+Kind = Literal["email", "calendar_event", "file", "crm_record"]
 
 # Composio toolkit slugs. Yahoo is not one Composio offers.
 GMAIL = "gmail"
@@ -43,6 +43,10 @@ GOOGLE_CALENDAR = "googlecalendar"
 GOOGLE_DRIVE = "googledrive"
 OUTLOOK = "outlook"
 ONE_DRIVE = "one_drive"
+# 13 Nov (a client: "Can we hook this up to Salesforce? … Hubspot?"). Read only:
+# contacts, companies and deals are searched and read, never written.
+SALESFORCE = "salesforce"
+HUBSPOT = "hubspot"
 
 
 @dataclass(frozen=True)
@@ -58,17 +62,24 @@ TOOLKITS: dict[str, Toolkit] = {
     GOOGLE_DRIVE: Toolkit(GOOGLE_DRIVE, "Google Drive", "Searches all of your files and reads the ones that match."),
     OUTLOOK: Toolkit(OUTLOOK, "Outlook", "Searches all of your mail and meetings and reads the ones that match."),
     ONE_DRIVE: Toolkit(ONE_DRIVE, "OneDrive", "Searches all of your files and reads the ones that match."),
+    SALESFORCE: Toolkit(SALESFORCE, "Salesforce", "Searches your contacts, accounts and opportunities and reads the ones that match."),
+    HUBSPOT: Toolkit(HUBSPOT, "HubSpot", "Searches your contacts, companies and deals and reads the ones that match."),
 }
 
 #: Composio's Gmail, Calendar and Drive are one Google app, so revoking one revokes the
 #: grant for all three (seen on production, 7 Nov: Drive disconnected, Gmail answered 401).
-#: Outlook and OneDrive are one Microsoft app.
-PROVIDER = {GMAIL: "google", GOOGLE_CALENDAR: "google", GOOGLE_DRIVE: "google", OUTLOOK: "microsoft", ONE_DRIVE: "microsoft"}
+#: Outlook and OneDrive are one Microsoft app. A CRM is its own grant.
+PROVIDER = {
+    GMAIL: "google", GOOGLE_CALENDAR: "google", GOOGLE_DRIVE: "google", OUTLOOK: "microsoft", ONE_DRIVE: "microsoft",
+    SALESFORCE: "salesforce", HUBSPOT: "hubspot",
+}
 
 #: How many of each kind a list or a search brings back. Not how far back it looks.
 MAX_EMAILS = 25
 MAX_EVENTS = 25
 MAX_FILES = 25
+#: Of each kind of CRM record (contacts, companies, deals).
+MAX_RECORDS = 10
 MAX_PICKED = 20
 MAX_TEXT_CHARS = 8_000
 MAX_ATTENDEES = 20
@@ -512,6 +523,152 @@ def onedrive_items(data: Any) -> list[PreviewItem]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# CRM records (13 Nov): Salesforce and HubSpot. A record is read as a fixed list
+# of its fields, never every property: a CRM holds whatever a web form put in it.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CrmObject:
+    """One kind of record: what the provider calls it, what a person calls it, and the fields read."""
+
+    name: str
+    label: str
+    #: (what a person calls the field, the provider's field), in the order they are written.
+    fields: tuple[tuple[str, str], ...]
+    #: The field that holds running text.
+    long: str = "Description"
+    #: HubSpot only: the Composio tool that searches this kind.
+    tool: str = ""
+
+
+SALESFORCE_OBJECTS: dict[str, CrmObject] = {
+    "Contact": CrmObject("Contact", "Contact", (
+        ("Title", "Title"), ("Account", "Account.Name"), ("Email", "Email"), ("Phone", "Phone"), ("Department", "Department"),
+    )),
+    "Account": CrmObject("Account", "Account", (
+        ("Industry", "Industry"), ("Type", "Type"), ("Website", "Website"), ("Phone", "Phone"), ("City", "BillingCity"),
+        ("Country", "BillingCountry"), ("Annual revenue", "AnnualRevenue"), ("Employees", "NumberOfEmployees"),
+    )),
+    "Opportunity": CrmObject("Opportunity", "Opportunity", (
+        ("Account", "Account.Name"), ("Stage", "StageName"), ("Amount", "Amount"), ("Close date", "CloseDate"),
+        ("Probability (%)", "Probability"), ("Type", "Type"), ("Next step", "NextStep"),
+    )),
+}
+HUBSPOT_OBJECTS: dict[str, CrmObject] = {
+    "contact": CrmObject("contact", "Contact", (
+        ("Job title", "jobtitle"), ("Company", "company"), ("Email", "email"), ("Phone", "phone"), ("Lifecycle stage", "lifecyclestage"),
+    ), long="", tool="HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA"),
+    "company": CrmObject("company", "Company", (
+        ("Domain", "domain"), ("Industry", "industry"), ("City", "city"), ("Country", "country"),
+        ("Employees", "numberofemployees"), ("Annual revenue", "annualrevenue"),
+    ), long="description", tool="HUBSPOT_SEARCH_COMPANIES"),
+    "deal": CrmObject("deal", "Deal", (
+        ("Amount", "amount"), ("Stage", "dealstage"), ("Pipeline", "pipeline"), ("Close date", "closedate"), ("Type", "dealtype"),
+    ), long="description", tool="HUBSPOT_SEARCH_DEALS"),
+}
+_HUBSPOT_NAMES = {"contact": ("firstname", "lastname"), "company": ("name",), "deal": ("dealname",)}
+_HUBSPOT_MODIFIED = ("lastmodifieddate", "hs_lastmodifieddate")
+#: A Salesforce id is 15 or 18 letters and digits; a HubSpot one is digits. Checked before either goes into a query.
+SALESFORCE_ID = re.compile(r"^[A-Za-z0-9]{15,18}$")
+HUBSPOT_ID = re.compile(r"^\d{1,20}$")
+
+
+def salesforce_fields(obj: CrmObject, full: bool = True) -> list[str]:
+    """What a query asks for. `full` is everything read; without it, what any profile may see."""
+    base = ["Id", "Name", "LastModifiedDate"]
+    return base + [f for _label, f in obj.fields] + ([obj.long] if obj.long else []) if full else base
+
+
+def hubspot_properties(obj: CrmObject) -> list[str]:
+    return [*_HUBSPOT_NAMES[obj.name], *(f for _label, f in obj.fields), *([obj.long] if obj.long else []), *_HUBSPOT_MODIFIED]
+
+
+def crm_id(obj: CrmObject, record_id: str) -> str:
+    """An id that says which kind it is: HubSpot numbers contacts, companies and deals apart, so 12 can be all three."""
+    return f"{obj.name}:{record_id}"
+
+
+def split_crm_id(item_id: str, objects: dict[str, CrmObject], valid: re.Pattern[str]) -> tuple[CrmObject, str]:
+    name, _, record_id = item_id.partition(":")
+    obj = objects.get(name)
+    if obj is None or not valid.match(record_id):
+        raise ComposioError("That record can't be read.", 404)
+    return obj, record_id
+
+
+def _record_text(obj: CrmObject, title: str, record: dict[str, Any], when: str) -> str:
+    """The record as lines a person can read: the fields on the list, then its description."""
+    lines = [f"{obj.label}: {title}"]
+    for label, path in obj.fields:
+        value = _first(record, path)
+        if value is not None and not isinstance(value, (dict, list)):
+            lines.append(f"{label}: {_short(str(value), 300)}")
+    if when:
+        lines.append(f"Last changed: {when}")
+    text = "\n".join(lines)
+    described = _first(record, obj.long) if obj.long else None
+    if described:
+        text += "\n\n" + clean_text(str(described))
+    return clean_text(text)
+
+
+def _salesforce_type(record: dict[str, Any]) -> str:
+    return str(_first(record, "attributes.type") or "")
+
+
+def salesforce_items(data: Any, default: str = "") -> list[PreviewItem]:
+    """Records from a search or a query. Each says its own type; a query of one kind may not."""
+    out: list[PreviewItem] = []
+    counts: dict[str, int] = {}
+    for r in find_records(data, ("Id",)):
+        obj = SALESFORCE_OBJECTS.get(_salesforce_type(r) or default)
+        rid = str(r.get("Id") or "")
+        if obj is None or not SALESFORCE_ID.match(rid) or counts.get(obj.name, 0) >= MAX_RECORDS:
+            continue
+        counts[obj.name] = counts.get(obj.name, 0) + 1
+        out.append(PreviewItem(
+            id=crm_id(obj, rid), toolkit=SALESFORCE, kind="crm_record",
+            title=_short(_first(r, "Name") or f"({obj.label.lower()} with no name)"),
+            when=_when(_first(r, "LastModifiedDate")), who=_short(_first(r, "Account.Name"), 200),
+            detail=obj.label, ref={"object": obj.name},
+        ))
+    return out
+
+
+def _hubspot_properties(record: dict[str, Any]) -> dict[str, Any]:
+    props = record.get("properties")
+    return props if isinstance(props, dict) else record
+
+
+def _hubspot_title(obj: CrmObject, props: dict[str, Any]) -> str:
+    name = " ".join(str(props.get(k) or "").strip() for k in _HUBSPOT_NAMES[obj.name]).strip()
+    return _short(name or props.get("email") or f"({obj.label.lower()} with no name)")
+
+
+def hubspot_items(kind: str) -> Callable[[Any], list[PreviewItem]]:
+    """A parser for one kind: a HubSpot answer does not say what kind of record it holds."""
+    obj = HUBSPOT_OBJECTS[kind]
+
+    def parse(data: Any) -> list[PreviewItem]:
+        out: list[PreviewItem] = []
+        for r in find_records(data, ("properties", "hs_object_id"))[:MAX_RECORDS]:
+            props = _hubspot_properties(r)
+            rid = str(r.get("id") or props.get("hs_object_id") or "")
+            if not HUBSPOT_ID.match(rid):
+                continue
+            out.append(PreviewItem(
+                id=crm_id(obj, rid), toolkit=HUBSPOT, kind="crm_record", title=_hubspot_title(obj, props),
+                when=_when(_first(props, *_HUBSPOT_MODIFIED) or r.get("updatedAt")),
+                who=_short(props.get("company"), 200) if obj.name == "contact" else "",
+                detail=obj.label, ref={"object": obj.name},
+            ))
+        return out
+
+    return parse
+
+
 DRIVE_FIELDS = "files(id,name,mimeType,modifiedTime,owners(displayName,emailAddress))"
 NOT_TRASH_OR_FOLDER = "trashed = false and mimeType != 'application/vnd.google-apps.folder'"
 OUTLOOK_MAIL_FIELDS = ["id", "subject", "from", "toRecipients", "receivedDateTime"]
@@ -603,21 +760,67 @@ async def _onedrive_preview(c: Composio, sid: str, now: datetime) -> list[Previe
     return items
 
 
+SALESFORCE_QUERY = "SALESFORCE_RUN_SOQL_QUERY"
+
+
+async def salesforce_query(c: Composio, sid: str, obj: CrmObject, where: str, tail: str = "") -> Any:
+    """One SOQL query. A field this person's profile may not see fails the whole query, so it is tried again with only what every profile sees."""
+    try:
+        soql = f"SELECT {', '.join(salesforce_fields(obj))} FROM {obj.name} {where} {tail}".strip()
+        return await c.execute(sid, SALESFORCE_QUERY, {"query": soql})
+    except ComposioError as e:
+        logger.warning("CONNECTIONS_TOOL_FAILED tool=%s object=%s error=%s", SALESFORCE_QUERY, obj.name, e)
+        soql = f"SELECT {', '.join(salesforce_fields(obj, full=False))} FROM {obj.name} {where} {tail}".strip()
+        return await c.execute(sid, SALESFORCE_QUERY, {"query": soql})
+
+
+async def _salesforce_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
+    """What is being worked on: the open opportunities, newest first."""
+    obj = SALESFORCE_OBJECTS["Opportunity"]
+    data = await salesforce_query(c, sid, obj, "WHERE IsClosed = false", f"ORDER BY LastModifiedDate DESC LIMIT {MAX_RECORDS}")
+    items = salesforce_items(data, default=obj.name)
+    if not items:
+        _log_empty(SALESFORCE_QUERY, data)
+    return items
+
+
+async def _hubspot_preview(c: Composio, sid: str, now: datetime) -> list[PreviewItem]:
+    """What is being worked on: the deals changed most recently."""
+    obj = HUBSPOT_OBJECTS["deal"]
+    try:
+        tool = obj.tool
+        data = await c.execute(sid, tool, {
+            "sorts": [{"propertyName": "hs_lastmodifieddate", "direction": "DESCENDING"}],
+            "limit": MAX_RECORDS, "properties": hubspot_properties(obj),
+        })
+    except ComposioError as e:
+        logger.warning("CONNECTIONS_TOOL_FAILED tool=%s error=%s", obj.tool, e)
+        tool = "HUBSPOT_LIST_DEALS"
+        data = await c.execute(sid, tool, {"limit": MAX_RECORDS, "properties": hubspot_properties(obj)})
+    items = hubspot_items(obj.name)(data)
+    if not items:
+        _log_empty(tool, data)
+    return items
+
+
 PREVIEWS = {
     GMAIL: _gmail_preview,
     GOOGLE_CALENDAR: _google_calendar_preview,
     GOOGLE_DRIVE: _drive_preview,
     OUTLOOK: _outlook_preview,
     ONE_DRIVE: _onedrive_preview,
+    SALESFORCE: _salesforce_preview,
+    HUBSPOT: _hubspot_preview,
 }
 
 
 def ordered(items: list[PreviewItem]) -> list[PreviewItem]:
-    """Meetings soonest first, then mail and files newest first."""
+    """Meetings soonest first, then mail, files and CRM records, each newest first."""
     meetings = sorted((i for i in items if i.kind == "calendar_event"), key=lambda i: i.when)
     mail = sorted((i for i in items if i.kind == "email"), key=lambda i: i.when, reverse=True)
     files = sorted((i for i in items if i.kind == "file"), key=lambda i: i.when, reverse=True)
-    return meetings + mail + files
+    records = sorted((i for i in items if i.kind == "crm_record"), key=lambda i: i.when, reverse=True)
+    return meetings + mail + files + records
 
 
 async def across_accounts(
@@ -868,7 +1071,40 @@ async def _read_file(c: Composio, sid: str, item: PickedItem, toolkit: str) -> C
                          text=clean_text(_as_text(content)))
 
 
+async def _read_salesforce(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
+    obj, rid = split_crm_id(item.id, SALESFORCE_OBJECTS, SALESFORCE_ID)
+    data = await salesforce_query(c, sid, obj, f"WHERE Id = '{rid}'", "LIMIT 1")
+    record = find_object(data, ("Id",))
+    if record is None:
+        _log_empty(SALESFORCE_QUERY, data)
+        raise ComposioError("That record is no longer there.", 404)
+    title = _short(_first(record, "Name") or item.title)
+    when = human_when(_when(_first(record, "LastModifiedDate")))
+    return ConnectedText(id=item.id, toolkit=SALESFORCE, kind="crm_record", source=_source("Salesforce", obj.label, when),
+                         title=title, text=_record_text(obj, title, record, when))
+
+
+async def _read_hubspot(c: Composio, sid: str, item: PickedItem) -> ConnectedText:
+    obj, rid = split_crm_id(item.id, HUBSPOT_OBJECTS, HUBSPOT_ID)
+    data = await c.execute(sid, obj.tool, {
+        "filterGroups": [{"filters": [{"propertyName": "hs_object_id", "operator": "EQ", "value": rid}]}],
+        "limit": 1, "properties": hubspot_properties(obj),
+    })
+    record = next((r for r in find_records(data, ("properties", "hs_object_id"))
+                   if str(r.get("id") or _hubspot_properties(r).get("hs_object_id") or "") == rid), None)
+    if record is None:
+        _log_empty(obj.tool, data)
+        raise ComposioError("That record is no longer there.", 404)
+    props = _hubspot_properties(record)
+    title = _hubspot_title(obj, props) or item.title
+    when = human_when(_when(_first(props, *_HUBSPOT_MODIFIED) or record.get("updatedAt")))
+    return ConnectedText(id=item.id, toolkit=HUBSPOT, kind="crm_record", source=_source("HubSpot", obj.label, when),
+                         title=title, text=_record_text(obj, title, props, when))
+
+
 async def _read_one(c: Composio, sid: str, item: PickedItem) -> ConnectedText | ConnectedFile:
+    if item.kind == "crm_record":
+        return await (_read_salesforce if item.toolkit == SALESFORCE else _read_hubspot)(c, sid, item)
     if item.kind == "email":
         return await (_read_gmail if item.toolkit == GMAIL else _read_outlook_mail)(c, sid, item)
     if item.kind == "calendar_event":
@@ -879,7 +1115,7 @@ async def _read_one(c: Composio, sid: str, item: PickedItem) -> ConnectedText | 
 
 
 _VALID = {(GMAIL, "email"), (OUTLOOK, "email"), (GOOGLE_CALENDAR, "calendar_event"), (OUTLOOK, "calendar_event"),
-          (GOOGLE_DRIVE, "file"), (ONE_DRIVE, "file")}
+          (GOOGLE_DRIVE, "file"), (ONE_DRIVE, "file"), (SALESFORCE, "crm_record"), (HUBSPOT, "crm_record")}
 
 
 async def read(c: Composio, user_id: str, picked: list[PickedItem]) -> tuple[list[ConnectedText], list[ConnectedFile], list[Skipped]]:

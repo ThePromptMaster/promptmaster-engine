@@ -125,7 +125,7 @@ def test_lists_only_the_callers_accounts(fake):
     fake.add("a4", "outlook", status="INITIATED")  # abandoned at the consent screen
     body = client.get("/api/connections").json()
     assert [a["id"] for a in body["accounts"]] == ["a1"]
-    assert {t["slug"] for t in body["toolkits"]} == {"gmail", "googlecalendar", "googledrive", "outlook", "one_drive"}
+    assert {t["slug"] for t in body["toolkits"]} == {"gmail", "googlecalendar", "googledrive", "outlook", "one_drive", "salesforce", "hubspot"}
 
 
 def test_link_returns_to_our_connect_page_only(fake):
