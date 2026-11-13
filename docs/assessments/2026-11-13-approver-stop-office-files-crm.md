@@ -67,14 +67,26 @@ A defect was found on the way. A spreadsheet or a deck handed over from Drive or
 
 Not seen by hand: an .xlsx or .pptx read from Drive or OneDrive (neither is connected on the test account; the reading is the same function the attachment used, and is unit-tested from a Drive file's bytes); the exported file saved to disk and opened in Excel itself (it was read from what the page produced).
 
-## 3. Salesforce and HubSpot (#679, #680 held, L-241)
+## 3. Salesforce and HubSpot (#679, #680, #682, #683, #684, L-241)
 
-Composio, which already holds the Google and Microsoft connections, offers both with its own sign-in. The backend can now search and read contacts, accounts and opportunities in Salesforce and contacts, companies and deals in HubSpot, as one more kind of item, read only, a fixed list of fields per kind, ids checked before they reach a query.
+Composio, which already holds the Google and Microsoft connections, offers both with its own sign-in. PromptMaster searches and reads contacts, accounts and opportunities in Salesforce and contacts, companies and deals in HubSpot, as one more kind of item, read only, a fixed list of fields per kind, ids checked before they reach a query.
+
+Run on production against real accounts on 13 Nov: a HubSpot account with its sample records, and a Salesforce Developer Edition org holding one account, one contact and one open opportunity (invented, added for the test).
 
 | Check | How | Result |
 |---|---|---|
-| The backend's parsing, search, read, id checks and disconnect | 18 tests against scripted records | Pass |
-| Production lists both, and Composio gives a sign-in link for each | By hand on production (the link was not followed) | Seven accounts listed; a link returned for each |
-| A real account | | **Not run.** No call has been made against a real Salesforce or HubSpot account. The screens (#680) are held until one has |
+| Parsing, search, read, id checks, disconnect | 26 tests against scripted records | Pass |
+| Both connect | By hand: the owner signed in on Salesforce's and HubSpot's own screens | Both Connected on the settings page (`09-settings-salesforce-hubspot-connected.jpg`) |
+| What is going on, the search and the read by id | By hand, calling production as the signed-in owner | All three kinds of record found and read on both, with no tool name, argument or parser changed |
+| What a record reads as | By hand | Three lines told a reader nothing and were fixed (#682): a HubSpot stage was its number (now "Prospecting"), a close date was a timestamp, a Salesforce website was "[link removed]" |
+| A request naming a person, a company and a deal | By hand | **Found nothing**: a CRM matches every word inside one record. Fixed (#683, #684): each name is searched for by itself, and the words as well. The same sentence then found the opportunity, the contact and the account |
+| A draft in a new project | By hand | Searched Salesforce by itself, read the opportunity and cited it as [T1] (`10-opportunity-read-from-salesforce.jpg`) |
+| The side chat | By hand | Read the Salesforce contact, and a HubSpot deal and contact, each cited and listed in the project |
+| Add from my accounts, and Remove | By hand | Added the account with no press; two items removed and still gone after a reload (`11-project-panel-six-crm-records.jpg`) |
+| Disconnect | By hand | Salesforce: "Composio" gone from the org's connected apps. HubSpot: the connection is removed, and "Composio" stays listed under Connected Apps until uninstalled there. The settings page now says both |
+
+Not seen by hand: a project started from a suggestion built on a record (the page that reads by itself opened eight emails and no record on this mailbox); an organisation whose administrator must allow the app first; the three fallbacks (the second Salesforce search tool, the plain list of deals, the query repeated with fewer fields); a deal's currency. What HubSpot's permission screen asks for is wider than what is used, and includes changing records: it is Composio's shared app.
+
+During the last deploy a shell loop passed a wrong project name. `vercel link` failed, and `vercel deploy` then made a new project named after the folder and served the export of the repository at a public address for about two minutes. Its page was replaced with an empty one, the project was deleted with the owner's approval, and `docs/deployment.md` now says to check the link before deploying.
 
 ZoomInfo: nothing built. Composio's ZoomInfo connection needs the customer's own ZoomInfo client id and secret.

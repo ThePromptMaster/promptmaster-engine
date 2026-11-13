@@ -13,7 +13,7 @@ export const zh: Record<keyof typeof en, string> = {
   'conn.reads.one_drive': '搜索你的全部文件，并读取匹配的文件。',
   'conn.reads.salesforce': '搜索你的联系人、客户和商机，并读取匹配的记录。',
   'conn.reads.hubspot': '搜索你的联系人、公司和交易，并读取匹配的记录。',
-  'conn.crmNote': 'Salesforce 和 HubSpot 的页面上也会显示“Composio”。该页面请求的权限比 PromptMaster 实际使用的更广，其中包括更改记录。PromptMaster 只读取：匹配的联系人、公司和交易中的少量字段，绝不创建、更改或删除记录；断开连接时，它在那里的访问权限会被撤销。',
+  'conn.crmNote': 'Salesforce 和 HubSpot 的页面上也会显示“Composio”。该页面请求的权限比 PromptMaster 实际使用的更广，其中包括更改记录。PromptMaster 只读取：匹配的联系人、公司和交易中的少量字段，绝不创建、更改或删除记录。断开连接时，它在 Salesforce 的访问权限会被撤销；在 HubSpot，连接会被移除，但“Composio”仍会列在“已连接的应用”中，直到你在那里将其卸载。',
   'conn.connect': '连接',
   'conn.opening': '正在打开…',
   'conn.connected': '已连接',
