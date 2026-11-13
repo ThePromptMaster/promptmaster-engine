@@ -201,6 +201,46 @@ async def test_never_more_than_eight():
     assert len(await pick_best(llm, _found(20), "work")) == 8
 
 
+def test_with_nothing_typed_each_kind_found_has_a_place():
+    """13 Nov, a real mailbox: all eight places went to mail, and no CRM record or file was read."""
+    mail, records, files = _found(20, "email"), _found(3, "crm_record"), _found(2, "file")
+    found = mail + files + records
+    chosen = search.with_each_kind(mail[:8], found, 8)
+    assert len(chosen) == 8 and [i.id for i in chosen[-2:]] == ["file0", "crm_record0"]
+    # The mail the choice ranked last gave up its place, not the mail it ranked first.
+    assert [i.id for i in chosen[:6]] == [f"email{n}" for n in range(6)]
+    # A choice that already holds every kind, or room to spare, loses nothing.
+    assert search.with_each_kind(mail[:3] + records[:1] + files[:1], found, 8) == mail[:3] + records[:1] + files[:1]
+    assert [i.id for i in search.with_each_kind(mail[:2], found, 8)] == ["email0", "email1", "file0", "crm_record0"]
+    # Nothing chosen stays nothing, and one place is never taken from a kind that has only one.
+    assert search.with_each_kind([], found, 8) == []
+    one_each = [mail[0], files[0]]
+    assert search.with_each_kind(one_each, found, 2) == one_each
+
+
+@pytest.mark.asyncio
+async def test_two_things_asked_for_together_are_each_looked_for(fake):
+    """13 Nov, a real Drive: "the supplier review deck and the churn workbook" became one search for every word,
+    and no one file holds them all."""
+    together = Search(words="operating plan offsite recording")
+    found, _ = await search_everything(fake, TEST_USER_ID, ["googledrive"], together, now=NOW)
+    assert found == []
+    named = together.model_copy(update={"names": ["operating plan", "Offsite recording"]})
+    found, problems = await search_everything(fake, TEST_USER_ID, ["googledrive"], named, now=NOW)
+    assert problems == [] and sorted(i.id for i in found) == ["f-plan", "f-video"]
+    asked = [args["q"] for kind, (tool, args) in fake.calls if kind == "execute" and tool == "GOOGLEDRIVE_FIND_FILE"]
+    assert "fullText contains 'operating' and fullText contains 'plan'" in asked[-2] and "fullText contains 'offsite'" not in asked[-2]
+    # When the words together do find something, nothing more is asked.
+    before = len(fake.calls)
+    found, _ = await search_everything(fake, TEST_USER_ID, ["googledrive"], Search(words="operating plan", names=["Offsite recording"]), now=NOW)
+    assert [i.id for i in found] == ["f-plan"]
+    assert sum(1 for kind, (tool, _a) in fake.calls[before:] if kind == "execute" and tool == "GOOGLEDRIVE_FIND_FILE") == 1
+    # Several things named, and the words hold only the first: the others are looked for as well.
+    several = Search(words="operating plan", names=["operating plan", "Offsite recording"])
+    found, _ = await search_everything(fake, TEST_USER_ID, ["googledrive"], several, now=NOW)
+    assert sorted(i.id for i in found) == ["f-plan", "f-video"]
+
+
 @pytest.mark.asyncio
 async def test_a_picker_that_fails_opens_the_newest_of_each_kind():
     llm = AsyncMock()
