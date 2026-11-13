@@ -323,12 +323,22 @@ def sosl_for(text: str) -> str:
     return f"FIND {{{words}}} IN ALL FIELDS RETURNING {returning}"
 
 
+#: How many searches one question may cost a CRM: each is a call to Salesforce and three to HubSpot.
+MAX_CRM_TERMS = 3
+
+
 def crm_terms(q: Search) -> list[str]:
     """What a CRM is searched for. A CRM matches every word of a search inside one record, and a person, their
     company and the deal are three records: asked for together, none is found (seen on a real account, 13 Nov).
-    So each name is searched for by itself, and the words are used only when no name was given."""
+    So each name is searched for by itself. The words are searched for as well, since a question can name one
+    record and only describe another ("who is Brian Halligan, and what stage is the new deal at?"), unless the
+    names already hold every one of them."""
     names = list(dict.fromkeys(n.strip() for n in q.names if len(n.replace(" ", "")) >= 2))[:MAX_NAMES]
-    return names or [t for t in [q.words or q.sender] if t]
+    words = (q.words or q.sender).strip()
+    named = {w.lower() for n in names for w in n.split()}
+    if words and not all(w.lower() in named for w in words.split()):
+        names.append(words)
+    return names[:MAX_CRM_TERMS]
 
 
 def _once(items: list[PreviewItem]) -> list[PreviewItem]:
