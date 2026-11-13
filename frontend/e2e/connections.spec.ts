@@ -29,7 +29,8 @@ test('connect, search everything, suggest, brief, chat and disconnect', async ({
   await dismissBetaNotice(page);
   await expect(page.getByRole('heading', { name: 'Connected accounts' })).toBeVisible();
   await expect(page.getByText('Searches all of your mail and reads the emails that match.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Connect', exact: true })).toHaveCount(5);
+  await expect(page.getByText('Searches your contacts, accounts and opportunities and reads the ones that match.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Connect', exact: true })).toHaveCount(7);
   await shot('01-settings.png');
 
   // Connect three: the mock returns straight to /projects/connect, which confirms and comes back.

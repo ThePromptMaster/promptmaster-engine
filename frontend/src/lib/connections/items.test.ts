@@ -102,6 +102,10 @@ describe('what a project holds from the accounts (7 Nov)', () => {
     expect(takeStartItems()).toEqual([]);
     sessionStorage.setItem('pm.start.items', JSON.stringify([a, { kind: 'script', title: 'x', text: 'y', source: '' }, 'junk']));
     expect(takeStartItems()).toEqual([a]);
+    // A CRM record is carried like any other item (13 Nov): it used to be dropped here as an unknown kind.
+    const record = { kind: 'crm_record' as const, source: 'Salesforce · Opportunity', title: 'Northwind renewal', text: 'Stage: Negotiation' };
+    rememberStartItems([a, record]);
+    expect(takeStartItems()).toEqual([a, record]);
     sessionStorage.setItem('pm.start.items', '{not json');
     expect(takeStartItems()).toEqual([]);
   });
@@ -114,6 +118,9 @@ describe('which account an item came from', () => {
     expect(toolkitFromSource('Google Drive')).toBe('googledrive');
     expect(toolkitFromSource('Outlook calendar · 12 Nov 2026')).toBe('outlook');
     expect(toolkitFromSource('OneDrive')).toBe('one_drive');
+    // 13 Nov: a CRM record's line says its kind after the account.
+    expect(toolkitFromSource('Salesforce · Opportunity · 12 Nov 2026, 10:00 UTC+00:00')).toBe('salesforce');
+    expect(toolkitFromSource('HubSpot · Deal')).toBe('hubspot');
   });
 
   it('says nothing when the line names no account', () => {

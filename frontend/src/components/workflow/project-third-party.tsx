@@ -5,12 +5,11 @@ import { useEffect, useState } from 'react';
 import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { hasConnectedAccount } from '@/lib/connections/account-found';
-import { MAX_HELD, shortWhen, toolkitFromSource } from '@/lib/connections/items';
+import { KIND_ICON, MAX_HELD, shortWhen, toolkitFromSource } from '@/lib/connections/items';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { ThirdPartyItem } from '@/types';
 import type { Project } from '@/types/project';
 
-const ICON: Record<ThirdPartyItem['kind'], string> = { email: 'mail', calendar_event: 'event', file: 'description' };
 
 /**
  * What the project holds from the person's accounts (7 Nov): the emails, meetings
@@ -120,7 +119,7 @@ export function ProjectThirdParty({
                 return (
                   <li key={`${i}-${item.kind}-${item.title}`} className="text-body text-[var(--on-surface)]">
                     <span className="flex items-start gap-1.5">
-                      <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={ICON[item.kind]} size={16} className="mt-0.5 text-[var(--on-surface-variant)]" />
+                      <ToolkitLogo slug={toolkitFromSource(item.source)} fallback={KIND_ICON[item.kind]} size={16} className="mt-0.5 text-[var(--on-surface-variant)]" />
                       <span className="min-w-0">
                         <span className="font-semibold">[T{i + 1}] </span>
                         <span dir="auto">{item.title || t('conn.heldUntitled')}</span>

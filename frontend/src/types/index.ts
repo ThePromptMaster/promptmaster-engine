@@ -4,7 +4,7 @@ export type ScoreLevel = 'Low' | 'Medium' | 'High';
 export type Phase = 'input' | 'review' | 'output' | 'realign' | 'summary';
 
 export interface ThirdPartyItem {
-  kind: 'calendar_event' | 'email' | 'file';
+  kind: 'calendar_event' | 'email' | 'file' | 'crm_record';
   source: string;
   title: string;
   text: string;
