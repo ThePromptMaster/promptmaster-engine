@@ -5,7 +5,7 @@ import readExcelFile from 'read-excel-file/node';
 import { describe, expect, it } from 'vitest';
 
 import { previewOf, rejectReason } from './preview';
-import { csvNamesFor, sheetToCsv, sheetsToCsv, type Cell } from './spreadsheet';
+import { csvNamesFor, sheetToCsv, sheetsToCsv, sheetsToText, type Cell } from './spreadsheet';
 
 describe('a spreadsheet becomes CSV (1 Oct, item 17)', () => {
   it('quotes what needs quoting, writes dates as dates, and squares the rows off', () => {
@@ -17,6 +17,12 @@ describe('a spreadsheet becomes CSV (1 Oct, item 17)', () => {
     ]);
     expect(csv).toBe('name,joined,note\n"Acme, Inc.",2026-03-01,"said ""maybe"""\nBolt,,\n');
     expect(sheetToCsv([])).toBe('');
+  });
+
+  it('gives a workbook as text: one sheet as its rows, several each under its name, empty ones left out', () => {
+    expect(sheetsToText([{ sheet: 'Only', data: [['a', 'b'], [1, 2]] }])).toBe('a,b\n1,2\n');
+    expect(sheetsToText([{ sheet: 'Q1', data: [['a'], [1]] }, { sheet: 'Blank', data: [] }, { sheet: 'Q2', data: [['b'], [2]] }])).toBe('Sheet: Q1\na\n1\n\nSheet: Q2\nb\n2\n');
+    expect(sheetsToText([])).toBe('');
   });
 
   it('names one sheet after the workbook, and several after their sheets', () => {

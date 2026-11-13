@@ -42,7 +42,10 @@ describe('previewOf: what a model is shown of an attached file', () => {
 describe('rejectReason', () => {
   it('says why a file cannot be attached', () => {
     expect(rejectReason('book.pdf', 10, [])).toBeNull();
-    expect(rejectReason('deck.pptx', 10, [])).toMatch(/is not a PDF, Word/);
+    // A deck is read for its words, like a Word file (13 Nov).
+    expect(rejectReason('deck.pptx', 10, [])).toBeNull();
+    expect(rejectReason('deck.ppt', 10, [])).toMatch(/old PowerPoint format/);
+    expect(rejectReason('clip.mp4', 10, [])).toMatch(/is not a PDF, Word \(\.docx\), PowerPoint \(\.pptx\)/);
     expect(rejectReason('old.doc', 10, [])).toMatch(/old Word format/);
     expect(rejectReason('lion.jpg', 10, [])).toBeNull();
     expect(rejectReason('big.csv', 6_000_000, [])).toMatch(/larger than 5 MB/);

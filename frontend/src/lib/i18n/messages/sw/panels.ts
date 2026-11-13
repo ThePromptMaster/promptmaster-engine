@@ -177,6 +177,8 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.exportMd': 'Hamisha Markdown',
   'pnl.building': 'Inaunda…',
   'pnl.exportWord': 'Hamisha Word',
+  'pnl.exportExcel': 'Hamisha Excel',
+  'pnl.excelFailed': 'Faili la Excel halikuweza kutengenezwa.',
   'pnl.exportPdf': 'Hamisha PDF',
   'pnl.editNoun': 'Hariri {noun}',
   'pnl.newVersionFailed': 'Toleo jipya halikuweza kuanzishwa.',

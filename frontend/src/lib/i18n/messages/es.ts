@@ -192,7 +192,7 @@ export const es: Messages = {
   "attach.input": "Adjuntar archivos",
   "attach.reading": "Leyendo…",
   "attach.button": "Adjuntar un encargo, datos o imágenes",
-  "attach.hint": "PDF, Word, texto, correos guardados, convocatorias de calendario, hojas de cálculo, CSV o imágenes. El texto de un encargo se lee antes de sugerir la configuración.",
+  "attach.hint": "PDF, Word, PowerPoint, texto, correos guardados, convocatorias de calendario, hojas de cálculo, CSV o imágenes. El texto de un encargo se lee antes de sugerir la configuración.",
   "attach.attached": "Adjuntado",
   "attach.chars": "{count} caracteres de texto · van al contexto del proyecto",
   "attach.remove": "Quitar",

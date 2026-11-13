@@ -12,6 +12,8 @@
  * and theming are left to whoever opens the file.
  */
 
+import { cells, plain, TABLE_ROW, TABLE_RULE } from './markdown-tables';
+
 export interface DeckSlide {
   title: string;
   bullets: string[];
@@ -33,27 +35,10 @@ const BOLD_SLIDE = /^\*\*\s*(slide\s+\d+\b.*?)\s*\*\*\s*$/i;
 const NOTES = /^(?:[-*]\s+)?(?:\*\*|__)?\s*(?:speaker\s+)?notes?\s*(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*(.*)$/i;
 const NOTES_HEADING = /^(?:speaker\s+)?notes?$/i;
 const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s+(.*)$/;
-const TABLE_ROW = /^\s*\|.*\|\s*$/;
-const TABLE_RULE = /^\s*\|?[\s:|-]+\|?\s*$/;
-
-/** The words without the Markdown around them. A deck shows them as written, not with asterisks. */
-function plain(text: string): string {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    .replace(/(^|\s)\*([^*\s][^*]*?)\*(?=\s|[.,;:!?)]|$)/g, '$1$2')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .trim();
-}
 
 /** "Slide 3: Where we stand" is a slide titled "Where we stand". */
 function slideTitle(raw: string): string {
   return plain(raw).replace(/^slide\s+\d+\s*[:.\-–—]\s*/i, '').trim() || plain(raw);
-}
-
-function cells(line: string): string[] {
-  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => plain(c));
 }
 
 /** The heading level that holds the slides: the shallowest one used at least MIN_SLIDES times. */

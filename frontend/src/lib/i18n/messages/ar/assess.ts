@@ -53,6 +53,7 @@ export const ar: Record<keyof typeof en, string> = {
   "assess.sortBest": "الأفضل أولًا",
   "assess.sortNewest": "الأحدث أولًا",
   "assess.csv": "تنزيل CSV",
+  "assess.xlsx": "تنزيل Excel",
   "assess.batchCol": "الدفعة",
   "assess.dateCol": "تاريخ التقييم",
   "assess.rowActions": "إجراءات الصف",

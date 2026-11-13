@@ -9,6 +9,7 @@ import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { carriedForward, CARRIED_HEADING, exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
+import { workbookFrom } from '@/lib/export/xlsx-export';
 import { type CompletionSummary } from '@/lib/workflow/engine';
 import { deliverableNouns } from '@/lib/workflow/labels';
 import { asksForChangeLog, missingParts } from '@/lib/workflow/requested-parts';
@@ -94,6 +95,21 @@ export function ProjectFinished({ bundle, completion, evaluation, limitation, op
     }
   };
 
+  // The deliverable's tables as a workbook; offered only when it has one (13 Nov).
+  const hasTables = useMemo(() => /^\s*\|.*\|\s*$/m.test(markdown) && workbookFrom(markdown).length > 0, [markdown]);
+  const excel = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const { workbookToXlsx } = await import('@/lib/export/xlsx-export');
+      downloadBlob(await workbookToXlsx(workbookFrom(markdown)), `${stem()}.xlsx`);
+    } catch (e) {
+      setNote(e instanceof Error && e.message ? e.message : t('pnl.excelFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const action = 'rounded-lg px-4 py-2 text-title transition-colors';
   const primary = `${action} bg-[var(--pm-primary)] text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50`;
   const secondary = `${action} bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50`;
@@ -159,6 +175,11 @@ export function ProjectFinished({ bundle, completion, evaluation, limitation, op
             <button onClick={() => void word()} disabled={busy} className={secondary}>
               {busy ? t('pnl.building') : t('pnl.exportWord')}
             </button>
+            {hasTables && (
+              <button onClick={() => void excel()} disabled={busy} className={secondary}>
+                {t('pnl.exportExcel')}
+              </button>
+            )}
             <a
               href={`/projects/${project.id}/print`}
               target="_blank"

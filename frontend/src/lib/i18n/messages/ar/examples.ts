@@ -46,6 +46,8 @@ export const ar: Record<keyof typeof en, string> = {
   "ex.useBatch": "استخدم الدفعة النموذجية",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "يصبح كل عنوان شريحة، مع نقاطها وجداولها وملاحظات المتحدث.",
+  "export.xlsx": "Excel",
+  "export.xlsxHint": "يصبح كل جدول ورقة عمل تحمل اسم عنوانه.",
   "ex.startFrom": "ابدأ من مثال",
   "prompty.name": "Prompty",
   "prompty.hello": "هل تريد رؤية مثال، أم تبدأ بمشروعك الخاص؟",

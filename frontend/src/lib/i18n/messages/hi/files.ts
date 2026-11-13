@@ -4,7 +4,8 @@ import type { en } from '../areas/files';
 export const hi: Record<keyof typeof en, string> = {
   'file.oldExcel': '{name} पुराने Excel प्रारूप में है। पहले इसे .xlsx या CSV के रूप में सहेजें।',
   'file.oldWord': '{name} पुराने Word प्रारूप में है। पहले इसे .docx या PDF के रूप में सहेजें।',
-  'file.unsupported': '{name} PDF, Word (.docx), Markdown, टेक्स्ट, स्प्रेडशीट (.xlsx), CSV, TSV, JSON या इमेज (PNG, JPEG, WebP, GIF, HEIC) फ़ाइल नहीं है।',
+  'file.oldPowerPoint': '{name} पुराने PowerPoint प्रारूप में है। पहले इसे .pptx या PDF के रूप में सहेजें।',
+  'file.unsupported': '{name} PDF, Word (.docx), PowerPoint (.pptx), Markdown, टेक्स्ट, स्प्रेडशीट (.xlsx), CSV, TSV, JSON या इमेज (PNG, JPEG, WebP, GIF, HEIC) फ़ाइल नहीं है।',
   'file.tooLarge': '{name} {mb} MB से बड़ी है।',
   'file.empty': '{name} खाली है।',
   'file.duplicate': '{name} नाम की फ़ाइल पहले से जुड़ी है। उसे बदलने के लिए पहले उसे हटाएँ।',

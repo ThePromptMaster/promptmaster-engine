@@ -53,6 +53,7 @@ export const zh: Record<keyof typeof en, string> = {
   "assess.sortBest": "最佳优先",
   "assess.sortNewest": "最新优先",
   "assess.csv": "下载 CSV",
+  "assess.xlsx": "下载 Excel",
   "assess.batchCol": "批次",
   "assess.dateCol": "评估时间",
   "assess.rowActions": "行操作",

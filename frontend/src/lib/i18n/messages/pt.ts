@@ -192,7 +192,7 @@ export const pt: Messages = {
   "attach.input": "Anexar arquivos",
   "attach.reading": "Lendo…",
   "attach.button": "Anexar um briefing, dados ou imagens",
-  "attach.hint": "PDF, Word, texto, e-mails salvos, convites de calendário, planilhas, CSV ou imagens. O texto de um briefing é lido antes de a configuração ser sugerida.",
+  "attach.hint": "PDF, Word, PowerPoint, texto, e-mails salvos, convites de calendário, planilhas, CSV ou imagens. O texto de um briefing é lido antes de a configuração ser sugerida.",
   "attach.attached": "Anexado",
   "attach.chars": "{count} caracteres de texto · vão para o contexto do projeto",
   "attach.remove": "Remover",
