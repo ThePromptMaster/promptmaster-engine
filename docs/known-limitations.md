@@ -4177,10 +4177,17 @@ What is not done, or not known:
   On HubSpot the connection is removed at Composio, and "Composio" stays listed under HubSpot's
   Connected Apps until the person uninstalls it there (seen). Whether HubSpot's token is revoked at
   that moment is not known. The settings page says both.
-- **With nothing typed, a busy mailbox can take all eight places.** On the test account the page that
-  reads by itself opened eight emails and no record. Nothing reserves a place for a CRM; a record is
-  reached from a project, by its draft, its chat or "Add from my accounts". Starting a project from a
-  suggestion built on a record was therefore not seen by hand.
+- **With nothing typed, each kind found has a place** (#686). On the test account the page that reads
+  by itself had opened eight emails and no record; a kind the choice leaves out now gets its first item,
+  in place of the last of the kind that has most. It read four emails, the opportunity and three files.
+  Its three suggestions can still all go elsewhere: a project was started from a suggestion built on a
+  record only with the page's reading narrowed to the record in the browser.
+- **Two things asked for together** (#686). Mail, meetings and files match every word of a search
+  inside one item, so "the supplier review deck and the churn workbook" found neither on a real Drive.
+  Each name is now searched for by itself when the words together find nothing, and each name the
+  words do not hold when several things were named. This costs up to three more searches per account.
+- **A deal's amount has no currency on a free HubSpot account**: there is no currency field on the
+  deal, and the account's own currency is not read. The amount is written as a bare number.
 - **A sign-in that was started and never finished shows as "Needs reconnecting"**, not as "Connect",
   once nothing else of that kind is connected. Reconnect works as Connect does.
 - **A Salesforce organisation may refuse the connection.** Salesforce restricts apps an administrator
@@ -4189,8 +4196,10 @@ What is not done, or not known:
   page offers `login` as the Salesforce address, which worked.
 - **Fallbacks that never ran on a real account**: the second Salesforce search tool
   (`SALESFORCE_EXECUTE_SOSL_SEARCH`), the plain list of deals, and the query repeated with fewer fields
-  when a profile may not see one. They are unit-tested against scripted records only. So is a deal's
-  currency: the sample deal had none.
+  when a profile may not see one. They run only when a call is refused, which a healthy account never
+  does; forcing them needs the Composio key on a developer's machine, and the owner chose to leave them
+  unit-tested (13 Nov). A name with an apostrophe and an ampersand ("O'Brien & Sons") was found by the
+  first tool with no call refused.
 - **Dates are filtered after the search**, on when a record was last changed, and only among the ten
   newest of each kind the search returned.
 - **A deal does not say which company it belongs to**: associations are not read.
