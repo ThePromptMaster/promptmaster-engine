@@ -124,8 +124,14 @@ HUBSPOT_RECORDS = {
                                                "hs_lastmodifieddate": _day(-4)}}],
     "deal": [{"id": "9001", "properties": {"dealname": "Okafor Estates lease renewal", "amount": "18500", "dealstage": "contractsent",
                                             "pipeline": "default", "closedate": _day(20), "description": "Lease renews at 3% above the current rent.",
+                                            "deal_currency_code": "GBP", "hs_is_closed": "false", "hs_is_closed_won": "false",
                                             "hs_lastmodifieddate": _day(-1)}}],
 }
+#: A deal holds its stage's id; the account's own name for it comes from its list of pipelines.
+HUBSPOT_PIPELINES = {"results": [{"id": "default", "label": "Sales pipeline", "stages": [
+    {"id": "appointmentscheduled", "label": "Appointment scheduled"}, {"id": "contractsent", "label": "Contract sent"},
+    {"id": "closedwon", "label": "Closed won"},
+]}]}
 _HUBSPOT_TOOLS = {"HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA": "contact", "HUBSPOT_SEARCH_COMPANIES": "company", "HUBSPOT_SEARCH_DEALS": "deal", "HUBSPOT_LIST_DEALS": "deal"}
 
 
@@ -171,6 +177,8 @@ def result(tool: str, arguments: dict[str, Any]) -> Any:
         return _salesforce_query(str(arguments.get("query") or ""))
     if tool in _HUBSPOT_TOOLS:
         return _hubspot_found(_HUBSPOT_TOOLS[tool], arguments)
+    if tool == "HUBSPOT_RETRIEVE_ALL_PIPELINES_FOR_SPECIFIED_OBJECT_TYPE":
+        return HUBSPOT_PIPELINES if arguments.get("objectType") == "deals" else {"results": []}
     if tool == "GMAIL_FETCH_EMAILS":
         query = str(arguments.get("query") or "")
         return {"messages": [

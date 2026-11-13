@@ -25,7 +25,10 @@ from promptmaster.connections import (
     TOOLKITS,
     PickedItem,
     PreviewItem,
+    _host,
+    deal_names,
     hubspot_items,
+    hubspot_readable,
     ordered,
     preview,
     read,
@@ -175,6 +178,73 @@ async def test_hubspot_records_are_read_by_their_own_kind(fake):
     assert deal.source.startswith("HubSpot · Deal") and company.source.startswith("HubSpot · Company")
     [asked] = _calls(fake, "HUBSPOT_SEARCH_DEALS")
     assert asked["filterGroups"] == [{"filters": [{"propertyName": "hs_object_id", "operator": "EQ", "value": "9001"}]}]
+
+
+PIPELINES = "HUBSPOT_RETRIEVE_ALL_PIPELINES_FOR_SPECIFIED_OBJECT_TYPE"
+
+
+@pytest.mark.asyncio
+async def test_a_deal_is_read_with_its_stage_by_name_its_currency_and_its_close_date_as_a_day(fake):
+    """13 Nov, a real account: the stage came back as 6434590966, the amount with no currency, the date as a timestamp."""
+    picked = [PickedItem(id="deal:9001", toolkit=HUBSPOT, kind="crm_record"), PickedItem(id="company:9001", toolkit=HUBSPOT, kind="crm_record")]
+    [deal, _company], _files, _skipped = await read(fake, TEST_USER_ID, picked)
+    closes = NOW.date().fromisoformat(composio_mock_data.HUBSPOT_RECORDS["deal"][0]["properties"]["closedate"][:10])
+    for line in ("Stage: Contract sent", "Pipeline: Sales pipeline", "Amount: 18500 GBP", f"Close date: {closes.day} {closes:%b %Y}"):
+        assert line in deal.text
+    assert "contractsent" not in deal.text and "T" not in deal.text.split("Close date: ")[1].split("\n")[0]
+    # Asked once, for deals, and for nothing the text does not use.
+    assert _calls(fake, PIPELINES) == [{"objectType": "deals"}]
+    [asked] = _calls(fake, "HUBSPOT_SEARCH_DEALS")
+    assert {"deal_currency_code", "hs_is_closed", "hs_is_closed_won"} <= set(asked["properties"])
+    assert "hs_is_closed" not in deal.text and "deal_currency_code" not in deal.text
+
+
+@pytest.mark.asyncio
+async def test_a_stage_that_is_only_a_number_is_never_written(fake, monkeypatch):
+    numbered = {**composio_mock_data.HUBSPOT_RECORDS["deal"][0]["properties"], "dealstage": "6434590966", "pipeline": "88120"}
+    monkeypatch.setitem(composio_mock_data.HUBSPOT_RECORDS, "deal", [{"id": "9001", "properties": numbered}])
+    fake.fail_tools.add(PIPELINES)
+    picked = [PickedItem(id="deal:9001", toolkit=HUBSPOT, kind="crm_record")]
+    [deal], _files, skipped = await read(fake, TEST_USER_ID, picked)
+    # The names could not be read: the deal still is, and says what HubSpot's own flags say.
+    assert skipped == [] and "Stage: Open" in deal.text
+    assert "6434590966" not in deal.text and "88120" not in deal.text and "Pipeline:" not in deal.text
+    won = {**numbered, "hs_is_closed": "true", "hs_is_closed_won": "true"}
+    monkeypatch.setitem(composio_mock_data.HUBSPOT_RECORDS, "deal", [{"id": "9001", "properties": won}])
+    [deal], _files, _skipped = await read(fake, TEST_USER_ID, picked)
+    assert "Stage: Closed won" in deal.text
+
+
+def test_names_are_found_however_the_list_of_pipelines_is_wrapped():
+    listed = [{"id": "default", "label": "Sales", "stages": [{"id": "1", "label": "New"}, {"id": "2", "label": "Won"}]},
+              {"id": "77", "label": "Renewals", "stages": [{"id": "1", "label": "Due"}, {"label": "no id"}, "not a stage"]}]
+    for wrapped in (listed, {"results": listed}, {"data": {"response_data": {"results": listed}}}):
+        names = deal_names(wrapped)
+        assert names.pipelines == {"default": "Sales", "77": "Renewals"}
+        # The same stage id in two pipelines is each pipeline's own stage.
+        assert names.stages[("default", "1")] == "New" and names.stages[("77", "1")] == "Due" and names.stages[("", "2")] == "Won"
+    assert deal_names({"results": []}).stages == {} and deal_names(None).stages == {}
+    deal = HUBSPOT_OBJECTS["deal"]
+    readable = hubspot_readable(deal, {"pipeline": "77", "dealstage": "1", "amount": "40"}, deal_names(listed))
+    assert (readable["pipeline"], readable["dealstage"], readable["amount"]) == ("Renewals", "Due", "40")
+
+
+@pytest.mark.asyncio
+async def test_pipelines_are_not_asked_for_when_no_deal_is_read(fake):
+    picked = [PickedItem(id="company:9001", toolkit=HUBSPOT, kind="crm_record"), PickedItem(id="contact:501", toolkit=HUBSPOT, kind="crm_record"),
+              PickedItem(id=OPPORTUNITY, toolkit=SALESFORCE, kind="crm_record")]
+    texts, _files, skipped = await read(fake, TEST_USER_ID, picked)
+    assert skipped == [] and len(texts) == 3 and _calls(fake, PIPELINES) == []
+    assert "Lifecycle stage: customer" in texts[1].text
+
+
+@pytest.mark.asyncio
+async def test_an_account_website_is_written_as_its_host(fake):
+    """13 Nov, a real account: the website was a link, so it was read as "[link removed]"."""
+    [account], _files, _skipped = await read(fake, TEST_USER_ID, [PickedItem(id="Account:001Hs00000Z9y8xIAB", toolkit=SALESFORCE, kind="crm_record")])
+    assert "Website: northwind-holdings.example" in account.text and "[link removed]" not in account.text and "https://" not in account.text
+    assert [_host(v) for v in ("https://www.Example.org/a/b?c=1", "example.org", "HTTP://shop.example.org#top", "", None)] == [
+        "Example.org", "example.org", "shop.example.org", "", None]
 
 
 @pytest.mark.asyncio
