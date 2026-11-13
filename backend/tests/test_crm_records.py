@@ -131,16 +131,20 @@ async def test_each_name_is_searched_for_by_itself(fake):
     assert problems == []
     # The contact answers to both names and is listed once.
     assert sorted(i.id for i in found) == sorted(["Contact:003Hs00000Q7w6vIAB", "Account:001Hs00000Z9y8xIAB", OPPORTUNITY])
-    assert [c["q"] for c in _calls(fake, "SALESFORCE_POST_PARAMETERIZED_SEARCH")][-2:] == ["Dana Whitfield", "Northwind Holdings"]
+    assert [c["q"] for c in _calls(fake, "SALESFORCE_POST_PARAMETERIZED_SEARCH")][-3:] == ["Dana Whitfield", "Northwind Holdings", "Northwind Whitfield renewal"]
     before = len(fake.calls)
     found, _ = await search_everything(fake, TEST_USER_ID, [HUBSPOT], Search(words="lease", names=["Sam Okafor", "Okafor Estates"]), NOW)
     assert sorted(i.id for i in found) == ["company:9001", "contact:501", "deal:9001"]
     asked = [args["query"] for kind, (_tool, args) in fake.calls[before:] if kind == "execute"]
-    assert sorted(asked) == ["Okafor Estates"] * 3 + ["Sam Okafor"] * 3
-    # With no name given the words are searched for, as before; never more than three names.
+    assert sorted(asked) == ["Okafor Estates"] * 3 + ["Sam Okafor"] * 3 + ["lease"] * 3
+    # With no name given the words are searched for, as before; never more than three searches.
     assert crm_terms(Search(words="Northwind renewal")) == ["Northwind renewal"]
     assert crm_terms(Search(words="x", names=["A1", "B2", "C3", "D4", "A1", " "])) == ["A1", "B2", "C3"]
     assert crm_terms(Search(sender="Okafor")) == ["Okafor"] and crm_terms(Search()) == []
+    # 13 Nov, a real account: a question that named a person and only described a deal found the person alone.
+    assert crm_terms(Search(words="new deal sample", names=["Brian Halligan"])) == ["Brian Halligan", "new deal sample"]
+    # Words the names already hold are not searched for again: together they match no one record.
+    assert crm_terms(Search(words="Dana Whitfield Northwind", names=["Dana Whitfield", "Northwind Traders"])) == ["Dana Whitfield", "Northwind Traders"]
 
 
 @pytest.mark.asyncio
