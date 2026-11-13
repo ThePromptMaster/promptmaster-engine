@@ -89,6 +89,10 @@ ACCOUNTS_FAILED_NOTE = "Your connected accounts could not be searched just now, 
 RECENT_TASK = "Work out what this person is working on at the moment and has coming up."
 
 
+#: How many names a CRM is searched for, each by itself.
+MAX_NAMES = 3
+
+
 class Search(BaseModel):
     """What to look for. Plain words, put into each provider's own syntax in code."""
 
@@ -96,6 +100,8 @@ class Search(BaseModel):
     sender: str = ""
     after: str = ""
     before: str = ""
+    #: The people, companies and deals named. A CRM holds each as a record of its own, so each is searched for by itself.
+    names: list[str] = []
 
     def said(self) -> str:
         return " ".join(b for b in (self.words, f"from {self.sender}" if self.sender else "") if b)
@@ -116,7 +122,11 @@ _DECIDE_SYSTEM = (
     "three, never a sentence, with no search operators. Keep names as written, in their own language.\n"
     "sender: a name or address, only if they said who it came from; leave its name out of the keywords. "
     "after and before: YYYY-MM-DD, only if they gave a time.\n"
-    'Return JSON only: {"search": true, "words": "...", "sender": "", "after": "", "before": ""} or {"search": false}'
+    f"names: each person, company or deal they named, whole and as written (\"Dana Whitfield\", \"Northwind Traders\"), "
+    "without a word that only says what kind of thing it is (deal, account, contact, company), "
+    f"at most {MAX_NAMES}, and none when they named none. A CRM keeps each as a record of its own, so each is looked up "
+    "by itself.\n"
+    'Return JSON only: {"search": true, "words": "...", "names": [], "sender": "", "after": "", "before": ""} or {"search": false}'
 )
 _TYPED_LINE = "\nThe person typed this into a search box, so always search."
 _NOT_SEARCHABLE = re.compile(r"[^\w\s@.'&+-]", re.UNICODE)
@@ -134,10 +144,18 @@ def _date(value: Any) -> str:
         return ""
 
 
+def _names(value: Any) -> list[str]:
+    """Up to MAX_NAMES names, cleaned like the words, each once."""
+    listed = value if isinstance(value, list) else []
+    cleaned = [_plain(n, 80) for n in listed if isinstance(n, str)]
+    return list(dict.fromkeys(n for n in cleaned if n))[:MAX_NAMES]
+
+
 def _to_search(data: Any) -> Search | None:
     if not isinstance(data, dict):
         return None
-    search = Search(words=_plain(data.get("words")), sender=_plain(data.get("sender")), after=_date(data.get("after")), before=_date(data.get("before")))
+    search = Search(words=_plain(data.get("words")), sender=_plain(data.get("sender")), after=_date(data.get("after")),
+                    before=_date(data.get("before")), names=_names(data.get("names")))
     return search if data.get("search") is True and (search.words or search.sender) else None
 
 
@@ -305,11 +323,36 @@ def sosl_for(text: str) -> str:
     return f"FIND {{{words}}} IN ALL FIELDS RETURNING {returning}"
 
 
+def crm_terms(q: Search) -> list[str]:
+    """What a CRM is searched for. A CRM matches every word of a search inside one record, and a person, their
+    company and the deal are three records: asked for together, none is found (seen on a real account, 13 Nov).
+    So each name is searched for by itself, and the words are used only when no name was given."""
+    names = list(dict.fromkeys(n.strip() for n in q.names if len(n.replace(" ", "")) >= 2))[:MAX_NAMES]
+    return names or [t for t in [q.words or q.sender] if t]
+
+
+def _once(items: list[PreviewItem]) -> list[PreviewItem]:
+    """Each record once: two names can find the same one."""
+    return list({(i.toolkit, i.id): i for i in items}.values())
+
+
 async def _salesforce_search(c: Composio, sid: str, q: Search, now: datetime) -> list[PreviewItem]:
-    text = q.words or q.sender
     # Salesforce refuses a search shorter than two characters.
-    if len(text.replace(" ", "")) < 2:
+    terms = [t for t in crm_terms(q) if len(t.replace(" ", "")) >= 2]
+    if not terms:
         return []
+    results = await asyncio.gather(*(_salesforce_find(c, sid, t) for t in terms), return_exceptions=True)
+    # One name failing costs that name; all failing is the account's failure, as with any toolkit.
+    for r in results:
+        if isinstance(r, BaseException) and not isinstance(r, ComposioError):
+            raise r
+    failures = [r for r in results if isinstance(r, ComposioError)]
+    if failures and len(failures) == len(results):
+        raise failures[0]
+    return _within(_once([i for r in results if not isinstance(r, BaseException) for i in r]), q)
+
+
+async def _salesforce_find(c: Composio, sid: str, text: str) -> list[PreviewItem]:
     tool = SALESFORCE_SEARCH
     try:
         data = await c.execute(sid, tool, {
@@ -323,20 +366,20 @@ async def _salesforce_search(c: Composio, sid: str, q: Search, now: datetime) ->
     items = salesforce_items(data)
     if not items:
         _log_empty(tool, data)
-    return _within(items, q)
+    return items
 
 
 async def _hubspot_search(c: Composio, sid: str, q: Search, now: datetime) -> list[PreviewItem]:
-    text = q.words or q.sender
-    if not text:
+    terms = crm_terms(q)
+    if not terms:
         return []
     # Who something came from is a person: with no other words, only contacts are searched.
-    kinds = [o for o in HUBSPOT_OBJECTS.values() if q.words or o.name == "contact"]
+    kinds = [o for o in HUBSPOT_OBJECTS.values() if q.words or q.names or o.name == "contact"]
     found = await gather_tools([
         (o.tool, c.execute(sid, o.tool, {"query": text, "limit": MAX_RECORDS, "properties": hubspot_properties(o)}), hubspot_items(o.name))
-        for o in kinds
+        for text in terms for o in kinds
     ])
-    return _within(found, q)
+    return _within(_once(found), q)
 
 
 SEARCHES = {

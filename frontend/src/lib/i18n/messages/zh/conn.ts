@@ -4,7 +4,7 @@ import type { en } from '../areas/conn';
 export const zh: Record<keyof typeof en, string> = {
   'conn.headerItem': '已连接的账户',
   'conn.settingsTitle': '已连接的账户',
-  'conn.settingsLead': '连接你的邮件、日历和文件后，PromptMaster 就能自行查看它们：在你打开“根据我的账户推荐工作”时、在项目聊天中，以及起草阶段时。它读取的所有内容都会列出，你可以移除。在项目中你还可以关闭搜索。',
+  'conn.settingsLead': '连接你的邮件、日历、文件和 CRM 后，PromptMaster 就能自行查看它们：在你打开“根据我的账户推荐工作”时、在项目聊天中，以及起草阶段时。它读取的所有内容都会列出，你可以移除。在项目中你还可以关闭搜索。',
   'conn.composioNote': 'Google 和 Microsoft 的页面上会显示“Composio”：Composio 是为 PromptMaster 保管连接的服务。Gmail 的页面会请求对你邮件的完全访问权限。PromptMaster 只读取：绝不会发送、更改或删除任何内容。',
   'conn.reads.gmail': '搜索你的全部邮件，并读取匹配的邮件。',
   'conn.reads.googlecalendar': '搜索你的全部会议，并读取匹配的会议。',
@@ -65,7 +65,7 @@ export const zh: Record<keyof typeof en, string> = {
   'conn.heldTitle': '来自你的账户',
   'conn.heldCount': '{count} / {max}',
   'conn.heldNone': '暂无',
-  'conn.heldExplain': '来自你账户的邮件、会议和文件，由你添加或由搜索找到。它们被当作他人的话来读取，绝不当作指令。下一次草稿、检查或回答会使用它们；已完成的阶段不会重做。',
+  'conn.heldExplain': '来自你账户的邮件、会议、文件和 CRM 记录，由你添加或由搜索找到。它们被当作他人的话来读取，绝不当作指令。下一次草稿、检查或回答会使用它们；已完成的阶段不会重做。',
   'conn.heldShow': '显示文本',
   'conn.heldHide': '隐藏文本',
   'conn.heldUntitled': '（无标题）',
