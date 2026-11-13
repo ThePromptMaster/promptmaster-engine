@@ -201,15 +201,16 @@ async def api_confirm(
 async def api_disconnect(
     account_id: str, user: AuthUser = Depends(connecting_user), composio: Composio = Depends(get_composio)
 ) -> DeleteResponse:
-    """Remove the connection; withdraw the grant at Google or Microsoft with that provider's last one.
+    """Remove the connection; withdraw the grant at the provider with that provider's last one.
 
     Composio's Google toolkits share one grant, as its Microsoft ones do, so revoking
-    while a sibling is still connected would break the sibling too.
+    while a sibling is still connected would break the sibling too. Salesforce and
+    HubSpot are each their own grant, withdrawn with the connection.
     """
     account = await _owned(composio, user, account_id)
     siblings = [
         a for a in await _accounts(composio, user)
-        if a.id != account.id and a.status == "ACTIVE" and PROVIDER.get(a.toolkit) == PROVIDER.get(account.toolkit)
+        if a.id != account.id and a.status == "ACTIVE" and PROVIDER.get(a.toolkit, a.toolkit) == PROVIDER.get(account.toolkit, account.toolkit)
     ]
     revoke = not siblings
     try:

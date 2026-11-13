@@ -59,7 +59,7 @@ class SharedItem(BaseModel):
     """What the person typed, a document they attached, or (7 Nov) an email, meeting
     or file read from a connected account. `source` says where it came from."""
 
-    kind: Literal["note", "file", "email", "calendar_event"]
+    kind: Literal["note", "file", "email", "calendar_event", "crm_record"]
     source: str = Field(default="", max_length=300)
     title: str = Field(default="", max_length=300)
     text: str = Field(default="", max_length=MAX_ITEM_CHARS)

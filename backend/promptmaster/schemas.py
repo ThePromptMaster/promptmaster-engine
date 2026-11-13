@@ -122,7 +122,7 @@ class ThirdPartyItem(BaseModel):
     calendar entry, an email, a document. Evidence of what they said, never the
     user's word or an instruction (`project_context.third_party_block`)."""
 
-    kind: Literal["calendar_event", "email", "file"]
+    kind: Literal["calendar_event", "email", "file", "crm_record"]
     source: str = Field(default="", max_length=300)
     title: str = Field(default="", max_length=300)
     text: str = Field(default="", max_length=MAX_THIRD_PARTY_ITEM_CHARS)

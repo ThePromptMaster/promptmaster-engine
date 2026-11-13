@@ -4125,3 +4125,49 @@ What it does not do:
   (L-203): those searches run on the server, which has no reader for them.
 - **There is no Word, Excel or PowerPoint connection of its own.** Files reach PromptMaster from
   OneDrive or Drive, or by attaching them. Nothing is written back to a file in either.
+
+### L-241 — Salesforce and HubSpot: what is read, and what has not been proven (2026-11-13)
+
+A client asked whether PromptMaster can be hooked up to Salesforce, ZoomInfo and HubSpot. Composio, which
+already holds people's Google and Microsoft connections (L-201), offers Salesforce and HubSpot with its
+own sign-in, so the backend can read both the way it reads mail and files: the person connects, a search
+is written from their own words, at most eight items are opened, and what is read is fenced as someone
+else's words (L-200, L-203).
+
+What the backend does (`promptmaster/connections.py`, `account_search.py`; the screens follow separately):
+
+- **Three kinds of record each.** Salesforce contacts, accounts and opportunities; HubSpot contacts,
+  companies and deals. A record is one more kind of item, `crm_record`.
+- **A fixed list of fields.** A record is read as the fields on a short list for its kind (for an
+  opportunity: account, stage, amount, close date, probability, type, next step, description), never
+  every property. A CRM holds whatever a web form or an import put in it; a custom field is not read.
+  The text is cleaned like an email's: hidden HTML and links removed, 8,000 characters at most.
+- **Read only.** No tool that creates, changes or deletes a record is called.
+- **Ids are checked before they reach a query.** A Salesforce id is 15 or 18 letters and digits, a
+  HubSpot one is digits; anything else is refused without a call. An item's id says its kind
+  (`deal:9001`), because HubSpot numbers each kind of record apart.
+- **With nothing typed**, what is going on is the open opportunities and the deals changed most recently.
+- **Disconnecting withdraws the grant**: each CRM is its own, unlike Google's three and Microsoft's two.
+- **Go still does not search accounts.**
+
+What is not done, or not known:
+
+- **Not yet run against a real Salesforce or HubSpot account.** The tool names
+  (`SALESFORCE_POST_PARAMETERIZED_SEARCH`, `SALESFORCE_EXECUTE_SOSL_SEARCH`, `SALESFORCE_RUN_SOQL_QUERY`,
+  `HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA`, `HUBSPOT_SEARCH_COMPANIES`, `HUBSPOT_SEARCH_DEALS`) are from
+  Composio's published list, their arguments partly so, and the shapes of their answers are undocumented.
+  The parsers accept the providers' own shapes and log field names when nothing parses, as the mail and
+  file parsers did before they were proven. The tests run against scripted records.
+- **A Salesforce organisation may refuse the connection.** Salesforce restricts apps an administrator
+  has not installed, so a person may need their admin to allow Composio's app first. Connecting may also
+  ask for the organisation's own Salesforce address. HubSpot may need an admin to install as well.
+- **Dates are filtered after the search**, on when a record was last changed, and only among the ten
+  newest of each kind the search returned.
+- **A field the person's profile may not see** makes Salesforce refuse the whole query; it is then asked
+  again for name and date only, so that record arrives nearly empty rather than not at all.
+- **A HubSpot deal's stage and pipeline arrive as HubSpot's internal names** (`contractsent`), and a deal
+  does not say which company it belongs to: associations are not read.
+- **Three calls for one HubSpot search**, one per kind, against Composio's monthly allowance (L-201).
+- **Leads, cases, tickets, notes, activities and custom objects are not read.**
+- **ZoomInfo is not connected.** Composio's ZoomInfo connection needs the customer's own ZoomInfo client
+  id and secret; nothing was built for it.
