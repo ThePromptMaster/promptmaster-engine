@@ -114,6 +114,19 @@ A migration that a deploy depends on goes out **before** that deploy. A migratio
 additive by convention here, so this is normally uneventful, but the ordering matters
 for anything that adds a NOT NULL column or a new CHECK value.
 
+## Deploying by hand with the Vercel CLI
+
+Each project is deployed from the root of a clean export of `main` (`git archive origin/main`), linked
+to its project by name, backend first.
+
+**Check the link before deploying.** `vercel link --project <name>` fails when the name is not a
+project's, and a `vercel deploy --prod` run after it does not stop: it makes a new project named after
+the folder and serves the export, which is the whole repository, at a public address. That happened on
+13 Nov 2026, when a shell loop passed two words as one name. The page was up for about two minutes
+before it was replaced with an empty one and the project deleted. After linking, read
+`.vercel/project.json` and deploy only if `projectName` is the project meant; afterwards, list the
+team's projects and expect exactly two.
+
 ## Branches
 
 - `main` — production. Both Vercel projects deploy from it.
