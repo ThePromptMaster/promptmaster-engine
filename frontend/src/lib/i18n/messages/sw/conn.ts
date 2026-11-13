@@ -13,7 +13,7 @@ export const sw: Record<keyof typeof en, string> = {
   'conn.reads.one_drive': 'Hutafuta faili zako zote na kusoma zinazolingana.',
   'conn.reads.salesforce': 'Hutafuta katika anwani zako, akaunti na fursa na kusoma zile zinazolingana.',
   'conn.reads.hubspot': 'Hutafuta katika anwani zako, kampuni na mikataba na kusoma zile zinazolingana.',
-  'conn.crmNote': 'Salesforce na HubSpot pia huonyesha "Composio" kwenye skrini yao. PromptMaster husoma orodha fupi ya sehemu kutoka kwa anwani, kampuni na mikataba inayolingana. Haiundi, haibadilishi wala haifuti rekodi kamwe, na ufikiaji wake huondolewa huko unapotenganisha.',
+  'conn.crmNote': 'Salesforce na HubSpot pia huonyesha "Composio" kwenye skrini yao. Ruhusa inayoombwa kwenye skrini hiyo ni pana kuliko PromptMaster inavyotumia, na inajumuisha kubadilisha rekodi. PromptMaster husoma tu: orodha fupi ya sehemu kutoka kwa anwani, kampuni na mikataba inayolingana. Haiundi, haibadilishi wala haifuti rekodi kamwe, na ufikiaji wake huondolewa huko unapotenganisha.',
   'conn.connect': 'Unganisha',
   'conn.opening': 'Inafungua…',
   'conn.connected': 'Imeunganishwa',
