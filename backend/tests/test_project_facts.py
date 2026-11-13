@@ -157,6 +157,11 @@ def test_what_the_user_supplied_is_given_wherever_their_material_goes():
     assert "make a result conditional on it being right" in SUPPLIED_RULE
     assert "Only a different figure or a changed rule would change it" in SUPPLIED_RULE
     assert "unless the user's own material contradicts it" in SUPPLIED_RULE
+    # 12 Nov (a client): a plan the brief called approved, with nobody named, was written
+    # up as "Approver: to confirm", and the run stopped to ask about it.
+    assert "calls approved, authorised or agreed is approved, whoever approved it" in SUPPLIED_RULE
+    assert 'the record is "approver not specified"' in SUPPLIED_RULE
+    assert "never something to confirm, a question for the user, or a finding" in SUPPLIED_RULE
     # With facts, and with context alone.
     assert SUPPLIED_RULE in context_block(_inputs())
     only_context = PMInput(objective="Screen the target.", audience="", constraints="", output_format="", mode="analyst", context="Revenue: $18 million.")

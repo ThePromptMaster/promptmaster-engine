@@ -774,10 +774,15 @@ def test_history_keeps_superseded_corrections_and_declined_apart(basic_inputs, p
     system, user = build_stage_prompt(harbor, prose_stage, digest)
     assert HISTORY_RULE in system + user
     for phrase in ("SUPERSEDED", "CORRECTION", "DECLINED / NOT ADOPTED", "keeps its own reporting date",
-                   "Never call one of these superseded or a correction", "approver not recorded",
+                   "Never call one of these superseded or a correction",
+                   # 12 Nov (a client): "record 'approver not specified' and keep moving". A draft had
+                   # been made to write "Approver: to confirm", and the run stopped over it.
+                   'write "approver not specified"', "never write that the approver is to be confirmed",
+                   "never ask who approved",
                    # 18 Oct (Sean, Summit): the board's authorization was logged with an unknown approver.
                    "the board, the CEO", "never call that item's approver unknown"):
         assert phrase in HISTORY_RULE
+    assert "approver not recorded\"" not in HISTORY_RULE
     plain = basic_inputs.model_copy(update={"objective": "Write a haiku about rain", "constraints": "", "context": ""})
     system, user = build_stage_prompt(plain, prose_stage, digest)
     assert HISTORY_RULE not in system + user

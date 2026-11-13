@@ -24,6 +24,7 @@ export const sw: Record<keyof typeof en, string> = {
   'need.approveOutline': 'Idhinisha muhtasari',
   'need.reserved': 'Hili ni lako pekee: linarekodi uamuzi wako mwenyewe, si kitu ninachoweza kukagua.',
   'need.policyAsk': 'Ni idhini ya kawaida, lakini maamuzi yako ya kawaida yamewekwa kuwa "Niulize".',
+  'need.approvalRefused': 'Ni idhini ya kawaida, na niliikagua kabla ya kuitoa kwa niaba yako. Ukaguzi haukuithibitisha: {reason}',
   'need.approval': 'Inahitaji idhini yako: "{label}".',
   'need.approveResume': 'Idhinisha na uendelee',
   'need.majorReason': 'Hoja kubwa bado iko wazi, na kuidhinisha kunaiacha wazi. Sema sababu; itarekodiwa pamoja na idhini yako.',

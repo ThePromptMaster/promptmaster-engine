@@ -47,7 +47,7 @@ import { keptQuestions } from '@/lib/agent/account';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser, REPAIR_TRIES } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, refusalToRepair, refusedCommits, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser, REPAIR_TRIES } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -893,11 +893,13 @@ export function useGoLoop(opts: Options) {
           (s) => s.action_key === 'propose_statuses' && s.stage_id === o.stage!.id
         ).length >= ((o.project.routine_decisions ?? 'ask') === 'handle' ? 2 : 1);
         const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
+        // Every move the stage offers now, before the polishing cap takes any away.
+        const offered = withoutOverride(
+          allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), stageEvaluation.canAdvance, current.policy
+        );
         const allowed = withoutSettledRuns(withoutEndlessPolish(
-          withoutOverride(
-            allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), stageEvaluation.canAdvance, current.policy
-            // Asked once: if the user stayed, the stage is to be done.
-          ).filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
+          // Asked once: if the user stayed, the stage is to be done.
+          offered.filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
           polishedHere,
           stageEvaluation.canAdvance,
           Boolean(unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id))
@@ -927,10 +929,16 @@ export function useGoLoop(opts: Options) {
         // the current version, which are revised toward rather than re-checked.
         const routine = o.project.routine_decisions ?? 'ask';
         const headAt = o.bundles[o.stage.id]?.versions.at(-1)?.created_at ?? '';
-        const commitTried = [...priorStepsRef.current, ...stepsRef.current]
-          .filter((s) => s.action_key === 'commit_delegated' && s.stage_id === o.stage!.id && s.status === 'failed' && (s.finished_at ?? s.started_at ?? '') >= headAt)
-          .map((s) => String(s.params?.criterion_id ?? ''));
+        const commitRefused = refusedCommits([...priorStepsRef.current, ...stepsRef.current], o.stage.id, headAt);
+        const commitTried = commitRefused.map((r) => r.criterionId);
         if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
+        // A refused routine approval gets one repair of its own, even where the
+        // polishing cap has taken Revise away (12 Nov, a client: two rounds of
+        // check-and-apply had used the cap, so the approval Go had just refused
+        // over one line was handed to him instead of being fixed).
+        if (refusalToRepair(o.stage, stageEvaluation, routine, commitRefused) && offered.includes('revise_stage') && !allowed.includes('revise_stage')) {
+          allowed.push('revise_stage');
+        }
         // Q2 (9 Oct): back to the stage that does the further work the analysis asks for.
         const goBackTo = returnTargets({
           template: o.template, stage: o.stage, policy: current.policy, routine,
@@ -1087,7 +1095,7 @@ export function useGoLoop(opts: Options) {
         const needInput = {
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
-          runAttemptsLeft, lookupDue, routine, commitTried, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
+          runAttemptsLeft, lookupDue, routine, commitTried, commitRefused, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
         };
         const need = repair || merge ? null : needsUser(needInput);
         if (need) {
@@ -1124,7 +1132,7 @@ export function useGoLoop(opts: Options) {
               },
             }
           : null) ?? (justLeftToGo ? null : requiredWork({
-          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft, asItStands,
+          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, commitRefused, runAttemptsLeft, asItStands,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         }));
         const planNext = () => planning(() => api.agentNextAction(

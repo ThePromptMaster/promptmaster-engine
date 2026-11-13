@@ -90,3 +90,12 @@ def test_a_routine_choice_is_a_verdict_of_its_own_and_carries_no_instruction():
     out = parse_screen({"verdict": "routine_choice", "reason": "Either order fits.", "instruction": "Pick one."}, _req())
     assert out.verdict == "routine_choice" and out.instruction == "" and out.reason == "Either order fits."
 
+
+def test_who_approved_something_already_called_approved_is_not_asked():
+    """12 Nov (a client): could Go just record "approver not specified" and keep moving
+    when the plan is already stated as approved."""
+    system, _user = build_screen_prompt(_req())
+    choice = system.split("routine_choice:")[1].split("real_world_action:")[0]
+    assert "Who approved, authorised or signed off something the user's own words already call approved" in choice
+    assert 'records "approver not specified"' in choice
+

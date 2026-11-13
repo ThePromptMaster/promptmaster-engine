@@ -18,7 +18,7 @@ describe('an approver must have a source', () => {
     expect(unsupportedApprovers(draft, [baseline])).toEqual(['Elena']);
     const [finding] = approverFindings(draft, [baseline]);
     expect(finding.summary).toMatch(/^Elena is named as approving something/);
-    expect(finding.suggested_change).toContain('approver not recorded');
+    expect(finding.suggested_change).toContain('approver not specified');
   });
 
   it('is satisfied once a fact names her as approving', () => {
@@ -53,5 +53,47 @@ describe('roles are approvers', () => {
 
   it('matches on a shared figure', () => {
     expect(missedApprovals('The 75 hours have an approver not recorded.', facts)).toHaveLength(1);
+  });
+});
+
+// 12 Nov (a client, an executive-search simulation): the fact began "Original
+// approved plan:", the check read a person called Original, and a decision log
+// that rightly said "approver not recorded" was told to name the approver on
+// record. The fix wrote "Approver: to confirm", and the routine approval was
+// refused over it.
+describe('"approved" in front of the thing it describes names nobody', () => {
+  const fact = 'Original approved plan: interview three qualified CFO candidates on Thursday — Avery 9 a.m. Central, Morgan 10 a.m., Jordan 11 a.m.';
+  const row = (approver: string) =>
+    `| 1 | **Original plan:** interview three qualified CFO candidates on Thursday. Avery at 9 a.m., Morgan at 10 a.m. and Jordan at 11 a.m. Central, one hour each, with the same panel and no overlaps. Client update due Thursday at noon Central, after all interviews. | Approved plan | Avery's and Morgan's slots stand. | ${approver} |`;
+
+  it('reads no approver in "Original approved plan"', () => {
+    expect(approversNamed(fact)).toEqual([]);
+    expect(rolesNamed(fact)).toEqual([]);
+    expect(approversNamed('Revised approved budget: $44,000. Signed approved contract on file. Latest authorized headcount is 12.')).toEqual([]);
+  });
+
+  it('raises nothing against a log that says the approver is not recorded, or not specified', () => {
+    for (const approver of ['Approved; approver not recorded', 'Approved; approver not specified', 'Approver: not specified']) {
+      expect(missedApprovals(row(approver), [fact])).toEqual([]);
+      expect(approverFindings(row(approver), [fact])).toEqual([]);
+    }
+  });
+
+  it('still reads a person who approved something', () => {
+    expect(approversNamed('Elena approved the budget. Priya approved changing the launch date. Marco has approved budget changes.')).toEqual(['Elena', 'Priya', 'Marco']);
+    expect(approversNamed('Dana approved it on 2 November. Omar authorized $5,000.')).toEqual(['Dana', 'Omar']);
+  });
+
+  it('reads "approver not specified" as an approver called unknown, so a recorded approval is still caught', () => {
+    const facts = ['The board authorized management to schedule a process-improvement analysis this quarter.'];
+    expect(missedApprovals('Decision: schedule the process-improvement analysis. Approver not specified.', facts)).toHaveLength(1);
+  });
+
+  it('never takes the word after "Approver:" for a person when it is not a name', () => {
+    expect(approversNamed('Approver: unknown')).toEqual([]);
+    expect(approversNamed('Approver: unspecified')).toEqual([]);
+    expect(approversNamed('Approver: pending')).toEqual([]);
+    expect(approversNamed('Approver: TBD. Approver: Unknown. Approver - Pending')).toEqual([]);
+    expect(approversNamed('Approver: Priya')).toEqual(['Priya']);
   });
 });

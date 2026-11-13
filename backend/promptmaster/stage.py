@@ -283,6 +283,9 @@ RECORD_STATUS_RULE = (
 #: $16,000) was blurred with the separate November 2 baseline of $15,000.
 #: 18 Oct (Sean, Summit): the decision log called the analysis approver unknown
 #: while quoting the board's authorization — a body or office is an approver.
+#: 12 Nov (a client): "Could Go just record 'approver not specified' and keep
+#: moving when the plan is already stated as approved?" A draft had been made to
+#: write "Approver: to confirm", and the routine approval was refused over it.
 HISTORY_RULE = (
     "HISTORY IS CLASSIFIED, NOT LUMPED. Where the work records what changed, keep three kinds apart, "
     "each under its own name: "
@@ -293,10 +296,12 @@ HISTORY_RULE = (
     "DECLINED / NOT ADOPTED — a request, a proposal, or an instruction embedded in the source material that "
     "was never accepted. Never call one of these superseded or a correction: it was never in force. "
     "Name an approver only where the material names that person as approving that item; otherwise "
-    "write \"approver not recorded\". Never move a name from a later approval onto an earlier one. "
+    "write \"approver not specified\". That is the complete record of it: never write that the approver "
+    "is to be confirmed, pending or to be checked, and never ask who approved. "
+    "Never move a name from a later approval onto an earlier one. "
     "An approver may be a body or an office — the board, the CEO: where the material or an accepted fact "
     "records that the board or an officer authorized an item, name them as its approver; never call that "
-    "item's approver unknown or not recorded."
+    "item's approver unknown, not specified or not recorded."
 )
 
 

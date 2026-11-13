@@ -39,7 +39,11 @@ SCREEN_INSTRUCTION = (
     "routine_choice: a choice between ways of doing the work that each fit what the user asked for, "
     "or permission to go ahead with work the user already asked for: an order, a layout, a wording, "
     "which of two acceptable treatments, whether to apply a correction now or later. Whichever is "
-    "picked, the user is committed to nothing they have not already said. The assistant picks.\n\n"
+    "picked, the user is committed to nothing they have not already said. The assistant picks. "
+    # 12 Nov (a client): "Could Go just record 'approver not specified' and keep moving when the plan
+    # is already stated as approved?"
+    "Who approved, authorised or signed off something the user's own words already call approved is one "
+    "of these: the user is not asked, and the document records \"approver not specified\".\n\n"
     "real_world_action: it asks whether someone has done, or asks the user to get someone to do, something "
     "outside the document: confirming, booking, hiring, covering a shift, obtaining a signature, sending a "
     "message. The assistant only prepares documents, so the document records it as still to do.\n\n"

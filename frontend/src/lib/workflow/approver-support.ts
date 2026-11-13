@@ -20,6 +20,13 @@
  * board's authorization). A role named as approving needs the same source a
  * name does, and a line that calls an approver unknown is checked against the
  * material: if the material records who authorized that item, it is a finding.
+ *
+ * "Approved" also describes things (12 Nov, a client: the fact "Original
+ * approved plan: interview three…" was read as a person called Original who
+ * approved it; the check then told a draft that rightly said "approver not
+ * recorded" to name the approver on record, the fix wrote "Approver: to
+ * confirm", and the routine approval was refused over that placeholder). A
+ * participle in front of the noun it describes names nobody.
  */
 
 import type { AuditFinding } from '@/types';
@@ -57,7 +64,33 @@ const NOT_NAMES = new Set([
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   'The', 'This', 'That', 'Not', 'Never', 'Was', 'Has', 'Have', 'Had', 'Been', 'Budget', 'Launch', 'Date', 'Sponsor',
   'Change', 'Changes', 'Plan', 'Project', 'Board', 'Committee', 'Chair', 'Chairman', 'President', 'Nobody', 'None', 'Who', 'Which', 'Already', 'Formally', 'Also', 'Since',
+  // What an approved thing is called, not who approved it: "Original approved plan".
+  'Original', 'Initial', 'Current', 'Previous', 'Prior', 'Final', 'Revised', 'Updated', 'Latest', 'New', 'Old', 'First', 'Second', 'Last',
+  'Earlier', 'Previously', 'Newly', 'Recently', 'Fully', 'Only', 'Once', 'Now', 'Then', 'Still', 'Both', 'All', 'Each', 'Every', 'Any', 'Our', 'Your', 'Their', 'Its',
+  // What a log writes where it has no approver: "Approver: Unknown".
+  'Unknown', 'Unspecified', 'Unrecorded', 'Pending', 'Awaiting', 'Tbd', 'Tbc',
 ]);
+/** A person's name as written: a capital, then lower case. "Approver: unknown" and "Approver: TBD" name nobody. */
+const isName = (word: string) => /^[A-Z][a-z]/.test(word) && !NOT_NAMES.has(word);
+/** The pattern that reads "Elena approved …": the one where "approved" may instead describe the noun after it. */
+const NAME_THEN_VERB = 1;
+/** What follows a verb rather than a noun being described: "approved the budget", "approved on 2 Nov", "approved it". */
+const AFTER_A_VERB = new Set([
+  'the', 'a', 'an', 'this', 'that', 'these', 'those', 'it', 'its', 'them', 'all', 'both', 'each', 'every', 'any', 'some', 'no',
+  'our', 'his', 'her', 'their', 'my', 'your', 'on', 'in', 'at', 'for', 'by', 'of', 'to', 'with', 'and', 'or', 'but', 'as', 'up', 'only',
+  'after', 'before', 'when', 'while', 'because', 'so', 'what', 'which', 'yesterday', 'today', 'last', 'one', 'two', 'three', 'four', 'five',
+]);
+/**
+ * "Original approved plan", "Signed approved contract": the participle describes
+ * the noun that follows, so the word before it approved nothing. A verb is
+ * followed by its object's determiner, a preposition, a gerund ("approved
+ * changing the launch"), a figure, punctuation or the end.
+ */
+function describesWhatFollows(sentence: string, match: RegExpMatchArray): boolean {
+  if (/\b(?:has|had)\s/.test(match[0])) return false;
+  const next = /^\s+([A-Za-z][A-Za-z'’-]*)/.exec(sentence.slice((match.index ?? 0) + match[0].length))?.[1];
+  return Boolean(next) && /^[a-z]/.test(next!) && !/ing$/.test(next!) && !AFTER_A_VERB.has(next!);
+}
 /** A sentence that says someone has NOT approved names no approver. */
 const NEGATED = /\b(?:not|never|hasn['’]t|hadn['’]t|no one|nobody|without|pending|awaiting|unapproved)\b/i;
 const APPROVING = /\b(?:approv|authori[sz]|sign(?:ed)?[- ]?off)/i;
@@ -71,12 +104,13 @@ export function approversNamed(text: string): string[] {
   const out: string[] = [];
   for (const s of sentences(text)) {
     if (NEGATED.test(s)) continue;
-    for (const re of PATTERNS) {
+    PATTERNS.forEach((re, i) => {
       for (const m of s.matchAll(re)) {
         const name = m[1];
-        if (name && !NOT_NAMES.has(name) && !out.includes(name)) out.push(name);
+        if (i === NAME_THEN_VERB && describesWhatFollows(s, m)) continue;
+        if (name && isName(name) && !out.includes(name)) out.push(name);
       }
-    }
+    });
   }
   return out;
 }
@@ -104,8 +138,8 @@ export function unsupportedApprovers(content: string, sources: readonly string[]
   return [...names, ...roles.map((r) => (r === 'board' ? 'the board' : `the ${r}`))];
 }
 
-/** "Approver unknown", "approver: not recorded", "approved by an unknown approver". */
-const UNKNOWN_APPROVER = /\b(?:approver|approved by|authori[sz]ed by)\b[^.;\n]{0,40}?\b(?:unknown|not (?:recorded|known|stated|identified|named)|unrecorded|unspecified|tbd)\b|\bunknown approver\b/i;
+/** "Approver unknown", "approver not specified", "approver: not recorded", "approved by an unknown approver". */
+const UNKNOWN_APPROVER = /\b(?:approver|approved by|authori[sz]ed by)\b[^.;\n]{0,40}?\b(?:unknown|not (?:specified|recorded|known|stated|identified|named)|unrecorded|unspecified|tbd)\b|\bunknown approver\b/i;
 const FIGURE = /\d[\d,]*(?:\.\d+)?/g;
 const STOP = new Set(['the', 'a', 'an', 'of', 'for', 'to', 'and', 'or', 'in', 'on', 'with', 'by', 'is', 'was', 'be', 'has', 'have', 'had', 'this', 'that', 'approver', 'approved', 'approval', 'authorized', 'authorised', 'authorizes', 'authorises', 'authorization', 'unknown', 'not', 'recorded', 'up', 'its', 'it', 'as', 'at', 'from', 'no']);
 
@@ -158,7 +192,7 @@ export function approverFindings(content: string, sources: readonly string[]): A
       id: 'unsupported-approvers',
       category: UNSUPPORTED_APPROVERS,
       summary: `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} named as approving something, but nothing in the project says ${names.length === 1 ? 'that approver' : 'they'} approved anything.`,
-      suggested_change: 'Name an approver only where the project material names that person or body as approving that item; otherwise write "approver not recorded".',
+      suggested_change: 'Name an approver only where the project material names that person or body as approving that item; otherwise write "approver not specified". That is the whole record: never "to confirm", and never a question about who approved.',
     });
   }
   missedApprovals(content, sources).forEach(({ line, source }, i) => {
