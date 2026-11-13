@@ -928,8 +928,7 @@ export function useGoLoop(opts: Options) {
         // change mid-run applies at once; and the ones whose check failed on
         // the current version, which are revised toward rather than re-checked.
         const routine = o.project.routine_decisions ?? 'ask';
-        const headAt = o.bundles[o.stage.id]?.versions.at(-1)?.created_at ?? '';
-        const commitRefused = refusedCommits([...priorStepsRef.current, ...stepsRef.current], o.stage.id, headAt);
+        const commitRefused = refusedCommits([...priorStepsRef.current, ...stepsRef.current], o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
         const commitTried = commitRefused.map((r) => r.criterionId);
         if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
         // A refused routine approval gets one repair of its own, even where the

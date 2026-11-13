@@ -4070,3 +4070,13 @@ What it does not do:
   specified"; nothing rewrites it.
 - The rule for Go's questions is a prompt rule; a live question about who approved something has not been
   seen since.
+- **A refusal is of the version it checked** (found the same day, forcing this case on production). The
+  repair ran, and then the user was asked anyway: the repaired version was never checked. A step's start
+  is stamped by the database and its finish was stamped by the browser, whose clock was 31 seconds ahead,
+  so the refusal of the old version carried a time later than the new one and was read as a refusal of
+  it. The failed check now names the version it checked, an older step is placed by its start, and a
+  step's finish is written on the database's clock (`lib/supabase/server-clock.ts`, measured each time a
+  step starts). Until then, on any device whose clock ran ahead of the database by more than a revision
+  takes, a routine approval refused once was not checked again after Go revised the stage. The
+  repeated-question guard (`repeat-question.ts`) compares the same finish times with versions and facts;
+  it now gets database times too, but steps saved before this keep the times they have.

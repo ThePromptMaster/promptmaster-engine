@@ -610,17 +610,25 @@ const REFUSED_TAIL = / (?:I will revise toward it rather than ask you; it|It) is
  * moves, so nothing was left to revise with and the approval went to the user.
  * A refusal names what to change, so it gets one repair of its own, counted
  * here from the steps: `repairs` since the user last gave a direction.
+ *
+ * A refusal is of the version it checked. The step says which one; a step
+ * saved before it did is placed by when it started, which the database
+ * stamped, like the version. Its finish was stamped by the browser: on a
+ * device 31 seconds fast (13 Nov, production) the refusal read as newer than
+ * the version the repair then made, so the repaired work was never checked.
  */
 export function refusedCommits(
   steps: readonly Pick<AgentStep, 'action_key' | 'stage_id' | 'status' | 'params' | 'output' | 'changes' | 'started_at' | 'finished_at'>[],
   stageId: string,
-  headAt: string
+  head: { id?: string | null; created_at?: string | null } | null | undefined
 ): RefusedCommit[] {
   const since = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP) + 1;
   const out: RefusedCommit[] = [];
   for (const s of steps) {
     if (s.action_key !== 'commit_delegated' || s.stage_id !== stageId || s.status !== 'failed') continue;
-    if ((s.finished_at ?? s.started_at ?? '') < headAt) continue;
+    const checked = s.changes?.checked_version_id;
+    const ofHead = typeof checked === 'string' && head?.id ? checked === head.id : (s.started_at ?? s.finished_at ?? '') >= (head?.created_at ?? '');
+    if (!ofHead) continue;
     const criterionId = String(s.params?.criterion_id ?? '');
     if (!criterionId || out.some((r) => r.criterionId === criterionId)) continue;
     const said = typeof s.changes?.check_reason === 'string' ? s.changes.check_reason : (s.output ?? '').split(': not met — ')[1]?.replace(REFUSED_TAIL, '') ?? '';

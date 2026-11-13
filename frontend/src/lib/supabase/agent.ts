@@ -16,6 +16,7 @@ import type {
   ExecutionPolicy,
   SandboxRun,
 } from '@/types/agent';
+import { noteServerTime, serverNow } from './server-clock';
 
 export async function createAgentRun(args: {
   projectId: string;
@@ -126,6 +127,7 @@ export async function startAgentStep(step: {
   needsDecision: boolean;
   decisionQuestion: string | null;
 }): Promise<AgentStep> {
+  const sent = Date.now();
   const { data, error } = await createClient()
     .from('agent_steps')
     .insert({
@@ -145,6 +147,8 @@ export async function startAgentStep(step: {
     .select('*')
     .single();
   if (error) throw error;
+  // The database stamped `started_at`: that is its clock, read against this device's.
+  noteServerTime((data as AgentStep).started_at, sent, Date.now());
   return data as AgentStep;
 }
 
@@ -172,7 +176,8 @@ export async function finishAgentStep(
       changes: outcome.changes ?? {},
       ...(outcome.params ? { params: outcome.params } : {}),
       cost_usd: outcome.costUsd ?? null,
-      finished_at: new Date().toISOString(),
+      // On the database's clock, like the start and like every version it is compared with.
+      finished_at: serverNow(),
     })
     .eq('id', stepId)
     .select('*')
