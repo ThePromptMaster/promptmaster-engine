@@ -27,7 +27,14 @@ MAX_STAGES = 10
 #: Page kinds the model may choose, and what each is for.
 KINDS = {
     "write": "a page of prose the user reads and edits (a brief, a draft, a plan, the finished piece)",
-    "list": "a short table of items (sources, people, options, requirements)",
+    # 15 Nov (Sean, inventory audit): "a short table of each error and its
+    # correction" was planned as a list page, which shows cards and exports a
+    # numbered list; the deliverable never had a table.
+    "list": (
+        "a short list of items each with the same few fields (sources, people, options, requirements); "
+        "shown as cards, not as a table. A table the user asks for in the finished work is written as a "
+        "Markdown table on the \"write\" page that holds the finished work"
+    ),
     "check": "a table of findings about earlier work, each one accepted or rejected by the user",
     # 25 Oct (client: screening pasted LinkedIn profiles in batches, colour-coded).
     "assess": (

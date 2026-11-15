@@ -102,7 +102,7 @@ type Need =
   | {
       kind: 'objective_check';
       stageId: string;
-      finding: 'unmet' | 'no_evidence' | 'stages_left' | 'work_open' | 'repair_limit';
+      finding: 'unmet' | 'no_evidence' | 'stages_left' | 'work_open' | 'repair_limit' | 'not_written';
       /** `repair_limit`: how many times Go has tried. */
       tried?: number;
       /** The unmet requirements, the open work, or the stages left — as the record names them. */
@@ -1354,6 +1354,15 @@ function describeObjectiveCheck(
         message: `${t('need.metOn', { stage: need.metOn ?? stage, list })} ${next === stage ? t('need.marksComplete', { stage }) : t('need.takesMeTo', { next })}`,
         action: options[0].label, options,
       };
+    }
+    case 'not_written': {
+      // 15 Nov: what is left is the deliverable itself, said as that.
+      const next = need.next ?? need.items[0] ?? t('need.theNextStage');
+      const options = [
+        { id: 'resume' as const, label: t('need.carryTo', { next }) },
+        { id: 'stop' as const, label: t('need.stopHere') },
+      ];
+      return { message: t('need.notWritten', { list }), action: options[0].label, options };
     }
     case 'work_open': {
       // One undecided row is all that is open: it is decided here, with what

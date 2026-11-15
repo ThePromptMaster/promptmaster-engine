@@ -295,6 +295,24 @@ function tabIdentity(): string {
 /** Let React render what the last await changed before reading props again. */
 const settle = () => new Promise((r) => setTimeout(r, 60));
 
+/** Moves that take the project to another stage: the next step waits for the page to show it. */
+const STAGE_MOVES = new Set(['stage_marked_complete', 'stage_advanced', 'stage_entered', 'stage_returned', 'stage_skipped']);
+
+/**
+ * Wait until the page shows the project on another stage than `from`, at most
+ * `ms` (15 Nov, Sean's workshop run on an iPad: after a long pause the page
+ * caught up slowly, and Go, still shown Email, moved on from it three times
+ * and then asked why the Check stage would not open). True when it has moved.
+ */
+export async function waitForStageChange(current: () => string | null | undefined, from: string, ms = 15_000): Promise<boolean> {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (current() !== from) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return current() !== from;
+}
+
 /** The planner's calls, tagged as Go's so the usage views count them (4 Nov). */
 async function planning<T>(call: () => Promise<T>): Promise<T> {
   setUsageOperation({ operation: 'go:plan' });
@@ -612,6 +630,9 @@ export function useGoLoop(opts: Options) {
         return 'stop';
       }
       await settle();
+      if ((done.changes?.event_types ?? []).some((t) => STAGE_MOVES.has(t)) && o.stage) {
+        await waitForStageChange(() => latest.current.state.current_stage_id, o.stage.id);
+      }
       return 'continue';
     },
     [upsertStep, commitRun, setRunStatus]
@@ -633,7 +654,7 @@ export function useGoLoop(opts: Options) {
       const current = runRef.current!;
       const routine = o.project.routine_decisions ?? 'ask';
       const steps = [...priorStepsRef.current, ...stepsRef.current];
-      const recordedHere = stepsRef.current.filter((s) => s.stage_id === stage.id && s.action_key === ROUTINE_DEFAULT_STEP && s.params?.real_world === true).length;
+      const recordedHere = stepsRef.current.filter((s) => s.stage_id === stage.id && s.action_key === ROUTINE_DEFAULT_STEP && (s.params?.real_world === true || typeof s.params?.optional_suggestion === 'string')).length;
       if (!shouldScreen({ policy: current.policy, routine, question, recordedHere, expert })) return { kind: 'ask' };
       const at = o.template.stages.findIndex((s) => s.id === stage.id);
       const screen = await api.agentScreenQuestion({
@@ -649,6 +670,23 @@ export function useGoLoop(opts: Options) {
         question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made,
         approvalStands: approvalStandsThroughRepairs(o.project, stage, o.bundles[stage.id]?.versions ?? []),
       });
+      if (plan.kind === 'leave_out') {
+        // 15 Nov (Sean, guest invitation): Go's own extra is not a question for the
+        // user and not part of the work. Said once, on the record, and left out.
+        const step = await startAgentStep({
+          runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+          stageId: stage.id, mode: modeForStage(o.project, stage), actionKey: ROUTINE_DEFAULT_STEP,
+          params: { question: question.slice(0, 1000), optional_suggestion: plan.suggestion.slice(0, 500) },
+          rationale: `Instead of asking "${question.slice(0, 200)}": ${plan.reason || 'this is an extra I thought of, and nothing you asked for needs it.'}`,
+          expectedOutcome: 'Left out of the work, and mentioned as an optional suggestion.', needsDecision: false, decisionQuestion: null,
+        });
+        upsertStep(step);
+        upsertStep(await finishAgentStep(step.id, {
+          status: 'succeeded', label: null,
+          output: `Left out, as an optional suggestion nothing you asked for needs: ${plan.suggestion} It is not in the document, and nothing promises it.`,
+        }));
+        return { kind: 'record', action: '', reason: plan.reason };
+      }
       if (plan.kind !== 'record') return plan;
       const step = await startAgentStep({
         runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
@@ -895,7 +933,7 @@ export function useGoLoop(opts: Options) {
         const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
         // Every move the stage offers now, before the polishing cap takes any away.
         const offered = withoutOverride(
-          allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), stageEvaluation.canAdvance, current.policy
+          allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone), stageEvaluation.canAdvance, current.policy
         );
         const allowed = withoutSettledRuns(withoutEndlessPolish(
           // Asked once: if the user stayed, the stage is to be done.
@@ -2099,7 +2137,7 @@ export function useGoLoop(opts: Options) {
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
-          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), policy: current.policy,
+          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone), policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           objective: o.project.objective, currentStageId: o.state.current_stage_id,
         });

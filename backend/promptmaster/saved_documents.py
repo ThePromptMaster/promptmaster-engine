@@ -26,7 +26,16 @@ DOCUMENTS_RULE = (
     "that does not make each assumption, estimate or inference in it a confirmed "
     "fact. Keep what a document calls an assumption, estimate or inference labelled "
     "as one. What is established is the accepted facts and requirements and the "
-    "figures the user supplied."
+    "figures the user supplied. "
+    # 15 Nov (Sean, guest invitation): a checklist's own "a non-alcoholic option"
+    # came back into the invitation as "Drinks, including water and non-alcoholic
+    # options", after an earlier check had taken the unsupplied refreshments out.
+    "Nor is what an earlier stage only proposes: a suggestion, an option, a "
+    "recommendation, an item marked optional, proposed or to confirm, or a planning "
+    "line that no accepted fact or decision of the user's confirms. Text written for "
+    "other people — an invitation, an email, a notice, a letter — never promises or "
+    "announces such a thing: what it tells its readers they will get or find rests "
+    "on the accepted facts and the user's decisions only."
 )
 
 

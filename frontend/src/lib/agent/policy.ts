@@ -359,7 +359,15 @@ export function allowedActions(
   stage: StageDefinition,
   stageHasDraft: boolean,
   tools: AgentTools = NO_TOOLS,
-  facts: StageFacts = {}
+  facts: StageFacts = {},
+  /**
+   * The stage that writes the deliverable has nothing yet (15 Nov, Sean's
+   * workshop run: Go "declared the objective complete" on Schedule & budget with
+   * Email, Check and Revision unwritten, and stopped saying "Revision is written
+   * … Revision is not written yet"). Nothing is judged finished before it is
+   * written, so while a later stage can still be worked the move is not offered.
+   */
+  deliverableUnwritten = false
 ): string[] {
   const keys: string[] = [];
   // Research predates the flag; anything else says so on the template.
@@ -442,7 +450,7 @@ export function allowedActions(
   // Nor is open-ended work declared complete by Go at the end of a round: on
   // production, with the write-up no longer offered, it proposed "Objective
   // complete" instead of the next round (4 Oct). Ending it is the user's.
-  if (!stage.transitions.loop_to) keys.push('declare_objective_complete');
+  if (!stage.transitions.loop_to && !(deliverableUnwritten && nextSuggestedStage(template, state))) keys.push('declare_objective_complete');
   // A round's stages stay on their task (production, 5 Oct): offered the
   // reasoning moves, Go spent a whole window deriving and comparing on Next
   // question instead of writing it, so the next round was never proposed.

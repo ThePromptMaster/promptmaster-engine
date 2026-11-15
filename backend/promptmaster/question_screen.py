@@ -24,8 +24,14 @@ from .schemas import PMInput
 #: Classifying one question does not need the default model.
 SCREEN_MODEL = "anthropic/claude-sonnet-5.5"
 
-Verdict = Literal["routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input"]
-_VERDICTS = ("routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input")
+Verdict = Literal[
+    "routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input",
+    "optional_suggestion",
+]
+_VERDICTS = (
+    "routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input",
+    "optional_suggestion",
+)
 
 SCREEN_INSTRUCTION = (
     "An AI assistant is carrying out a project for a user and wants to stop and ask them something. "
@@ -47,6 +53,12 @@ SCREEN_INSTRUCTION = (
     "real_world_action: it asks whether someone has done, or asks the user to get someone to do, something "
     "outside the document: confirming, booking, hiring, covering a shift, obtaining a signature, sending a "
     "message. The assistant only prepares documents, so the document records it as still to do.\n\n"
+    # 15 Nov (Sean, guest invitation): Go stopped at the end to ask whether to add a backup volunteer
+    # it had suggested itself. "Please check why Go treats suggestions it generates as blockers."
+    "optional_suggestion: an extra the assistant thought of itself that nothing in THE USER'S OWN WORDS asks "
+    "for or needs: an addition, a backup, a nice-to-have (a backup volunteer, refreshments, a second "
+    "reminder, an extra section). The work is complete without it. It is left out of the work and mentioned "
+    "as an optional suggestion; it is never a question and never a promise.\n\n"
     "reserved_approval: it asks the user to approve or sign off something listed under RESERVED APPROVALS.\n\n"
     "missing_input: the document cannot be written without a fact only the user has, and the brief does not "
     "allow it to be left as a stated gap.\n\n"
@@ -57,12 +69,13 @@ SCREEN_INSTRUCTION = (
     "real requirement, copy the user's words exactly into requirement_quote.\n"
     "If you are unsure between routine_repair or routine_choice and business_decision, choose "
     "business_decision.\n\n"
-    "Return JSON only: {\"verdict\": one of the six names, \"reason\": one short sentence, "
+    "Return JSON only: {\"verdict\": one of the seven names, \"reason\": one short sentence, "
     "\"instruction\": for routine_repair, the work to do, in one or two sentences, stating any target "
     "the question names; for routine_choice, empty, "
     "\"target_stage\": for routine_repair, the name of the EARLIER STAGE where the correction belongs, "
     "exactly as listed, or empty if it belongs on this stage, "
     "\"action\": for real_world_action, what still has to be done, in one short sentence, "
+    "\"suggestion\": for optional_suggestion, the extra in one short sentence, "
     "\"requirement_quote\": the user's exact words, or empty}."
 )
 
@@ -84,11 +97,12 @@ class ScreenQuestionResponse(BaseModel):
     target_stage: str = ""
     action: str = ""
     requirement_quote: str = ""
+    suggestion: str = ""
 
 
 def _user_words(inputs: PMInput) -> str:
     """Only what the user supplied: never a draft, never a model's assumption."""
-    facts = [f.statement for f in inputs.facts if f.origin != "model_assumed"]
+    facts = [f.statement for f in inputs.facts if f.origin not in ("model_assumed", "policy")]
     return "\n".join(
         part for part in (inputs.objective, inputs.audience, inputs.constraints, inputs.output_format, inputs.context, *facts) if part
     )
@@ -127,10 +141,16 @@ def parse_screen(result: dict, req: ScreenQuestionRequest) -> ScreenQuestionResp
         return ScreenQuestionResponse(reason=reason or "The screen named no work to do.")
     if verdict == "real_world_action" and not action:
         action = req.question.strip()[:500]
+    suggestion = str(result.get("suggestion") or "").strip()[:500]
+    if verdict == "optional_suggestion":
+        # Something the user's own words require is not optional, whatever the screen thought.
+        if quote:
+            return ScreenQuestionResponse(reason="The question rests on the user's own requirement.", requirement_quote=quote)
+        suggestion = suggestion or req.question.strip()[:500]
     return ScreenQuestionResponse(
         verdict=verdict, reason=reason, instruction=instruction if verdict == "routine_repair" else "",
         target_stage=target if verdict == "routine_repair" else "", action=action if verdict == "real_world_action" else "",
-        requirement_quote=quote,
+        requirement_quote=quote, suggestion=suggestion if verdict == "optional_suggestion" else "",
     )
 
 
