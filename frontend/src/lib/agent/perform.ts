@@ -2411,7 +2411,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         }
         return done(key, {
           status: 'succeeded', toolsUsed: [], changes: {},
-          output: `The model judged the objective met, but ${where} is not written yet, so the work is not finished. Still to write: ${todo.join(', ')}.`,
+          output: `The model judged the objective met, but the work is not finished: still to write — ${todo.join('; ')}. ${where} is not written yet.`,
           stop: { status: 'awaiting_decision', reason: `The work is not finished: still to write — ${todo.join('; ')}. Nothing is judged finished before it is written.` },
           needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'not_written', items: todo, ...(next ? { next } : {}) },
         });

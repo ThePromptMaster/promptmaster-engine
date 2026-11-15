@@ -182,8 +182,9 @@ test('Refreshing mid-run resumes without repeating the interrupted step', async 
   await page.reload();
   await expect(steps(page).first()).toHaveAttribute('data-step-status', 'interrupted', { timeout: 20_000 });
   await expect(steps(page).first()).toContainText('It was not repeated');
-  // It carries on by itself, then stops for the user: the deliverable is not done.
-  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText('the deliverable is not', { timeout: 90_000 });
+  // It carries on by itself, then stops for the user: the deliverable is not written yet
+  // (15 Nov: said as what is still to write, never "X is written … X is not written").
+  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText('still to write', { timeout: 90_000 });
   await page.screenshot({ path: test.info().outputPath('01-resumed-after-refresh.png'), fullPage: true });
 
   const recorded = await stepsOf((await runOf(id)).id);
@@ -262,7 +263,7 @@ test('A run going round in circles reconsiders once: the repeated moves are with
   const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=derive,prove,derive,prove,derive,prove,simplify]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
+  await expect(transparency).toContainText('still to write', { timeout: 60_000 });
   await expect(transparency).not.toContainText('have been taking turns on this stage without it moving on');
   await page.screenshot({ path: test.info().outputPath('01-reconsidered.png'), fullPage: true });
   const recorded = await stepsOf((await runOf(id)).id);
@@ -275,7 +276,7 @@ test('A derivation chosen again while its result is unsaved is saved into the do
   const id = await researchProject(page, 'E2E go derive saved', 'Pendulum [[mock:plan=derive,derive,prove]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
+  await expect(transparency).toContainText('still to write', { timeout: 60_000 });
   await expect(transparency).not.toContainText('was chosen 3 times in a row');
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.slice(0, 2).map((s) => s.action_key)).toEqual(['derive', 'revise_stage']);

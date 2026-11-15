@@ -16,6 +16,12 @@ describe('a table the brief asks for is checked in code (15 Nov, inventory audit
     expect(parseRequirements(['Write it as prose, no table.'])).toEqual([]);
     expect(parseRequirements(['Start with a table of contents.'])).toEqual([]);
     expect(parseRequirements(['Use bullets rather than a table.'])).toEqual([]);
+    // Offered, not asked for (the slide-deck example's format).
+    expect(parseRequirements(['Each slide has at most five short bullets or one small table, then speaker notes.'])).toEqual([]);
+    expect(parseRequirements(['Add a table if useful.'])).toEqual([]);
+    expect(parseRequirements(['The memo may include a table of costs.'])).toEqual([]);
+    // Asked for, in Sean's objective's words.
+    expect(parseRequirements(['Check the draft against the source notes, show each error and its correction in a short table, and write a corrected handoff.'])).toHaveLength(1);
   });
 
   it('holds the deliverable to it, and no other stage', () => {
