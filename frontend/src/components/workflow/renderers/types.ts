@@ -114,7 +114,13 @@ export interface StageRendererProps {
    * the new rows appended, as one version. Resolves to a sentence saying what
    * was added; rejects with the reason it was not.
    */
-  onAssessBatch?: (input: { text: string; scale: AssessScale; existing: StageItem[] }) => Promise<string>;
+  onAssessBatch?: (input: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (assessed: number) => void }) => Promise<string>;
+  /** A finished Assess stage: open it again for another batch (15 Nov). */
+  onReopenForBatch?: () => void;
+  /** "Done — summarize": the stage's own Continue, from the table (15 Nov). */
+  onFinishAssessing?: () => void;
+  /** The label of the stage that summarizes, for the button. */
+  nextStageLabel?: string | null;
 
   /** True while a draft is being generated for this stage. */
   generating: boolean;

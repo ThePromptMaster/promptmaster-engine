@@ -14,6 +14,8 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.offerActions': '根据回复提供可选操作',
   'chat.openLatest': '仅提问——打开最新版本才能修改。',
   'chat.editElsewhere': '要修改{label}，请打开它并点击“编辑此阶段”。',
+  'chat.rowChangeAsk': '请按如下方式修改此阶段的表格，并说明哪些行会改变、各自改成什么：{text}',
+  'chat.rowChangeNote': '此阶段是一张表格：说明要改什么，回复会给出可供你应用的行修改。',
   'chat.openNamed': '打开{label}',
   'chat.loading': '正在加载对话…',
   'chat.suggested': '推荐问题',

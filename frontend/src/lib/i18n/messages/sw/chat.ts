@@ -14,6 +14,8 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.offerActions': 'Pendekeza hatua kutoka kwenye majibu',
   'chat.openLatest': 'Kuuliza tu — fungua toleo la karibuni zaidi ili kulibadilisha.',
   'chat.editElsewhere': 'Ili kubadilisha {label}, ifungue kisha ubonyeze Hariri hatua hii.',
+  'chat.rowChangeAsk': 'Badilisha jedwali la hatua hii hivi, na utaje safu zinazobadilika na kila moja inakuwa nini: {text}',
+  'chat.rowChangeNote': 'Hatua hii ni jedwali: sema cha kubadilisha, na jibu litatoa mabadiliko ya safu ili uyatumie.',
   'chat.openNamed': 'Fungua {label}',
   'chat.loading': 'Inapakia mazungumzo…',
   'chat.suggested': 'Maswali yaliyopendekezwa',

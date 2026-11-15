@@ -8,6 +8,7 @@
  * a workflow event the database checks like any other.
  */
 
+import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
@@ -53,7 +54,7 @@ import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { buildStageDigest, dataFileBriefs, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
-import { appendBatch, parseAssessment, scaleForRequest, scaleFromSpec, serializeAssessment } from '@/lib/workflow/assess';
+import { parseAssessment, scaleForRequest, scaleFromSpec, serializeAssessment } from '@/lib/workflow/assess';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, projectState, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
@@ -1618,41 +1619,60 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
     case 'assess': {
       // 6 Nov: pressing "Try it on this sample" asked for this batch to be judged.
       // Go stopped and sent the tester to a button that could not help.
-      const text = ctx.stage.assess?.offered_batch?.trim();
-      if (!text) return done(key, { status: 'failed', output: 'This stage was given no batch to judge.', toolsUsed: [], changes: {} });
+      // 15 Nov: what a paste left unjudged is the user's own material, so Go
+      // carries it on too, the same way the page does (`assessPaste`).
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
-      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
-      const saved = parseAssessment(head);
+      const head0 = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
+      const saved = parseAssessment(head0);
+      const fromPending = Boolean(saved?.pending?.text.trim());
+      const text = fromPending ? saved!.pending!.text : ctx.stage.assess?.offered_batch?.trim();
+      if (!text) return done(key, { status: 'failed', output: 'This stage was given no batch to judge.', toolsUsed: [], changes: {} });
       const scale = saved?.scale ?? scaleFromSpec(ctx.stage.assess);
-      const existing = saved?.items ?? [];
-      const res = await api.assessBatch(
-        {
-          inputs: inputsFrom(ctx.project),
-          digest: buildStageDigest(ctx.template, ctx.state, ctx.project, ctx.bundles, ctx.stage.id),
-          scale: scaleForRequest(scale),
-          text,
-          stage_hint: ctx.stage.entry_prompt_hint ?? '',
-          already: existing.map((i) => i.subject ?? '').filter(Boolean),
-          model: ctx.project.model,
-          web_access: webAccessOf(ctx.project),
+      let head = head0;
+      const versionIds: string[] = [];
+      let model = ctx.project.model;
+      const run = await assessPaste({
+        text,
+        existing: saved?.items ?? [],
+        call: async (chunk, already) => {
+          const res = await api.assessBatch(
+            {
+              inputs: inputsFrom(ctx.project),
+              digest: buildStageDigest(ctx.template, ctx.state, ctx.project, ctx.bundles, ctx.stage.id),
+              scale: scaleForRequest(scale),
+              text: chunk,
+              stage_hint: ctx.stage.entry_prompt_hint ?? '',
+              already,
+              model: ctx.project.model,
+              web_access: webAccessOf(ctx.project),
+            },
+            ctx.signal
+          );
+          await keepWeb(ctx, res, ctx.stage);
+          model = res.model_used || model;
+          return res;
         },
-        ctx.signal
-      );
-      await keepWeb(ctx, res, ctx.stage);
-      if (!res.items.length) return done(key, { status: 'failed', output: 'The batch came back with nothing judged.', toolsUsed: ['model'], changes: {} });
-      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
-        content: serializeAssessment(scale, appendBatch(existing, res.items, new Date().toISOString())),
-        source_operation: 'assess_batch',
-        base_content: head,
-        model: res.model_used || ctx.project.model,
-        mode: modeForStage(ctx.project, ctx.stage),
-        change_summary: `Go mode judged the sample batch: ${res.items.length} item${res.items.length === 1 ? '' : 's'}.`,
+        save: async (items, pending, added) => {
+          const content = serializeAssessment(scale, items, pending);
+          if (content === head) return;
+          const created = await ctx.appendStageVersion!(ctx.stage.id, ctx.stage.label, {
+            content,
+            source_operation: 'assess_batch',
+            base_content: head,
+            model,
+            mode: modeForStage(ctx.project, ctx.stage),
+            change_summary: `Go mode judged ${added} item${added === 1 ? '' : 's'} ${fromPending ? 'left from your paste' : 'from the sample batch'}.`,
+          });
+          head = content;
+          const id = (created as { id?: unknown } | null)?.id;
+          if (typeof id === 'string') versionIds.push(id);
+        },
       });
-      const versionId = (created as { id?: unknown } | null)?.id;
+      if (!run.added) return done(key, { status: 'failed', output: 'The batch came back with nothing judged.', toolsUsed: ['model'], changes: versionIds.length ? { version_ids: versionIds } : {} });
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
-        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `Judged ${res.items.length} item${res.items.length === 1 ? '' : 's'} from the sample batch. The table on this stage has each verdict and why; change any of them.`,
+        changes: versionIds.length ? { version_ids: versionIds } : {},
+        output: `Judged ${run.added} item${run.added === 1 ? '' : 's'} ${fromPending ? 'left from your paste' : 'from the sample batch'}.${run.pending ? ' Some are still left; they stay on the stage to assess.' : ''} The table on this stage has each verdict and why; change any of them.`,
       });
     }
 

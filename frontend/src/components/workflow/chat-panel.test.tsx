@@ -707,3 +707,19 @@ describe('the thread stays at its end (6 Nov: the next-step card’s last button
     vi.unstubAllGlobals();
   });
 });
+
+describe('Change it on a table stage (15 Nov, Sean: greyed out on a summary stage)', () => {
+  it('is on, and the request goes as a question about the rows, whose reply offers row changes', async () => {
+    panel({ canInstruct: false, isTable: true, changeAsRows: true, cannotChangeBecause: 'Ask only — answers offer row changes for you to review.' });
+    const tab = screen.getByRole('tab', { name: /change it/i });
+    expect(tab).toBeEnabled();
+    const user = userEvent.setup();
+    await user.click(tab);
+    expect(screen.getByText(/the reply offers the row changes for you to apply/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Give a revision instruction'), 'Mark row 3 as rejected');
+    await user.click(screen.getByRole('button', { name: /draft revision/i }));
+    await waitFor(() => expect(chatMessage).toHaveBeenCalledTimes(1));
+    expect(JSON.stringify(chatMessage.mock.calls[0][0])).toContain('Change the table on this stage as follows');
+    expect(applyToAnswer).not.toHaveBeenCalled();
+  });
+});

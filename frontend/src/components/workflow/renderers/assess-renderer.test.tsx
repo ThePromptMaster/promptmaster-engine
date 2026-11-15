@@ -96,3 +96,27 @@ describe('the Assess stage (client, 25 Oct)', () => {
     expect(screen.queryByRole('button', { name: 'Use the sample batch' })).toBeNull();
   });
 });
+
+describe('more batches, the rest of a paste, and finishing (15 Nov, Sean)', () => {
+  const WITH_PENDING = serializeAssessment(DEFAULT_SCALE, parseAssessment(TABLE)!.items, { text: 'Candidate 13\nVP Ops', count: 13 });
+
+  it('offers the items a paste left, and judges them from the table', async () => {
+    const onAssessBatch = vi.fn(async () => '13 assessed and added to the table.');
+    render(<StageRenderer {...props({ versions: [version(WITH_PENDING)], onAssessBatch })} />);
+    expect(screen.getByText('13 more from your last paste are not judged yet.')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Assess the remaining 13/ }));
+    expect(onAssessBatch).toHaveBeenCalledWith(expect.objectContaining({ text: 'Candidate 13\nVP Ops' }));
+  });
+
+  it('on a finished stage, offers another batch; on the current one, finishing', async () => {
+    const onReopenForBatch = vi.fn();
+    const { unmount } = render(<StageRenderer {...props({ versions: [version(TABLE)], readOnly: true, onReopenForBatch })} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: /Add another batch/ }));
+    expect(onReopenForBatch).toHaveBeenCalled();
+    unmount();
+    const onFinishAssessing = vi.fn();
+    render(<StageRenderer {...props({ versions: [version(TABLE)], onAssessBatch: vi.fn(async () => ''), onFinishAssessing, nextStageLabel: 'Summary' })} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: /Done — summarize on Summary/ }));
+    expect(onFinishAssessing).toHaveBeenCalled();
+  });
+});

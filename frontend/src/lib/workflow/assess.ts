@@ -32,8 +32,15 @@ export interface AssessScale {
 }
 
 export const SCALE_LIMITS = { minLevels: 2, maxLevels: 7, labelMax: 40, meaningMax: 300 } as const;
-/** What one paste may carry; the server holds the same bound (assessment.MAX_ASSESS_CHARS). */
-export const ASSESS_PASTE_MAX = 40_000;
+/**
+ * What one paste may carry (15 Nov, Sean: "it will only do like 12 people at a
+ * time … can we make it a big amount?"). The page sends it a batch at a time.
+ */
+export const ASSESS_PASTE_MAX = 200_000;
+/** What one call carries; the server holds the same bound (assessment.MAX_ASSESS_CHARS). */
+export const ASSESS_CALL_MAX = 40_000;
+/** Calls one paste may take: twelve items each, 240 in all. */
+export const ASSESS_MAX_CALLS = 20;
 
 /** The scales offered without typing one. Labels are stored in English and shown translated. */
 export const SCALE_PRESETS: AssessScale[] = [
@@ -117,24 +124,68 @@ export function validScale(scale: AssessScale | null | undefined): scale is Asse
 
 export interface AssessmentDocument extends StageItemsDocument {
   scale: AssessScale;
+  /**
+   * What a paste left unjudged (15 Nov: "13 more were in the paste; assess them
+   * in another batch", and the 13 were gone). Kept with the table until judged.
+   */
+  pending?: AssessPending;
+}
+
+export interface AssessPending {
+  text: string;
+  /** How many items the last call said were left, when it said. */
+  count: number;
 }
 
 /** The scale and rows a version holds; null when it is not an assessment. */
-export function parseAssessment(content: string | null | undefined): { scale: AssessScale | null; items: StageItem[] } | null {
+export function parseAssessment(content: string | null | undefined): { scale: AssessScale | null; items: StageItem[]; pending: AssessPending | null } | null {
   if (!content?.trim()) return null;
   try {
     const doc = JSON.parse(content) as Partial<AssessmentDocument>;
     if (doc?.kind !== 'stage_items' || !Array.isArray(doc.items)) return null;
     const scale = doc.scale && Array.isArray(doc.scale.levels) ? (doc.scale as AssessScale) : null;
-    return { scale: validScale(scale) ? scale : null, items: doc.items.filter((i): i is StageItem => Boolean(i && typeof i.id === 'string')) };
+    const pending = doc.pending && typeof doc.pending.text === 'string' && doc.pending.text.trim()
+      ? { text: doc.pending.text, count: Number(doc.pending.count) || 0 }
+      : null;
+    return { scale: validScale(scale) ? scale : null, items: doc.items.filter((i): i is StageItem => Boolean(i && typeof i.id === 'string')), pending };
   } catch {
     return null;
   }
 }
 
-export function serializeAssessment(scale: AssessScale, items: StageItem[]): string {
-  const doc: AssessmentDocument = { kind: 'stage_items', scale, items };
+export function serializeAssessment(scale: AssessScale, items: StageItem[], pending?: AssessPending | null): string {
+  const doc: AssessmentDocument = { kind: 'stage_items', scale, items, ...(pending?.text.trim() ? { pending } : {}) };
   return JSON.stringify(doc, null, 2);
+}
+
+/** A name as compared for duplicates: case, spacing and punctuation aside. */
+export function subjectKey(subject: string | undefined): string {
+  return (subject ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/** What one call carries of the rest of a paste: up to `max`, ending at a blank line, or a line, so no item is cut. */
+export function batchChunk(text: string, max = ASSESS_CALL_MAX): string {
+  if (text.length <= max) return text;
+  const blank = text.lastIndexOf('\n\n', max);
+  if (blank > max / 2) return text.slice(0, blank);
+  const line = text.lastIndexOf('\n', max);
+  return text.slice(0, line > max / 2 ? line : max);
+}
+
+/**
+ * The rest of a paste after a call: from where the first unjudged item starts,
+ * '' when nothing is left, or null when the call said items were left but its
+ * starting line cannot be found (the caller keeps the rest as pending).
+ */
+export function restAfter(rest: string, chunk: string, res: { not_assessed?: number; next_from?: string }): string | null {
+  if ((res.not_assessed ?? 0) > 0) {
+    const start = (res.next_from ?? '').trim();
+    if (!start) return null;
+    const words = start.split(/\s+/).slice(0, 12).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const found = new RegExp(words.join('\\s+')).exec(rest.slice(1));
+    return found ? rest.slice(found.index + 1).trim() : null;
+  }
+  return chunk.length < rest.length ? rest.slice(chunk.length).trim() : '';
 }
 
 /** A returned row as the table stores it. */
@@ -147,7 +198,11 @@ export function batchAwaited(
   stage: { renderer: string; assess?: { offered_batch?: string; item_noun?: string } },
   head: string | null | undefined
 ): { offered: boolean; noun: string | null } | null {
-  if (stage.renderer !== 'assess' || parseAssessment(head)?.items.length) return null;
+  if (stage.renderer !== 'assess') return null;
+  const doc = parseAssessment(head);
+  // Items a paste left unjudged are the user's own, given already: Go judges them (15 Nov).
+  if (doc?.pending?.text.trim()) return { offered: true, noun: stage.assess?.item_noun?.trim() || null };
+  if (doc?.items.length) return null;
   return { offered: Boolean(stage.assess?.offered_batch?.trim()), noun: stage.assess?.item_noun?.trim() || null };
 }
 
@@ -167,9 +222,19 @@ export interface AssessedRow {
  */
 export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string): StageItem[] {
   const batch = String(nextBatch(existing));
+  // A name already in the table is not added twice (15 Nov: carrying a paste on,
+  // or pasting the same profiles again, duplicated rows).
+  const seen = new Set(existing.map((i) => subjectKey(i.subject)).filter(Boolean));
+  const fresh = rows.filter((r) => {
+    const key = subjectKey(r.subject);
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return [
     ...existing,
-    ...rows.map((r) => ({
+    ...fresh.map((r) => ({
       id: r.id,
       subject: r.subject,
       verdict: r.verdict,

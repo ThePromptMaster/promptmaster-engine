@@ -14,6 +14,8 @@ export const hi: Record<keyof typeof en, string> = {
   'chat.offerActions': 'उत्तरों से कार्रवाइयाँ सुझाएँ',
   'chat.openLatest': 'केवल पूछें — इसे बदलने के लिए नवीनतम संस्करण खोलें।',
   'chat.editElsewhere': '{label} बदलने के लिए उसे खोलें और इस चरण को संपादित करें दबाएँ।',
+  'chat.rowChangeAsk': 'इस चरण की तालिका को इस तरह बदलें, और बताएँ कि कौन-सी पंक्तियाँ बदलती हैं और हर एक क्या बनती है: {text}',
+  'chat.rowChangeNote': 'यह चरण एक तालिका है: बताएँ क्या बदलना है, और जवाब लागू करने के लिए पंक्तियों के बदलाव देगा।',
   'chat.openNamed': '{label} खोलें',
   'chat.loading': 'बातचीत लोड हो रही है…',
   'chat.suggested': 'सुझाए गए प्रश्न',

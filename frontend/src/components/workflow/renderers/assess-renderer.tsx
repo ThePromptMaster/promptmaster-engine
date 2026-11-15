@@ -54,6 +54,9 @@ export function AssessRenderer({
   onRestore,
   onSaveContent,
   onAssessBatch,
+  onReopenForBatch,
+  onFinishAssessing,
+  nextStageLabel,
   readOnly,
 }: StageRendererProps) {
   const t = useT();
@@ -80,6 +83,8 @@ export function AssessRenderer({
 
   const [text, setText] = useState('');
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const pending = doc?.pending ?? null;
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [filter, setFilter] = useState<Filter>({ kind: 'all' });
   const [bestFirst, setBestFirst] = useState(true);
@@ -103,18 +108,21 @@ export function AssessRenderer({
   // A sample to offer: it fills the box, and only pressing Assess runs anything.
   const sampleBatch = stage.assess?.offered_batch?.trim();
 
-  async function run() {
-    if (!onAssessBatch || !text.trim() || running || !validScale(scale)) return;
+  async function run(given?: string) {
+    const input = (given ?? text).trim();
+    if (!onAssessBatch || !input || running || !validScale(scale)) return;
     setRunning(true);
     setNote(null);
+    setProgress(0);
     try {
-      const said = await onAssessBatch({ text: text.trim(), scale, existing: items });
-      setText('');
+      const said = await onAssessBatch({ text: input, scale, existing: items, onProgress: setProgress });
+      if (!given) setText('');
       setNote({ text: said });
     } catch (e) {
       setNote({ text: t('assess.failed', { why: e instanceof Error && e.message ? e.message : t('assess.failedUnknown') }), error: true });
     } finally {
       setRunning(false);
+      setProgress(null);
     }
   }
 
@@ -156,6 +164,37 @@ export function AssessRenderer({
         evaluation={evaluation}
       />
 
+      {/* What a paste left unjudged (15 Nov): kept with the table, one press away. */}
+      {editable && onAssessBatch && pending && (
+        <section data-assess-pending className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3">
+          <p className="me-auto text-body text-[var(--on-surface)]">
+            {pending.count ? t('assess.pendingTitle', { n: pending.count }) : t('assess.pendingTitleSome')}
+          </p>
+          <button
+            type="button"
+            onClick={() => void run(pending.text)}
+            disabled={running || !validScale(scale)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-40"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">playlist_play</span>
+            {pending.count ? t('assess.assessRemaining', { n: pending.count }) : t('assess.assessRest')}
+          </button>
+        </section>
+      )}
+      {/* A finished table takes more batches too (15 Nov, Sean: "keep adding batches … and choose when to finish"). */}
+      {!editable && isHead && onReopenForBatch && (
+        <section data-assess-reopen className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+          <button
+            type="button"
+            onClick={onReopenForBatch}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-highest)]"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">add</span>
+            {t('assess.addBatch')}
+          </button>
+          <span className="text-label text-[var(--on-surface-variant)]">{t('assess.addBatchNote')}</span>
+        </section>
+      )}
       {editable && onAssessBatch && (
         <section data-batch-box aria-label={t('assess.newBatch')} className="rounded-xl bg-[var(--surface-container-low)] p-5">
           {!locked && (
@@ -201,8 +240,19 @@ export function AssessRenderer({
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-40"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">fact_check</span>
-              {running ? t('assess.running') : t('assess.run')}
+              {running ? (progress ? t('assess.progress', { n: progress }) : t('assess.running')) : t('assess.run')}
             </button>
+            {items.length > 0 && onFinishAssessing && nextStageLabel && !running && (
+              <button
+                type="button"
+                data-assess-done
+                onClick={onFinishAssessing}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">summarize</span>
+                {t('assess.done', { next: nextStageLabel })}
+              </button>
+            )}
             {locked && (
               <span className="flex flex-wrap items-center gap-1.5 text-label text-[var(--on-surface-variant)]">
                 {t('assess.judgedOn')}

@@ -31,7 +31,7 @@ describe('assessing items in batches (client, 25 Oct)', () => {
   it('round-trips the scale with the rows, and reads as an ordinary table', () => {
     const items = appendBatch([], [row('a', 'Jane', 'Green')], 'now');
     const content = serializeAssessment(DEFAULT_SCALE, items);
-    expect(parseAssessment(content)).toEqual({ scale: DEFAULT_SCALE, items });
+    expect(parseAssessment(content)).toEqual({ scale: DEFAULT_SCALE, items, pending: null });
     // Counts, digests and the chat read it with the shared parser.
     expect(parseItems(content)).toHaveLength(1);
     expect(parseAssessment('# prose')).toBeNull();
