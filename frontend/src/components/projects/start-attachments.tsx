@@ -1,6 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
+
+import { useFileDrop } from '@/hooks/use-file-drop';
 
 import { prepareFiles, type PreparedFile } from '@/lib/data/attachments';
 import { DOCUMENT_EXTENSIONS } from '@/lib/data/extract-text';
@@ -33,6 +35,8 @@ export function StartAttachments({
   documentsOnly = false,
   hint,
   buttonLabel,
+  zone,
+  onReading,
 }: {
   files: PreparedFile[];
   images: StartImage[];
@@ -43,6 +47,13 @@ export function StartAttachments({
   documentsOnly?: boolean;
   hint?: string;
   buttonLabel?: string;
+  /** Where a dropped or pasted file is taken in, as if picked (15 Nov). */
+  zone?: RefObject<HTMLElement | null>;
+  /**
+   * The names being read, or null when done (15 Nov): the start buttons wait for
+   * them, or a press made while a paper was still being read went without it.
+   */
+  onReading?: (names: string[] | null) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const t = useT();
@@ -52,9 +63,10 @@ export function StartAttachments({
   const [note, setNote] = useState<string | null>(null);
   const names = [...files.map((f) => f.file.name), ...images.map((i) => i.file.name)];
 
-  const pick = async (picked: FileList | null) => {
+  const pick = async (picked: FileList | readonly File[] | null) => {
     if (!picked?.length) return;
     setBusy(true);
+    onReading?.(Array.from(picked).map((f) => f.name));
     setError(null);
     setNote(null);
     try {
@@ -87,11 +99,13 @@ export function StartAttachments({
       if (notes.length) setNote(notes.join(' '));
     } finally {
       setBusy(false);
+      onReading?.(null);
       if (input.current) input.current.value = '';
     }
   };
 
   const count = files.length + images.length;
+  const dragging = useFileDrop(zone, (dropped) => void pick(dropped), !disabled && !busy && count < MAX_FILES);
 
   return (
     <div aria-label={t('attach.group')} role="group" className="mt-4">
@@ -115,7 +129,7 @@ export function StartAttachments({
           {busy ? t('attach.reading') : (buttonLabel ?? t('attach.button'))}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {hint ?? t('attach.hint')}
+          {dragging ? t('attach.dropHere') : (hint ?? t('attach.hint'))}
         </span>
       </div>
 

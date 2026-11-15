@@ -11,16 +11,13 @@
  */
 
 import { installPdfShims } from './browser-shims';
+import { cutText, storableText } from './clean-text';
 import { emlText, icsText } from './mail-text';
-import { extensionOf } from './preview';
+import { DOCUMENT_EXTENSIONS, extensionOf, isDocument } from './preview';
 import { tr } from '@/lib/i18n/store';
 
-/** Attachments whose words, not rows, are what matters. */
-export const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.md', '.txt', '.ics', '.eml'] as const;
-
-export function isDocument(name: string): boolean {
-  return (DOCUMENT_EXTENSIONS as readonly string[]).includes(extensionOf(name));
-}
+/** Attachments whose words, not rows, are what matters (the list lives in preview.ts, beside the size limits). */
+export { DOCUMENT_EXTENSIONS, isDocument };
 
 async function pdfText(data: ArrayBuffer): Promise<string> {
   // Safari (iPhone included) cannot iterate a stream; pdfjs does (22 Oct).
@@ -122,15 +119,224 @@ async function pptxText(data: ArrayBuffer): Promise<string> {
   return parts.join('\n\n');
 }
 
+/** HTML (or XHTML) as plain text: headings kept as "#" lines, scripts and styles left out. */
+export function htmlText(html: string): string {
+  const body = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
+  return xmlText(
+    body
+      .replace(/<(script|style|head|nav)\b[\s\S]*?<\/\1>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi, (_m, level: string, inner: string) =>
+        `\n\n${'#'.repeat(Math.min(Number(level), 3))} ${inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()}\n\n`)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr|blockquote|section|article|table|ul|ol)>/gi, '\n\n')
+      .replace(/<(td|th)\b[^>]*>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+  )
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
+/** Groups in an RTF file that hold no words of the document. */
+const RTF_SKIP = new Set([
+  'fonttbl', 'colortbl', 'stylesheet', 'info', 'pict', 'object', 'header', 'headerl', 'headerr', 'headerf',
+  'footer', 'footerl', 'footerr', 'footerf', 'listtable', 'listoverridetable', 'rsidtbl', 'themedata',
+  'colorschememapping', 'latentstyles', 'datastore', 'xmlnstbl', 'generator', 'filetbl', 'revtbl',
+]);
+const RTF_CHAR: Record<string, string> = {
+  par: '\n', line: '\n', sect: '\n\n', page: '\n\n', tab: '\t', cell: ' ', row: '\n',
+  emdash: '—', endash: '–', lquote: '‘', rquote: '’', ldblquote: '“', rdblquote: '”', bullet: '•', emspace: ' ', enspace: ' ', '~': ' ',
+};
+
+/** The words of an RTF document: control words and groups that hold no text are dropped. */
+export function rtfText(raw: string): string {
+  if (!raw.startsWith('{\\rtf')) throw new Error('it is not an RTF file');
+  const cp1252 = new TextDecoder('windows-1252');
+  const stack: { skip: boolean; uc: number }[] = [];
+  let skip = false;
+  let uc = 1;
+  let fallback = 0;
+  let atGroupStart = false;
+  let out = '';
+  const emit = (s: string) => {
+    if (fallback > 0) {
+      fallback -= 1;
+      return;
+    }
+    if (!skip) out += s;
+  };
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (ch === '{') {
+      stack.push({ skip, uc });
+      atGroupStart = true;
+      continue;
+    }
+    if (ch === '}') {
+      const prior = stack.pop();
+      if (prior) ({ skip, uc } = prior);
+      atGroupStart = false;
+      continue;
+    }
+    if (ch === '\r' || ch === '\n') continue;
+    if (ch !== '\\') {
+      atGroupStart = false;
+      emit(ch);
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === '\\' || next === '{' || next === '}') {
+      emit(next);
+      i += 1;
+      atGroupStart = false;
+      continue;
+    }
+    if (next === "'") {
+      const code = parseInt(raw.slice(i + 2, i + 4), 16);
+      if (Number.isFinite(code)) emit(cp1252.decode(new Uint8Array([code])));
+      i += 3;
+      atGroupStart = false;
+      continue;
+    }
+    if (next === '*') {
+      if (atGroupStart) skip = true;
+      i += 1;
+      continue;
+    }
+    const word = /^([a-zA-Z]+)(-?\d+)? ?/.exec(raw.slice(i + 1, i + 40));
+    if (!word) {
+      if (next === '~') emit(' ');
+      i += 1;
+      continue;
+    }
+    i += word[0].length;
+    const name = word[1];
+    if (atGroupStart && RTF_SKIP.has(name)) skip = true;
+    atGroupStart = false;
+    if (name === 'uc' && word[2]) uc = Number(word[2]);
+    else if (name === 'u' && word[2]) {
+      const n = Number(word[2]);
+      emit(String.fromCharCode(n < 0 ? n + 65536 : n));
+      fallback = uc;
+    } else if (RTF_CHAR[name] !== undefined) emit(RTF_CHAR[name]);
+  }
+  return out;
+}
+
+/** An OpenDocument text file (.odt): its paragraphs and headings, in order. */
+async function odtText(data: ArrayBuffer): Promise<string> {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  const files = unzipSync(new Uint8Array(data), { filter: (f) => f.name === 'content.xml' });
+  const xml = files['content.xml'] ? strFromU8(files['content.xml']) : '';
+  if (!xml) throw new Error('it holds no text part');
+  return xmlText(
+    xml
+      .replace(/<text:h\b[^>]*>([\s\S]*?)<\/text:h>/g, (_m, inner: string) => `\n\n# ${inner.replace(/<[^>]+>/g, '')}\n\n`)
+      .replace(/<text:tab\s*\/>/g, '\t')
+      .replace(/<text:line-break\s*\/>/g, '\n')
+      .replace(/<text:s(?:\s+text:c="(\d+)")?\s*\/>/g, (_m, n?: string) => ' '.repeat(n ? Number(n) : 1))
+      .replace(/<\/text:p>/g, '\n\n')
+      .replace(/<[^>]+>/g, '')
+  );
+}
+
+/** An e-book (.epub): each chapter's text in reading order. */
+async function epubText(data: ArrayBuffer): Promise<string> {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  const files = unzipSync(new Uint8Array(data), { filter: (f) => f.originalSize <= MAX_PART_BYTES * 10 });
+  const read = (name: string) => (files[name] ? strFromU8(files[name]) : '');
+  const opfPath = /full-path="([^"]+)"/.exec(read('META-INF/container.xml'))?.[1] ?? Object.keys(files).find((n) => n.endsWith('.opf')) ?? '';
+  const opf = read(opfPath);
+  const base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+  const href = new Map<string, string>();
+  for (const item of opf.matchAll(/<item\b[^>]*>/g)) {
+    const id = /\bid="([^"]+)"/.exec(item[0])?.[1];
+    const to = /\bhref="([^"]+)"/.exec(item[0])?.[1];
+    if (!id || !to) continue;
+    let path = to;
+    try {
+      path = decodeURIComponent(to);
+    } catch {
+      // A malformed escape: the name as written.
+    }
+    href.set(id, base + path);
+  }
+  const spine = [...opf.matchAll(/<itemref\b[^>]*\bidref="([^"]+)"/g)].map((m) => href.get(m[1])).filter((n): n is string => Boolean(n && files[n]));
+  const order = spine.length ? spine : Object.keys(files).filter((n) => /\.x?html?$/i.test(n)).sort();
+  if (!order.length) throw new Error('it holds no chapters');
+  return order.map((name) => htmlText(read(name)).trim()).filter(Boolean).join('\n\n');
+}
+
+/** What a .zip's files are read as: words, by the reader for their type. */
+const ZIP_TEXT = new Set(['.tex', '.bib', '.md', '.txt', '.wl', '.m', '.nb', '.bbl', '.csv', '.tsv', '.json']);
+const ZIP_DOCUMENT = new Set(['.pdf', '.docx', '.pptx', '.odt', '.epub', '.rtf', '.html', '.htm']);
+const ZIP_MAX_ENTRIES = 300;
+const ZIP_MAX_PART = 20_000_000;
+
+/**
+ * The words in a .zip (15 Nov: a physics paper's source comes as one — the
+ * .tex, the .bib and the figures). Each file that holds words is read by the
+ * reader for its type, under its own heading; what has none (figures, fonts,
+ * compiled output) is named as not read. A zip inside the zip is not opened.
+ */
+async function zipText(data: ArrayBuffer, name: string): Promise<string> {
+  const { unzipSync } = await import('fflate');
+  const wanted = (n: string) =>
+    !n.endsWith('/') && !n.startsWith('__MACOSX/') && !n.split('/').some((part) => part.startsWith('.'));
+  let seen = 0;
+  const skipped: string[] = [];
+  const files = unzipSync(new Uint8Array(data), {
+    filter: (f) => {
+      if (!wanted(f.name)) return false;
+      const ext = extensionOf(f.name);
+      if (!ZIP_TEXT.has(ext) && !ZIP_DOCUMENT.has(ext)) {
+        skipped.push(f.name);
+        return false;
+      }
+      if (f.originalSize > ZIP_MAX_PART || seen >= ZIP_MAX_ENTRIES) {
+        skipped.push(f.name);
+        return false;
+      }
+      seen += 1;
+      return true;
+    },
+  });
+  const parts: string[] = [];
+  for (const entry of Object.keys(files).sort()) {
+    const ext = extensionOf(entry);
+    const bytes = files[entry];
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    let text = '';
+    try {
+      text = ZIP_TEXT.has(ext) ? plainText(buffer) : await readerFor(ext, buffer);
+    } catch {
+      skipped.push(entry);
+      continue;
+    }
+    if (text.trim()) parts.push(`### ${entry}\n\n${text.trim()}`);
+    else skipped.push(entry);
+  }
+  if (!parts.length) throw new Error('nothing in it holds text');
+  if (skipped.length) {
+    const shown = skipped.slice(0, 12).join(', ');
+    parts.push(`[Not read from ${name}: ${shown}${skipped.length > 12 ? ` and ${skipped.length - 12} more` : ''}]`);
+  }
+  return parts.join('\n\n');
+}
+
 /** A zip (every Office file is one) or anything holding NULs is not text, whatever it is called. */
 function notText(data: ArrayBuffer): boolean {
   const head = new Uint8Array(data.slice(0, 4096));
   return (head[0] === 0x50 && head[1] === 0x4b) || head.includes(0);
 }
 
-/** Collapse the blank lines and trailing spaces document converters leave behind. */
+/**
+ * Collapse the blank lines and trailing spaces document converters leave behind,
+ * and drop what the database refuses (`clean-text.ts`, 15 Nov).
+ */
 export function tidyText(text: string): string {
-  return text
+  return storableText(text)
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((l) => l.replace(/\s+$/, ''))
@@ -149,6 +355,25 @@ function plainText(data: ArrayBuffer): string {
   return new TextDecoder().decode(data);
 }
 
+/** The reader for one file type; anything without its own is read as plain text. */
+async function readerFor(ext: string, data: ArrayBuffer): Promise<string> {
+  switch (ext) {
+    case '.pdf': return pdfText(data);
+    case '.docx': return docxText(data);
+    case '.xlsx': return (await import('./spreadsheet')).spreadsheetToText(data);
+    case '.pptx': return pptxText(data);
+    case '.odt': return odtText(data);
+    case '.epub': return epubText(data);
+    case '.rtf': return rtfText(plainText(data));
+    case '.html':
+    case '.htm': return htmlText(plainText(data));
+    case '.ics': return icsText(new TextDecoder().decode(data));
+    case '.eml': return emlText(new TextDecoder().decode(data));
+    default:
+      return plainText(data);
+  }
+}
+
 /**
  * The text of a document, or a sentence saying why it has none. A scanned PDF
  * has pages but no words; that is said rather than attached as an empty brief.
@@ -156,20 +381,7 @@ function plainText(data: ArrayBuffer): string {
 export async function extractText(name: string, data: ArrayBuffer): Promise<{ text: string } | { error: string }> {
   const ext = extensionOf(name);
   try {
-    const raw =
-      ext === '.pdf'
-        ? await pdfText(data)
-        : ext === '.docx'
-          ? await docxText(data)
-          : ext === '.xlsx'
-            ? await (await import('./spreadsheet')).spreadsheetToText(data)
-            : ext === '.pptx'
-              ? await pptxText(data)
-              : ext === '.ics'
-                ? icsText(new TextDecoder().decode(data))
-                : ext === '.eml'
-                  ? emlText(new TextDecoder().decode(data))
-                  : plainText(data);
+    const raw = ext === '.zip' ? await zipText(data, name) : await readerFor(ext, data);
     const text = tidyText(raw);
     if (!text) {
       return {
@@ -206,7 +418,7 @@ export function contextFromDocuments(
     }
     const room = limit - (context ? context.length + 2 : 0);
     const note = `\n\n[…the rest of ${doc.name} was not added: the project context holds ${limit.toLocaleString('en-US')} characters]`;
-    if (room > note.length + 200) context = `${context ? `${context}\n\n` : ''}${block.slice(0, room - note.length)}${note}`;
+    if (room > note.length + 200) context = `${context ? `${context}\n\n` : ''}${cutText(block, room - note.length)}${note}`;
     cut.push(doc.name);
   }
   return { context, cut };

@@ -77,7 +77,7 @@ export async function startExample(
     await appendWorkflowEvent(project.id, userId, { type: 'project_created', stage_id: first?.id ?? '' });
 
     if (own) {
-      for (const { file, preview } of own.files) await attachProjectFile(project, file, preview);
+      for (const { file, preview, textOnly } of own.files) if (!textOnly) await attachProjectFile(project, file, preview);
       for (const { file, caption } of own.images) await attachProjectFile(project, file, imagePreview(file.name, caption, 0, 0));
       return project.id;
     }

@@ -114,3 +114,28 @@ test('a file with accents and curly quotes in its name attaches, at the start an
   await chat.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('06-attached-from-the-chat.png') });
 });
+
+/**
+ * 15 Nov (Sean, physics papers): a paper's LaTeX source is accepted, a paper
+ * attached with nothing typed is enough to talk it through, and the
+ * conversation's first turn carries the paper's words.
+ */
+test('a LaTeX paper attached with nothing typed starts the conversation with its words', async ({ page }) => {
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('Attach files').setInputFiles({
+    name: 'regge.tex',
+    mimeType: 'text/x-tex',
+    buffer: Buffer.from('\\section{Regge measure}\nThe discriminant lift closes the full-placement gate.'),
+  });
+  await expect(page.getByRole('list', { name: 'Attached' })).toContainText('regge.tex');
+  const talk = page.getByRole('button', { name: /Build a plan with me/ });
+  await expect(talk).toBeEnabled();
+  await expect(page.getByRole('button', { name: /Get a first draft/ })).toBeDisabled();
+  const turn = page.waitForRequest((r) => r.url().endsWith('/api/front-door'));
+  await talk.click();
+  const body = (await turn).postDataJSON() as { material?: string; turns?: { content: string }[] };
+  expect(JSON.stringify(body)).toContain("I've attached regge.tex.");
+  expect(body.material).toContain('The discriminant lift closes the full-placement gate.');
+  await page.screenshot({ path: test.info().outputPath('04-paper-alone-starts-the-conversation.png') });
+});

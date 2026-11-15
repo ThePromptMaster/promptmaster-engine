@@ -7,8 +7,16 @@
  */
 
 import { tr } from '@/lib/i18n/store';
+import { cutText } from './clean-text';
 
 export const MAX_FILE_BYTES = 5_000_000;
+/**
+ * A document's words are read from a file up to this size (15 Nov: a tester's
+ * book was refused before a word of it was read, because the file was over the
+ * 5 MB a project stores). A larger document keeps its text; the file itself is
+ * stored only when it is within MAX_FILE_BYTES.
+ */
+export const MAX_READ_BYTES = 50_000_000;
 export const MAX_FILES = 20;
 export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
 /**
@@ -16,7 +24,21 @@ export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
  * (lib/data/extract-text.ts) and offered as project context; the file itself
  * is kept like any other.
  */
-export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.md', '.ics', '.eml'] as const;
+export const DOCUMENT_ONLY_EXTENSIONS = [
+  '.pdf', '.docx', '.pptx', '.md', '.ics', '.eml',
+  // 15 Nov (Sean: "these are all grayed out and I can't put my physics papers
+  // in"): a paper's LaTeX source, its bibliography, a Wolfram notebook, and the
+  // .zip a paper's source comes in. The picker greys out anything not listed.
+  '.tex', '.bib', '.wl', '.m', '.nb', '.zip',
+  // A book or a manuscript in the other forms writers save them in.
+  '.rtf', '.odt', '.epub', '.html', '.htm',
+] as const;
+/** Every type whose words are read as a document's (`extract-text.ts`); `.txt` is data and document both. */
+export const DOCUMENT_EXTENSIONS = ['.txt', ...DOCUMENT_ONLY_EXTENSIONS] as const;
+
+export function isDocument(name: string): boolean {
+  return (DOCUMENT_EXTENSIONS as readonly string[]).includes(extensionOf(name));
+}
 /**
  * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
  * placed in the work, never shown to a model: a prompt gets each one's name,
@@ -78,9 +100,11 @@ export function rejectReason(name: string, bytes: number, existing: readonly str
     return ext === '.xls' ? tr('file.oldExcel', { name })
       : ext === '.doc' ? tr('file.oldWord', { name })
         : ext === '.ppt' ? tr('file.oldPowerPoint', { name })
-          : tr('file.unsupported', { name });
+          : ext === '.pages' ? tr('file.pages', { name })
+            : tr('file.unsupported', { name });
   }
-  if (bytes > MAX_FILE_BYTES) return tr('file.tooLarge', { name, mb: MAX_FILE_BYTES / 1_000_000 });
+  const max = isDocument(name) ? MAX_READ_BYTES : MAX_FILE_BYTES;
+  if (bytes > max) return tr('file.tooLarge', { name, mb: max / 1_000_000 });
   if (bytes === 0) return tr('file.empty', { name });
   if (existing.includes(name)) return tr('file.duplicate', { name });
   if (existing.length >= MAX_FILES) return tr('file.limit', { max: MAX_FILES });
@@ -110,7 +134,7 @@ export function splitLine(line: string, delimiter: string): string[] {
   return cells.map((c) => c.trim());
 }
 
-const clip = (value: string) => (value.length > CELL_MAX ? `${value.slice(0, CELL_MAX - 1)}…` : value);
+const clip = (value: string) => (value.length > CELL_MAX ? `${cutText(value, CELL_MAX - 1)}…` : value);
 
 export function previewOf(name: string, text: string): DataPreview {
   const ext = extensionOf(name);
@@ -142,7 +166,7 @@ export function previewOf(name: string, text: string): DataPreview {
 /** An image's record. The caption defaults to the file's name without its extension. */
 export function imagePreview(name: string, caption: string, width = 0, height = 0): DataPreview {
   const fallback = name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
-  return { kind: 'image', columns: [], sample: [], rows: 0, caption: (caption.trim() || fallback).slice(0, 200), width, height };
+  return { kind: 'image', columns: [], sample: [], rows: 0, caption: cutText(caption.trim() || fallback, 200), width, height };
 }
 
 /** One line a person reads: "1,204 rows · account_id, plan, churned…". */

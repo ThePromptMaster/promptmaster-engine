@@ -1,5 +1,6 @@
 'use client';
 
+import { errorMessage } from '@/lib/data/clean-text';
 /**
  * "Take this into the full PromptMaster process" (Sean, 26 Oct): a Quick
  * answer project re-pinned, in place, to a workflow designed for the work —
@@ -122,7 +123,7 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
       setChoices(found);
       setPicked(0);
     } catch (e) {
-      setError(t('quick.takeFullFailed', { reason: e instanceof Error && e.message ? e.message : String(e) }));
+      setError(t('quick.takeFullFailed', { reason: errorMessage(e) || String(e) }));
     } finally {
       setBusy(null);
     }
@@ -188,7 +189,7 @@ export function TakeFullProcess({ project, stageId, answer, onSwitched }: Props)
       if (pinError) throw pinError;
       onSwitched();
     } catch (e) {
-      setError(t('quick.takeFullFailed', { reason: e instanceof Error && e.message ? e.message : String(e) }));
+      setError(t('quick.takeFullFailed', { reason: errorMessage(e) || String(e) }));
       setBusy(null);
     }
   }
