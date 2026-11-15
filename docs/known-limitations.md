@@ -507,6 +507,8 @@ code, not a model. The trade-offs:
 
 ### L-38 · Project context is capped at 200,000 characters and rides on every call · `accepted`
 
+**Superseded 2026-11-15 by L-243:** a project now keeps up to 2,000,000 characters, and each request carries at most 200,000 of them as the opening and the passages that match the step.
+
 `projects.context` (2026-10-05) is the user's source material, kept apart from the
 objective. It is capped at 200,000 characters, about 50k tokens (`MAX_CONTEXT_CHARS`;
 60,000 until 6 Oct, raised so the text of an attached PDF or Word brief fits).
@@ -2299,6 +2301,8 @@ do anything" (24 Oct) was this list: three icons left the title a few letters wi
 for the project opened a popover, and a tap outside did not close it.
 
 ### L-114 — Assess: batches, scales and what Go does there (2026-10-25)
+
+**Extended 2026-11-15 by L-245:** a paste of any size is judged twelve at a time, leftovers are kept, and names already in the table are skipped.
 
 An Assess stage judges what is pasted, a batch at a time: at most 40,000 characters and 12
 items per batch (the rest of a longer paste is counted and said, not judged). The scale is
@@ -4208,3 +4212,94 @@ What is not done, or not known:
 - **Leads, cases, tickets, notes, activities and custom objects are not read.**
 - **ZoomInfo is not connected.** Composio's ZoomInfo connection needs the customer's own ZoomInfo client
   id and secret; nothing was built for it.
+
+### L-242 — Attachments: what the database refuses, what is read, and paste and drag (2026-11-15)
+
+A tester could not upload his book; physics papers were greyed out in the iPad picker; with a paper
+attached, "Could not create the project. Nothing was created". Reproduced on production before the
+fix: a document cut at a fixed length (the context limit, an 80-character preview cell, a title) can
+end on the first half of a two-unit character such as 𝑥, and PostgREST refuses the whole insert
+(`400 PGRST102 "Empty or invalid json"`). The start page threw Supabase's plain error object, which
+is not an `Error`, so the reason was replaced by the generic message.
+
+What it does now (`lib/data/clean-text.ts`, `extract-text.ts`, `preview.ts`, `hooks/use-file-drop.ts`):
+
+- **Cuts never split a pair**, and NUL, control characters and lone halves are removed before a
+  project, a patch or a file preview is written. A failed write says the database's own reason.
+- **More types**: `.tex`, `.bib`, `.wl`, `.m`, `.nb`, `.rtf`, `.odt`, `.epub`, `.html`, and `.zip`
+  (the files with words inside are read under their own headings; figures and the rest are named as
+  not read; a zip inside a zip is not opened). `.pages` and `.doc` say how to export. Word headings
+  are kept as `#` lines.
+- **Documents are read up to 50 MB.** One over 5 MB keeps its text; the file itself is not stored
+  (the bucket and the table still hold 5 MB).
+- **Files carry over** from the projects-page questionnaire (IndexedDB, also across a full page load);
+  **the start buttons wait** while a file is read; **a paper alone** can start "Build a plan with me".
+- **Paste and drop**: on the start box, the start conversation, the side chat and the stage column
+  (which files into the Data panel). Pictures follow the existing rules: the side chat sends them to
+  the model; elsewhere they are placed by caption.
+- **Not seen by hand**: the iPad picker itself (its `accept` list was checked), Sean's own PDF,
+  `.rtf`/`.odt`/`.epub`/`.html` on production (unit tests only). No OCR: a scanned PDF still has no text.
+
+### L-243 — The whole manuscript: kept, sent as passages, and a book as its chapters (2026-11-15)
+
+Supersedes L-38. A project keeps up to 2,000,000 characters of material (`INPUT_LIMITS.context`,
+`MAX_STORED_CONTEXT_CHARS`). A request still carries at most 200,000 (`MAX_CONTEXT_CHARS`).
+
+- **Passages** (`lib/data/context-for-request.ts`): a text that fits is sent whole. A longer one is sent
+  as its opening (30,000) and the paragraph passages that best match the step, in the text's order,
+  with "[… N characters not included …]" markers and a first line saying how much was read. A word
+  counts by how rare it is in the text, and the user's objective, title and request count four times
+  the step's own wording.
+- **Matched by words, not meaning.** Asked what Darcy says "at the ball", a novel that calls it "the
+  assembly" and "dance" did not send that passage; asked with the book's own words, it did. The chat
+  reads at most 60,000 of the material (L-172).
+- **A book becomes its chapters** (`lib/data/chapters.ts`, `lib/outline/import-manuscript.ts`): a
+  document of 60,000 characters or more with two or more chapters, attached at the start, is offered
+  as the manuscript (on by default). In a workflow that writes chapters, Start writes one "Imported"
+  outline version and the chapters word for word under the same ids; approving the outline keeps them
+  (`longFormFromOutline`), so drafting is complete with the user's text. Chapters are found by headings
+  or "Chapter N" / "Part II" / "Prologue" lines, else 20,000-character parts. The context keeps a note
+  in the book's place. Production: Pride and Prejudice (748,167 characters) → 63 parts, approved, kept.
+- **Not done**: a manuscript added after Start becomes context, not chapters; a workflow with no
+  chapters stage keeps it as context (passages).
+
+### L-244 — Go: unwritten stages, a repeated move, the table asked for, and its own extras (2026-11-15)
+
+From three of Sean's 13 Nov runs.
+
+- **Nothing is judged finished before it is written.** "Check the objective is met" is not offered while
+  the deliverable is unwritten and a later stage can be worked; reached anyway, the run carries on under
+  "handle them for me", or stops with "still to write — …" (never "X is written … X is not written").
+  A routine fix with no edits left moves to the next stage and keeps the question.
+- **A decision takes out what it rules out**: a recommendation or option it contradicts is removed.
+- **A move is written once.** After a 7½-minute pause on an iPad, Go moved on from one stage three
+  times while the page still showed it. An advance already in the log writes nothing, and the loop
+  waits up to 15 s for the page to show the new stage.
+- **"A table"** in the brief is a measured requirement (`measurable.ts`, kind `table`): the deliverable
+  must hold a Markdown table, counted in code, repaired like a word limit. Only the deliverable stage is
+  held to it; "no table", "rather than a table" and "table of contents" measure nothing. The designer
+  puts an asked-for table on a write page, not a card list. Not seen by hand: Go repairing a missing
+  table (unit tests); the rebuilt run wrote tables from the start.
+- **Go's own extras** (a backup volunteer, refreshments) are a question-screen verdict of their own,
+  `optional_suggestion`: noted, left out, never asked; a quote of the user's own requirement overrides
+  it. An earlier stage's suggestion is never promised in text for other people, and the final check
+  reports such a promise. Defaults Go chose under the routine policy are sent marked as not the user's.
+
+### L-245 — Assess: any number at once, what is left, more batches, and Change it on tables (2026-11-15)
+
+Extends L-114.
+
+- **A paste of up to 200,000 characters** is judged twelve at a time; each call says where the first
+  item it did not judge begins (`next_from`, checked against the paste), and the next starts there.
+  Each batch is saved as it lands; at most 20 calls (240 items) a paste.
+- **What is left is kept** with the table and offered as "Assess the remaining N"; Go judges it too.
+  If the server's starting line cannot be found, the rest is kept whole and the next press skips the
+  names already judged.
+- **No name twice**: a name already in the table is not judged or added again (case and punctuation
+  aside). Two different people with the same name are one row: keep a title or company in the name.
+- **More batches later**: a finished Assess stage offers "Add another batch" (reopens it; later stages
+  are rechecked). The current one offers "Done — summarize on …".
+- **Later stages read one line per person**; the export prints the table, best first.
+- **Change it on list and review stages** sends the request as a question about the rows; the reply's
+  suggested actions are the row changes, applied by the user. Not on Assess, which has its own verdict
+  menu.
