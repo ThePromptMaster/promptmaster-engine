@@ -12,7 +12,7 @@ import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 import { DELEGATED_RULE } from '@/lib/workflow/answers';
 
-export type ScreenVerdict = 'routine_repair' | 'routine_choice' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input';
+export type ScreenVerdict = 'routine_repair' | 'routine_choice' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input' | 'optional_suggestion';
 
 export interface QuestionScreen {
   verdict: ScreenVerdict;
@@ -21,6 +21,8 @@ export interface QuestionScreen {
   target_stage: string;
   action: string;
   requirement_quote: string;
+  /** `optional_suggestion`: Go's own extra, left out and mentioned (15 Nov). */
+  suggestion?: string;
 }
 
 /** Enough recorded on one stage in one window: a third attempt is asked, in case the screen is wrong. */
@@ -38,6 +40,8 @@ export function shouldScreen(input: { policy: ExecutionPolicy; routine: string |
 export type ScreenPlan =
   | { kind: 'ask' }
   | { kind: 'record'; action: string; reason: string }
+  /** An extra Go thought of itself that nothing the user said needs: noted, left out, never asked (15 Nov). */
+  | { kind: 'leave_out'; suggestion: string; reason: string }
   | {
       kind: 'repair';
       move: { action_key: string; params: Record<string, unknown>; rationale: string; expected_outcome: string };
@@ -56,6 +60,7 @@ export function planFromScreen(
   }
 ): ScreenPlan {
   if (screen.verdict === 'real_world_action') return { kind: 'record', action: screen.action, reason: screen.reason };
+  if (screen.verdict === 'optional_suggestion') return { kind: 'leave_out', suggestion: screen.suggestion || input.question, reason: screen.reason };
   if (screen.verdict === 'reserved_approval' && input.approvalStands && input.allowed.includes('declare_objective_complete')) {
     return {
       kind: 'repair',
@@ -100,6 +105,20 @@ export function planFromScreen(
     };
   }
   if (!input.allowed.includes('revise_stage')) {
+    // 15 Nov (Sean, workshop): with later stages still to write, this became
+    // "declare the objective complete", which stopped the run before the email.
+    // The work moves on and the question is kept for the user.
+    if (input.allowed.includes('advance_stage')) {
+      return {
+        kind: 'repair',
+        move: {
+          action_key: 'advance_stage',
+          params: { set_aside_question: input.question.slice(0, 1000) },
+          rationale: `${instead} This run has used up its edits on this stage, so I move on to the next one and keep this for you.`,
+          expected_outcome: 'The next stage worked on, with this question kept for you.',
+        },
+      };
+    }
     // Routine, and this run has used up its edits on the stage: judged as it stands
     // and said, not asked (9 Nov, production: "trim it, or accept it?" over 7% on a
     // hedged target, because "further edits are paused for this run").

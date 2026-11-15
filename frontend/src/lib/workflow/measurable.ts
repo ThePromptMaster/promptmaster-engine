@@ -20,7 +20,12 @@
 import { primaryArtifactKind } from './stage-artifact';
 import type { StageDefinition } from './types';
 
-export type MeasureKind = 'words' | 'questions' | 'sections' | 'pages';
+/**
+ * `table` (15 Nov, Sean, inventory audit: "the prompt asked for a short table
+ * showing each error and its correction, and Go wrote a numbered list"): the
+ * brief asks for a table, so the deliverable has one, counted in its text.
+ */
+export type MeasureKind = 'words' | 'questions' | 'sections' | 'pages' | 'table';
 
 export interface MeasurableRequirement {
   id: string;
@@ -388,6 +393,18 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       if (!n || n > 30) continue;
       add({ kind: 'sections', subject: '', min: n, max: n, source: m[0].trim() });
     }
+    // "a short table listing each error and its correction", "in a table",
+    // "as a table", "tabulate". Not "no table", "rather than a table",
+    // "without a table" or "instead of a table".
+    for (const m of t.matchAll(/\b(?:(?:a|an|one|the)\s+)?(?:(?:short|simple|brief|small|clear|single|summary|comparison)\s+)?table\b|\btabulate[ds]?\b/gi)) {
+      const before = t.slice(Math.max(0, m.index! - 40), m.index!);
+      if (/\b(?:no|not|never|without|rather than|instead of|avoid|don['’]t use|do not use)\s+(?:(?:a|an|any)\s+)?$/i.test(before)) continue;
+      // "the table of contents", "a table below the line" in a description of something else.
+      const after = t.slice(m.index! + m[0].length, m.index! + m[0].length + 14);
+      if (/^\s+of\s+contents\b/i.test(after)) continue;
+      add({ kind: 'table', subject: '', min: 1, source: t.slice(m.index!, Math.min(t.length, m.index! + 90)).split(/[.;\n]/)[0].trim() });
+      break;
+    }
     // "exactly five FAQ questions", "a five-question support FAQ", "5 FAQ questions".
     const questionPatterns = [
       new RegExp(`\\bexactly\\s+${NUM}\\s+(?:(?:faq|support|customer)\\s+)*questions?\\b`, 'gi'),
@@ -703,7 +720,18 @@ export function requirementLabel(r: MeasurableRequirement): string {
   if (r.kind === 'words') return `${name}: ${rangeText(r)} words${r.headings ? ' (headings included)' : ''}`;
   if (r.kind === 'pages') return `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`;
   if (r.kind === 'sections') return `${name}: ${rangeText(r)} sections`;
+  if (r.kind === 'table') return `${name}: a table, as the brief asks ("${r.source}")`;
   return `${name}: ${rangeText(r)} questions${r.answered ? ', each answered' : ''}`;
+}
+
+/** Markdown tables in a text: a header row, then a |---| line. */
+export function countTables(text: string): number {
+  const rows = text.split('\n').map((l) => l.trim());
+  let n = 0;
+  for (let i = 1; i < rows.length; i += 1) {
+    if (/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?$/.test(rows[i]) && /^\|.*\|$/.test(rows[i - 1])) n += 1;
+  }
+  return n;
 }
 
 /** Sections a document ends on that are not parts of the work. */
@@ -795,6 +823,11 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
     const value = `about ${pages} page${pages === 1 ? '' : 's'} (${n} words; estimated at ${WORDS_PER_PAGE} words a page)`;
     return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`, satisfied: ok, value, ...(ok ? {} : { detail: value }) };
   }
+  if (r.kind === 'table') {
+    const n = countTables(section);
+    const value = n ? `${n} table${n === 1 ? '' : 's'}` : 'no table (rows written as a list or as prose)';
+    return { id: `measured.${r.id}`, label: requirementLabel(r), satisfied: n >= (r.min ?? 1), value, ...(n ? {} : { detail: 'no table' }) };
+  }
   if (r.kind === 'sections') {
     const n = countSections(section);
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
@@ -866,6 +899,11 @@ export function requirementsForStage(
   for (const r of requirements) {
     // A target the brief hedged holds no stage up; the objective check gets its count.
     if (r.approximate) continue;
+    // A table the brief asks for is in the deliverable, wherever in it.
+    if (r.kind === 'table') {
+      if (stage.id === deliverableId) out.push({ requirement: r, whole: true });
+      continue;
+    }
     const aboutIt = Boolean(r.subject) && !preparesFor(stage.label, r.subject) &&
       (r.subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(about) : about.includes(r.subject));
     if (aboutIt) out.push({ requirement: r, whole: true });

@@ -159,7 +159,14 @@ def facts_block(inputs: PMInput) -> str:
         about = f" ({f.subject.strip()})" if f.subject.strip() else ""
         src = f" — {f.source.strip()}" if f.source.strip() else ""
         replaces = f' (replaces "{" ".join(f.replaces.split())}", which is no longer true)' if f.replaces.strip() else ""
-        assumed = " (assumed by PromptMaster, not stated by the user)" if f.origin == "model_assumed" else ""
+        assumed = (
+            " (assumed by PromptMaster, not stated by the user)" if f.origin == "model_assumed"
+            # 15 Nov (Sean, guest invitation): a default Go took under the routine-decision
+            # policy read as the user's own word, and an extra Go suggested became a promise.
+            else " (chosen by PromptMaster under the routine-decision policy, not stated by the user: never promise "
+            "it to anyone the work is written for)" if f.origin == "policy"
+            else ""
+        )
         lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{assumed}")
     current = reporting_date_line(inputs)
     return f"{FACTS_HEADER}\n" + "\n".join(lines) + f"\n{SUGGESTIONS_RULE}" + (f"\n{current}" if current else "")

@@ -141,5 +141,5 @@ export function decisionText(choice: string): string {
 
 /** What Go's repair of the stage is told, once the user has decided. */
 export function recordDecisionReason(choice: string): string {
-  return `the user has decided: "${decisionText(choice)}". Record it as the decision of record wherever this stage says the decision is awaited, pending or still to be made, and carry it through what depends on it here. Change nothing else.`;
+  return `the user has decided: "${decisionText(choice)}". Record it as the decision of record wherever this stage says the decision is awaited, pending or still to be made, and carry it through what depends on it here. A recommendation, option or line that the decision rules out is removed or rewritten to match it (15 Nov: "Recommendation: Option B" stayed after the user chose A). Change nothing else.`;
 }

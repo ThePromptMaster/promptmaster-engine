@@ -55,7 +55,7 @@ import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { buildStageDigest, dataFileBriefs, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, parseAssessment, scaleForRequest, scaleFromSpec, serializeAssessment } from '@/lib/workflow/assess';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, projectState, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { creditStop, OUT_OF_CREDITS } from './credit-stop';
@@ -1765,6 +1765,18 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
 
     case 'advance': {
       const target = ctx.stage.transitions.default_next;
+      // Already moved on, by an earlier step the page has not shown yet (15 Nov,
+      // Sean's workshop run: three "moved on" events for one stage): nothing is
+      // written twice.
+      if (ctx.loadEvents) {
+        const now = projectState(ctx.template, [...(await ctx.loadEvents())]).current_stage_id;
+        if (now && now !== ctx.stage.id) {
+          return done(key, {
+            status: 'succeeded', toolsUsed: [], changes: {},
+            output: `${ctx.stage.label} is already complete and the project is on ${ctx.template.stages.find((s) => s.id === now)?.label ?? now}; nothing was written again.`,
+          });
+        }
+      }
       const evaluation = evaluateStage(ctx.template, ctx.stage.id, ctx.context);
       // Sean, 7 Oct (TaskBoard): Output was marked complete while its own
       // check said "incomplete" and "needs realignment", and Realign was then
@@ -2309,7 +2321,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
               ? null
               : await api.agentScreenQuestion({ inputs: inputsFrom(ctx.project), question: ask, stage_label: holder?.label ?? ctx.stage.label, earlier_stages: [], reserved_approvals: [], delegation: delegationSentences(ctx.project), model: ctx.project.model }, ctx.signal).catch(() => null);
             if (screen?.verdict === 'real_world_action') await recordOpenActions(ctx, [screen.action], holder?.id ?? ctx.stage.id);
-            else kept.push(ask);
+            // Go's own extra holds nothing up (15 Nov, Sean: a backup volunteer it had suggested).
+            else if (screen?.verdict !== 'optional_suggestion') kept.push(ask);
           }
           if (kept.length !== asks.length) assessment.blockers = assessment.blockers.filter((b) => !b.ask?.trim() || kept.includes(b.ask.trim()));
           asks = kept;
@@ -2359,13 +2372,28 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         });
       }
       {
+        // 15 Nov (Sean, workshop): this stopped the run with "Revision is written,
+        // but the work is not finished: Revision is not written yet" — the
+        // finding for open work on a written deliverable, used for an unwritten
+        // one. What is left is said as what it is, and under "handle them for
+        // me" the run carries on to it rather than stopping.
         const holder = deliverableStage(ctx.template);
         const where = holder ? holder.short_label ?? holder.label : 'The deliverable';
+        const left = remainingStages(ctx.template, ctx.state);
+        const next = left.required[0] ?? left.optional[0];
+        const todo = left.required.length ? left.required : [where];
+        const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+        if (next && routine) {
+          return done(key, {
+            status: 'succeeded', toolsUsed: [], changes: {},
+            output: `Not finished: ${where} is not written yet. Still to write: ${todo.join(', ')}. Carrying on with ${next}.`,
+          });
+        }
         return done(key, {
           status: 'succeeded', toolsUsed: [], changes: {},
-          output: `The model judged the objective met, but the deliverable is not done yet: ${where} is not written, so there is nothing to check.`,
-          stop: { status: 'awaiting_decision', reason: `The model thinks the work is done, but the deliverable is not: ${where} is not written yet.` },
-          needs: { kind: 'objective_check', stageId: holder?.id ?? ctx.stage.id, finding: 'work_open', items: [`${where} is not written yet`] },
+          output: `The model judged the objective met, but ${where} is not written yet, so the work is not finished. Still to write: ${todo.join(', ')}.`,
+          stop: { status: 'awaiting_decision', reason: `The work is not finished: still to write — ${todo.join('; ')}. Nothing is judged finished before it is written.` },
+          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'not_written', items: todo, ...(next ? { next } : {}) },
         });
       }
     }

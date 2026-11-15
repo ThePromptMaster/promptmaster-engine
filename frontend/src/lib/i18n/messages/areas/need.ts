@@ -95,6 +95,7 @@ export const en = {
   "need.rowEffect": "Accepting {id} applies its suggested change and settles it on {where}; rejecting it drops the change and keeps the reason on the row.",
   'need.openFirst': 'Still undecided before you approve: {list}.',
   'need.workOpen': '{stage} is written, but the work is not finished: {list}. I will not call the objective met while any of it is open.',
+  'need.notWritten': 'The work is not finished: still to write — {list}. Nothing is judged finished before it is written.',
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -190,6 +191,7 @@ export const es: Keys = {
   "need.rowEffect": "Aceptar {id} aplica el cambio sugerido y lo resuelve en {where}; rechazarlo descarta el cambio y conserva el motivo en la fila.",
   'need.openFirst': 'Aún sin decidir antes de que apruebes: {list}.',
   'need.workOpen': '{stage} está escrita, pero el trabajo no ha terminado: {list}. No daré el objetivo por cumplido mientras quede algo abierto.',
+  'need.notWritten': 'El trabajo no ha terminado: falta escribir — {list}. No se da nada por terminado antes de escribirlo.',
 };
 
 export const fr: Keys = {
@@ -283,6 +285,7 @@ export const fr: Keys = {
   "need.rowEffect": "Accepter {id} applique la modification suggérée et la règle dans {where} ; la rejeter écarte la modification et garde la raison sur la ligne.",
   'need.openFirst': 'Encore à trancher avant votre approbation : {list}.',
   'need.workOpen': '{stage} est rédigée, mais le travail n’est pas terminé : {list}. Je ne considérerai pas l’objectif comme atteint tant qu’une partie reste ouverte.',
+  'need.notWritten': 'Le travail n’est pas terminé : reste à écrire — {list}. Rien n’est jugé terminé avant d’être écrit.',
 };
 
 export const pt: Keys = {
@@ -376,4 +379,5 @@ export const pt: Keys = {
   "need.rowEffect": "Aceitar {id} aplica a alteração sugerida e a resolve em {where}; rejeitá-la descarta a alteração e mantém o motivo na linha.",
   'need.openFirst': 'Ainda por decidir antes de você aprovar: {list}.',
   'need.workOpen': '{stage} está escrita, mas o trabalho não terminou: {list}. Não vou dar o objetivo como atingido enquanto algo estiver em aberto.',
+  'need.notWritten': 'O trabalho não terminou: ainda falta escrever — {list}. Nada é considerado pronto antes de ser escrito.',
 };

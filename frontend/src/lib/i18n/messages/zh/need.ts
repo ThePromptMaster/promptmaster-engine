@@ -92,4 +92,5 @@ export const zh: Record<keyof typeof en, string> = {
   'need.rowEffect': '接受 {id} 会应用其建议的修改，并在 {where} 中将其标为已处理；拒绝则放弃该修改，并在该行保留原因。',
   'need.openFirst': '在你批准之前，以下仍未决定：{list}。',
   'need.workOpen': '{stage}已写好，但工作尚未完成：{list}。只要其中任何一项仍未完成，我就不会宣布目标已达成。',
+  'need.notWritten': '工作尚未完成：还需撰写——{list}。尚未写出的内容不会被判定为完成。',
 };
