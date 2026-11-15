@@ -120,6 +120,11 @@ export default function NewProjectPage() {
   // The user's presets taken off the list, to put back (Sean, 23 Oct).
   const [removedTemplates, setRemovedTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
+  // Each step starts at its top (15 Nov, CI): pressing a way in low on the first
+  // screen left the next one scrolled past its own Start button.
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
+  }, [step]);
   const [objective, setObjective] = useState('');
   // Client, 21 Oct ("pick your language"): the start screen's conversation and
   // the new project write in this. Someone reading the interface in Spanish
