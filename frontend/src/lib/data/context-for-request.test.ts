@@ -37,6 +37,13 @@ describe('what one request carries of a long manuscript (15 Nov: 417,000 charact
     expect(out.context).toContain('zebrafish telemetry');
   });
 
+  it("weighs the user's own words over the step's wording, and rare words over common ones", () => {
+    // "produce" is rare in this text and only in the step's wording; "dance" is the user's.
+    const text = manuscript(440, { 30: 'They produce nothing here.', 31: 'They produce nothing here.', 300: 'Darcy would not dance with her.' });
+    const out = contextForRequest(text, { primary: 'Why would Darcy not dance?', secondary: 'Produce the finished thing.' }, 40_000);
+    expect(out.context).toContain('Darcy would not dance with her.');
+  });
+
   it('caps every request at the backend limit by default', () => {
     expect(CONTEXT_REQUEST_CHARS).toBe(200_000);
     expect(contextForRequest('x'.repeat(900_000), '').context.length).toBeLessThanOrEqual(200_000);
