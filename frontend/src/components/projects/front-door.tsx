@@ -1,5 +1,6 @@
 'use client';
 
+import { CONTEXT_REQUEST_CHARS } from '@/lib/data/context-for-request';
 import { setupMaterial } from '@/lib/data/attachments';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
@@ -219,7 +220,7 @@ export function FrontDoor({
     try {
       const conversation = from.map((x) => `${x.role === 'user' ? 'Me' : 'PromptMaster'}: ${x.content}`).join('\n\n');
       // The conversation first: this call reads only the opening of what it is sent.
-      const read = setupMaterial(conversation ? `THE CONVERSATION SO FAR:\n${conversation.slice(-QUESTION_CONTEXT_CHARS)}` : '', material, INPUT_LIMITS.context);
+      const read = setupMaterial(conversation ? `THE CONVERSATION SO FAR:\n${conversation.slice(-QUESTION_CONTEXT_CHARS)}` : '', material, CONTEXT_REQUEST_CHARS);
       const res = await api.guideNextQuestion({
         objective: (brief.objective || opening || from.find((x) => x.role === 'user')?.content || '').trim().slice(0, INPUT_LIMITS.objective),
         answered: asked,

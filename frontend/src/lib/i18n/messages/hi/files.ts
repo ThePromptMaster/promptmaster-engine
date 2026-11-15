@@ -11,6 +11,8 @@ export const hi: Record<keyof typeof en, string> = {
   'start.readingWait': '{names} पढ़ी जा रही है… बटन पढ़ाई पूरी होने तक रुकते हैं, ताकि उसका टेक्स्ट आपके शुरू किए काम के साथ जाए।',
   'start.attachedOnly': 'मैंने {names} संलग्न की है।',
   'start.sayWhatToDo': 'बताएँ कि आप इसके साथ क्या करवाना चाहते हैं, या बात करके तय करने के लिए मेरे साथ योजना बनाएँ दबाएँ।',
+  'start.docKept': 'आपके संलग्न किए गए सभी {count} अक्षर रखे जाते हैं। हर चरण शुरुआत और उससे जुड़े अंश पढ़ता है, एक बार में 200,000 अक्षरों तक, और बताता है कि उसने कितना पढ़ा।',
+  'start.asManuscript': '{name} को पांडुलिपि के रूप में इस्तेमाल करें: {count} अध्याय मिले। अध्याय लिखने वाले प्रोजेक्ट में ये शब्दशः उसके अध्याय बन जाते हैं।',
   'file.unsupported': 'PromptMaster {name} नहीं पढ़ता। यह PDF, Word (.docx), PowerPoint (.pptx), RTF, OpenDocument (.odt), EPUB, Markdown, टेक्स्ट, LaTeX (.tex, .bib), Wolfram (.wl, .nb), HTML, इनकी .zip, स्प्रेडशीट (.xlsx), CSV, TSV, JSON और इमेज (PNG, JPEG, WebP, GIF, HEIC) पढ़ता है।',
   'file.tooLarge': '{name} {mb} MB से बड़ी है।',
   'file.empty': '{name} खाली है।',

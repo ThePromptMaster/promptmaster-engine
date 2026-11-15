@@ -104,6 +104,7 @@ export async function enqueueDraftJobs(args: DraftJobsArgs): Promise<string[]> {
       stageId,
       outlineVersionId: approvedOutlineVersionId,
       sectionId: section.id,
+        sectionTitle: `${section.title}\n${section.abstract ?? ''}`,
       sectionIndex: index,
       // A section whose last job gave up needs a fresh key, or resuming
       // collides with the dead row and does nothing (PM-04).
@@ -179,6 +180,7 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
       stageId,
       outlineVersionId: approvedOutlineVersionId,
       sectionId: section.id,
+        sectionTitle: `${section.title}\n${section.abstract ?? ''}`,
       sectionIndex: index,
       revision,
       ...(retry ? { retry } : {}),

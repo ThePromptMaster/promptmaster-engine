@@ -1,5 +1,6 @@
 'use client';
 
+import { changeWindow } from '@/lib/data/context-for-request';
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -115,7 +116,7 @@ export function useBriefChange({
           }
           if (!stages.length) continue;
           try {
-            const impact = await api.assessChange({ field, before, after, stages, model: p.model });
+            const impact = await api.assessChange({ field, ...changeWindow(before, after), stages, model: p.model });
             // An answer given to Go is judged against every finished stage, and
             // the stage it was given on is then left to Go, which acts on it
             // there (4 Nov).

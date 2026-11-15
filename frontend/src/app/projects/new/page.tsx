@@ -2,14 +2,15 @@
 
 import { designDepth, isConcise } from '@/lib/workflow/request-size';
 import { formOf } from '@/lib/workflow/work-form';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { formatNumber } from '@/lib/i18n/format';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { RemovedWorkflows, useWorkflowWords } from '@/components/projects/workflow-picker';
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { ColourMenu } from '@/components/shared/colour-preferences';
@@ -37,11 +38,14 @@ import { documentsCut, documentsOf, materialFrom, setupMaterial, type PreparedFi
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { errorMessage } from '@/lib/data/clean-text';
+import { CONTEXT_REQUEST_CHARS } from '@/lib/data/context-for-request';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { ExampleCards } from '@/components/examples/example-cards';
 import { PromptyHelp } from '@/components/examples/prompty-help';
 import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
 import { takeStartFiles } from '@/lib/projects/start-handoff';
+import { looksLikeManuscript, splitChapters } from '@/lib/data/chapters';
+import { importManuscript, manuscriptNote, takesManuscript } from '@/lib/outline/import-manuscript';
 import { takeStartItems } from '@/lib/connections/items';
 import { CarriedItems } from '@/components/personalize/carried-items';
 import type { ThirdPartyItem } from '@/types';
@@ -109,6 +113,7 @@ export default function NewProjectPage() {
   const [experience, setExperience] = useExperience();
   const simple = experience === 'simple';
   const t = useT();
+  const locale = useLocale();
   const words = useWorkflowWords();
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
@@ -156,6 +161,8 @@ export default function NewProjectPage() {
   const [startFiles, setStartFiles] = useState<PreparedFile[]>([]);
   // Files still being read (15 Nov): every way to start waits for them.
   const [reading, setReading] = useState<string[] | null>(null);
+  // A book-length document becomes the chapters of a project that writes them (15 Nov).
+  const [manuscriptOff, setManuscriptOff] = useState(false);
   const startZone = useRef<HTMLDivElement | null>(null);
   const talkZone = useRef<HTMLDivElement | null>(null);
   const [startImages, setStartImages] = useState<StartImage[]>([]);
@@ -163,7 +170,7 @@ export default function NewProjectPage() {
   // project as other people's words; the conversation sees their titles only.
   const [startItems, setStartItems] = useState<ThirdPartyItem[]>([]);
   const dropItem = (index: number) => setStartItems((held) => held.filter((_x, i) => i !== index));
-  const material = materialFrom(startFiles, INPUT_LIMITS.context);
+  const material = materialFrom(startFiles, CONTEXT_REQUEST_CHARS);
   /** The ask split into objective and context, with any attached documents' words after it. */
   const withDocuments = (text: string) => {
     const ask = splitAsk(text);
@@ -313,6 +320,13 @@ export default function NewProjectPage() {
     setTemplateId((templates.find((t) => t.key === (recommendedKey ?? 'book')) ?? templates[0]).id);
   }
   const hasObjective = objective.trim().length > 0;
+  // Worked out once per set of files, not on every keystroke: a book is long.
+  const manuscript = useMemo(() => {
+    const books = documentsOf(startFiles).filter((d) => looksLikeManuscript(d.text));
+    const book = books.sort((a, b) => b.text.length - a.text.length)[0];
+    return book ? { ...book, chapters: splitChapters(book.text).length } : null;
+  }, [startFiles]);
+  const documentChars = useMemo(() => documentsOf(startFiles).reduce((n, d) => n + d.text.length, 0), [startFiles]);
   // A paper attached with nothing typed is enough to talk it through (15 Nov:
   // every button stayed grey until something was typed).
   const attachedNames = documentsOf(startFiles).map((d) => d.name);
@@ -322,7 +336,7 @@ export default function NewProjectPage() {
   /** A recommended setup for the ask (or the conversation's brief), without applying it. */
   async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     const ask = from?.objective ?? objective;
-    const brought = setupMaterial(from?.material ?? '', material, INPUT_LIMITS.context);
+    const brought = setupMaterial(from?.material ?? '', material, CONTEXT_REQUEST_CHARS);
     // A workflow designed for this work is the default (Sean, 23 Oct: "the
     // default is a custom workflow after answering what you want to do or a
     // conversation"), worked out beside the usual setup. The standard
@@ -555,13 +569,21 @@ export default function NewProjectPage() {
         void _unsaved;
         selected = await publishUserTemplate(template, user.id, { listed: !given && keepDesigned });
       }
+      // The manuscript goes in as the chapters, and the context keeps a note in its
+      // place, so every chapter call does not carry the whole book again (15 Nov).
+      const asChapters = !manuscriptOff && manuscript && takesManuscript(selected) ? manuscript : null;
+      const chapters = asChapters ? splitChapters(asChapters.text) : [];
+      const block = asChapters ? `### From ${asChapters.name}\n\n${asChapters.text}` : '';
+      const context = asChapters && draft.context.includes(block)
+        ? draft.context.replace(block, manuscriptNote(asChapters.name, chapters.length, asChapters.text.length))
+        : draft.context;
       const project = await createProject(
         {
           title: draft.title.trim() || titleFrom(draft.objective) || 'Untitled project',
           objective: draft.objective.trim(),
           audience: draft.audience.trim() || 'General',
           constraints: draft.constraints.trim(),
-          context: draft.context.trim(),
+          context: context.trim(),
           ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output.trim() } : {}),
           // A book's deliverable is prose. Left empty, every chapter prompt
           // read "Output format: (none)" and the mode's structural habits
@@ -590,6 +612,7 @@ export default function NewProjectPage() {
       if (pinError) throw pinError;
 
       await createArtifact(project.id, user.id, 'output', 'Output');
+      if (asChapters && chapters.length) await importManuscript(project, selected, chapters, asChapters.name);
       await appendWorkflowEvent(project.id, user.id, {
         type: 'project_created',
         stage_id: selected.stages[0]?.id ?? '',
@@ -858,6 +881,23 @@ export default function NewProjectPage() {
               <p role="note" data-start-cut className="mt-2 text-label text-[var(--on-surface-variant)]">
                 {t('start.docCut', { names: documentsCut(startFiles, INPUT_LIMITS.context).join(', ') })}
               </p>
+            )}
+            {documentChars > CONTEXT_REQUEST_CHARS && (
+              <p role="note" data-start-kept className="mt-2 text-label text-[var(--on-surface-variant)]">
+                {t('start.docKept', { count: formatNumber(Math.min(documentChars, INPUT_LIMITS.context), locale) })}
+              </p>
+            )}
+            {manuscript && (
+              <label data-start-manuscript className="mt-2 flex items-start gap-2 text-label text-[var(--on-surface)]">
+                <input
+                  type="checkbox"
+                  checked={!manuscriptOff}
+                  onChange={(e) => setManuscriptOff(!e.target.checked)}
+                  disabled={working !== null}
+                  className="mt-0.5"
+                />
+                <span>{t('start.asManuscript', { name: manuscript.name, count: manuscript.chapters })}</span>
+              </label>
             )}
             <div className="mt-3">
               <SampleField value={draft.sample_output ?? ''} onChange={(v) => setDraft((d) => ({ ...d, sample_output: v }))} disabled={working !== null} />

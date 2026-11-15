@@ -29,12 +29,12 @@ export interface ProjectJob {
 const JOB_COLUMNS =
   'id, kind, status, payload, attempts, max_attempts, error_code, error_message, created_at';
 
-export function inputsFromProject(project: Project): PMInput {
+export function inputsFromProject(project: Project, focus = ''): PMInput {
   // What a stage written in the browser is given: the current facts, what the
   // user removed, what they instructed (8 Nov, production: a chapter repair was
   // told a correction was needed and shown none of it). Sources are read when
   // the job runs: they are long, and this payload is polled while it waits.
-  const { sources: _sources, ...inputs } = inputsFrom(project);
+  const { sources: _sources, ...inputs } = inputsFrom(project, '', focus);
   return inputs;
 }
 
@@ -85,6 +85,8 @@ export interface EnqueueSectionArgs {
   continueOnly?: boolean;
   /** The stage's `entry_prompt_hint`, for the chapter prompt. */
   stageHint?: string;
+  /** The section's title and abstract: what the project's material is searched for. */
+  sectionTitle?: string;
 }
 
 /** A job that stopped for good: nothing will run it again unless asked. */
@@ -124,7 +126,9 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     model: args.project.model,
     // Carried in the payload rather than reassembled later: the drain may run
     // hours afterwards, in a process that has never seen this user.
-    inputs: inputsFromProject(args.project),
+    // A long manuscript in the context is sent as the passages that match this
+    // section and its notes (15 Nov), not the same opening for every chapter.
+    inputs: inputsFromProject(args.project, [args.sectionTitle ?? '', args.stageHint ?? '', JSON.stringify(args.revise ?? '')].join('\n')),
     ...(args.revise ? { revise: args.revise } : {}),
     ...(args.continueOnly ? { continue_only: true } : {}),
     // The images ride with the stage's hint: the chapter prompt is where they

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { INPUT_LIMITS, counterText, withinLimit } from './input-limits';
+import { CONTEXT_REQUEST_CHARS } from '@/lib/data/context-for-request';
 
 const PY = readFileSync(join(process.cwd(), '..', 'backend', 'promptmaster', 'limits.py'), 'utf8');
 
@@ -25,7 +26,8 @@ describe('input limits', () => {
     expect(INPUT_LIMITS.audience).toBe(py('MAX_FIELD_CHARS'));
     expect(INPUT_LIMITS.constraints).toBe(py('MAX_FIELD_CHARS'));
     expect(INPUT_LIMITS.output_format).toBe(py('MAX_FIELD_CHARS'));
-    expect(INPUT_LIMITS.context).toBe(py('MAX_CONTEXT_CHARS'));
+    expect(INPUT_LIMITS.context).toBe(py('MAX_STORED_CONTEXT_CHARS'));
+    expect(CONTEXT_REQUEST_CHARS).toBe(py('MAX_CONTEXT_CHARS'));
     expect(INPUT_LIMITS.sample_output).toBe(py('MAX_SAMPLE_CHARS'));
     expect(INPUT_LIMITS.instruction).toBe(py('MAX_INSTRUCTION_CHARS'));
     expect(INPUT_LIMITS.message).toBe(py('MAX_CHAT_MESSAGE_CHARS'));

@@ -11,6 +11,8 @@ export const sw: Record<keyof typeof en, string> = {
   'start.readingWait': 'Inasoma {names}… Vitufe vinasubiri hadi isomwe, ili maneno yake yaende pamoja na unachoanzisha.',
   'start.attachedOnly': 'Nimeambatisha {names}.',
   'start.sayWhatToDo': 'Sema unachotaka kifanywe nacho, au bonyeza Tengeneza mpango nami ili tuzungumze.',
+  'start.docKept': 'Herufi zote {count} ulizoambatisha zinahifadhiwa. Kila hatua husoma mwanzo na vifungu vinavyohusiana nayo, hadi herufi 200,000 kwa wakati mmoja, na husema imesoma kiasi gani.',
+  'start.asManuscript': 'Tumia {name} kama mswada: sura {count} zimepatikana. Katika mradi unaoandika sura, zinakuwa sura zake, neno kwa neno.',
   'file.unsupported': 'PromptMaster haisomi {name}. Inasoma PDF, Word (.docx), PowerPoint (.pptx), RTF, OpenDocument (.odt), EPUB, Markdown, maandishi, LaTeX (.tex, .bib), Wolfram (.wl, .nb), HTML, .zip yenye hizi, majedwali (.xlsx), CSV, TSV, JSON na picha (PNG, JPEG, WebP, GIF, HEIC).',
   'file.tooLarge': '{name} ni kubwa kuliko MB {mb}.',
   'file.empty': '{name} ni tupu.',

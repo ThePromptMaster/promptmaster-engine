@@ -54,6 +54,15 @@ async function docxText(data: ArrayBuffer): Promise<string> {
   // The browser build reads `arrayBuffer`, the Node build (the tests) `buffer`;
   // each ignores the other's key, and a bundler may define Buffer in the browser.
   const input = typeof Buffer === 'undefined' ? { arrayBuffer: data } : { arrayBuffer: data, buffer: Buffer.from(data) };
+  // As HTML first, so the document's headings are kept as "#" lines (15 Nov): a
+  // manuscript's chapters are found by them, and passages are matched under them.
+  try {
+    const { value } = await mammoth.convertToHtml(input as Parameters<typeof mammoth.convertToHtml>[0]);
+    const text = htmlText(value);
+    if (text.trim()) return text;
+  } catch {
+    // Read as plain text below.
+  }
   const { value } = await mammoth.extractRawText(input as Parameters<typeof mammoth.extractRawText>[0]);
   return value;
 }

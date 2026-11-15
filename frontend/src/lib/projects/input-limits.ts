@@ -15,7 +15,11 @@ export const INPUT_LIMITS = {
   audience: 60_000,
   constraints: 60_000,
   output_format: 60_000,
-  context: 200_000,
+  /**
+   * What a project keeps of its material (15 Nov: a 417,000-character manuscript
+   * was cut to 200,000). A request carries at most CONTEXT_REQUEST_CHARS of it.
+   */
+  context: 2_000_000,
   /** A sample of what good looks like (4 Nov). */
   sample_output: 60_000,
   /** A revise request, chat instruction or stage hint. */

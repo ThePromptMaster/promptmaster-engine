@@ -27,6 +27,7 @@
 
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { formatNumber } from '@/lib/i18n/format';
 import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
@@ -36,6 +37,7 @@ import { ACCENTS } from '@/lib/appearance/colours';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
+import { CONTEXT_REQUEST_CHARS } from '@/lib/data/context-for-request';
 import { DEFAULT_MODEL, MODEL_CHOICES, currentModel } from '@/lib/constants';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
@@ -188,6 +190,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
  */
 export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'>) {
   const t = useT();
+  const locale = useLocale();
   const text = useFieldText();
   const objective = project.objective.trim();
   return (
@@ -237,6 +240,12 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
               />
               )}
               {!readOnly && <LimitCounter length={(project[key] ?? '').length} limit={INPUT_LIMITS[key]} />}
+              {/* 15 Nov: the whole text is kept; how much each step reads is said here too. */}
+              {key === 'context' && (project.context ?? '').length > CONTEXT_REQUEST_CHARS && (
+                <p role="note" data-context-kept className="mt-1 text-label text-[var(--on-surface-variant)]">
+                  {t('start.docKept', { count: formatNumber((project.context ?? '').length, locale) })}
+                </p>
+              )}
             </div>
           );
         })}
