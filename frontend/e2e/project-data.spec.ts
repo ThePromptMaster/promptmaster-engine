@@ -37,7 +37,7 @@ test('a CSV attached to the project is read by the code Go runs', async ({ page 
   await expect(data).toContainText('Data and images · 3 files');
   // Something that is not data is refused, and says what is accepted.
   await data.getByLabel('Attach data files').setInputFiles({ name: 'clip.mp4', mimeType: 'video/mp4', buffer: Buffer.from('x') });
-  await expect(data.getByRole('alert')).toContainText('is not a PDF, Word (.docx), PowerPoint (.pptx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image');
+  await expect(data.getByRole('alert')).toContainText('is not a file PromptMaster reads. It reads PDF, Word (.docx), PowerPoint (.pptx)');
   await page.screenshot({ path: test.info().outputPath('01-data-attached.png'), fullPage: true });
 
   const panel = page.getByRole('region', { name: 'Go mode', exact: true });

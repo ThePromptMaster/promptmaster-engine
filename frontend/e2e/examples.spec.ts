@@ -205,7 +205,12 @@ test('deal screening under Go: it judges the sample batch itself, and does not c
 
   await card.getByRole('button', { name: 'Approve and resume' }).click();
   await expect.poll(() => calls.filter((c) => c === '/api/assess-batch').length, { timeout: 60_000 }).toBe(1);
-  await expect(page.getByRole('table').first()).toBeVisible({ timeout: 30_000 });
+  // Read from the record, not the page: on a slow runner Go has moved on to the
+  // next stage before the table is looked for (15 Nov CI).
+  await expect.poll(
+    async () => (await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.assess_batch&select=id`)).length,
+    { timeout: 30_000 }
+  ).toBeGreaterThan(0);
   await page.screenshot({ path: test.info().outputPath('01-go-judged-the-batch.png'), fullPage: true });
   const steps = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.assess_batch&select=status,output`);
   expect(steps[0].status).toBe('succeeded');
