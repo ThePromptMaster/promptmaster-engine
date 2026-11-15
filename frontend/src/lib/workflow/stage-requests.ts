@@ -2,6 +2,7 @@ import { holdsTheWork } from './deliverable';
 import { factsForRequest } from './facts';
 import { referencePayload } from './references';
 import { sourcesForRequest, withoutSourcesList } from './sources';
+import { contextForRequest } from '@/lib/data/context-for-request';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
  * their responses. Pure.
@@ -47,14 +48,19 @@ import type {
  *
  * `citing` is the text being worked on: past 40 sources, the ones it cites are
  * sent first, so a revision keeps its citations (31 Oct).
+ *
+ * `focus` is what this call is about — a stage's name and instruction. A project's
+ * material longer than one request carries is sent as its opening and the
+ * passages that match the focus, the objective and the text being worked on
+ * (15 Nov: a 417,000-character manuscript; `context-for-request.ts`).
  */
-export function inputsFrom(project: Project, citing = ''): PMInput {
+export function inputsFrom(project: Project, citing = '', focus = ''): PMInput {
   return {
     objective: project.objective,
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
-    context: project.context ?? '',
+    context: contextForRequest(project.context ?? '', [focus, project.objective, project.title, citing.slice(0, 6_000)].filter(Boolean).join('\n')).context,
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
     ...(project.third_party?.length ? { third_party: project.third_party } : {}),
     facts: factsForRequest(project.facts),
@@ -90,7 +96,7 @@ export function generationRequest(
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
-    inputs: { ...inputsFrom(project, existingContent), mode: modeForStage(project, target) },
+    inputs: { ...inputsFrom(project, existingContent, [target.label, target.entry_prompt_hint ?? '', instruction].join('\n')), mode: modeForStage(project, target) },
     // Every stage may search the web first, while the switch is on (22 Oct).
     web_access: webAccessOf(project),
     stage: {
@@ -225,7 +231,7 @@ export function evaluationRequest(
   approvedOutline: OutlineSection[]
 ): EvaluateStageArtifactRequest {
   return {
-    inputs: inputsFrom(project),
+    inputs: inputsFrom(project, content, [stage.label, stage.entry_prompt_hint ?? ''].join('\n')),
     stage: {
       id: stage.id,
       label: stage.label,

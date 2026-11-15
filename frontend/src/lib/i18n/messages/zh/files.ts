@@ -11,6 +11,8 @@ export const zh: Record<keyof typeof en, string> = {
   'start.readingWait': '正在读取 {names}…… 读取完成前按钮会等待，以便其中的文字随你开始的工作一起使用。',
   'start.attachedOnly': '我附加了 {names}。',
   'start.sayWhatToDo': '说说你想用它做什么，或点击“和我一起制定计划”来聊一聊。',
+  'start.docKept': '你附加的全部 {count} 个字符都会保留。每一步读取开头以及与该步相关的段落，每次最多 200,000 个字符，并说明读了多少。',
+  'start.asManuscript': '将 {name} 用作书稿：找到 {count} 个章节。在撰写章节的项目中，它们会逐字成为该项目的章节。',
   'file.unsupported': 'PromptMaster 无法读取 {name}。它可读取 PDF、Word (.docx)、PowerPoint (.pptx)、RTF、OpenDocument (.odt)、EPUB、Markdown、文本、LaTeX (.tex、.bib)、Wolfram (.wl、.nb)、HTML、包含这些文件的 .zip、电子表格 (.xlsx)、CSV、TSV、JSON 和图片（PNG、JPEG、WebP、GIF、HEIC）。',
   'file.tooLarge': '{name} 大于 {mb} MB。',
   'file.empty': '{name} 是空文件。',

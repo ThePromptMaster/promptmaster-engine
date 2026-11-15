@@ -11,6 +11,8 @@ export const ar: Record<keyof typeof en, string> = {
   'start.readingWait': 'جارٍ قراءة {names}… تنتظر الأزرار حتى تنتهي القراءة، كي يصل نصه مع ما تبدؤه.',
   'start.attachedOnly': 'أرفقتُ {names}.',
   'start.sayWhatToDo': 'قل ما تريد فعله به، أو اضغط ضع خطة معي لنتحدث فيه.',
+  'start.docKept': 'تُحفظ كل الأحرف التي أرفقتها وعددها {count}. تقرأ كل خطوة البداية والمقاطع المتعلقة بها، حتى 200,000 حرف في كل مرة، وتذكر كم قرأت.',
+  'start.asManuscript': 'استخدم {name} مخطوطةً: عُثر على {count} فصلًا. في مشروع يكتب فصولًا، تصبح فصوله كلمةً بكلمة.',
   'file.unsupported': 'لا يقرأ PromptMaster الملف {name}. يقرأ PDF وWord (.docx) وPowerPoint (.pptx) وRTF وOpenDocument (.odt) وEPUB وMarkdown والنص وLaTeX (.tex و.bib) وWolfram (.wl و.nb) وHTML وملف .zip يضم هذه الأنواع وجداول البيانات (.xlsx) وCSV وTSV وJSON والصور (PNG وJPEG وWebP وGIF وHEIC).',
   'file.tooLarge': '{name} أكبر من {mb} MB.',
   'file.empty': '{name} فارغ.',

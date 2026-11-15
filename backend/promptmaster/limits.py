@@ -55,6 +55,11 @@ MAX_PREAMBLE_CHARS = 8_000
 #: brief attached on the start screen. It rides on every stage call (L-38), so
 #: it is still bounded: about 50k tokens, a long report, not a library.
 MAX_CONTEXT_CHARS = 200_000
+#: What a project keeps of its material (15 Nov, a 417,000-character manuscript
+#: cut to 200,000). Stored by the browser, never sent whole: a request carries at
+#: most MAX_CONTEXT_CHARS of it — the opening and the passages that match the
+#: step (`frontend/src/lib/data/context-for-request.ts`).
+MAX_STORED_CONTEXT_CHARS = 2_000_000
 #: A sample of what good looks like (4 Nov): a standard for depth and style, not
 #: source material. Stored up to this; prompts carry its opening (SAMPLE_PROMPT_CHARS).
 MAX_SAMPLE_CHARS = 60_000
