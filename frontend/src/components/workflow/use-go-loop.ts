@@ -933,7 +933,7 @@ export function useGoLoop(opts: Options) {
         const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
         // Every move the stage offers now, before the polishing cap takes any away.
         const offered = withoutOverride(
-          allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone), stageEvaluation.canAdvance, current.policy
+          allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone && current.policy === 'autonomous' && o.project.routine_decisions === 'handle'), stageEvaluation.canAdvance, current.policy
         );
         const allowed = withoutSettledRuns(withoutEndlessPolish(
           // Asked once: if the user stayed, the stage is to be done.
@@ -2137,7 +2137,7 @@ export function useGoLoop(opts: Options) {
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
-          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone), policy: current.policy,
+          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts, !o.deliverableDone && current.policy === 'autonomous' && o.project.routine_decisions === 'handle'), policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           objective: o.project.objective, currentStageId: o.state.current_stage_id,
         });

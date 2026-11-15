@@ -399,6 +399,11 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
     for (const m of t.matchAll(/\b(?:(?:a|an|one|the)\s+)?(?:(?:short|simple|brief|small|clear|single|summary|comparison)\s+)?table\b|\btabulate[ds]?\b/gi)) {
       const before = t.slice(Math.max(0, m.index! - 40), m.index!);
       if (/\b(?:no|not|never|without|rather than|instead of|avoid|don['’]t use|do not use)\s+(?:(?:a|an|any)\s+)?$/i.test(before)) continue;
+      // A table offered, not asked for: "five bullets or one small table" (the slide-deck
+      // example, 15 Nov E2E), "may include a table", "a table if useful".
+      if (/\b(?:or|either|optional(?:ly)?|may|might|can|could|at most|up to)\b[^.;:\n]{0,30}$/i.test(before)) continue;
+      const tail = t.slice(m.index! + m[0].length, m.index! + m[0].length + 40);
+      if (/^[^.;\n]{0,25}\b(?:if (?:needed|useful|helpful|appropriate|it helps)|where (?:useful|helpful|needed)|optional(?:ly)?)\b/i.test(tail)) continue;
       // "the table of contents", "a table below the line" in a description of something else.
       const after = t.slice(m.index! + m[0].length, m.index! + m[0].length + 14);
       if (/^\s+of\s+contents\b/i.test(after)) continue;

@@ -326,7 +326,7 @@ test('a reasoning move chosen again is saved, not repeated a fourth time', async
   // Once the derivation is saved, a further repeat on a stage whose own work is
   // done moves on (C7) — here Literature, which then waits for the user's own
   // approval — rather than tripping the repeat guard.
-  await expect(transparency).toContainText(/the deliverable is not|waiting for your approval/, { timeout: 60_000 });
+  await expect(transparency).toContainText(/still to write|waiting for your approval/, { timeout: 60_000 });
   await expect(transparency).not.toContainText('was chosen 3 times in a row');
   const steps = page.getByRole('list', { name: 'Go mode steps' });
   await expect(steps).toContainText('Revise this stage');
