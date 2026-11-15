@@ -29,7 +29,7 @@ export interface ProjectJob {
 const JOB_COLUMNS =
   'id, kind, status, payload, attempts, max_attempts, error_code, error_message, created_at';
 
-export function inputsFromProject(project: Project, focus = ''): PMInput {
+export function inputsFromProject(project: Project, focus: { user?: string; step?: string } = {}): PMInput {
   // What a stage written in the browser is given: the current facts, what the
   // user removed, what they instructed (8 Nov, production: a chapter repair was
   // told a correction was needed and shown none of it). Sources are read when
@@ -128,7 +128,7 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     // hours afterwards, in a process that has never seen this user.
     // A long manuscript in the context is sent as the passages that match this
     // section and its notes (15 Nov), not the same opening for every chapter.
-    inputs: inputsFromProject(args.project, [args.sectionTitle ?? '', args.stageHint ?? '', JSON.stringify(args.revise ?? '')].join('\n')),
+    inputs: inputsFromProject(args.project, { user: [args.sectionTitle ?? '', args.revise ? JSON.stringify(args.revise) : ''].join('\n'), step: args.stageHint ?? '' }),
     ...(args.revise ? { revise: args.revise } : {}),
     ...(args.continueOnly ? { continue_only: true } : {}),
     // The images ride with the stage's hint: the chapter prompt is where they

@@ -54,13 +54,16 @@ import type {
  * passages that match the focus, the objective and the text being worked on
  * (15 Nov: a 417,000-character manuscript; `context-for-request.ts`).
  */
-export function inputsFrom(project: Project, citing = '', focus = ''): PMInput {
+export function inputsFrom(project: Project, citing = '', focus: { user?: string; step?: string } = {}): PMInput {
   return {
     objective: project.objective,
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
-    context: contextForRequest(project.context ?? '', [focus, project.objective, project.title, citing.slice(0, 6_000)].filter(Boolean).join('\n')).context,
+    context: contextForRequest(project.context ?? '', {
+      primary: [project.objective, project.title, focus.user ?? ''].join('\n'),
+      secondary: [focus.step ?? '', citing.slice(0, 6_000)].join('\n'),
+    }).context,
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
     ...(project.third_party?.length ? { third_party: project.third_party } : {}),
     facts: factsForRequest(project.facts),
@@ -96,7 +99,7 @@ export function generationRequest(
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
-    inputs: { ...inputsFrom(project, existingContent, [target.label, target.entry_prompt_hint ?? '', instruction].join('\n')), mode: modeForStage(project, target) },
+    inputs: { ...inputsFrom(project, existingContent, { user: instruction, step: [target.label, target.entry_prompt_hint ?? ''].join('\n') }), mode: modeForStage(project, target) },
     // Every stage may search the web first, while the switch is on (22 Oct).
     web_access: webAccessOf(project),
     stage: {
@@ -231,7 +234,7 @@ export function evaluationRequest(
   approvedOutline: OutlineSection[]
 ): EvaluateStageArtifactRequest {
   return {
-    inputs: inputsFrom(project, content, [stage.label, stage.entry_prompt_hint ?? ''].join('\n')),
+    inputs: inputsFrom(project, content, { step: [stage.label, stage.entry_prompt_hint ?? ''].join('\n') }),
     stage: {
       id: stage.id,
       label: stage.label,

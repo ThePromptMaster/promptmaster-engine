@@ -78,19 +78,37 @@ export interface RequestContext {
  * At most `limit` characters of `text`: the whole of it when it fits, otherwise
  * the opening and the passages that best match `focus`.
  */
-export function contextForRequest(text: string, focus: string, limit = CONTEXT_REQUEST_CHARS): RequestContext {
+/**
+ * What a request is about. `primary` is the user's own words (the objective, the
+ * title, what they asked for); `secondary` is the step's own wording and the
+ * text being worked on, which count for less: a stage's boilerplate ("produce
+ * the finished thing") is rare in a novel and outranked the user's question.
+ */
+export type Focus = string | { primary: string; secondary?: string };
+
+export function contextForRequest(text: string, focus: Focus, limit = CONTEXT_REQUEST_CHARS): RequestContext {
   const total = text.length;
   if (total <= limit) return { context: text, read: total, total, passages: 0 };
   const opening = cutText(text, Math.min(OPENING_CHARS, Math.floor(limit / 4)));
   const budget = limit - opening.length - MARKER_ROOM;
-  const wanted = termsOf(focus);
+  const primary = termsOf(typeof focus === 'string' ? focus : focus.primary);
+  const secondary = typeof focus === 'string' ? new Set<string>() : termsOf(focus.secondary ?? '');
+  const wanted = new Set([...primary, ...secondary]);
   const passages = passagesOf(text, opening.length);
+  // A word in every passage says nothing about which one is wanted; a rare one
+  // says a lot (15 Nov, production: "what does Darcy say at the ball" sent 115
+  // passages with "Darcy" in them and not the one at the ball).
+  const termSets = passages.map((p) => termsOf(p.text));
+  const weight = new Map<string, number>();
+  for (const w of wanted) {
+    const df = termSets.reduce((n, set) => n + (set.has(w) ? 1 : 0), 0);
+    if (df > 0) weight.set(w, Math.log((passages.length + 1) / (df + 0.5)) * (primary.has(w) ? 1 : 0.25));
+  }
   const scored = passages.map((p, i) => {
-    const terms = termsOf(p.text);
-    let hits = 0;
-    for (const w of wanted) if (terms.has(w)) hits += 1;
-    // Headings and short lists are cheap to keep and often what a step is about.
-    return { i, score: hits + (/^#{1,3} /m.test(p.text) ? 0.5 : 0) };
+    let score = 0;
+    for (const [w, wt] of weight) if (termSets[i].has(w)) score += wt;
+    // Headings are cheap to keep and often what a step is about.
+    return { i, score: score + (/^#{1,3} /m.test(p.text) ? 0.25 : 0) };
   });
   // Best matches first; ties keep the text's order, so with no match at all the
   // passages after the opening are what is sent.
