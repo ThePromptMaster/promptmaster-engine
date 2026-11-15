@@ -1,13 +1,15 @@
 'use client';
 
 import { useT } from '@/lib/i18n/i18n-provider';
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
+import { useFileDrop } from '@/hooks/use-file-drop';
 
-import { IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, rejectReason } from '@/lib/data/preview';
-import { prepareFiles } from '@/lib/data/attachments';
+import { IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
+import { prepareFiles, storesFile } from '@/lib/data/attachments';
 import { normalizeImage } from '@/lib/data/normalize-image';
 import { useProjectImageUrls } from '@/components/shared/project-images';
 import { attachProjectFile, removeProjectFile } from '@/lib/supabase/project-files';
+import { errorMessage } from '@/lib/data/clean-text';
 import type { Project, ProjectFile } from '@/types/project';
 
 /**
@@ -25,6 +27,7 @@ export function ProjectData({
   onChanged,
   onAddToContext,
   readOnly = false,
+  zone,
 }: {
   project: Pick<Project, 'id' | 'user_id'>;
   files: ProjectFile[];
@@ -32,6 +35,8 @@ export function ProjectData({
   /** A document's words into the project context, when the user says so. */
   onAddToContext?: (documents: { name: string; text: string }[]) => void;
   readOnly?: boolean;
+  /** The stage column: a file dropped on it, or pasted into it, is attached here (15 Nov). */
+  zone?: RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   const input = useRef<HTMLInputElement>(null);
@@ -46,7 +51,7 @@ export function ProjectData({
   // Documents just attached whose words could go into the project context.
   const [readable, setReadable] = useState<{ name: string; text: string }[]>([]);
 
-  const attach = async (picked: FileList | null) => {
+  const attach = async (picked: FileList | readonly File[] | null) => {
     if (!picked?.length) return;
     setBusy(true);
     setError(null);
@@ -54,20 +59,21 @@ export function ProjectData({
     setReadable([]);
     try {
       const prepared = await prepareFiles(Array.from(picked), files.map((f) => f.name));
-      for (const { file, preview } of prepared.ready) await attachProjectFile(project, file, preview);
+      // A document too large to store keeps only its words (15 Nov): offered below for the context.
+      for (const p of prepared.ready) if (storesFile(p)) await attachProjectFile(project, p.file, p.preview);
       if (prepared.errors.length) setError(prepared.errors.join(' '));
       if (prepared.notes.length) setNote(prepared.notes.join(' '));
       setReadable(prepared.ready.flatMap((p) => (p.text ? [{ name: p.file.name, text: p.text }] : [])));
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error && e.message ? t('data.attachErrorWhy', { message: e.message }) : t('data.attachError'));
+      setError(errorMessage(e) ? t('data.attachErrorWhy', { message: errorMessage(e) }) : t('data.attachError'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
     }
   };
 
-  const pickImages = async (picked: FileList | null) => {
+  const pickImages = async (picked: FileList | readonly File[] | null) => {
     if (!picked?.length) return;
     setError(null);
     setNote(null);
@@ -121,11 +127,23 @@ export function ProjectData({
       setPending([]);
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error && e.message ? t('data.imageErrorWhy', { message: e.message }) : t('data.imageError'));
+      setError(errorMessage(e) ? t('data.imageErrorWhy', { message: errorMessage(e) }) : t('data.imageError'));
     } finally {
       setBusy(false);
     }
   };
+
+  // Dropped or pasted: pictures wait for a caption as picked ones do, the rest are attached.
+  const dragging = useFileDrop(
+    zone,
+    (dropped) => {
+      const pictures = dropped.filter((f) => isImage(f.name));
+      const others = dropped.filter((f) => !isImage(f.name));
+      if (pictures.length) void pickImages(pictures);
+      if (others.length) void attach(others);
+    },
+    !readOnly && !busy && files.length < MAX_FILES
+  );
 
   const images = files.filter((f) => f.preview.kind === 'image');
   const dataFiles = files.filter((f) => f.preview.kind !== 'image');
@@ -145,6 +163,12 @@ export function ProjectData({
 
   return (
     <section data-panel="project-data" aria-label={t('data.label')} className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
+      {/* The panel may be scrolled out of view while a file is dragged over the stage, so the hint floats. */}
+      {dragging && (
+        <p role="status" data-drop-hint className="pointer-events-none fixed inset-x-0 bottom-6 z-50 mx-auto w-fit rounded-full bg-[var(--pm-primary)] px-4 py-2 text-label font-medium text-[var(--on-primary)] shadow-lg">
+          {t('attach.dropHere')}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">table_view</span>
         <h3 className="me-auto text-label uppercase tracking-wider text-[var(--on-surface-variant)]">

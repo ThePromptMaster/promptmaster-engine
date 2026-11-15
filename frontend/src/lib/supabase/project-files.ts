@@ -1,5 +1,6 @@
 import { createClient } from './client';
 import type { DataPreview } from '@/lib/data/preview';
+import { storableText, storableValue } from '@/lib/data/clean-text';
 import type { ProjectFile } from '@/types/project';
 
 const BUCKET = 'project-files';
@@ -50,8 +51,8 @@ export async function attachProjectFile(
   const { data, error } = await supabase
     .from('project_files')
     .insert({
-      project_id: project.id, user_id: project.user_id, name: file.name, path,
-      content_type: file.type || 'text/plain', bytes: file.size, preview,
+      project_id: project.id, user_id: project.user_id, name: storableText(file.name), path,
+      content_type: file.type || 'text/plain', bytes: file.size, preview: storableValue(preview),
     })
     .select(COLUMNS)
     .single();

@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
+import { useFileDrop } from '@/hooks/use-file-drop';
 import { useT } from '@/lib/i18n/i18n-provider';
 
-import { documentsOf, prepareFiles, type MessageAttachment } from '@/lib/data/attachments';
+import { documentsOf, prepareFiles, storesFile, type MessageAttachment } from '@/lib/data/attachments';
 import { imageForMessage, normalizeImage } from '@/lib/data/normalize-image';
 import { PICKABLE_EXTENSIONS, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
 import { attachProjectFile } from '@/lib/supabase/project-files';
+import { errorMessage } from '@/lib/data/clean-text';
 import type { Project } from '@/types/project';
 
 /**
@@ -28,6 +30,7 @@ export function ChatAttach({
   onAddToContext,
   onForNextMessage,
   disabled = false,
+  zone,
 }: {
   project: Pick<Project, 'id' | 'user_id'>;
   existingNames: readonly string[];
@@ -37,6 +40,8 @@ export function ChatAttach({
   /** What was attached, to go with the next message. */
   onForNextMessage?: (items: MessageAttachment[]) => void;
   disabled?: boolean;
+  /** The side chat: a file dropped on it, or a screenshot pasted into it, is attached as if picked (15 Nov). */
+  zone?: RefObject<HTMLElement | null>;
 }) {
   const t = useT();
   const input = useRef<HTMLInputElement>(null);
@@ -44,7 +49,7 @@ export function ChatAttach({
   const [message, setMessage] = useState<string | null>(null);
   const [readable, setReadable] = useState<{ name: string; text: string }[]>([]);
 
-  const attach = async (picked: FileList | null) => {
+  const attach = async (picked: FileList | readonly File[] | null) => {
     if (!picked?.length) return;
     setBusy(true);
     setMessage(null);
@@ -55,12 +60,18 @@ export function ChatAttach({
       const prepared = await prepareFiles(files.filter((f) => !isImage(f.name)), existingNames);
       const stored: string[] = [];
       const failed: string[] = [...prepared.errors];
+      const textOnly: string[] = [];
       for (const p of prepared.ready) {
+        // Too large to store (15 Nov): its words still go with the message.
+        if (!storesFile(p)) {
+          textOnly.push(p.file.name);
+          continue;
+        }
         try {
           await attachProjectFile(project, p.file, p.preview);
           stored.push(p.file.name);
         } catch (e) {
-          failed.push(t('pnl.couldNotStore', { name: p.file.name, why: e instanceof Error && e.message ? ` (${e.message})` : '' }));
+          failed.push(t('pnl.couldNotStore', { name: p.file.name, why: errorMessage(e) ? ` (${errorMessage(e)})` : '' }));
         }
       }
       // Photos from the chat are stored too (U1, 8 Oct: Sean attached from his
@@ -88,13 +99,13 @@ export function ChatAttach({
           forNext.push(image ? { name: normal.file.name, image } : { name: normal.file.name, not_read: true });
           if (normal.note) prepared.notes.push(normal.note);
         } catch (e) {
-          failed.push(t('pnl.couldNotStore', { name: normal.file.name, why: e instanceof Error && e.message ? ` (${e.message})` : '' }));
+          failed.push(t('pnl.couldNotStore', { name: normal.file.name, why: errorMessage(e) ? ` (${errorMessage(e)})` : '' }));
         }
       }
       if (added.length) {
         prepared.notes.push(t('pnl.addedImages', { count: added.length, names: added.join(', ') }));
       }
-      const docs = documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name)));
+      const docs = documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name) || textOnly.includes(p.file.name)));
       setReadable(docs);
       const dataFiles = stored.filter((name) => !docs.some((d) => d.name === name));
       const withNext: MessageAttachment[] = [...docs.map((d) => ({ name: d.name, text: d.text })), ...dataFiles.map((name) => ({ name })), ...forNext];
@@ -118,6 +129,8 @@ export function ChatAttach({
       if (input.current) input.current.value = '';
     }
   };
+
+  const dragging = useFileDrop(zone, (dropped) => void attach(dropped), !disabled && !busy);
 
   return (
     // `min-w-0 flex-1`, not `shrink-0`: the status line below the button can
@@ -144,6 +157,7 @@ export function ChatAttach({
         <span className="material-symbols-outlined text-[18px]">attach_file</span>
         {busy ? t('pnl.attaching') : t('pnl.attach')}
       </button>
+      {dragging && <p role="status" className="text-label font-medium text-[var(--pm-primary)]">{t('attach.dropHere')}</p>}
       {message && (
         <p role="status" className="break-words text-label text-[var(--on-surface-variant)]">
           {message}

@@ -10,6 +10,7 @@
  * Images are not handled here: they wait for a caption before they are stored.
  */
 
+import { cutText } from './clean-text';
 import { contextFromDocuments, extractText, isDocument } from './extract-text';
 import { MAX_FILE_BYTES, describePreview, isImage, isSpreadsheet, previewOf, rejectReason, type DataPreview } from './preview';
 import { spreadsheetToCsvFiles } from './spreadsheet';
@@ -20,6 +21,16 @@ export interface PreparedFile {
   preview: DataPreview;
   /** A document's words, for the project context. */
   text?: string;
+  /**
+   * Over the size a project stores (MAX_FILE_BYTES): its words are kept, the
+   * file itself is not uploaded (15 Nov, a tester's book).
+   */
+  textOnly?: boolean;
+}
+
+/** Whether a prepared file is uploaded to the project's storage, or only its words kept. */
+export function storesFile(p: Pick<PreparedFile, 'textOnly'>): boolean {
+  return !p.textOnly;
 }
 
 export interface Prepared {
@@ -66,7 +77,9 @@ export async function prepareFiles(picked: readonly File[], existing: readonly s
           out.errors.push(read.error);
           continue;
         }
-        out.ready.push({ file, preview: previewOf(file.name, read.text), text: read.text });
+        const textOnly = file.size > MAX_FILE_BYTES;
+        if (textOnly) out.notes.push(tr('file.textOnly', { name: file.name, mb: MAX_FILE_BYTES / 1_000_000 }));
+        out.ready.push({ file, preview: previewOf(file.name, read.text), text: read.text, ...(textOnly ? { textOnly } : {}) });
       } else {
         out.ready.push({ file, preview: previewOf(file.name, await file.text()) });
       }
@@ -105,7 +118,7 @@ const MATERIAL_CUT = '\n\n[…the rest of the material was not sent: it is still
  */
 export function setupMaterial(said: string, attached: string, limit: number): string {
   const joined = [said.trim(), attached.trim()].filter(Boolean).join('\n\n');
-  return joined.length <= limit ? joined : `${joined.slice(0, Math.max(0, limit - MATERIAL_CUT.length))}${MATERIAL_CUT}`;
+  return joined.length <= limit ? joined : `${cutText(joined, Math.max(0, limit - MATERIAL_CUT.length))}${MATERIAL_CUT}`;
 }
 
 /** Attached documents too long for a project to hold whole, by name (5 Nov): said, not silently cut. */
@@ -136,7 +149,7 @@ export const MESSAGE_ATTACHMENTS_MAX = 3_000_000;
 export function withinMessage(items: readonly MessageAttachment[], max = MESSAGE_ATTACHMENTS_MAX): MessageAttachment[] {
   let used = 0;
   return items.map((item) => {
-    const text = item.text && item.text.length > MESSAGE_TEXT_MAX ? `${item.text.slice(0, MESSAGE_TEXT_MAX)}\n[…the rest of this document was not sent with the message]` : item.text;
+    const text = item.text && item.text.length > MESSAGE_TEXT_MAX ? `${cutText(item.text, MESSAGE_TEXT_MAX)}\n[…the rest of this document was not sent with the message]` : item.text;
     const size = (item.image?.length ?? 0) + (text?.length ?? 0);
     if (used + size > max) return { name: item.name, not_read: true };
     used += size;

@@ -18,6 +18,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
 import { NEED_ANSWERS, WORK_ANSWERS, rankExamples } from '@/lib/projects/examples/rank';
 import { rememberStartGoal } from '@/lib/projects/example-goals';
+import { handOverStartFiles } from '@/lib/projects/start-handoff';
 import { loadAnswers, saveAnswers } from '@/lib/supabase/preferences';
 
 /**
@@ -130,8 +131,10 @@ export function ExampleQuestionnaire() {
     }
   }
 
-  function startSuggestion(objective: string) {
+  async function startSuggestion(objective: string) {
     rememberStartGoal(objective);
+    // What was attached comes too (15 Nov): it was dropped here.
+    await handOverStartFiles(files);
     // A full page load, so the proxy sees a session that may have just started.
     goSignedIn('/projects/new');
   }
@@ -230,11 +233,12 @@ export function ExampleQuestionnaire() {
               <span aria-hidden className="material-symbols-outlined text-[16px]">auto_awesome</span>
               {suggesting ? t('ex.suggesting') : t('ex.suggest')}
             </button>
-            {plate.trim() && (
+            {(plate.trim() || files.length > 0) && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   rememberStartGoal(plate);
+                  await handOverStartFiles(files);
                   router.push('/projects/new');
                 }}
                 className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
@@ -268,7 +272,7 @@ export function ExampleQuestionnaire() {
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
-                          onClick={() => startSuggestion(s.objective)}
+                          onClick={() => void startSuggestion(s.objective)}
                           className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label font-medium text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
                         >
                           {t('ex.suggestStart')}

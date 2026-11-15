@@ -8,6 +8,8 @@
  * nears one instead of the next stage saying so afterwards.
  */
 
+import { cutText } from '@/lib/data/clean-text';
+
 export const INPUT_LIMITS = {
   objective: 60_000,
   audience: 60_000,
@@ -31,7 +33,7 @@ export type LimitedField = keyof typeof INPUT_LIMITS;
 /** The value as it may be saved: never longer than its field allows. */
 export function withinLimit(field: LimitedField, value: string): string {
   const limit = INPUT_LIMITS[field];
-  return value.length > limit ? value.slice(0, limit) : value;
+  return cutText(value, limit);
 }
 
 /** A counter is worth showing only once the limit is in sight. */

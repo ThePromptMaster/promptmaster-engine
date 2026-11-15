@@ -36,10 +36,12 @@ import { StartAttachments, type StartImage } from '@/components/projects/start-a
 import { documentsCut, documentsOf, materialFrom, setupMaterial, type PreparedFile } from '@/lib/data/attachments';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
+import { errorMessage } from '@/lib/data/clean-text';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { ExampleCards } from '@/components/examples/example-cards';
 import { PromptyHelp } from '@/components/examples/prompty-help';
 import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
+import { takeStartFiles } from '@/lib/projects/start-handoff';
 import { takeStartItems } from '@/lib/connections/items';
 import { CarriedItems } from '@/components/personalize/carried-items';
 import type { ThirdPartyItem } from '@/types';
@@ -152,6 +154,10 @@ export default function NewProjectPage() {
   });
   // Held until Start: a project's files are stored under its id (5 Oct, email 8).
   const [startFiles, setStartFiles] = useState<PreparedFile[]>([]);
+  // Files still being read (15 Nov): every way to start waits for them.
+  const [reading, setReading] = useState<string[] | null>(null);
+  const startZone = useRef<HTMLDivElement | null>(null);
+  const talkZone = useRef<HTMLDivElement | null>(null);
   const [startImages, setStartImages] = useState<StartImage[]>([]);
   // What "Start this" carried from the person's accounts (7 Nov): saved with the
   // project as other people's words; the conversation sees their titles only.
@@ -231,6 +237,10 @@ export default function NewProjectPage() {
     if (goal) setObjective((current) => current || goal);
     const carried = takeStartItems();
     if (carried.length) setStartItems(carried);
+    // Files attached on the projects page come with the words (15 Nov).
+    void takeStartFiles().then((handed) => {
+      if (handed.length) setStartFiles((current) => [...current, ...handed.filter((h) => !current.some((c) => c.file.name === h.file.name))]);
+    });
   }, []);
 
   // An unfinished setup from an earlier visit: offered, never applied unasked.
@@ -303,6 +313,11 @@ export default function NewProjectPage() {
     setTemplateId((templates.find((t) => t.key === (recommendedKey ?? 'book')) ?? templates[0]).id);
   }
   const hasObjective = objective.trim().length > 0;
+  // A paper attached with nothing typed is enough to talk it through (15 Nov:
+  // every button stayed grey until something was typed).
+  const attachedNames = documentsOf(startFiles).map((d) => d.name);
+  const canTalk = hasObjective || attachedNames.length > 0;
+  const opening = objective.trim() || (attachedNames.length ? t('start.attachedOnly', { names: attachedNames.join(', ') }) : '');
 
   /** A recommended setup for the ask (or the conversation's brief), without applying it. */
   async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
@@ -585,11 +600,13 @@ export default function NewProjectPage() {
       // take the project back out (6 Oct, email 9): its text is already in
       // the context, and the file can be added again on the first stage.
       const failed: string[] = [];
-      for (const { file, preview } of startFiles) {
+      for (const { file, preview, textOnly } of startFiles) {
+        // Too large to store (15 Nov): its words are already in the context.
+        if (textOnly) continue;
         try {
           await attachProjectFile(project, file, preview);
         } catch (e) {
-          failed.push(`${file.name} (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`${file.name} (${errorMessage(e) || 'not stored'})`);
         }
       }
       for (const { file, caption } of startImages) {
@@ -606,7 +623,7 @@ export default function NewProjectPage() {
         try {
           await attachProjectFile(project, file, imagePreview(file.name, caption, width, height));
         } catch (e) {
-          failed.push(`${file.name} (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`${file.name} (${errorMessage(e) || 'not stored'})`);
         }
       }
       // What its searches found (22 Oct), saved in the order the conversation
@@ -619,15 +636,9 @@ export default function NewProjectPage() {
         try {
           found = [...found, ...(await saveSources({ ...project, sources: found }, web.sources, { query: web.query, stageId: selected.stages[0]?.id ?? null }))];
         } catch (e) {
-          failed.push(`web sources found for “${web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`web sources found for “${web.query}” (${errorMessage(e) || 'not stored'})`);
         }
       }
-      if (failed.length) {
-        setCreatedWithFailures({ id: project.id, failed });
-        setWorking(null);
-        return;
-      }
-
       // What the user confirmed in the front door is the project's initial record.
       if (initialFacts.length) await recordFacts(project, initialFacts);
       // The conversation it started from comes along, as the first stage's
@@ -646,6 +657,14 @@ export default function NewProjectPage() {
           }).catch(() => undefined);
         }
       }
+      // A file that would not store is reported after the facts and the
+      // conversation are saved (15 Nov): reported before, they were lost, and
+      // Start stayed dead for the project that had been made.
+      if (failed.length) {
+        setCreatedWithFailures({ id: project.id, failed });
+        setWorking(null);
+        return;
+      }
       await clearSetupDraft(user.id).catch(() => undefined);
       router.push(`/projects/${project.id}`);
     } catch (e) {
@@ -653,7 +672,7 @@ export default function NewProjectPage() {
       // with no workflow pinned and no history, and pressing Start again made
       // a second one. Take the half-made one back out, so a retry starts clean.
       if (createdId) await hardDeleteProject(createdId).catch(() => undefined);
-      const reason = e instanceof Error && e.message ? e.message : t('start.createFailed');
+      const reason = errorMessage(e) || t('start.createFailed');
       setError(t('start.nothingCreated', { reason }));
       setWorking(null);
     }
@@ -800,13 +819,13 @@ export default function NewProjectPage() {
               : t('start.intro')}
           </p>
 
-          <div className="mt-8 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_1px_2px_rgba(25,28,30,0.04)]">
+          <div ref={startZone} className="mt-8 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_1px_2px_rgba(25,28,30,0.04)]">
             <AutoGrowTextarea
               ref={goalBox}
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasObjective && working === null) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasObjective && working === null && reading === null) {
                   e.preventDefault();
                   quickStart();
                 }
@@ -824,6 +843,8 @@ export default function NewProjectPage() {
               onFiles={setStartFiles}
               onImages={setStartImages}
               disabled={working !== null}
+              zone={startZone}
+              onReading={setReading}
             />
             <CarriedItems items={startItems} onRemove={dropItem} disabled={working !== null} />
             <Link
@@ -855,10 +876,18 @@ export default function NewProjectPage() {
               what people should discover, and the quick route stays beside it.
               The other two ways in are under "More ways to start". */}
           <p className="mt-4 text-body text-[var(--on-surface-variant)]">{t('start.eitherWay')}</p>
+          {reading && (
+            <p role="status" data-start-reading className="mt-2 text-body text-[var(--on-surface)]">
+              {t('start.readingWait', { names: reading.join(', ') })}
+            </p>
+          )}
+          {!reading && !hasObjective && attachedNames.length > 0 && (
+            <p role="note" data-start-say className="mt-2 text-label text-[var(--on-surface-variant)]">{t('start.sayWhatToDo')}</p>
+          )}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => { setError(null); setStep('talk'); }}
-              disabled={!hasObjective || working !== null}
+              disabled={!canTalk || working !== null || reading !== null}
               className="rounded-2xl bg-[var(--pm-primary)] px-6 py-4 text-start text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               <span className="flex items-center justify-between gap-2 text-title">
@@ -869,7 +898,7 @@ export default function NewProjectPage() {
             </button>
             <button
               onClick={quickStart}
-              disabled={!hasObjective || working !== null || !user || !templateFor('quick')}
+              disabled={!hasObjective || working !== null || reading !== null || !user || !templateFor('quick')}
               className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="flex items-center justify-between gap-2 text-title">
@@ -913,7 +942,7 @@ export default function NewProjectPage() {
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <button
                   onClick={() => void recommend()}
-                  disabled={!hasObjective || working !== null}
+                  disabled={!hasObjective || working !== null || reading !== null}
                   className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
                 >
                   <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
@@ -963,9 +992,10 @@ export default function NewProjectPage() {
       {step === 'talk' && (
         <>
           <h1 className="sr-only">{t('start.talkTitle')}</h1>
+          <div ref={talkZone}>
           <FrontDoor
             key={`fd-${restoredAt}`}
-            opening={objective}
+            opening={opening}
             onReady={(brief, transcript, said, turns) => void makeFromConversation(brief, transcript, said, turns)}
             onReview={fromConversation}
             onBack={() => setStep('ask')}
@@ -975,7 +1005,12 @@ export default function NewProjectPage() {
             onStateChange={setFrontDoorState}
             material={material}
             carried={startItems}
-            busyLabel={working === 'setup' ? t('start.workingTheSetup') : working === 'creating' ? t('start.creatingProject') : null}
+            busyLabel={
+              working === 'setup' ? t('start.workingTheSetup')
+                : working === 'creating' ? t('start.creatingProject')
+                  : reading ? t('start.readingWait', { names: reading.join(', ') })
+                    : null
+            }
             attach={
               <>
                 <StartAttachments
@@ -984,11 +1019,14 @@ export default function NewProjectPage() {
                   onFiles={setStartFiles}
                   onImages={setStartImages}
                   disabled={working !== null}
+                  zone={talkZone}
+                  onReading={setReading}
                 />
                 <CarriedItems items={startItems} onRemove={dropItem} disabled={working !== null} />
               </>
             }
           />
+          </div>
         </>
       )}
 

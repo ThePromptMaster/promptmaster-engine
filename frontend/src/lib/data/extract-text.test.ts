@@ -4,7 +4,10 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { contextFromDocuments, extractText, isDocument, tidyText } from './extract-text';
+import { strToU8, zipSync } from 'fflate';
+
+import { contextFromDocuments, extractText, htmlText, isDocument, rtfText, tidyText } from './extract-text';
+import { rejectReason } from './preview';
 
 const fixture = (name: string) => {
   const buf = readFileSync(join(__dirname, '__fixtures__', name));
@@ -112,5 +115,90 @@ describe('calendar invites and saved emails', () => {
     expect(text).toContain('Hello & welcome');
     expect(text).not.toContain('color:red');
     expect(text).not.toContain('x()');
+  });
+});
+
+
+const bytes = (text: string) => new TextEncoder().encode(text).buffer as ArrayBuffer;
+const zipped = (files: Record<string, string | Uint8Array>) => {
+  const z = zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, typeof v === 'string' ? strToU8(v) : v])));
+  return z.buffer.slice(z.byteOffset, z.byteOffset + z.byteLength) as ArrayBuffer;
+};
+
+describe('physics papers and manuscripts (15 Nov: "these are all grayed out")', () => {
+  it('reads LaTeX, BibTeX and Wolfram source as text', async () => {
+    expect(await extractText('regge.tex', bytes('\\section{Regge measure}\n$\\int D\\ell$'))).toEqual({ text: '\\section{Regge measure}\n$\\int D\\ell$' });
+    expect(await extractText('refs.bib', bytes('@article{regge61, title={General relativity without coordinates}}'))).toEqual({ text: expect.stringContaining('regge61') });
+    expect(await extractText('hessian.wl', bytes('h = D[f[x], {x, 2}]'))).toEqual({ text: 'h = D[f[x], {x, 2}]' });
+  });
+
+  it("reads a paper's .zip: each file with words under its own heading, the figures named as not read", async () => {
+    const out = await extractText('Regge_Axial.zip', zipped({
+      'paper/main.tex': '\\title{Axial Regge}\nThe measure is local.',
+      'paper/refs.bib': '@book{misner}',
+      'paper/fig1.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      '__MACOSX/paper/._main.tex': 'junk',
+    }));
+    expect('text' in out).toBe(true);
+    const text = (out as { text: string }).text;
+    expect(text).toContain('### paper/main.tex');
+    expect(text).toContain('The measure is local.');
+    expect(text).toContain('### paper/refs.bib');
+    expect(text).toContain('[Not read from Regge_Axial.zip: paper/fig1.png]');
+    expect(text).not.toContain('junk');
+  });
+
+  it('says so when a .zip holds nothing with words', async () => {
+    const out = await extractText('figs.zip', zipped({ 'a.png': new Uint8Array([1, 2]) }));
+    expect(out).toEqual({ error: expect.stringContaining('could not be read') });
+  });
+
+  it('reads RTF without its control words or font tables', () => {
+    const rtf = "{\\rtf1\\ansi{\\fonttbl{\\f0 Times;}}{\\*\\generator Word;}\\f0 Chapter One\\par It was caf\\'e9 time.\\par {\\b Bold} \\u8212? done}";
+    expect(rtfText(rtf)).toBe('Chapter One\nIt was café time.\nBold — done');
+  });
+
+  it('reads HTML with its headings kept as # lines', () => {
+    expect(htmlText('<html><head><title>x</title></head><body><h1>Part I</h1><p>First &amp; <b>last</b>.</p><script>no()</script></body></html>').trim())
+      .toBe('# Part I\n\nFirst & last.');
+  });
+
+  it('reads an OpenDocument text file and an EPUB in reading order', async () => {
+    const odt = await extractText('book.odt', zipped({
+      'content.xml': '<office:document-content><office:body><text:h text:outline-level="1">Chapter 1</text:h><text:p>It began<text:s/>here.</text:p></office:body></office:document-content>',
+    }));
+    expect(odt).toEqual({ text: '# Chapter 1\n\nIt began here.' });
+    const epub = await extractText('book.epub', zipped({
+      'META-INF/container.xml': '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+      'OEBPS/content.opf': '<package><manifest><item id="c2" href="two.xhtml"/><item id="c1" href="one.xhtml"/></manifest><spine><itemref idref="c1"/><itemref idref="c2"/></spine></package>',
+      'OEBPS/one.xhtml': '<html><body><h1>One</h1><p>First.</p></body></html>',
+      'OEBPS/two.xhtml': '<html><body><h1>Two</h1><p>Second.</p></body></html>',
+    }));
+    expect(epub).toEqual({ text: '# One\n\nFirst.\n\n# Two\n\nSecond.' });
+  });
+
+  it('accepts the new types in the picker and reads a large document; old formats say what to do', () => {
+    expect(isDocument('paper.tex')).toBe(true);
+    expect(isDocument('source.zip')).toBe(true);
+    expect(rejectReason('book.pdf', 30_000_000, [])).toBeNull();
+    expect(rejectReason('book.pdf', 60_000_000, [])).toMatch(/larger than 50 MB/);
+    expect(rejectReason('data.csv', 6_000_000, [])).toMatch(/larger than 5 MB/);
+    expect(rejectReason('book.pages', 1_000, [])).toMatch(/Export To/);
+    expect(rejectReason('book.doc', 1_000, [])).toMatch(/old Word format/);
+  });
+
+  it('never leaves half a math letter at the context limit', () => {
+    const x = '\u{1D465}';
+    // Whichever way the cut falls, odd or even, no half pair is left.
+    for (let limit = 340; limit < 346; limit += 1) {
+      const { context } = contextFromDocuments('', [{ name: 'paper.pdf', text: x.repeat(400) }], limit);
+      expect(context.toWellFormed?.() ?? context).toBe(context);
+      expect(JSON.stringify(context)).not.toMatch(/\\ud835(?!\\udc65)/);
+      expect(context).toContain('the rest of paper.pdf was not added');
+    }
+  });
+
+  it('drops NUL characters a PDF reader can produce', () => {
+    expect(tidyText('a\u0000b')).toBe('ab');
   });
 });

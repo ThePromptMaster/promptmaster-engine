@@ -1317,6 +1317,9 @@ export function WorkflowWorkspace({
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   // What was attached in the side chat, until the next message carries it (5 Nov).
   const forNextMessage = useRef<MessageAttachment[]>([]);
+  // Where a dropped or pasted file lands (15 Nov): the side chat, or the stage column's data panel.
+  const chatZone = useRef<HTMLDivElement | null>(null);
+  const mainZone = useRef<HTMLElement | null>(null);
   // What a fact recorded from the chat may affect: offered, nothing reopened (5 Nov).
   const offeredChange = useMemo(() => proposedChange(events ?? []), [events]);
   // The last step of the sequence, "Updated and checked", until dismissed.
@@ -2654,6 +2657,7 @@ export function WorkflowWorkspace({
       )}
 
       <main
+        ref={mainZone}
         data-version-tint={tintStyle ? '' : undefined}
         className="min-w-0 flex-1 px-6 py-10 transition-colors duration-200 md:px-10"
         style={tintStyle ? ({ ...tintStyle, background: 'var(--background)' } as React.CSSProperties) : undefined}
@@ -3067,6 +3071,7 @@ export function WorkflowWorkspace({
                 onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
               }
               readOnly={project.status === 'finalized'}
+              zone={mainZone}
             />
             {/* On every stage: what the project has cost so far (31 Oct). */}
             <ProjectCost projectId={project.id} refreshKey={`${stage.id}:${project.revision ?? ''}:${go.run?.cost_usd ?? ''}`} />
@@ -3549,7 +3554,7 @@ export function WorkflowWorkspace({
               />
             </div>
           )}
-          <div data-testid="chat-slot" className={readingTab ? 'hidden' : 'min-h-0 flex-1'}>
+          <div ref={chatZone} data-testid="chat-slot" className={readingTab ? 'hidden' : 'min-h-0 flex-1'}>
             <ChatPanel
               project={project}
               stageId={stage.id}
@@ -3581,6 +3586,7 @@ export function WorkflowWorkspace({
                     }}
                     onForNextMessage={(items) => { forNextMessage.current = [...forNextMessage.current, ...items]; }}
                     disabled={!isEditable}
+                    zone={chatZone}
                   />
                 )
               }

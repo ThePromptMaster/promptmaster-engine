@@ -8,6 +8,7 @@ import {
   type ProjectSummary,
 } from '@/types/project';
 import { currentModel } from '@/lib/constants';
+import { storableValue } from '@/lib/data/clean-text';
 
 const LIST_COLUMNS =
   'id, title, objective, mode, workflow, workflow_template_id, example_key, stage, status, accent, folder_id, updated_at, created_at';
@@ -73,7 +74,9 @@ export async function createProject(
   const supabase = createClient();
   const { data, error } = await supabase
     .from('projects')
-    .insert({
+    // Cleaned at the last step (15 Nov): a NUL or half a surrogate pair from an
+    // attached paper made Postgres refuse the whole project.
+    .insert(storableValue({
       user_id: userId,
       title: input.title?.trim() || 'Untitled project',
       objective: input.objective ?? '',
@@ -87,7 +90,7 @@ export async function createProject(
       model: input.model ?? '',
       workflow: input.workflow ?? 'single_output',
       ...(input.language && input.language !== 'en' ? { language: input.language } : {}),
-    })
+    }))
     .select(FULL_COLUMNS)
     .single();
 
@@ -113,7 +116,7 @@ export async function updateProject(
   const supabase = createClient();
   const { data, error } = await supabase
     .from('projects')
-    .update(patch)
+    .update(storableValue(patch))
     .eq('id', id)
     .eq('revision', knownRevision)
     .select(FULL_COLUMNS)
