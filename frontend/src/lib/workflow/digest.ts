@@ -222,6 +222,20 @@ export function documentText(stage: StageDefinition, content: string | null | un
   const items = parseItems(content);
   if (!items) return content.trim();
   const labels = new Map(itemSchemaFor(stage).fields.map((f) => [f.key, f.label || f.key]));
+  // An assessment is everyone judged (15 Nov, Sean: "choose when to finish and get a
+  // summary of everyone assessed"). Each row is its subject, its verdict and why in
+  // one line, so a hundred rows fit beside the criteria; no row status, as it has none.
+  if (stage.renderer === 'assess') {
+    const one = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').replace(/^-\s*/, '').trim();
+    return [
+      `${items.length} assessed:`,
+      ...items.map((item, i) => {
+        const why = one(String(item.rationale ?? '').split(/\n/)[0]).slice(0, 220);
+        const gaps = one(item.gaps).slice(0, 160);
+        return `${i + 1}. ${one(item.subject) || '(unnamed)'} — ${one(item.verdict) || 'no verdict'}${why ? ` — ${why}` : ''}${gaps ? ` (gaps: ${gaps})` : ''}`;
+      }),
+    ].join('\n');
+  }
   // A findings row keeps its id, so the chat can say "i11" as the table does (1 Nov).
   const review = stage.renderer === 'review';
   return items

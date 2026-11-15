@@ -142,6 +142,13 @@ interface Props {
    * so a discussion cannot be saved over it as prose.
    */
   isTable?: boolean;
+  /**
+   * A table stage whose rows the chat can change (15 Nov, Sean: "'Change it' was
+   * grayed out on a summary stage … I couldn't use the sidechat to click 'change
+   * it'"). Change it is on: the request goes as a question about the rows, and the
+   * reply offers the row changes to apply.
+   */
+  changeAsRows?: boolean;
   /** Where the user is, sent with every question (3 Oct call). */
   getChatContext?: () => ChatContext;
   /** What was attached, until the next message carries it (5 Nov). */
@@ -224,6 +231,7 @@ export function ChatPanel({
   afterActionDone,
   applying = false,
   isTable = false,
+  changeAsRows = false,
   getChatContext,
   nextMessageAttachments,
   starters = [],
@@ -265,7 +273,7 @@ export function ChatPanel({
   const [requestedMode, setMode] = useState<Mode>(initialMode);
   // Derived, not corrected after the fact: there is no render in which the
   // composer offers a power the panel will not honour.
-  const mode: Mode = canInstruct ? requestedMode : 'discuss';
+  const mode: Mode = canInstruct || changeAsRows ? requestedMode : 'discuss';
   const [draft, setDraft] = useState('');
   const [scope, setScope] = useState<ScopeKind>('document');
   const [sectionId, setSectionId] = useState<string>('');
@@ -523,7 +531,7 @@ export function ChatPanel({
   );
 
   const canSend =
-    !readOnly && !chat.busy && !checking && !conflicting && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
+    !readOnly && !chat.busy && !checking && !conflicting && draft.trim().length > 0 && (mode === 'discuss' || changeAsRows || scopeReady);
 
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -534,6 +542,10 @@ export function ChatPanel({
     setAutoKept(null);
     if (mode === 'discuss') {
       await chat.discuss(text);
+      return;
+    }
+    if (changeAsRows) {
+      await chat.discuss(t('chat.rowChangeAsk', { text }));
       return;
     }
     setChecking(true);
@@ -558,7 +570,7 @@ export function ChatPanel({
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority, keepUnderRoutine]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority, keepUnderRoutine, changeAsRows, t]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {
@@ -621,7 +633,7 @@ export function ChatPanel({
         onChange={setMode}
         disabled={readOnly}
         instructDisabledReason={
-          canInstruct
+          canInstruct || changeAsRows
             ? null
             : (cannotChangeBecause ?? t('chat.openLatest'))
         }
@@ -841,7 +853,13 @@ export function ChatPanel({
               {t('chat.saveDiscussion')}
             </button>
           )}
-          {mode === 'instruct' && (
+          {mode === 'instruct' && changeAsRows && (
+            <p data-change-rows className="flex items-start gap-1.5 px-1 text-label text-[var(--on-surface-variant)]">
+              <span aria-hidden className="material-symbols-outlined text-[16px]">{'table_rows'}</span>
+              <span>{t('chat.rowChangeNote')}</span>
+            </p>
+          )}
+          {mode === 'instruct' && !changeAsRows && (
             <ScopePicker
               scope={scope}
               onScope={setScope}

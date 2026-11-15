@@ -24,6 +24,7 @@
  * source of truth, and nothing that can fail halfway and leave a partial file.
  */
 
+import { parseAssessment, sortByVerdict } from '@/lib/workflow/assess';
 import { isCutSection } from '@/lib/jobs/continuation';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { formatManuscript } from '@/lib/workflow/digest';
@@ -226,7 +227,22 @@ export function toMarkdown(bundle: ExportBundle): string {
       continue;
     }
 
-    lines.push(current.content.trim(), '');
+    // An assessment is a table to read, not the JSON it is stored as (15 Nov,
+    // Sean: "summarize, and export the full list"). Best first, everyone in it.
+    const assessed = stage.renderer === 'assess' ? parseAssessment(current.content) : null;
+    if (assessed?.scale) {
+      const cell = (v: unknown) => String(v ?? '').replace(/\r?\n+/g, ' ').replace(/\|/g, '\\|').trim();
+      lines.push(
+        `${assessed.items.length} assessed.`,
+        '',
+        '| Assessed | Verdict | Why | Gaps |',
+        '|---|---|---|---|',
+        ...sortByVerdict(assessed.scale, assessed.items).map((i) => `| ${cell(i.subject)} | ${cell(i.verdict)} | ${cell(i.rationale)} | ${cell(i.gaps)} |`),
+        ''
+      );
+    } else {
+      lines.push(current.content.trim(), '');
+    }
 
     // Provenance sits under the content, not above it: the reader came for the
     // work, and the attribution is what they check afterwards.

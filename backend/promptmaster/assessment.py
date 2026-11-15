@@ -66,6 +66,12 @@ class AssessBatchResult(BaseModel):
     ungraded: int = 0
     #: Items found in the paste beyond what one batch judges.
     not_assessed: int = 0
+    #: The first line of the first item not judged, exactly as pasted, so the page
+    #: carries on from there (15 Nov, Sean: "13 more were in the paste; assess them
+    #: in another batch", and nowhere to do it). Empty when it is not in the paste.
+    next_from: str = ""
+    #: Items in the paste that were already in the table, left out.
+    already_in_table: int = 0
     finish_reason: str = "stop"
 
 
@@ -95,10 +101,14 @@ _ASSESS_INSTRUCTION = (
     "them (photos, graduation years as a stand-in for age, names). If a criterion "
     "asks for one, ignore that criterion and say so in `gaps`.\n"
     f"- At most {MAX_ASSESS_ITEMS} items, in the order they appear. If the text holds "
-    "more, judge the first ones and give the count of the rest as `not_assessed`.\n"
+    "more, judge the first ones, give the count of the rest as `not_assessed`, and copy "
+    "the first line of the first item you did not judge into `next_from`, character for "
+    "character as it is in the pasted text (it is where the next batch starts).\n"
+    "- An item named under ALREADY IN THE TABLE is not judged again: leave it out of "
+    "`items` and count it in `already_in_table`.\n"
     "Return JSON only, with shape: "
     '{ "items": [ { "subject": "", "verdict": "", "rationale": "", "evidence": "", "gaps": "" } ], '
-    '"not_assessed": 0 }'
+    '"not_assessed": 0, "next_from": "", "already_in_table": 0 }'
 )
 
 
@@ -137,10 +147,11 @@ def build_assess_prompt(
         "",
     ]
     if already:
-        # A profile pasted twice is judged again, but said: the user may be re-checking.
+        # 15 Nov: a batch carried on from where the last one stopped, or pasted
+        # again, would otherwise add the same people twice.
         user += [
-            "Already assessed in this project (do not skip these; just judge what is pasted):",
-            *(f"- {s}" for s in already[:60]),
+            "ALREADY IN THE TABLE (not judged again):",
+            *(f"- {s}" for s in already[:200]),
             "",
         ]
     user += ["--- BEGIN PASTED ITEMS ---", text.strip(), "--- END PASTED ITEMS ---"]
@@ -164,7 +175,7 @@ def _text(value: object, limit: int) -> str:
     return str(value or "").strip()[:limit]
 
 
-def parse_assessment(raw: object, scale: AssessScale) -> AssessBatchResult:
+def parse_assessment(raw: object, scale: AssessScale, text: str = "") -> AssessBatchResult:
     rows = raw.get("items") if isinstance(raw, dict) else None
     items: list[AssessedItem] = []
     ungraded = 0
@@ -191,7 +202,13 @@ def parse_assessment(raw: object, scale: AssessScale) -> AssessBatchResult:
     if len(items) > MAX_ASSESS_ITEMS:
         not_assessed += len(items) - MAX_ASSESS_ITEMS
         items = items[:MAX_ASSESS_ITEMS]
-    return AssessBatchResult(items=items, ungraded=ungraded, not_assessed=not_assessed)
+    # Where the next batch starts, kept only when it is really in the paste.
+    start = " ".join(str(raw.get("next_from") or "").split()).strip() if isinstance(raw, dict) else ""
+    flat = " ".join(text.split())
+    next_from = start[:300] if not_assessed and start and start in flat else ""
+    seen = raw.get("already_in_table") if isinstance(raw, dict) else 0
+    already_in_table = seen if isinstance(seen, int) and seen > 0 else 0
+    return AssessBatchResult(items=items, ungraded=ungraded, not_assessed=not_assessed, next_from=next_from, already_in_table=already_in_table)
 
 
 async def assess_batch(
@@ -219,4 +236,4 @@ async def assess_batch(
             raise
         logger.warning("assess batch JSON failed: %s", e)
         return AssessBatchResult(finish_reason="error")
-    return parse_assessment(raw, scale)
+    return parse_assessment(raw, scale, text)

@@ -914,6 +914,10 @@ export const api = {
     items: { id: string; subject: string; verdict: string; rationale: string; evidence: string; gaps: string }[];
     ungraded: number;
     not_assessed: number;
+    /** The first line of the first item not judged, as pasted; '' when it is not in the paste (15 Nov). */
+    next_from?: string;
+    /** Items already in the table, left out. */
+    already_in_table?: number;
     finish_reason: string;
     model_used: string;
   }> {

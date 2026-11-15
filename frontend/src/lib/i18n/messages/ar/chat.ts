@@ -14,6 +14,8 @@ export const ar: Record<keyof typeof en, string> = {
   'chat.offerActions': 'اقتراح إجراءات من الردود',
   'chat.openLatest': 'للسؤال فقط — افتح أحدث نسخة لتغييرها.',
   'chat.editElsewhere': 'لتغيير {label}، افتحه واضغط «تحرير هذه المرحلة».',
+  'chat.rowChangeAsk': 'غيّر جدول هذه المرحلة كما يلي، واذكر الصفوف التي تتغير وما يصبح كل منها: {text}',
+  'chat.rowChangeNote': 'هذه المرحلة جدول: قل ما تريد تغييره، وسيعرض الرد تغييرات الصفوف لتطبقها.',
   'chat.openNamed': 'فتح {label}',
   'chat.loading': 'جارٍ تحميل المحادثة…',
   'chat.suggested': 'أسئلة مقترحة',

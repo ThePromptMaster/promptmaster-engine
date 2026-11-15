@@ -89,7 +89,8 @@ import {
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
-import { appendBatch, batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
+import { batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
+import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -1455,36 +1456,52 @@ export function WorkflowWorkspace({
 
   // An Assess stage's batch (25 Oct): judged on the scale, then saved as the
   // table with the new rows appended. The rows are the record; nothing else moves.
+  // 15 Nov (Sean): a paste of any size is judged a batch at a time, each batch
+  // saved as it lands, and what could not be reached is kept for "Assess the remaining N".
   const assessBatch = useCallback(
-    async ({ text, scale, existing }: { text: string; scale: AssessScale; existing: StageItem[] }) => {
+    async ({ text, scale, existing, onProgress }: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }) => {
       if (!stage || !appendStageVersion) throw new Error(t('assess.failedUnknown'));
-      const head = headVersion?.content ?? '';
-      const res = await api.assessBatch({
-        inputs: inputsFrom(project),
-        digest: buildStageDigest(template, state, project, stageBundles, stage.id),
-        scale: scaleForRequest(scale),
+      let head = headVersion?.content ?? '';
+      let model = project.model;
+      const run = await assessPaste({
         text,
-        stage_hint: stage.entry_prompt_hint ?? '',
-        already: existing.map((i) => i.subject ?? '').filter(Boolean),
-        model: project.model,
-        web_access: webAccessOf(project),
-      });
-      await keepFound(project, res, { stageId: stage.id });
-      const said: string[] = [];
-      if (res.web_query) said.push(t('assess.searched', { query: res.web_query }));
-      if (!res.items.length) return [t('assess.none'), ...said].join(' ');
-      await appendStageVersion(stage.id, stage.label, {
-        content: serializeAssessment(scale, appendBatch(existing, res.items, new Date().toISOString())),
-        source_operation: 'assess_batch',
-        model: res.model_used || project.model,
-        mode: project.mode,
-        change_summary: `Assessed ${res.items.length} item${res.items.length === 1 ? '' : 's'}.`,
-        base_content: head,
+        existing,
+        onProgress,
+        call: async (chunk, already) => {
+          const res = await api.assessBatch({
+            inputs: inputsFrom(project),
+            digest: buildStageDigest(template, state, project, stageBundles, stage.id),
+            scale: scaleForRequest(scale),
+            text: chunk,
+            stage_hint: stage.entry_prompt_hint ?? '',
+            already,
+            model: project.model,
+            web_access: webAccessOf(project),
+          });
+          await keepFound(project, res, { stageId: stage.id });
+          model = res.model_used || model;
+          return res;
+        },
+        save: async (items, pending, added) => {
+          const content = serializeAssessment(scale, items, pending);
+          if (content === head) return;
+          await appendStageVersion(stage.id, stage.label, {
+            content,
+            source_operation: 'assess_batch',
+            model,
+            mode: project.mode,
+            change_summary: `Assessed ${added} item${added === 1 ? '' : 's'}.${pending ? ` ${pending.count || 'Some'} more kept to assess.` : ''}`,
+            base_content: head,
+          });
+          head = content;
+        },
       });
       setActiveVersionId(null);
-      said.unshift(t('assess.added', { n: res.items.length }));
-      if (res.ungraded) said.push(t('assess.ungraded', { n: res.ungraded }));
-      if (res.not_assessed) said.push(t('assess.notAssessed', { n: res.not_assessed }));
+      const said: string[] = run.webQueries.map((query) => t('assess.searched', { query }));
+      said.unshift(run.added ? t('assess.added', { n: run.added }) : t('assess.none'));
+      if (run.alreadyIn) said.push(t('assess.alreadyIn', { n: run.alreadyIn }));
+      if (run.ungraded) said.push(t('assess.ungraded', { n: run.ungraded }));
+      if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { n: run.pending.count }) : t('assess.pendingKeptSome'));
       return said.join(' ');
     },
     [stage, appendStageVersion, headVersion?.content, project, template, state, stageBundles, t]
@@ -2449,9 +2466,10 @@ export function WorkflowWorkspace({
   // 15–17 Oct (Sean): "Should we be able to change it in summary?" A later
   // stage that cannot rewrite the deliverable says where it is changed, with
   // the way there — rather than leaving "Change it" greyed out.
+  // 15 Nov (Sean, again on a summary stage): shown whenever the deliverable is
+  // another stage, not only once it is done.
   const editElsewhere =
-    isCurrent && !chatEditsProse && deliverable && deliverable.id !== stage.id &&
-    isDone(state.stages[deliverable.id]?.status) && project.status !== 'finalized'
+    isCurrent && !chatEditsProse && deliverable && deliverable.id !== stage.id && project.status !== 'finalized'
       ? {
           label: deliverable.short_label,
           onOpen: () => {
@@ -3159,6 +3177,14 @@ export function WorkflowWorkspace({
                 onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
                 onProposeStatuses={(itemSchemaFor(stage).statuses ?? []).some((s) => s.modelMayPropose) ? proposeItems : undefined}
                 onAssessBatch={stage.renderer === 'assess' && appendStageVersion ? assessBatch : undefined}
+                onReopenForBatch={stage.renderer === 'assess' && canReopen ? () => void reopenStage() : undefined}
+                onFinishAssessing={stage.renderer === 'assess' && isCurrent && transitions.some((o) => o.kind === 'advance' && !o.requiresNote)
+                  ? () => {
+                      const option = transitions.find((o) => o.kind === 'advance' && !o.requiresNote);
+                      if (option) void handleTransition(option, '');
+                    }
+                  : undefined}
+                nextStageLabel={nextStage ? stageText(locale, template.key, nextStage, 'short') : null}
                 generating={generation.generating}
                 generationError={generation.error}
                 onGenerate={generation.generate}
@@ -3655,6 +3681,10 @@ export function WorkflowWorkspace({
                       : undefined
               }
               isTable={!chatEditsProse}
+              changeAsRows={
+                (stage.renderer === 'list' || stage.renderer === 'review') && Boolean(draftable && headVersion) &&
+                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id)
+              }
               editElsewhere={editElsewhere}
               suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
               previewRows={previewReplyRows}
