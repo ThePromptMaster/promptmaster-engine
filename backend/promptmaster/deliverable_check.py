@@ -134,7 +134,8 @@ _INSTRUCTION = (
     # 15 Nov (Sean, guest invitation): refreshments the user never offered were promised to guests.
     "a promise to the reader, in text for other people, of something they will get or find (refreshments, a "
     "gift, a service, a person on hand) that no accepted fact, decision or supplied material provides, even when "
-    "an earlier stage of the work planned or suggested it; an earlier suggestion worked out on "
+    "an earlier stage of the work planned or suggested it, and even when only a detail of it (its type, time or "
+    "amount) is marked to confirm, since the line still tells the reader it will be there; an earlier suggestion worked out on "
     "numbers that changed after it was made, or treated as on top of a later change or as separate from it, when "
     "nothing supplied says which, even in a list of things not adopted (an old suggestion to add six places, costed "
     "as six on top of a total that has since risen). Something the brief states is supplied: never report it as unsupported. You are "
