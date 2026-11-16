@@ -105,7 +105,7 @@ export function StartAttachments({
   };
 
   const count = files.length + images.length;
-  const dragging = useFileDrop(zone, (dropped) => void pick(dropped), !disabled && !busy && count < MAX_FILES);
+  const dragging = useFileDrop(zone, (dropped) => void pick(dropped), !disabled && !busy && count < MAX_FILES, { pageWide: Boolean(zone) });
 
   return (
     <div aria-label={t('attach.group')} role="group" className="mt-4">

@@ -142,7 +142,8 @@ export function ProjectData({
       if (pictures.length) void pickImages(pictures);
       if (others.length) void attach(others);
     },
-    !readOnly && !busy && files.length < MAX_FILES
+    !readOnly && !busy && files.length < MAX_FILES,
+    { pageWide: Boolean(zone) }
   );
 
   const images = files.filter((f) => f.preview.kind === 'image');
