@@ -62,6 +62,52 @@ describe('drop and paste on the start box', () => {
   });
 });
 
+describe('a paste or drop outside the start box (16 Nov, hand pass)', () => {
+  function Page() {
+    return (
+      <>
+        <textarea aria-label="elsewhere" />
+        <p>Blank space</p>
+        <Harness onReading={() => undefined} />
+      </>
+    );
+  }
+
+  it('takes a paste made with the focus on the page itself', async () => {
+    render(<Page />);
+    const shot = new File([new Uint8Array([137, 80, 78, 71])], 'image.png', { type: 'image/png' });
+    await act(async () => {
+      fireEvent.paste(document.body, { clipboardData: transfer([shot]) });
+    });
+    await waitFor(() => expect(screen.getByText(/^pasted-.*\.png$/)).toBeInTheDocument());
+  });
+
+  it('leaves a paste into a text box that is not the start box to that box', async () => {
+    render(<Page />);
+    const note = new File(['Margin fell.'], 'notes.md', { type: 'text/markdown' });
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: transfer([note]) });
+    await act(async () => {
+      screen.getByLabelText('elsewhere').dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByText('notes.md')).toBeNull();
+  });
+
+  it('keeps a file dropped beside the box instead of letting the browser open it', async () => {
+    render(<Page />);
+    const paper = new File(['Fog came in at six.'], 'harbour.txt', { type: 'text/plain' });
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(over, 'dataTransfer', { value: transfer([paper]) });
+    screen.getByText('Blank space').dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    await act(async () => {
+      fireEvent.drop(screen.getByText('Blank space'), { dataTransfer: transfer([paper]) });
+    });
+    await waitFor(() => expect(screen.getByText('harbour.txt')).toBeInTheDocument());
+  });
+});
+
 describe('files in a paste', () => {
   it('finds a screenshot that is only in the items', () => {
     const shot = new File([new Uint8Array([1])], 'image.png', { type: 'image/png' });

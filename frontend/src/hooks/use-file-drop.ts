@@ -12,6 +12,13 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
  * A paste with no files in it (ordinary text) is left alone. A drop is taken by
  * the innermost zone it lands in: the side chat inside the workspace takes it,
  * not the workspace around it.
+ *
+ * A page's main zone may also be `pageWide` (16 Nov, hand pass): a click on blank
+ * space leaves the focus on the page itself, so Cmd+V there never reached the
+ * stage, and a file dropped beside the stage column made the browser open it and
+ * leave the page. Such a zone also takes a paste or drop no other zone took,
+ * except a paste into a text box, which is that box's. The last page-wide zone
+ * mounted is the one that takes it.
  */
 
 /** The files in a paste or a drop. */
@@ -26,6 +33,15 @@ export function filesFrom(data: DataTransfer | null): File[] {
     .filter((f): f is File => Boolean(f));
 }
 
+/** The page-wide zones mounted, latest last: only the latest takes the page's files. */
+const pageTakers: object[] = [];
+
+/** Whether a paste landed in a place that takes typing. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.tagName === 'SELECT';
+}
+
 /** Whether a drag carries files (not text or a link being moved). */
 function carriesFiles(data: DataTransfer | null): boolean {
   return Boolean(data && Array.from(data.types ?? []).includes('Files'));
@@ -38,8 +54,10 @@ function carriesFiles(data: DataTransfer | null): boolean {
 export function useFileDrop(
   zone: RefObject<HTMLElement | null> | undefined,
   onFiles: (files: File[]) => void,
-  enabled = true
+  enabled = true,
+  options: { pageWide?: boolean } = {}
 ): boolean {
+  const pageWide = Boolean(options.pageWide);
   const [over, setOver] = useState(false);
   const latest = useRef(onFiles);
   useEffect(() => {
@@ -95,6 +113,43 @@ export function useFileDrop(
       el.removeEventListener('paste', paste);
     };
   }, [zone, enabled]);
+
+  useEffect(() => {
+    if (!pageWide || !enabled || typeof document === 'undefined') return;
+    const token = {};
+    pageTakers.push(token);
+    const mine = () => pageTakers[pageTakers.length - 1] === token;
+    const overHandler = (e: DragEvent) => {
+      if (!mine() || !carriesFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    };
+    const drop = (e: DragEvent) => {
+      if (!mine() || e.defaultPrevented) return;
+      const files = filesFrom(e.dataTransfer);
+      setOver(false);
+      if (!files.length) return;
+      e.preventDefault();
+      latest.current(files);
+    };
+    const paste = (e: ClipboardEvent) => {
+      if (!mine() || e.defaultPrevented || isTypingTarget(e.target)) return;
+      const files = filesFrom(e.clipboardData);
+      if (!files.length) return;
+      e.preventDefault();
+      latest.current(files.map((f) => namedForPaste(f)));
+    };
+    document.addEventListener('dragover', overHandler);
+    document.addEventListener('drop', drop);
+    document.addEventListener('paste', paste);
+    return () => {
+      document.removeEventListener('dragover', overHandler);
+      document.removeEventListener('drop', drop);
+      document.removeEventListener('paste', paste);
+      const at = pageTakers.indexOf(token);
+      if (at >= 0) pageTakers.splice(at, 1);
+    };
+  }, [pageWide, enabled]);
 
   return over;
 }
