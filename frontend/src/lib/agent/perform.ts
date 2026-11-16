@@ -1791,8 +1791,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (ctx.loadEvents) {
         const now = projectState(ctx.template, [...(await ctx.loadEvents())]).current_stage_id;
         if (now && now !== ctx.stage.id) {
+          // 16 Nov, hand pass with two tabs: the page stayed on the finished
+          // stage and Go then proposed revising it. The page is brought up to
+          // the log, and the loop waits for it before choosing the next move.
+          await ctx.afterStageEvent();
           return done(key, {
-            status: 'succeeded', toolsUsed: [], changes: {},
+            status: 'succeeded', toolsUsed: [], changes: { caught_up_to: now },
             output: `${ctx.stage.label} is already complete and the project is on ${ctx.template.stages.find((s) => s.id === now)?.label ?? now}; nothing was written again.`,
           });
         }
