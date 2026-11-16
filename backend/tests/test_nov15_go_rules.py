@@ -47,6 +47,14 @@ def test_earlier_suggestions_are_not_promised_to_readers():
     assert "a promise to the reader" in CHECK
 
 
+def test_a_detail_marked_to_confirm_still_promises_the_thing():
+    # 16 Nov, hand pass: "Refreshments throughout the afternoon: [refreshment type,
+    # to confirm]" told guests there would be refreshments nobody had offered.
+    assert "Marking only a detail of it as to confirm" in DOCUMENTS_RULE
+    assert "mark the whole line as pending the user's decision" in DOCUMENTS_RULE
+    assert "even when only a detail of it (its type, time or amount) is marked to confirm" in CHECK
+
+
 def test_a_table_the_user_asks_for_is_written_on_the_finished_page():
     assert "shown as cards, not as a table" in KINDS["list"]
     assert "Markdown table" in KINDS["list"]

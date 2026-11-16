@@ -35,7 +35,12 @@ DOCUMENTS_RULE = (
     "line that no accepted fact or decision of the user's confirms. Text written for "
     "other people — an invitation, an email, a notice, a letter — never promises or "
     "announces such a thing: what it tells its readers they will get or find rests "
-    "on the accepted facts and the user's decisions only."
+    "on the accepted facts and the user's decisions only. "
+    # 16 Nov, hand pass on the same brief: "Refreshments throughout the afternoon:
+    # [refreshment type, to confirm]" still told guests there would be refreshments.
+    "Marking only a detail of it as to confirm (its type, its time, its amount) still "
+    "promises the thing itself: leave it out of that text, or mark the whole line as "
+    "pending the user's decision, and list the decision as needed."
 )
 
 
