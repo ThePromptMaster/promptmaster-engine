@@ -89,7 +89,7 @@ import {
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
-import { batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
+import { batchAwaited, leftToAssess, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
@@ -150,7 +150,7 @@ import type { ReplyAction } from '@/types';
 import { buildStageContext, manuscriptSourceFor, measureStageContent } from '@/lib/workflow/context';
 import { proposeSummary, proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
-import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
+import type { StageContext, StageDefinition, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
@@ -1458,11 +1458,18 @@ export function WorkflowWorkspace({
   // table with the new rows appended. The rows are the record; nothing else moves.
   // 15 Nov (Sean): a paste of any size is judged a batch at a time, each batch
   // saved as it lands, and what could not be reached is kept for "Assess the remaining N".
-  const assessBatch = useCallback(
-    async ({ text, scale, existing, onProgress }: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }) => {
-      if (!stage || !appendStageVersion) throw new Error(t('assess.failedUnknown'));
-      let head = headVersion?.content ?? '';
+  // Any Assess stage's paste, judged and saved on that stage: the one on screen,
+  // or a reopened one Apply and continue is about to close (16 Nov).
+  const assessFor = useCallback(
+    async (
+      target: StageDefinition,
+      startHead: string,
+      { text, scale, existing, onProgress }: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }
+    ) => {
+      if (!appendStageVersion) throw new Error(t('assess.failedUnknown'));
+      let head = startHead;
       let model = project.model;
+      let lastId: string | undefined;
       const run = await assessPaste({
         text,
         existing,
@@ -1470,22 +1477,22 @@ export function WorkflowWorkspace({
         call: async (chunk, already) => {
           const res = await api.assessBatch({
             inputs: inputsFrom(project),
-            digest: buildStageDigest(template, state, project, stageBundles, stage.id),
+            digest: buildStageDigest(template, state, project, stageBundles, target.id),
             scale: scaleForRequest(scale),
             text: chunk,
-            stage_hint: stage.entry_prompt_hint ?? '',
+            stage_hint: target.entry_prompt_hint ?? '',
             already,
             model: project.model,
             web_access: webAccessOf(project),
           });
-          await keepFound(project, res, { stageId: stage.id });
+          await keepFound(project, res, { stageId: target.id });
           model = res.model_used || model;
           return res;
         },
         save: async (items, pending, added) => {
           const content = serializeAssessment(scale, items, pending);
           if (content === head) return;
-          await appendStageVersion(stage.id, stage.label, {
+          const created = await appendStageVersion(target.id, target.label, {
             content,
             source_operation: 'assess_batch',
             model,
@@ -1493,9 +1500,19 @@ export function WorkflowWorkspace({
             change_summary: `Assessed ${added} item${added === 1 ? '' : 's'}.${pending ? ` ${pending.count || 'Some'} more kept to assess.` : ''}`,
             base_content: head,
           });
+          if (created && typeof created === 'object' && 'id' in created) lastId = String((created as { id: unknown }).id);
           head = content;
         },
       });
+      return { run, lastId };
+    },
+    [appendStageVersion, project, template, state, stageBundles, t]
+  );
+
+  const assessBatch = useCallback(
+    async (args: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }) => {
+      if (!stage) throw new Error(t('assess.failedUnknown'));
+      const { run } = await assessFor(stage, headVersion?.content ?? '', args);
       setActiveVersionId(null);
       const said: string[] = run.webQueries.map((query) => t('assess.searched', { query }));
       said.unshift(run.added ? t('assess.added', { n: run.added }) : t('assess.none'));
@@ -1504,7 +1521,7 @@ export function WorkflowWorkspace({
       if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { n: run.pending.count }) : t('assess.pendingKeptSome'));
       return said.join(' ');
     },
-    [stage, appendStageVersion, headVersion?.content, project, template, state, stageBundles, t]
+    [stage, assessFor, headVersion?.content, t]
   );
 
   const restore = useCallback(
@@ -1683,9 +1700,21 @@ export function WorkflowWorkspace({
     setTransitionError(null);
     try {
       for (const s of reopenedStages(template, state)) {
+        // 16 Nov, hand pass: Apply and continue closed a reopened Assess stage
+        // with 8 pasted profiles not judged yet, and the shortlist was drafted
+        // without them. What is left is judged first; if some still cannot be
+        // reached, the stage stays open with "Assess the remaining N".
+        let assessedId: string | undefined;
+        const head = stageBundles[s.id]?.versions.at(-1)?.content ?? '';
+        const left = leftToAssess(s.renderer, head);
+        if (left) {
+          const { run, lastId } = await assessFor(s, head, { text: left.text, scale: left.scale, existing: left.items });
+          if (run.pending) continue;
+          assessedId = lastId;
+        }
         const ev = evaluateStage(template, s.id, context);
         if (ev.canAdvance) {
-          const evidenceId = await stageEvidence({ template, stage: s, bundles: stageBundles, project, appendStageVersion });
+          const evidenceId = assessedId ?? (await stageEvidence({ template, stage: s, bundles: stageBundles, project, appendStageVersion }));
           await appendEvent({
             type: 'stage_marked_complete',
             stage_id: s.id,
@@ -1711,7 +1740,7 @@ export function WorkflowWorkspace({
     } catch (e) {
       setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
     }
-  }, [template, state, context, stageBundles, project, appendStageVersion, appendEvent, go, t]);
+  }, [template, state, context, stageBundles, project, appendStageVersion, appendEvent, go, t, assessFor]);
 
   /** Stages a change left waiting for an update, by label: the next-step bar and the "Revision applied" note both say it. */
   const awaitingLabels = [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map(
