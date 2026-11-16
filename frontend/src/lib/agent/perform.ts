@@ -2399,9 +2399,17 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // me" the run carries on to it rather than stopping.
         const holder = deliverableStage(ctx.template);
         const where = holder ? holder.short_label ?? holder.label : 'The deliverable';
+        // 16 Nov, hand pass: "still to write" named the stage the run was on,
+        // already drafted, and offered "Carry on to" it. Only a stage with
+        // nothing written is still to write; carrying on means the first of
+        // those after this one.
+        const unwritten = stillToWrite(ctx.template, ctx.state, ctx.bundles);
+        const here = ctx.template.stages.findIndex((s) => s.id === ctx.stage.id);
+        const ahead = unwritten.find((s) => ctx.template.stages.indexOf(s) > here) ?? unwritten[0];
         const left = remainingStages(ctx.template, ctx.state);
-        const next = left.required[0] ?? left.optional[0];
-        const todo = left.required.length ? left.required : [where];
+        const next = ahead ? ahead.short_label ?? ahead.label : left.required[0] ?? left.optional[0];
+        const required = unwritten.filter((s) => s.required !== false).map((s) => s.short_label ?? s.label);
+        const todo = required.length ? required : [where];
         const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
         if (next && routine) {
           return done(key, {
@@ -3237,3 +3245,15 @@ function sameKinds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((k) => b.includes(k));
 }
 
+/** Stages not finished, not skipped and with nothing written yet, in workflow order. */
+export function stillToWrite(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  bundles: Record<string, StageArtifactBundle>
+): StageDefinition[] {
+  return template.stages.filter((s) => {
+    const status = state.stages[s.id]?.status;
+    if (status === 'skipped' || isDone(status)) return false;
+    return (bundles[s.id]?.versions?.length ?? 0) === 0;
+  });
+}
