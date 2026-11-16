@@ -10,7 +10,7 @@ import {
   serializeAssessment,
   setVerdict,
   sortByVerdict,
-  verdictCounts, batchAwaited } from './assess';
+  verdictCounts, batchAwaited, leftToAssess } from './assess';
 import { parseItems } from './stage-artifact';
 import { validateTemplate } from './validate';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
@@ -96,5 +96,23 @@ describe('batchAwaited', () => {
     const judged = JSON.stringify({ kind: 'stage_items', items: [{ id: 'a', subject: 'A', verdict: 'Green' }] });
     expect(batchAwaited(stage, judged)).toBeNull();
     expect(batchAwaited({ renderer: 'prose' }, '')).toBeNull();
+  });
+});
+
+describe('what Apply and continue judges before it closes Assess (16 Nov, hand pass)', () => {
+  const rows = appendBatch([], [row('a', 'Aria Okafor', 'Green')], 'now');
+
+  it('the profiles a stopped paste left are judged first, under the same scale', () => {
+    const head = serializeAssessment(DEFAULT_SCALE, rows, { text: 'Bastien Lindqvist — Head of Procurement.', count: 1 });
+    const left = leftToAssess('assess', head);
+    expect(left?.text).toBe('Bastien Lindqvist — Head of Procurement.');
+    expect(left?.scale).toEqual(parseAssessment(head)?.scale);
+    expect(left?.items).toHaveLength(1);
+  });
+
+  it('nothing when nothing is left, or the stage is not an Assess stage', () => {
+    expect(leftToAssess('assess', serializeAssessment(DEFAULT_SCALE, rows))).toBeNull();
+    expect(leftToAssess('list', serializeAssessment(DEFAULT_SCALE, rows, { text: 'x', count: 1 }))).toBeNull();
+    expect(leftToAssess('assess', '')).toBeNull();
   });
 });

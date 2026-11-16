@@ -309,3 +309,18 @@ export function scaleFromSpec(spec: { scale: string | ScaleLevel[] } | undefined
   const custom: AssessScale = { id: 'custom', levels: spec.scale.slice(0, SCALE_LIMITS.maxLevels) };
   return validScale(custom) ? custom : DEFAULT_SCALE;
 }
+
+/**
+ * What an Assess stage still has to judge before Apply and continue closes it
+ * (16 Nov, hand pass: 8 pasted profiles were left unjudged and the shortlist was
+ * drafted without them). Null when it is not an Assess stage or nothing is left.
+ */
+export function leftToAssess(
+  renderer: string,
+  head: string | null | undefined
+): { text: string; scale: AssessScale; items: StageItem[] } | null {
+  if (renderer !== 'assess') return null;
+  const doc = parseAssessment(head);
+  if (!doc?.scale || !doc.pending?.text?.trim()) return null;
+  return { text: doc.pending.text, scale: doc.scale, items: doc.items };
+}
