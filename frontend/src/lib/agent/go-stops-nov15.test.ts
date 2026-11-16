@@ -104,9 +104,13 @@ describe('moving on is written once (15 Nov, three "moved on" events for Email)'
     const c = ctx('autonomous', 'handle', [
       { type: 'stage_marked_complete', stage_id: first.id, to_stage_id: next.id, created_at: '2026-11-14T00:23:34Z', payload: {} },
     ]);
-    const out = await performStep({ ...c, step: { action_key: 'advance_stage', params: {}, rationale: 'Move on.' } } as unknown as PerformContext);
-    expect(out.changes).toEqual({});
+    const refreshed = vi.fn(async () => undefined);
+    const out = await performStep({ ...c, afterStageEvent: refreshed, step: { action_key: 'advance_stage', params: {}, rationale: 'Move on.' } } as unknown as PerformContext);
+    expect(out.changes).toEqual({ caught_up_to: next.id });
     expect(out.output).toMatch(/already complete and the project is on /);
+    // 16 Nov, hand pass: the page is brought up to the log, so the next move is
+    // not chosen on the finished stage.
+    expect(refreshed).toHaveBeenCalledTimes(1);
   });
 
   it('the loop waits for the page to show the new stage', async () => {

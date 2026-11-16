@@ -630,7 +630,7 @@ export function useGoLoop(opts: Options) {
         return 'stop';
       }
       await settle();
-      if ((done.changes?.event_types ?? []).some((t) => STAGE_MOVES.has(t)) && o.stage) {
+      if (((done.changes?.event_types ?? []).some((t) => STAGE_MOVES.has(t)) || done.changes?.caught_up_to) && o.stage) {
         await waitForStageChange(() => latest.current.state.current_stage_id, o.stage.id);
       }
       return 'continue';
