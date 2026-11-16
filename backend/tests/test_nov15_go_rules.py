@@ -58,3 +58,13 @@ def test_a_detail_marked_to_confirm_still_promises_the_thing():
 def test_a_table_the_user_asks_for_is_written_on_the_finished_page():
     assert "shown as cards, not as a table" in KINDS["list"]
     assert "Markdown table" in KINDS["list"]
+
+
+def test_who_covers_a_task_nobody_was_named_for_is_recorded_not_asked():
+    # 16 Nov, hand pass: Go stopped to ask who covers the display, refreshments and safety watch.
+    from promptmaster.question_screen import SCREEN_INSTRUCTION
+
+    assert "who should cover, own or do a task when nothing the user supplied names anyone for it" in SCREEN_INSTRUCTION
+    assert "even when the question offers named people as choices" in SCREEN_INSTRUCTION
+    assert "not a question one of whose own choices leaves the point open and flagged" in SCREEN_INSTRUCTION
+
