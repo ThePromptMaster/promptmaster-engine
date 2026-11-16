@@ -52,7 +52,13 @@ SCREEN_INSTRUCTION = (
     "of these: the user is not asked, and the document records \"approver not specified\".\n\n"
     "real_world_action: it asks whether someone has done, or asks the user to get someone to do, something "
     "outside the document: confirming, booking, hiring, covering a shift, obtaining a signature, sending a "
-    "message. The assistant only prepares documents, so the document records it as still to do.\n\n"
+    "message. The assistant only prepares documents, so the document records it as still to do. "
+    # 16 Nov, hand pass on Sean's invitation brief: "no one is named for the display, refreshments
+    # and safety watch … How should the pack handle these three tasks?" stopped the run, though its
+    # own first choice was to keep them "Owner: to confirm" and flag the gap.
+    "So is who should cover, own or do a task when nothing the user supplied names anyone for it, even when "
+    "the question offers named people as choices: the document keeps the task with its owner to confirm and "
+    "lists it as needed.\n\n"
     # 15 Nov (Sean, guest invitation): Go stopped at the end to ask whether to add a backup volunteer
     # it had suggested itself. "Please check why Go treats suggestions it generates as blockers."
     "optional_suggestion: an extra the assistant thought of itself that nothing in THE USER'S OWN WORDS asks "
@@ -63,7 +69,9 @@ SCREEN_INSTRUCTION = (
     "missing_input: the document cannot be written without a fact only the user has, and the brief does not "
     "allow it to be left as a stated gap.\n\n"
     "business_decision: a choice that changes what the work commits to and that nothing supplied settles: "
-    "budget, scope, deadline, which option to recommend, or a conflict between two requirements.\n\n"
+    "budget, scope, deadline, which option to recommend, or a conflict between two requirements. Not a gap the "
+    "work can state and carry on with when the user's own words ask to be told what is needed or allow gaps "
+    "to be stated, and not a question one of whose own choices leaves the point open and flagged.\n\n"
     "A condition counts as a requirement only if the user's own words state it. A practice the assistant "
     "suggested itself (for example getting something \"in writing\") is not one. When a question rests on a "
     "real requirement, copy the user's words exactly into requirement_quote.\n"
