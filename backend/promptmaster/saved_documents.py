@@ -40,7 +40,14 @@ DOCUMENTS_RULE = (
     # [refreshment type, to confirm]" still told guests there would be refreshments.
     "Marking only a detail of it as to confirm (its type, its time, its amount) still "
     "promises the thing itself: leave it out of that text, or mark the whole line as "
-    "pending the user's decision, and list the decision as needed."
+    "pending the user's decision, and list the decision as needed. "
+    # 16 Nov, hand pass, fresh run of the same brief: a review row offered "drop the PENDING
+    # marks on the talk and refreshments and treat them as the approved assumptions"; Go's
+    # routine triage accepted it and the final invitation offered "Drinks and light snacks".
+    "A review finding accepted under the routine-decision policy, or one that offers to treat an "
+    "assumption as approved or settled, confirms nothing: such a thing stays pending in text for other "
+    "people until an accepted fact or the user's own decision confirms it, whichever way the finding was "
+    "decided."
 )
 
 

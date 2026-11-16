@@ -68,3 +68,10 @@ def test_who_covers_a_task_nobody_was_named_for_is_recorded_not_asked():
     assert "even when the question offers named people as choices" in SCREEN_INSTRUCTION
     assert "not a question one of whose own choices leaves the point open and flagged" in SCREEN_INSTRUCTION
 
+
+def test_a_routine_accepted_row_does_not_confirm_an_assumption():
+    # 16 Nov, hand pass: an accepted row turned the talk and refreshments into "approved assumptions".
+    assert "A review finding accepted under the routine-decision policy" in DOCUMENTS_RULE
+    assert "confirms nothing" in DOCUMENTS_RULE
+    assert "even when a review row accepted treating it as an approved assumption" in CHECK
+
