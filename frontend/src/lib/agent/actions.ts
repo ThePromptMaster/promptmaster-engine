@@ -68,7 +68,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'draft_sections', family: 'writing', label: 'Draft the sections', performer: 'sections', important: true },
   { key: 'revise_sections', family: 'writing', label: 'Revise the sections', performer: 'sections', important: true },
   // 6 Nov: an example's sample batch is judged by Go, not carried to the box by hand.
-  { key: 'assess_batch', family: 'writing', label: 'Assess the sample batch', performer: 'assess', important: false },
+  // 16 Nov: so is what a paste left over, so the label names neither.
+  { key: 'assess_batch', family: 'writing', label: 'Assess the pasted batch', performer: 'assess', important: false },
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
   // 3 Oct: what the draft already concluded reaches the status, as a proposal the user confirms.
