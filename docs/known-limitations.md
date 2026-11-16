@@ -4236,9 +4236,16 @@ What it does now (`lib/data/clean-text.ts`, `extract-text.ts`, `preview.ts`, `ho
   **the start buttons wait** while a file is read; **a paper alone** can start "Build a plan with me".
 - **Paste and drop**: on the start box, the start conversation, the side chat and the stage column
   (which files into the Data panel). Pictures follow the existing rules: the side chat sends them to
-  the model; elsewhere they are placed by caption.
-- **Not seen by hand**: the iPad picker itself (its `accept` list was checked), Sean's own PDF,
-  `.rtf`/`.odt`/`.epub`/`.html` on production (unit tests only). No OCR: a scanned PDF still has no text.
+  the model; elsewhere they are placed by caption. Since 16 Nov (#696) the start box and the stage's
+  Data panel also take a paste or drop no other place took: a click on blank space leaves the focus on
+  the page, so Cmd+V there went nowhere, and a file dropped beside the stage column made the browser
+  open it and leave the page. A paste into another text box stays that box's.
+- **Seen by hand on production (16 Nov)**: `.rtf`, `.odt`, `.epub` and `.html` read with their headings
+  and accents; a real Cmd+V of a picture into the start box, the side chat (the model described it) and
+  the stage after a click on blank space. A drop was sent as the browser's own drop event with a real
+  file, not dragged from Finder.
+- **Not seen by hand**: the iPad picker itself (its `accept` list was checked), Sean's own PDF and the
+  tester's book, a drag from Finder. No OCR: a scanned PDF still has no text.
 
 ### L-243 — The whole manuscript: kept, sent as passages, and a book as its chapters (2026-11-15)
 
@@ -4268,22 +4275,69 @@ Supersedes L-38. A project keeps up to 2,000,000 characters of material (`INPUT_
 From three of Sean's 13 Nov runs.
 
 - **Nothing is judged finished before it is written.** "Check the objective is met" is not offered while
-  the deliverable is unwritten and a later stage can be worked; reached anyway, the run carries on under
-  "handle them for me", or stops with "still to write — …" (never "X is written … X is not written").
-  A routine fix with no edits left moves to the next stage and keeps the question.
+  the deliverable is unwritten and a later stage can be worked, under Autonomous with "handle them for
+  me" (#694; other settings still offer it, as the scripted runs need); reached anyway, the run carries
+  on under "handle them for me", or stops with "still to write — …" (never "X is written … X is not
+  written"). Only stages with nothing written are listed, and "Carry on to" names the first after the
+  current one (#697: the first production run listed the drafted stage it was on). A routine fix with
+  no edits left moves to the next stage and keeps the question. Seen by hand 16 Nov, the planner's
+  choice replaced in the page: Guided stops with "still to write — Review; Output; Summary"; Handle
+  says "Carrying on with Review" and finished the project with no stop; the planner was never offered
+  the move under Handle.
 - **A decision takes out what it rules out**: a recommendation or option it contradicts is removed.
+  Seen by hand 16 Nov: a team-lunch brief whose comparison said "Recommended: Option B, the Riverside
+  restaurant"; at Go's stop the user chose Option A, and the repaired version replaced the
+  recommendation with "Decision of record: Option A … The user chose this venue" and its trade-off.
 - **A move is written once.** After a 7½-minute pause on an iPad, Go moved on from one stage three
-  times while the page still showed it. An advance already in the log writes nothing, and the loop
-  waits up to 15 s for the page to show the new stage.
+  times while the page still showed it. An advance already in the log writes nothing, reloads the
+  page's events (`caught_up_to`, #698), and the loop waits up to 15 s for the page to show the new stage.
+  Seen by hand 16 Nov with two tabs: tab B moved the stage on, tab A approved Go's move; one event, tab
+  A moved to Review, and Go's next move was for Review (before #698 it proposed revising the finished
+  stage). Not seen: the iPad itself.
 - **"A table"** in the brief is a measured requirement (`measurable.ts`, kind `table`): the deliverable
   must hold a Markdown table, counted in code, repaired like a word limit. Only the deliverable stage is
   held to it; "no table", "rather than a table" and "table of contents" measure nothing. The designer
-  puts an asked-for table on a write page, not a card list. Not seen by hand: Go repairing a missing
-  table (unit tests); the rebuilt run wrote tables from the start.
+  puts an asked-for table on a write page, not a card list. A table only offered ("five bullets or one
+  small table", "if useful", "may include") measures nothing (#694). Seen by hand 16 Nov: the table
+  edited out of the inventory audit's final document was put back by Go ("2 tables, measured in code").
+  The user had approved the edited version; as L-117 says, Go does not re-tick a reserved approval, and
+  the stage closed on it — the checklist shows "approved v4, now v5".
 - **Go's own extras** (a backup volunteer, refreshments) are a question-screen verdict of their own,
   `optional_suggestion`: noted, left out, never asked; a quote of the user's own requirement overrides
   it. An earlier stage's suggestion is never promised in text for other people, and the final check
   reports such a promise. Defaults Go chose under the routine policy are sent marked as not the user's.
+  Since 16 Nov (#701) a detail marked "to confirm" no longer makes such a line conditional ("Refreshments
+  throughout the afternoon: [refreshment type, to confirm]" still promises refreshments): the writers and
+  the final check are told to leave it out or mark the whole line pending. Seen by hand on production,
+  Sean's invitation brief rebuilt under Autonomous + Handle: Go asked nothing in the whole run; before
+  #701 the invitation kept "Refreshments … [type, to confirm]" and the final check passed it; after #701,
+  on the same project, the stage check named it, and the invitation now marks the portfolio wall, demos,
+  talk and refreshments "[PENDING: …, if confirmed]" and the checklist orders refreshments only once
+  they are confirmed. A fresh run of the same brief after #701: the first draft still offered "Drinks and
+  light snacks"; the stage's own check marked it, with the talk and the seating, "PENDING – not yet
+  confirmed" before the work moved on. So the writers' rule alone does not stop it; the checks do. Then
+  a cross-check row offered to "drop the PENDING marks on the talk and refreshments and treat them as the
+  approved assumptions"; Go's routine triage accepted it, the final invitation offered "Drinks and light
+  snacks" and a 4:00 talk, and the final check passed it "as agreed in the cross-check". Since #703 a row
+  accepted under the routine policy, or one offering to treat an assumption as approved, confirms nothing,
+  for the writers and for the final check. The same run showed the deeper cause: Go had committed the
+  brief's "I approve this brief and the shared assumptions" under the routine policy, and every prompt
+  listed it under "APPROVED BY THE USER — decisions of record", so the stage check said the invitation
+  "promises only approved items". Since #704 an approval Go committed (`criterion_committed` on the
+  version it stands on, not only a re-confirmation of the user's) is sent `by_policy` and listed under its
+  own heading: not asked for again, but confirming no assumption or planning item, and never promised to
+  other people. Seen on production: the request marks Go's three approvals `by_policy` and the user's
+  final-pack approval not; the stage check then said the assumptions "were approved under the
+  routine-decision policy, not by the user, so they stay pending in guest-facing text", and the final
+  invitation marks the display, the talk, the drinks and snacks and the team "PENDING – not yet
+  confirmed". Still true: Go stops once on that run for a review row the check rates major (L-244 above),
+  and the first draft can still offer them before a check marks them. These are model instructions, not a check in code: a run can still word a
+  promise the check does not see.
+- **Who covers a task nobody was named for** is recorded with its owner to confirm and listed as needed,
+  not asked (#702, question screen): the fresh run stopped to ask who covers the display, refreshments and
+  safety watch, though its own first choice was to keep them "Owner: to confirm". After #702 the screen
+  called it routine. The run still stopped once, on a review row the check rated major (no one on the
+  refreshments and safety watch while both volunteers greet): major findings stay the user's to decide.
 
 ### L-245 — Assess: any number at once, what is left, more batches, and Change it on tables (2026-11-15)
 
@@ -4292,7 +4346,12 @@ Extends L-114.
 - **A paste of up to 200,000 characters** is judged twelve at a time; each call says where the first
   item it did not judge begins (`next_from`, checked against the paste), and the next starts there.
   Each batch is saved as it lands; at most 20 calls (240 items) a paste.
-- **What is left is kept** with the table and offered as "Assess the remaining N"; Go judges it too.
+- **What is left is kept** with the table and offered as "Assess the remaining N"; Go judges it too
+  (seen by hand 16 Nov: 20 pasted, the page left after 12, Go's first move "Judged 8 items left from
+  your paste"; the step reads "Assess the pasted batch", #700). Apply and continue judges what a
+  reopened Assess stage has left before closing it (#699; before, the stage closed and the shortlist was
+  drafted without them). A finished Assess stage still holding leftovers (from before #699, or closed
+  with "Mark this stage complete") does not show them until "Add another batch" reopens it.
   If the server's starting line cannot be found, the rest is kept whole and the next press skips the
   names already judged.
 - **No name twice**: a name already in the table is not judged or added again (case and punctuation
@@ -4302,4 +4361,4 @@ Extends L-114.
 - **Later stages read one line per person**; the export prints the table, best first.
 - **Change it on list and review stages** sends the request as a question about the rows; the reply's
   suggested actions are the row changes, applied by the user. Not on Assess, which has its own verdict
-  menu.
+  menu. Seen by hand 16 Nov on a book's Audience stage (a list): a fifth segment, saved as `chat_rows`.
