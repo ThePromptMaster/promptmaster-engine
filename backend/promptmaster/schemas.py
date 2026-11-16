@@ -115,6 +115,8 @@ class UserApproval(BaseModel):
     #: The option the user chose when giving it (12 Nov): a decision between
     #: options was a bare tick, so no prompt was told which one was chosen.
     choice: str = Field(default="", max_length=400)
+    #: Given by PromptMaster under the routine-decision policy, not by the user (16 Nov).
+    by_policy: bool = False
 
 
 class ThirdPartyItem(BaseModel):

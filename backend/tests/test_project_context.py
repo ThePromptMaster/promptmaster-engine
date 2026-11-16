@@ -191,3 +191,21 @@ def test_a_sample_sets_the_standard_and_is_never_a_source():
     assert "a 3.1 Å map can hide 6 Å loops" in block
     long = plain.model_copy(update={"sample_output": "x" * 20_000})
     assert "[…the rest of the sample is not shown]" in context_block(long)
+
+
+def test_approvals_go_gave_under_the_routine_policy_are_listed_apart():
+    # 16 Nov, hand pass: Go's own "I approve this brief and the shared assumptions" was read as
+    # the user's, and the guest invitation promised the refreshments the brief had only planned.
+    from promptmaster.project_context import approvals_block
+    from promptmaster.schemas import PMInput, UserApproval
+
+    block = approvals_block(PMInput(objective="Plan an open house", mode="analyst", approvals=[
+        UserApproval(stage="Brief", approval="I approve this brief and the shared assumptions", version=3, current=3, by_policy=True),
+        UserApproval(stage="Final pack", approval="I approve the finished pack", version=2, current=2),
+    ]))
+    user_part, policy_part = block.split("GIVEN BY PROMPTMASTER")
+    assert "APPROVED BY THE USER" in user_part and "I approve the finished pack" in user_part
+    assert "I approve this brief and the shared assumptions" in policy_part
+    assert "is still not confirmed, and text for other people never promises it" in policy_part
+    assert "not to be asked for again" in policy_part
+

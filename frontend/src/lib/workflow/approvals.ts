@@ -10,7 +10,7 @@
  */
 import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
-import type { WorkflowTemplate } from './types';
+import type { WorkflowEvent, WorkflowTemplate } from './types';
 
 export interface GivenApproval {
   stage: string;
@@ -20,6 +20,35 @@ export interface GivenApproval {
   current: number;
   /** The option the user chose when giving it (12 Nov); absent for a plain sign-off. */
   choice?: string;
+  /**
+   * Given by Go under the routine-decision policy, not ticked by the user (16 Nov,
+   * hand pass: Go committed "I approve this brief and the shared assumptions",
+   * and every later writer and check read its own refreshments plan as approved
+   * by the user, so the invitation promised drinks and snacks).
+   */
+  by_policy?: boolean;
+}
+
+/**
+ * The approvals Go committed itself, by criterion: the versions it committed
+ * them on. One Go only re-confirmed on a newer version (`reconfirmed`) counts
+ * as Go's only when Go also gave it in the first place.
+ */
+export function goCommitted(events: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null | undefined): Map<string, Set<string>> {
+  const versions = new Map<string, Set<string>>();
+  const original = new Set<string>();
+  for (const e of events ?? []) {
+    if (e.type !== 'criterion_committed') continue;
+    const p = (e.payload ?? {}) as { criterion_id?: unknown; evidence_version_id?: unknown; reconfirmed?: unknown; policy?: unknown };
+    if (typeof p.criterion_id !== 'string' || p.policy !== 'routine_decisions') continue;
+    if (!p.reconfirmed) original.add(p.criterion_id);
+    if (typeof p.evidence_version_id === 'string') {
+      if (!versions.has(p.criterion_id)) versions.set(p.criterion_id, new Set());
+      versions.get(p.criterion_id)!.add(p.evidence_version_id);
+    }
+  }
+  for (const id of [...versions.keys()]) if (!original.has(id)) versions.delete(id);
+  return versions;
 }
 
 /**
@@ -72,11 +101,13 @@ export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'reti
 export function approvalsGiven(
   project: Pick<Project, 'manual_checks' | 'manual_check_versions' | 'facts'>,
   template: Pick<WorkflowTemplate, 'stages'>,
-  bundles: Record<string, StageArtifactBundle> | null | undefined
+  bundles: Record<string, StageArtifactBundle> | null | undefined,
+  events?: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null
 ): GivenApproval[] {
   const ticked = project.manual_checks ?? {};
   const given = project.manual_check_versions ?? {};
   const chosen = chosenFor(project.facts);
+  const byGo = goCommitted(events);
   const out: GivenApproval[] = [];
   for (const stage of template.stages) {
     const versions = bundles?.[stage.id]?.versions ?? [];
@@ -85,7 +116,8 @@ export function approvalsGiven(
       if (c.check !== 'manual' || !ticked[c.id]) continue;
       const on = versions.find((v) => v.id === given[c.id])?.version_number ?? 0;
       const choice = chosen.get(c.id);
-      out.push({ stage: stage.label, approval: c.label, version: on, current, ...(choice ? { choice: choice.slice(0, 400) } : {}) });
+      const goGave = Boolean(given[c.id] && byGo.get(c.id)?.has(given[c.id]!));
+      out.push({ stage: stage.label, approval: c.label, version: on, current, ...(choice ? { choice: choice.slice(0, 400) } : {}), ...(goGave ? { by_policy: true } : {}) });
     }
   }
   return out.slice(0, 60);
@@ -168,8 +200,9 @@ export function approvalsOnEarlierVersion(
 export function withApprovals<P extends Project>(
   project: P,
   template: Pick<WorkflowTemplate, 'stages'>,
-  bundles: Record<string, StageArtifactBundle> | null | undefined
+  bundles: Record<string, StageArtifactBundle> | null | undefined,
+  events?: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null
 ): P {
-  const approvals = approvalsGiven(project, template, bundles);
+  const approvals = approvalsGiven(project, template, bundles, events);
   return approvals.length ? { ...project, approvals } : project;
 }

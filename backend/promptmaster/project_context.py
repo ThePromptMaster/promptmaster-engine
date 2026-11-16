@@ -289,22 +289,41 @@ APPROVALS_HEADER = (
 )
 
 
+#: 16 Nov, hand pass: Go committed "I approve this brief and the shared assumptions" under the
+#: routine policy, and every later writer and check read its own refreshments plan as approved by
+#: the user, so the guest invitation promised drinks and snacks.
+POLICY_APPROVALS_HEADER = (
+    "GIVEN BY PROMPTMASTER UNDER THE USER'S ROUTINE-DECISION POLICY, NOT BY THE USER. They let the work go "
+    "on and are not to be asked for again or called awaiting the user. They confirm only what the user's "
+    "own words, facts and decisions already settle: an assumption, estimate, suggestion, option or planning "
+    "item in a stage approved this way is still not confirmed, and text for other people never promises it:"
+)
+
+
+def _approval_line(a) -> str:
+    where = a.stage.strip() or "A stage"
+    when = ""
+    if a.version and a.current and a.version != a.current:
+        when = f" (given on v{a.version}; the current version is v{a.current})"
+    elif a.version:
+        when = f" (on v{a.version}, the current version)"
+    decided = f" — decided: {' '.join(a.choice.split())}" if a.choice.strip() else ""
+    return f"- {where}: {' '.join(a.approval.split())}{decided}{when}"
+
+
 def approvals_block(inputs: PMInput) -> str:
-    """The approvals the user gave, or "" when there are none."""
+    """The approvals the user gave, and apart from them the ones PromptMaster gave under the routine policy."""
     given = [a for a in (inputs.approvals or []) if a.approval.strip()]
     if not given:
         return ""
-    lines = []
-    for a in given:
-        where = a.stage.strip() or "A stage"
-        when = ""
-        if a.version and a.current and a.version != a.current:
-            when = f" (given on v{a.version}; the current version is v{a.current})"
-        elif a.version:
-            when = f" (on v{a.version}, the current version)"
-        decided = f" — decided: {' '.join(a.choice.split())}" if a.choice.strip() else ""
-        lines.append(f"- {where}: {' '.join(a.approval.split())}{decided}{when}")
-    return f"{APPROVALS_HEADER}\n" + "\n".join(lines)
+    users = [a for a in given if not a.by_policy]
+    policy = [a for a in given if a.by_policy]
+    parts = []
+    if users:
+        parts.append(f"{APPROVALS_HEADER}\n" + "\n".join(_approval_line(a) for a in users))
+    if policy:
+        parts.append(f"{POLICY_APPROVALS_HEADER}\n" + "\n".join(_approval_line(a) for a in policy))
+    return "\n\n".join(parts)
 
 
 #: The most context a check is sent. The checks took 4,000 characters until
