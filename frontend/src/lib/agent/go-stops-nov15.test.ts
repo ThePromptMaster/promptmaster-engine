@@ -63,6 +63,19 @@ describe('nothing is judged finished before it is written', () => {
     expect(card.message).not.toMatch(/is written, but/);
     expect(card.options?.map((o) => o.id)).toEqual(['resume', 'stop']);
   });
+
+  it('a stage already drafted is not "still to write", and Carry on names the next unwritten one (16 Nov, hand pass)', async () => {
+    const c = ctx('checkpoint', 'ask');
+    c.bundles = { [first.id]: { artifact: null, versions: [{ id: 'v1', version_number: 1 }] } } as never;
+    const out = await performStep(c);
+    const labels = T.stages.map((s) => s.short_label ?? s.label);
+    const firstLabel = first.short_label ?? first.label;
+    expect(out.needs).toMatchObject({ finding: 'not_written', next: labels[1] });
+    expect((out.needs as { items: string[] }).items).not.toContain(firstLabel);
+    const card = describeNeed(out.needs!, (id) => T.stages.find((s) => s.id === id)?.label ?? id, {}, 'en');
+    expect(card.options?.[0].label).toBe(`Carry on to ${labels[1]}`);
+    expect(card.message).not.toContain(`— ${firstLabel};`);
+  });
 });
 
 describe('a question Go cannot act on now moves the work on (15 Nov)', () => {
