@@ -282,7 +282,7 @@ export function WorkflowWorkspace({
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
   // …and the approvals they gave (25 Oct), so no stage or check calls them unresolved.
-  const project = useMemo(() => withApprovals(withAppliedInstructions(projectProp, template, bundles), template, bundles), [projectProp, template, bundles]);
+  const project = useMemo(() => withApprovals(withAppliedInstructions(projectProp, template, bundles), template, bundles, storeEvents), [projectProp, template, bundles, storeEvents]);
   // The interface's language (client, 21 Oct); the work's own language is the project's.
   const t = useT();
   const locale = useLocale();
