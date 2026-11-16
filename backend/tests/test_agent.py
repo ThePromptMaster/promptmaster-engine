@@ -658,7 +658,7 @@ def test_no_answer_waiting_says_nothing_about_one():
 
 def test_assess_batch_is_on_the_menu_only_when_offered():
     _, offered = build_next_action_prompt(INPUTS, STATE, ["assess_batch"], "autonomous")
-    assert "assess_batch: Assess the sample batch" in offered
+    assert "assess_batch: Assess the pasted batch" in offered
     _, not_offered = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
     assert "assess_batch" not in not_offered
 

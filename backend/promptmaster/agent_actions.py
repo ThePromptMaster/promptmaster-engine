@@ -91,7 +91,7 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "and the findings accepted before it. The manuscript is saved as a version first.",
                 important=True),
     # 6 Nov: an example's sample batch is judged by Go, not carried to the box by hand.
-    AgentAction(key="assess_batch", family="writing", label="Assess the sample batch",
+    AgentAction(key="assess_batch", family="writing", label="Assess the pasted batch",
                 when="This stage judges a batch of items, it was given one (a curated example's sample), and "
                      "nothing is judged yet. Judges each item against the earlier stages. No params."),
     AgentAction(key="apply_findings", family="writing", label="Apply the findings",
