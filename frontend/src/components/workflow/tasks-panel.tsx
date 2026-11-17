@@ -39,9 +39,11 @@ interface Props {
   onResolve: (id: string, status: 'done' | 'dismissed') => void;
   busy?: boolean;
   readOnly?: boolean;
+  /** A stage's name as the page shows it (17 Nov hand pass: "From finished_book_and_review_note"). */
+  stageName?: (id: string) => string;
 }
 
-export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }: Props) {
+export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false, stageName }: Props) {
   const t = useT();
   const open = tasks.filter((task) => task.status === 'open');
   if (open.length === 0) return null;
@@ -71,7 +73,7 @@ export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }:
               )}
               {task.stage && (
                 <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">
-                  {t('pnl.from', { stage: task.stage })}
+                  {t('pnl.from', { stage: stageName?.(task.stage) || task.stage })}
                 </p>
               )}
             </div>

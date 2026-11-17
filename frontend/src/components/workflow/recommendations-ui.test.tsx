@@ -421,6 +421,12 @@ function task(overrides: Partial<ProjectTask> = {}): ProjectTask {
 }
 
 describe('FR-01: unresolved tasks are visible', () => {
+  it('names the stage a task came from as the page does (17 Nov hand pass)', () => {
+    render(<TasksPanel tasks={[task({ stage: 'finished_book_and_review_note' })]} onResolve={vi.fn()} stageName={(id) => (id === 'finished_book_and_review_note' ? 'Final book' : id)} />);
+    expect(screen.getByText('From Final book')).toBeInTheDocument();
+    expect(screen.queryByText(/finished_book_and_review_note/)).toBeNull();
+  });
+
   it('shows an open task with the sentence the deferral cost', () => {
     render(<TasksPanel tasks={[task()]} onResolve={vi.fn()} />);
     expect(screen.getByText(/name two comparable/i)).toBeTruthy();
