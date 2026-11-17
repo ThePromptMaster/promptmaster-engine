@@ -96,6 +96,7 @@ export function GoPanel({
   decisionOffers,
   queue,
   decideByAnswer,
+  leftForGo,
 }: {
   go: ReturnType<typeof useGoLoop>;
   /**
@@ -109,6 +110,8 @@ export function GoPanel({
    * all asked at once (12 Nov). Answering one records it; the stop itself resumes.
    */
   queue?: { entries: readonly QueueEntry[]; offers?: Record<string, DecisionOffer>; onAnswer: (entry: QueueEntry, answer: QueueAnswer) => Promise<{ open: QueueItem[] } | void> };
+  /** What Go could still do on its own (17 Nov): said under the run's account when it pauses. */
+  leftForGo?: readonly { kind: 'recheck' | 'finish'; stageId: string }[];
   /** The options each waiting reserved approval offers, by criterion id (`useDecisionOptions`). */
   decisionOffers?: Record<string, DecisionOffer>;
   /**
@@ -518,7 +521,7 @@ export function GoPanel({
               {t('go.useMyMode', { mode: shownModeName(mode, MODE_DISPLAY[mode as ModeType]?.display_name ?? mode) })}
             </label>
           )}
-          <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} choosing={choosesOnCard} />
+          <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} choosing={choosesOnCard} left={leftForGo ? { forGo: leftForGo, forYou: queue?.entries.length ?? 0 } : undefined} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
               run={go.run}

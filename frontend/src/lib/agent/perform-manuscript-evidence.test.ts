@@ -14,6 +14,10 @@ vi.mock('@/lib/jobs/sections', async (original) => ({
   ...(await original<typeof import('@/lib/jobs/sections')>()),
   enqueueRevisionJobs: vi.fn(async () => ['s1', 's2']),
 }));
+vi.mock('@/lib/api/client', async (original) => {
+  const real = await original<typeof import('@/lib/api/client')>();
+  return { ...real, api: { ...real.api, agentSectionsToRepair: vi.fn(async () => ({ checked: true, already_done: false, sections: [{ id: 's1' }, { id: 's2' }] })) } };
+});
 vi.mock('@/lib/supabase/workflow', () => ({ appendWorkflowEvent: vi.fn(async () => undefined), listWorkflowEvents: vi.fn(async () => []) }));
 vi.mock('@/lib/supabase/outline', () => ({ approvedOutlineVersionId: () => null, commitOutlineVersion: vi.fn() }));
 vi.mock('@/lib/supabase/sources', () => ({ saveSources: vi.fn(async () => []) }));

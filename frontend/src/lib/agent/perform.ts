@@ -14,7 +14,10 @@ import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
 import { cutSections } from '@/lib/jobs/continuation';
-import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
+import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, pendingJobs, writtenSections, type SectionTarget } from '@/lib/jobs/sections';
+import { changeTerms, repairWaitMs, sectionExcerpt, sectionsWithOldValues } from './repair-targets';
+import { upstreamChange } from './recheck-first';
+import { changeWindow } from '@/lib/data/context-for-request';
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
 import { addStepCost } from '@/lib/supabase/model-usage';
@@ -214,14 +217,18 @@ async function waitForSections(
   ids: string[],
   verb: string,
   /** Another stage's manuscript (a repair, L-64); the current stage's otherwise. */
-  manuscript?: { artifactId: string; outline: readonly OutlineSection[] }
+  manuscript?: { artifactId: string; outline: readonly OutlineSection[] },
+  /** How long to wait (a repair waits longer for more sections), and the stage the wait is for. */
+  opts: { timeoutMs?: number; stageId?: string } = {}
 ): Promise<StepOutcome> {
   const current = ctx.facts?.manuscript;
   const m = manuscript ?? (current ? { artifactId: current.artifact.id, outline: current.outline } : null);
   if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
   const title = (id: string) => m.outline.find((s) => s.id === id)?.title || id;
+  const waitStage = opts.stageId ?? ctx.stage.id;
   const r: WaitResult = await awaitSectionJobs({
     projectId: ctx.project.id, artifactId: m.artifactId, sectionIds: ids, signal: ctx.signal,
+    ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
     onProgress: (s) => ctx.onProgress?.(`${s.complete} of ${s.total} sections written`),
   });
   ctx.refresh?.();
@@ -244,13 +251,13 @@ async function waitForSections(
       return done(key, {
         status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
         output: `${wrote} Stopped while ${r.pending.length} section${r.pending.length === 1 ? ' was' : 's were'} still being written; they continue in the background.${standing}`,
-        needs: { kind: 'wait_for_jobs', stageId: ctx.stage.id, pending: r.pending.length, complete: r.complete, total: r.total },
+        needs: { kind: 'wait_for_jobs', stageId: waitStage, pending: r.pending.length, complete: r.complete, total: r.total },
       });
     default:
       return done(key, {
         status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
-        output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background.${standing}`,
-        needs: { kind: 'wait_for_jobs', stageId: ctx.stage.id, pending: r.pending.length, complete: r.complete, total: r.total },
+        output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background${opts.stageId ? ', and Resume waits for them rather than starting them again' : ''}.${standing}`,
+        needs: { kind: 'wait_for_jobs', stageId: waitStage, pending: r.pending.length, complete: r.complete, total: r.total },
       });
   }
 }
@@ -1223,6 +1230,13 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       // L-64 (9 Oct): a manuscript is repaired by revising its sections with
       // the reason, each against its current saved record (C9).
       if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);
+      // 17 Nov: a stage reopened only because an earlier stage was saved again
+      // is checked before it is rewritten. If nothing in it relied on what
+      // changed, it is kept as it is.
+      if (st?.status === 'stale' && st.stale?.since && isDone(st.stale.was) && !measuredRepair && !carriedRepair && !userNote) {
+        const kept = await keptAfterCheck(ctx, key, target, st.stale.since, why);
+        if (kept) return kept;
+      }
       const headVersion = ctx.bundles[target.id]?.versions.at(-1);
       const head = headVersion?.content ?? '';
       const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
@@ -2642,11 +2656,18 @@ function unmetMeasurementsOf(ctx: Pick<PerformContext, 'project' | 'template'>, 
 }
 
 /**
- * Repair a reopened manuscript stage (Drafting, Revision): every written
- * section is revised with the reason it was reopened, each against its
- * current saved record (C9), then the stage is closed again when its own
- * requirements hold (L-64, 9 Oct). Until now a manuscript was "the user's
- * editor" and a reopened one stayed reopened.
+ * Repair a reopened manuscript stage (Drafting, Revision): the sections the
+ * reason concerns are revised with it, each against its current saved record
+ * (C9), then the stage is closed again when its own requirements hold (L-64,
+ * 9 Oct). Until then a manuscript was "the user's editor" and a reopened one
+ * stayed reopened.
+ *
+ * 17 Nov (Sean's book): every written section was rewritten, for a retitle the
+ * chapters already carried, and each Resume queued the whole book again while
+ * the last pass was still running: 26 sections, twelve times, about $63, and
+ * the text did not change. Now a pass still running is waited for, never queued
+ * again; the sections to rewrite are chosen first (`repairTargets`); and a
+ * change already in the chapters closes the stage with nothing rewritten.
  */
 async function recheckManuscript(
   ctx: PerformContext,
@@ -2665,31 +2686,169 @@ async function recheckManuscript(
   const append = ctx.appendStageVersion;
   const holderStageId = fresh.stage_id ?? target.id;
   const holderLabel = ctx.template.stages.find((s) => s.id === holderStageId)?.label ?? target.label;
-  const events = await listWorkflowEvents(ctx.project.id);
-  const ids = await enqueueRevisionJobs({
-    project: ctx.project, artifactId: fresh.id, stageId: target.id, outline,
-    approvedOutlineVersionId: approvedOutlineVersionId(events),
-    brief: {
-      stageLabel: target.label,
-      instruction: recheckInstruction(target.label, why, superseded, 'section'),
-      findings: [{ source: 'Why it was reopened', text: why }],
-      sources: [],
-      repair: true,
-      ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
-    },
-    stageHint: target.entry_prompt_hint,
-    jobs: await listProjectJobs(ctx.project.id).catch(() => []),
-    saveSnapshot: (v) => append(holderStageId, holderLabel, v, undefined, { writtenFor: target.id }),
-  });
-  const wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline });
+  const jobs = await listProjectJobs(ctx.project.id).catch(() => []);
+  const running = pendingJobs(jobs.filter((j) => j.payload?.artifact_id === fresh.id))
+    .map((j) => String(j.payload?.section_id ?? ''))
+    .filter(Boolean);
+
+  let wrote: StepOutcome;
+  let rewritten: string[];
+  if (running.length) {
+    // A pass an earlier step started is still being written: wait for it.
+    rewritten = [...new Set(running)];
+    wrote = await waitForSections(ctx, key, rewritten, 'Repaired', { artifactId: fresh.id, outline }, { timeoutMs: repairWaitMs(rewritten.length), stageId: target.id });
+  } else {
+    const pick = await repairTargets(ctx, outline, why, superseded);
+    if (pick.kind === 'unknown') {
+      return done(key, {
+        status: 'failed', toolsUsed: ['model'], changes: {},
+        output: `Could not tell which sections of ${target.label} the change concerns, so nothing was rewritten (${why}).`,
+      });
+    }
+    if (pick.kind === 'already') {
+      return closeRepairedManuscript(ctx, key, target, why, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: { checked_unchanged: true, sections_written: [] },
+        output: `Checked the chapters before rewriting any: ${pick.note || 'they already reflect this change'}. Nothing was rewritten.`,
+      });
+    }
+    const events = await listWorkflowEvents(ctx.project.id);
+    const ids = await enqueueRevisionJobs({
+      project: ctx.project, artifactId: fresh.id, stageId: target.id, outline,
+      approvedOutlineVersionId: approvedOutlineVersionId(events),
+      brief: {
+        stageLabel: target.label,
+        instruction: recheckInstruction(target.label, why, superseded, 'section'),
+        findings: [{ source: 'Why it was reopened', text: why }],
+        sources: [],
+        repair: true,
+        ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
+      },
+      targets: pick.targets,
+      stageHint: target.entry_prompt_hint,
+      jobs,
+      saveSnapshot: (v) => append(holderStageId, holderLabel, v, undefined, { writtenFor: target.id }),
+    });
+    rewritten = ids;
+    wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline }, { timeoutMs: repairWaitMs(ids.length), stageId: target.id });
+    if (wrote.status === 'succeeded') {
+      const left = writtenSections(outline).length - ids.length;
+      if (left > 0) wrote = { ...wrote, output: `${wrote.output} The other ${left} section${left === 1 ? ' was' : 's were'} left as they are: the change does not concern them.` };
+    }
+  }
   if (wrote.status !== 'succeeded') return wrote;
   await ctx.refresh?.();
   // "Repaired" is not taken on trust (8 Nov, production: "Repaired 14 sections"
   // twice, and the pension clause's section number never changed). What was
   // to change is looked for in what was written; if it isn't there the stage
   // stays reopened and the step says what didn't land.
-  const notLanded = await chaptersNotLanded(ctx, fresh.id, target.label, why, superseded);
+  const notLanded = await chaptersNotLanded(ctx, fresh.id, target.label, why, superseded, rewritten);
   if (notLanded) return done(key, { ...wrote, status: 'failed', output: `${wrote.output} ${notLanded}` });
+  return closeRepairedManuscript(ctx, key, target, why, wrote);
+}
+
+/**
+ * A reopened stage, checked against what changed before it is rewritten (17
+ * Nov). Sean: "a small change [should] get a quick check of the two drafts it
+ * affects, while a bigger change gets a deeper review". A save on an earlier
+ * stage reopens every finished stage after it; here the change itself (the
+ * earlier stage's text before and after) is put beside this stage's summary in
+ * one small call (`assess-change`). Not relied on: the stage is marked complete
+ * again on the version it already has, with nothing rewritten. Relied on, or
+ * any doubt (no single earlier stage, a version not loaded, a failed call, a
+ * gate that does not hold): null, and the stage is rewritten as before.
+ */
+async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDefinition, since: string, why: string): Promise<StepOutcome | null> {
+  const head = ctx.bundles[target.id]?.versions.at(-1);
+  if (!head?.content?.trim()) return null;
+  const events = await listWorkflowEvents(ctx.project.id).catch(() => [] as WorkflowEvent[]);
+  const change = upstreamChange(ctx.template, events, target.id, since);
+  if (!change) return null;
+  const upstream = ctx.bundles[change.stageId]?.versions ?? [];
+  const before = upstream.find((v) => v.id === change.beforeId)?.content;
+  const after = upstream.find((v) => v.id === change.afterId)?.content;
+  if (!before || !after) return null;
+  if (!evaluateStage(ctx.template, target.id, ctx.context).canAdvance) return null;
+  const artifact = ctx.bundles[target.id]?.artifact;
+  const figures = artifact?.key_figures?.figures ?? [];
+  let affected = true;
+  try {
+    const impact = await api.assessChange({
+      field: `the earlier stage "${change.label}"`,
+      ...changeWindow(before, after, 12_000),
+      stages: [{
+        stage_id: target.id,
+        label: target.label,
+        summary: (artifact?.summary?.trim() || summariseStageContent(target, head.content)).slice(0, 2_000),
+        figures: figures.slice(0, 60).map((f) => `${f.name}: ${f.value}`),
+        computed: figures.some((f) => f.source === 'sandbox'),
+      }],
+      model: ctx.project.model || undefined,
+    });
+    affected = impact.affected.some((a) => a.stage_id === target.id);
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e;
+    return null;
+  }
+  if (affected) return null;
+  const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+  const versions = change.beforeNumber && change.afterNumber ? ` (v${change.beforeNumber} to v${change.afterNumber})` : '';
+  await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+    type: 'stage_marked_complete',
+    stage_id: target.id,
+    actor,
+    agent_run_id: actor === 'system' ? ctx.run.id : null,
+    reason: `Checked after a change: ${change.label} changed${versions}, and nothing in ${target.label} relied on what changed.`,
+    payload: { evidence_version_id: head.id, checked_unchanged: true, repaired_after: why, ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}) },
+  });
+  await ctx.afterStageEvent();
+  return done(key, {
+    status: 'succeeded',
+    toolsUsed: ['model'],
+    changes: { checked_unchanged: true, stage_closed: true },
+    output: `Checked ${target.label} against the change to ${change.label}${versions} before rewriting it: nothing in it relied on what changed, so v${head.version_number} was kept as it is and marked complete again.`,
+  });
+}
+
+/**
+ * Which sections a manuscript repair rewrites (17 Nov): those that still state
+ * an old value, found in code, and those one small call says the reason
+ * concerns. "Already made" when the call names none and nothing old is left;
+ * "unknown" when there was no answer and nothing old to go on, which rewrites
+ * nothing rather than everything.
+ */
+async function repairTargets(
+  ctx: PerformContext,
+  outline: readonly OutlineSection[],
+  why: string,
+  superseded: readonly SupersededValue[]
+): Promise<{ kind: 'some'; targets: SectionTarget[] } | { kind: 'already'; note: string } | { kind: 'unknown' }> {
+  const written = writtenSections(outline);
+  const old = sectionsWithOldValues(outline, superseded);
+  const terms = changeTerms(why, superseded);
+  let res: Awaited<ReturnType<typeof api.agentSectionsToRepair>> | null = null;
+  try {
+    res = await api.agentSectionsToRepair(
+      {
+        reason: why.slice(0, 4_000),
+        superseded: superseded.slice(0, 40).map((v) => ({ was: v.was.slice(0, 400), now: v.now.slice(0, 400) })),
+        sections: written.slice(0, 200).map(({ section }) => ({ id: section.id, title: (section.title ?? '').slice(0, 400), excerpt: sectionExcerpt(section.content ?? '', terms) })),
+        model: ctx.project.model || undefined,
+      },
+      ctx.signal
+    );
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e;
+  }
+  const named = res?.checked && !res.already_done ? res.sections.map((s) => s.id) : [];
+  const ids = new Set([...old, ...named]);
+  if (ids.size) return { kind: 'some', targets: written.filter(({ section }) => ids.has(section.id)) };
+  if (res?.checked) return { kind: 'already', note: (res.note ?? '').trim().replace(/[.\s]+$/, '') };
+  return { kind: 'unknown' };
+}
+
+/** A repaired (or checked) manuscript's stage, closed again when its own requirements hold. */
+async function closeRepairedManuscript(ctx: PerformContext, key: string, target: StageDefinition, why: string, wrote: Omit<StepOutcome, 'label'>): Promise<StepOutcome> {
   const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
   // The chapters as the repair left them, not as this step found them: the
@@ -2703,16 +2862,17 @@ async function recheckManuscript(
       stage_id: target.id,
       actor,
       agent_run_id: actor === 'system' ? ctx.run.id : null,
-      reason: `Repaired after a change: ${why}`,
-      payload: { ...(evidence ? { evidence_version_id: evidence } : {}), repaired_after: why, ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}) },
+      reason: `${wrote.changes?.checked_unchanged ? 'Checked after a change' : 'Repaired after a change'}: ${why}`,
+      payload: { ...(evidence ? { evidence_version_id: evidence } : {}), repaired_after: why, ...(wrote.changes?.checked_unchanged ? { checked_unchanged: true } : {}), ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}) },
     });
     await ctx.afterStageEvent();
   }
   const closed = evaluation.canAdvance && Boolean(evidence || actor === 'user');
+  const verb = wrote.changes?.checked_unchanged ? 'was checked' : 'was repaired';
   return done(key, {
     ...wrote,
     changes: { ...wrote.changes, stage_closed: closed },
-    output: `${wrote.output} ${target.label} was repaired (${why})${closed ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
+    output: `${wrote.output} ${target.label} ${verb} (${why})${closed ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
 }
 
@@ -2751,16 +2911,19 @@ async function chaptersNotLanded(
   artifactId: string,
   label: string,
   why: string,
-  superseded: readonly SupersededValue[]
+  superseded: readonly SupersededValue[],
+  /** The sections this repair rewrote: a correction is looked for there, not in the whole book (17 Nov). */
+  only?: readonly string[]
 ): Promise<string | null> {
   const chapters = (await getArtifact(artifactId))?.long_form?.outline ?? [];
   const whole = chapters.map((s) => s.content ?? '').join('\n\n');
   const still = chapters.flatMap((s) => namedLeftovers(leftoverMentions(s.content ?? '', superseded, { derivedIn: whole })).map((l) => `${s.title}: ${l.text}`));
   if (still.length) return `It still states old values, so ${label} stays reopened: ${still.slice(0, 4).join('; ')}.`;
-  if (!NAMES_A_CORRECTION.test(why) || !whole.trim()) return null;
+  const looked = only?.length ? chapters.filter((s) => only.includes(s.id)).map((s) => `## ${s.title}\n\n${s.content ?? ''}`).join('\n\n') : whole;
+  if (!NAMES_A_CORRECTION.test(why) || !looked.trim()) return null;
   try {
     const res = await api.agentCheckDeliverable(
-      { inputs: inputsFrom(ctx.project), deliverable_label: label, content: whole, accepted: [{ id: 'correction', stage_label: 'Repair', finding: why, suggested_change: why }], tables: [], model: ctx.project.model || undefined },
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content: looked, accepted: [{ id: 'correction', stage_label: 'Repair', finding: why, suggested_change: why }], tables: [], model: ctx.project.model || undefined },
       ctx.signal
     );
     const miss = res.findings.find((f) => f.verdict === 'not_carried');

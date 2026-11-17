@@ -1003,6 +1003,18 @@ export const api = {
     return apiFetch('/api/agent/settles', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * Which sections of a reopened manuscript the reason concerns, and whether the
+   * change is already in them (17 Nov). `checked: false` means no answer was had,
+   * never "rewrite everything".
+   */
+  async agentSectionsToRepair(
+    req: { reason: string; superseded: { was: string; now: string }[]; sections: { id: string; title: string; excerpt: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ checked: boolean; already_done: boolean; sections: { id: string; why?: string }[]; note?: string }> {
+    return apiFetch('/api/agent/sections-to-repair', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** L-65: is a claim the answer makes about the saved record borne out by it? Fails open. */
   async agentCheckAnswer(
     req: { question: string; answer: string; documents: { label: string; version?: number | null; text: string }[]; model?: string },

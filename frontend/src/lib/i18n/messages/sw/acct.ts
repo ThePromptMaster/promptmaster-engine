@@ -34,4 +34,11 @@ export const sw: Record<keyof typeof en, string> = {
   'acct.stopped': 'Imesimamishwa na wewe. Kila kilichofanyika hadi sasa kimehifadhiwa.',
   'acct.or': ' au ',
   'acct.seeBelow': 'angalia hapa chini.',
+  'acct.checkedKept': "ilikagua {stages} baada ya mabadiliko na kuiacha kama ilivyokuwa: hakuna kilichotegemea mabadiliko hayo",
+  'acct.leftForGo': "Kilichobaki kwa Go: {work}.",
+  'acct.recheckStage': "kukagua upya {stage}",
+  'acct.finishStage': "kumaliza {stage}",
+  'acct.nothingForGo': "Hakuna kilichobaki ambacho Go inaweza kufanya peke yake.",
+  'acct.waitingOnYou_one': "Jambo {count} linakusubiri (hapa chini).",
+  'acct.waitingOnYou_other': "Mambo {count} yanakusubiri (hapa chini).",
 };

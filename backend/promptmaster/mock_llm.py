@@ -336,6 +336,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import question_screen
     from promptmaster import decision_options
     from promptmaster import settled_items
+    from promptmaster import section_targets
     from promptmaster import question_groups
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
@@ -706,6 +707,10 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Items that share the word "absence" are one question; nothing else is grouped.
         ids = [m.group(1) for m in re.finditer(r"^\[([^\]]+)\] [^\n]*\babsences?\b", prompt, re.M | re.I)]
         return {"groups": [{"ids": ids, "question": "Are any absences expected?", "choices": ["None", "Yes, some"]}] if len(ids) > 1 else []}
+    if system.startswith(section_targets.SECTIONS_INSTRUCTION[:60]):
+        # Every section given: a repair in the mock rewrites what it was sent, as before 17 Nov.
+        ids = re.findall(r"^\[([^\]]+)\] ", prompt.split("SECTIONS:\n", 1)[-1], re.M)
+        return {"already_done": False, "sections": [{"id": i, "why": "Mock: listed."} for i in ids], "note": "Mock."}
     if system.startswith(settled_items.SETTLES_INSTRUCTION[:60]):
         # A note that begins "Answer:" settles its finding; any other note postpones it.
         out = []

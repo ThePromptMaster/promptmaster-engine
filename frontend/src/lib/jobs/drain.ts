@@ -304,6 +304,23 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
       : {}),
   });
 
+  // A rewrite the model said does not concern this section (17 Nov): the
+  // section is kept as it was, its revision still advances (the job's key), and
+  // no record call is made, because nothing in it changed.
+  if (prose.unchanged && payload.revise && context.section?.content) {
+    const finishReason = context.section.finish_reason ?? 'stop';
+    await store.writeSection({
+      artifactId: payload.artifact_id,
+      worker,
+      sectionId: payload.section_id,
+      content: context.section.content,
+      finishReason,
+      outlineVersionId: payload.outline_version_id,
+    });
+    await store.completeJob(job.id, worker, { section_id: payload.section_id, finish_reason: finishReason, unchanged: true });
+    return { done: true };
+  }
+
   // A sentence the user removed stays out of a chapter too (28 Oct), unless
   // this revision's instruction asks for it back.
   const kept = withoutRemoved(prose.content, payload.inputs.removed_text, payload.revise?.instruction ?? '');

@@ -18,6 +18,7 @@ export function RunAccountCard({
   stageLabel,
   stageByEnglish,
   choosing = false,
+  left,
 }: {
   run: AgentRun | null;
   steps: readonly AgentStep[];
@@ -25,6 +26,8 @@ export function RunAccountCard({
   stageByEnglish?: (english: string) => string;
   /** The waiting approval is given by choosing an option on its card. */
   choosing?: boolean;
+  /** What Go could still do, and how many things wait on the user (17 Nov). */
+  left?: { forGo: readonly { kind: 'recheck' | 'finish'; stageId: string }[]; forYou: number };
 }) {
   const t = useT();
   const locale = useLocale();
@@ -37,6 +40,14 @@ export function RunAccountCard({
         <span>{account.now}</span>
       </p>
       {account.did && <p className="mt-2 text-body text-[var(--on-surface)]"><span className="text-[var(--on-surface-variant)]">{t('acc.soFar')}</span>{account.did}</p>}
+      {left && account.kind !== 'working' && account.kind !== 'complete' && (
+        <p className="mt-2 text-body text-[var(--on-surface)]" data-testid="run-left">
+          {left.forGo.length
+            ? t('acct.leftForGo', { work: left.forGo.slice(0, 6).map((w) => t(w.kind === 'recheck' ? 'acct.recheckStage' : 'acct.finishStage', { stage: stageLabel(w.stageId) })).join(', ') + (left.forGo.length > 6 ? '…' : '') })
+            : t('acct.nothingForGo')}
+          {left.forYou > 0 ? ` ${t('acct.waitingOnYou', { count: left.forYou })}` : ''}
+        </p>
+      )}
       {account.setAside.length > 0 && (
         <ul className="mt-2 list-disc ps-5 text-body text-[var(--on-surface-variant)]">
           {account.setAside.map((line) => <li key={line}>{line}</li>)}

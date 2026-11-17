@@ -34,4 +34,11 @@ export const ar: Record<keyof typeof en, string> = {
   'acct.stopped': 'أوقفتَه بنفسك. كل ما أُنجز حتى الآن محفوظ.',
   'acct.or': ' أو ',
   'acct.seeBelow': 'انظر أدناه.',
+  'acct.checkedKept': "فحص {stages} بعد تغيير وأبقاه كما هو: لم يعتمد عليه شيء فيه",
+  'acct.leftForGo': "متبقٍّ لـ Go: {work}.",
+  'acct.recheckStage': "إعادة فحص {stage}",
+  'acct.finishStage': "إنهاء {stage}",
+  'acct.nothingForGo': "لم يبقَ شيء يستطيع Go فعله وحده.",
+  'acct.waitingOnYou_one': "{count} أمر ينتظرك (أدناه).",
+  'acct.waitingOnYou_other': "{count} أمور تنتظرك (أدناه).",
 };

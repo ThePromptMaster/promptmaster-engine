@@ -34,4 +34,11 @@ export const hi: Record<keyof typeof en, string> = {
   'acct.stopped': 'आपने रोका। अब तक किया गया सब कुछ सहेजा गया है।',
   'acct.or': ' या ',
   'acct.seeBelow': 'नीचे देखें।',
+  'acct.checkedKept': "बदलाव के बाद {stages} को जाँचा और जैसा था वैसा रखा: उसमें कुछ भी इस पर निर्भर नहीं था",
+  'acct.leftForGo': "Go के लिए बाकी: {work}।",
+  'acct.recheckStage': "{stage} दोबारा जाँचना",
+  'acct.finishStage': "{stage} पूरा करना",
+  'acct.nothingForGo': "Go के अपने आप करने के लिए कुछ नहीं बचा।",
+  'acct.waitingOnYou_one': "{count} बात आपके जवाब का इंतज़ार कर रही है (नीचे)।",
+  'acct.waitingOnYou_other': "{count} बातें आपके जवाब का इंतज़ार कर रही हैं (नीचे)।",
 };

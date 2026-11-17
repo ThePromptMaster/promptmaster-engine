@@ -36,6 +36,13 @@ export const en = {
   'acct.stopped': 'Stopped by you. Everything done so far is saved.',
   'acct.or': ' or ',
   'acct.seeBelow': 'see below.',
+  'acct.checkedKept': "checked {stages} against a change and kept it as it was: nothing there relied on it",
+  'acct.leftForGo': "Left for Go: {work}.",
+  'acct.recheckStage': "recheck {stage}",
+  'acct.finishStage': "finish {stage}",
+  'acct.nothingForGo': "Nothing is left for Go to do on its own.",
+  'acct.waitingOnYou_one': "{count} thing waits on you (listed below).",
+  'acct.waitingOnYou_other': "{count} things wait on you (listed below).",
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -73,6 +80,13 @@ export const es: Keys = {
   'acct.stopped': 'Detenido por ti. Todo lo hecho hasta ahora está guardado.',
   'acct.or': ' o ',
   'acct.seeBelow': 'mira abajo.',
+  'acct.checkedKept': "comprobó {stages} frente a un cambio y lo dejó como estaba: nada dependía de él",
+  'acct.leftForGo': "Queda para Go: {work}.",
+  'acct.recheckStage': "revisar de nuevo {stage}",
+  'acct.finishStage': "terminar {stage}",
+  'acct.nothingForGo': "No queda nada que Go pueda hacer por su cuenta.",
+  'acct.waitingOnYou_one': "{count} cosa espera tu respuesta (abajo).",
+  'acct.waitingOnYou_other': "{count} cosas esperan tu respuesta (abajo).",
 };
 
 export const fr: Keys = {
@@ -108,6 +122,13 @@ export const fr: Keys = {
   'acct.stopped': 'Arrêté par vous. Tout ce qui a été fait est enregistré.',
   'acct.or': ' ou ',
   'acct.seeBelow': 'voir ci-dessous.',
+  'acct.checkedKept': "a vérifié {stages} après un changement et l’a gardé tel quel : rien n’en dépendait",
+  'acct.leftForGo': "Reste pour Go : {work}.",
+  'acct.recheckStage': "revérifier {stage}",
+  'acct.finishStage': "terminer {stage}",
+  'acct.nothingForGo': "Il ne reste rien que Go puisse faire seul.",
+  'acct.waitingOnYou_one': "{count} point attend votre réponse (ci-dessous).",
+  'acct.waitingOnYou_other': "{count} points attendent votre réponse (ci-dessous).",
 };
 
 export const pt: Keys = {
@@ -143,4 +164,11 @@ export const pt: Keys = {
   'acct.stopped': 'Parado por você. Tudo o que foi feito até agora está salvo.',
   'acct.or': ' ou ',
   'acct.seeBelow': 'veja abaixo.',
+  'acct.checkedKept': "verificou {stages} depois de uma mudança e manteve como estava: nada dependia dela",
+  'acct.leftForGo': "Falta para o Go: {work}.",
+  'acct.recheckStage': "verificar de novo {stage}",
+  'acct.finishStage': "terminar {stage}",
+  'acct.nothingForGo': "Não resta nada que o Go possa fazer sozinho.",
+  'acct.waitingOnYou_one': "{count} item espera por você (abaixo).",
+  'acct.waitingOnYou_other': "{count} itens esperam por você (abaixo).",
 };

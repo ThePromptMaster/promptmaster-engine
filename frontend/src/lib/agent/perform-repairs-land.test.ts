@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getArtifact = vi.fn();
 const agentCheckDeliverable = vi.fn();
-vi.mock('@/lib/api/client', () => ({ api: { agentCheckDeliverable: (...a: unknown[]) => agentCheckDeliverable(...a) } }));
+vi.mock('@/lib/api/client', () => ({ api: { agentCheckDeliverable: (...a: unknown[]) => agentCheckDeliverable(...a), agentSectionsToRepair: vi.fn(async () => ({ checked: true, already_done: false, sections: [{ id: 's1' }] })) } }));
 vi.mock('@/lib/supabase/versions', () => ({ getArtifact: (...a: unknown[]) => getArtifact(...a), listVersions: vi.fn(async () => []), listArtifacts: vi.fn(async () => []) }));
 vi.mock('@/lib/jobs/await', () => ({ awaitSectionJobs: vi.fn(async () => ({ outcome: 'done', written: ['s1'], complete: 1, total: 1, failed: [], pending: [] })) }));
 vi.mock('@/lib/jobs/sections', async (original) => ({ ...(await original<typeof import('@/lib/jobs/sections')>()), enqueueRevisionJobs: vi.fn(async () => ['s1']) }));

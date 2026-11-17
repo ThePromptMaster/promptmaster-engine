@@ -81,7 +81,7 @@ export interface AgentStep {
   execution_label: ExecutionLabel | null;
   block_kind: BlockKind | null;
   tools_used: string[];
-  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number; set_aside?: string; source_ids?: string[]; /** A repair: whether its stage closed again. Absent on steps from before 9 Nov. */ stage_closed?: boolean; /** A refused routine approval: what the check said, and the version it checked (13 Nov). */ check_reason?: string; checked_version_id?: string; /** An advance the log already held: the stage it is on, which the page was brought up to (16 Nov). */ caught_up_to?: string };
+  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number; set_aside?: string; source_ids?: string[]; /** A repair: whether its stage closed again. Absent on steps from before 9 Nov. */ stage_closed?: boolean; /** A refused routine approval: what the check said, and the version it checked (13 Nov). */ check_reason?: string; checked_version_id?: string; /** An advance the log already held: the stage it is on, which the page was brought up to (16 Nov). */ caught_up_to?: string; /** A recheck that looked first and found nothing to change: the stage closed with nothing rewritten (17 Nov). */ checked_unchanged?: boolean };
   output: string;
   cost_usd: number | null;
   started_at: string;

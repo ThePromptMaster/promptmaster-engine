@@ -139,7 +139,7 @@ import { carriedRows, carriedText, decideRow, effectiveRenderer, isTriaged, prop
 import { keptOpen, markSettled } from '@/lib/workflow/settled-rows';
 import { describeSettled, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
 import { answerItems, answeredKept, closedByAnswer, mergeQueue, restOfQueue, userQueue, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
-import { keptQuestions } from '@/lib/agent/account';
+import { keptQuestions, leftForGo } from '@/lib/agent/account';
 import { useQuestionGroups } from './agent/use-question-groups';
 import type { QueueAnswer } from './agent/question-queue';
 import { previewRowAction } from '@/lib/workflow/row-actions';
@@ -1975,6 +1975,7 @@ export function WorkflowWorkspace({
   }, [queueStopHere, goNeed, goStopReason, template, state, outstanding, stageBundles, project.manual_checks, project.routine_decisions, project.status, keptNow]);
   const questionGroups = useQuestionGroups(project, waitingQueue, queueStopHere);
   const queueEntries = useMemo(() => mergeQueue(waitingQueue, questionGroups), [waitingQueue, questionGroups]);
+  const goLeftForGo = useMemo(() => leftForGo(template, state), [template, state]);
   const queueTargets = useMemo(() => {
     const wanted = new Set(waitingQueue.filter((q) => q.kind === 'approval').map((q) => q.criterionId));
     return decisionTargets(template, stageBundles, project.manual_checks, waitingQueue.filter((q) => q.kind === 'approval').map((q) => q.stageId)).filter((d) => wanted.has(d.criterionId));
@@ -2965,6 +2966,7 @@ export function WorkflowWorkspace({
               decisionOffers={decisionOffers}
               queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
               decideByAnswer={decideByAnswer}
+              leftForGo={goLeftForGo}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />
