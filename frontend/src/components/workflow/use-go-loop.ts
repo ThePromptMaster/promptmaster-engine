@@ -1047,10 +1047,12 @@ export function useGoLoop(opts: Options) {
         // 17 Nov (Hidden Innovation): what the review after a manuscript accepted
         // is carried into the manuscript itself, each row once.
         const carriedSoFar = carriedKeys([...priorStepsRef.current, ...stepsRef.current]);
-        const fixRows = holder
-          ? [...returnWorkToCarry(o.template, freshEvents, holder.id, carriedSoFar), ...fixesToCarry(o.template, o.bundles, holder.id, carriedSoFar)]
-          : [];
-        const fixes = holder && fixRows.length ? { deliverableId: holder.id, rows: fixRows } : null;
+        // The work a return to a manuscript named goes into that manuscript, whichever stage delivers.
+        const back = returnWorkToCarry(o.template, freshEvents, carriedSoFar);
+        const fixRows = holder ? fixesToCarry(o.template, o.bundles, holder.id, carriedSoFar) : [];
+        const fixes = back
+          ? { deliverableId: back.stageId, rows: [...back.rows, ...(holder?.id === back.stageId ? fixRows : [])] }
+          : holder && fixRows.length ? { deliverableId: holder.id, rows: fixRows } : null;
         // After a loop of repairs was withdrawn, the next choice is the
         // planner's, not the same repair forced again (13 Oct).
         const outlineToo = current.policy === 'autonomous' && routine === 'handle';

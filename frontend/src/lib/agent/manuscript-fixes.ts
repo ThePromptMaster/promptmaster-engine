@@ -94,22 +94,21 @@ export function copiesTheManuscript(title: string, work: string): boolean {
 }
 
 /**
- * The work a return to the manuscript was for, not yet done (17 Nov, production
+ * The work a return to a manuscript was for, not yet done (17 Nov, production
  * pass): Go went back to a book's Manuscript to "add one line to Chapter 1", had no
  * move that edits chapters, and asked for the manuscript's approval instead, with
- * the line never added. The latest return to it with work named, once.
+ * the line never added. The latest return to the last long-form stage, with work
+ * named, once, whichever stage holds the delivered text.
  */
 export function returnWorkToCarry(
   template: Pick<WorkflowTemplate, 'stages'>,
   events: readonly Pick<WorkflowEvent, 'type' | 'to_stage_id' | 'payload' | 'created_at'>[],
-  holderId: string | undefined,
   carried: ReadonlySet<string>
-): FixToCarry[] {
-  const manuscript = loneManuscript(template, holderId);
-  if (!manuscript) return [];
-  const back = [...events].reverse().find((e) => e.type === 'stage_returned' && e.to_stage_id === manuscript);
+): { stageId: string; rows: FixToCarry[] } | null {
+  const back = [...events].reverse().find((e) => e.type === 'stage_returned');
+  const manuscript = back?.to_stage_id ? loneManuscript(template, back.to_stage_id) : null;
   const work = typeof back?.payload?.work === 'string' ? back.payload.work.trim() : '';
-  if (!back || !work) return [];
+  if (!back || !manuscript || !work) return null;
   const key = `return:${back.created_at}`;
-  return carried.has(key) ? [] : [{ key, text: `[went back for] ${work.slice(0, 1_100)}` }];
+  return carried.has(key) ? null : { stageId: manuscript, rows: [{ key, text: `[went back for] ${work.slice(0, 1_100)}` }] };
 }
