@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
 from typing import TYPE_CHECKING
 
-from .account_search import with_accounts
+from .account_search import chat_accounts_line, with_accounts
 from .schemas import AccountUse, ChatMessage, PMInput, SavedSource, ThirdPartyItem
 from .project_context import brought_titles, highest_source_number, third_party_block
 
@@ -269,6 +269,7 @@ async def _answer(
     found: str,
     questions: bool = False,
     brought: str = "",
+    accounts: str = "",
 ) -> tuple[dict, str, bool]:
     """The turn's JSON, asked for again rather than lost (Sean, 23 Oct: a full
     brief with pricing results came back as "Tell me more about what you want
@@ -285,8 +286,8 @@ async def _answer(
     prose, last_error = "", None
     for i, (results, extra) in enumerate(tries):
         system, user = build_front_door_prompt(
-            turns, brief, edited, material, web=chat_web_line(web_access), found=results, web_access=web_access,
-            questions=questions, brought=brought,
+            turns, brief, edited, material, web="\n\n".join(b for b in (chat_web_line(web_access), accounts) if b),
+            found=results, web_access=web_access, questions=questions, brought=brought,
         )
         try:
             # A long brief plus a block of results did not fit 2,000 tokens (23 Oct).
@@ -362,7 +363,13 @@ async def front_door_turn(
         except (OpenRouterError, ValueError, AttributeError) as e:
             logger.warning("front door web search failed: %s", e)
             web_note = "The web search failed, so this reply uses only what you have said."
-    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found, questions, held_items(carried, read))
+    # 17 Nov, production pass: told nothing about the accounts, the reply said "I can't open your
+    # Google Drive or your HubSpot account" and asked for exports. The side chat's line says it can,
+    # and what this turn's search did.
+    reach = chat_accounts_line("on" if account_search == "on" and composio is not None and owner else "off", account_use)
+    result, prose, dropped = await _answer(
+        client, model, turns, brief, edited, material, web_access, found, questions, held_items(carried, read), reach
+    )
     if dropped:
         new_sources, web_note = [], "The search results could not be used in this reply, so it uses only what you have said."
     turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)

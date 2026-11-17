@@ -4488,6 +4488,9 @@ plan with me".
   words (`with_accounts`; signed-in users only, guests read nothing). The reply may quote what it read, as
   [T n]; nothing of it goes into the brief as the user's words (the 7 Nov rule, kept). What was read is shown
   under the reply, sent back each turn, and saved as the project's account items when it is made. Items
-  "Start this" carried in stay titles only. A "Connect an account" link is in the conversation too.
+  "Start this" carried in stay titles only. A "Connect an account" link is in the conversation too. The
+  conversation is told, as the side chat is, that it can reach the accounts and what this turn's search did
+  (#715: without that line the first production try replied "I can't open your Google Drive or your HubSpot
+  account" and asked for exports).
 - **Not done:** the chat still sees every More button whether or not the menu holds it at that moment for
   that stage; a button that the chat names in words other than its label is not matched.
