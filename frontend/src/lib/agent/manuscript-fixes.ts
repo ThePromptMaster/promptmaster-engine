@@ -75,14 +75,28 @@ export function fixesToCarry(
   }).slice(0, 12);
 }
 
-/** The rows earlier repairs carried into the manuscript, by key: each is carried once. */
+/** Failed attempts at carrying the same row before it is no longer tried. */
+export const CARRY_TRIES = 2;
+
+/**
+ * The rows earlier repairs carried into the manuscript, by key: each is carried once.
+ * A row whose carrying failed `CARRY_TRIES` times is counted too, so it is not tried
+ * again: carries do not use up the stage's repair tries (17 Nov), so this is their limit.
+ */
 export function carriedKeys(steps: readonly Pick<AgentStep, 'action_key' | 'status' | 'params'>[]): Set<string> {
   const out = new Set<string>();
+  const failed = new Map<string, number>();
   for (const s of steps) {
-    if (s.action_key !== 'recheck_stage' || s.status !== 'succeeded') continue;
+    if (s.action_key !== 'recheck_stage') continue;
     const keys = s.params?.fix_keys;
-    if (Array.isArray(keys)) for (const k of keys) if (typeof k === 'string') out.add(k);
+    if (!Array.isArray(keys)) continue;
+    for (const k of keys) {
+      if (typeof k !== 'string') continue;
+      if (s.status === 'succeeded') out.add(k);
+      else if (s.status === 'failed') failed.set(k, (failed.get(k) ?? 0) + 1);
+    }
   }
+  for (const [k, n] of failed) if (n >= CARRY_TRIES) out.add(k);
   return out;
 }
 

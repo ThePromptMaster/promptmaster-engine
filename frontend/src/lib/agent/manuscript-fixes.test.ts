@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { carriedKeys, copiesTheManuscript, fixesToCarry, loneManuscript } from './manuscript-fixes';
-import { staleRepair } from './needs';
+import { repairTries, staleRepair } from './needs';
 import { acceptedRowsBefore } from './deliverable-check';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
@@ -59,6 +59,25 @@ describe('accepted fixes go into the manuscript itself', () => {
     expect(move?.key).toBe('recheck_stage');
     expect(move?.params).toMatchObject({ stage_id: 'manuscript', fix_keys: ['review:h2', 'review:h3'], accepted_fixes: true });
     expect(move?.rationale).toContain('The review accepted 2 findings that are not in Manuscript yet');
+  });
+
+  it('findings accepted after two carries are still carried: carries are not repair tries (17 Nov hand pass)', () => {
+    const state = { current_stage_id: 'review', stages: { plan: { status: 'complete' }, manuscript: { status: 'completed_with_artifact' }, review: { status: 'in_progress' }, memo: { status: 'not_started' } } } as never;
+    const earlier = [
+      { id: 's18', action_key: 'recheck_stage', status: 'succeeded', params: { stage_id: 'manuscript', carried: ['[f3] …'], fix_keys: ['review:f3'], accepted_fixes: true } },
+      { id: 's20', action_key: 'recheck_stage', status: 'succeeded', params: { stage_id: 'manuscript', carried: ['[f10] …'], fix_keys: ['review:f10'], accepted_fixes: true } },
+    ];
+    const tried = repairTries(earlier as never, state, new Set(['s18', 's20']));
+    expect(tried).toEqual([]);
+    const fixes = { deliverableId: 'manuscript', rows: fixesToCarry(TEMPLATE, BUNDLES, 'manuscript', carriedKeys(earlier as never)) };
+    const move = staleRepair(TEMPLATE, state, tried, {}, new Set(), null, {}, false, fixes);
+    expect(move?.params).toMatchObject({ stage_id: 'manuscript', fix_keys: ['review:h2', 'review:h3'], accepted_fixes: true });
+  });
+
+  it('a row whose carrying failed twice is not tried again', () => {
+    const failed = { action_key: 'recheck_stage', status: 'failed', params: { fix_keys: ['review:h3'], accepted_fixes: true } };
+    expect([...carriedKeys([failed] as never)]).toEqual([]);
+    expect([...carriedKeys([failed, failed] as never)]).toEqual(['review:h3']);
   });
 
   it('the final check reads that review too', () => {

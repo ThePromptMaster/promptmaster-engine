@@ -335,6 +335,11 @@ export const REPAIR_TRIES = 2;
 export function repairTries(steps: readonly AgentStep[], state: WorkflowState, thisRun: ReadonlySet<string>): string[] {
   return steps
     .filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s))
+    // Carrying accepted review findings into the manuscript is not a repair try: each
+    // finding is carried once (`carriedKeys`), so findings accepted later are carried
+    // too (17 Nov hand pass: two carries used both tries, and the two major findings
+    // the user then accepted were never carried; Go asked for the review's approval).
+    .filter((s) => !s.params?.accepted_fixes)
     .filter((s) => {
       const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
       if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried) || Boolean(s.params?.cut);
