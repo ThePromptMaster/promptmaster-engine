@@ -4391,6 +4391,9 @@ while the last pass was still running.
   version it has ("Checked after a change: …"). Not checked first: a stage reopened by a brief or fact
   change with no earlier stage changed (already judged by the same call), or with a measured requirement,
   carried rows or the user's note on it; and a draft that was in progress.
+- **The check is sent as `field: earlier_stage` with the stage named in `label`** (#711). Until then the stage's
+  name went in `field`, which takes only the brief's own fields, so every check was refused (422) and every
+  stage rewritten. Found on the production pass; the unit tests had mocked the call.
 - **A check that closes the stage is a change**: its step records the `stage_marked_complete` event, so it is
   not "reported success, but no change" (seen as a failed step on the 17 Nov test book, #707). The change
   notice says a manuscript's "Full draft saved" that Go's close made was Go's, not "updated by you".

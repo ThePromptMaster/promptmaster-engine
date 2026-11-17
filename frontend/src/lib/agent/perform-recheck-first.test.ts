@@ -79,7 +79,9 @@ describe('a reopened stage is checked before it is rewritten (17 Nov)', () => {
     expect(assertHonestOutcome('recheck_stage', out).status).toBe('succeeded');
     expect(out.output).toBe('Checked Realignment against the change to Output and evaluation (v3 to v4) before rewriting it: nothing in it relied on what changed, so v2 was kept as it is and marked complete again.');
     const sent = assessChange.mock.calls[0][0];
-    expect(sent.field).toBe('the earlier stage "Output and evaluation"');
+    // The brief's fields only in `field`; the stage is named in `label` (17 Nov, production: a 422).
+    expect(sent.field).toBe('earlier_stage');
+    expect(sent.label).toBe('the earlier stage "Output and evaluation"');
     expect(sent.before).toContain('The Growth Story');
     expect(sent.after).toContain('Beyond the Growth Narrative');
     expect(sent.stages[0]).toMatchObject({ stage_id: 'realign', summary: 'Moves the argument back to the objective: state pensions.' });

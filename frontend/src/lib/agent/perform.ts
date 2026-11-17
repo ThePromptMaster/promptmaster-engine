@@ -2790,7 +2790,10 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
   let affected = true;
   try {
     const impact = await api.assessChange({
-      field: one ? `the earlier stage ${named}` : `the earlier stages ${named}`,
+      // `field` takes the brief's own fields; an earlier stage is named in `label` (17 Nov:
+      // the stage's name in `field` was refused, 422, and every stage was rewritten).
+      field: 'earlier_stage',
+      label: one ? `the earlier stage ${named}` : `the earlier stages ${named}`,
       before: one ? windows[0].before : windows.map((w) => `## ${w.c.label}\n${w.before}`).join('\n\n'),
       after: one ? windows[0].after : windows.map((w) => `## ${w.c.label}\n${w.after}`).join('\n\n'),
       stages: [{

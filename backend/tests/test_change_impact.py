@@ -58,3 +58,24 @@ def test_only_brief_fields_can_be_assessed():
     finally:
         app.dependency_overrides.pop(get_client, None)
     assert res.status_code == 422
+
+
+def test_an_earlier_stage_can_be_assessed_by_its_label():
+    """17 Nov: a reopened stage is checked against what changed in an earlier stage before it is
+    rewritten. The request named the stage in `field`, which only takes brief fields, so every
+    check was refused (422) and every stage rewritten, on production."""
+    client = AsyncMock()
+    client.generate_json.return_value = ({"kind": "fact", "affected": [], "calculations_hold": True}, {})
+    app.dependency_overrides[get_client] = lambda: client
+    try:
+        res = TestClient(app).post("/api/assess-change", json={
+            "field": "earlier_stage", "label": 'the earlier stage "Objective and editorial brief"',
+            "before": "Revision log: 17 November.", "after": "Revision log: 18 November.",
+            "stages": [s.model_dump() for s in STAGES],
+        })
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert res.status_code == 200
+    prompt = client.generate_json.await_args.kwargs["prompt"]
+    assert 'FIELD: the earlier stage "Objective and editorial brief"' in prompt
+    assert "or to an earlier stage of its work" in client.generate_json.await_args.kwargs["system"]
