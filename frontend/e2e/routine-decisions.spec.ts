@@ -80,7 +80,8 @@ test('a reserved approval still stops Go, and the card says why it is the user\'
   await panel.getByRole('button', { name: /^Go$/ }).click();
 
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('"I accept these hypotheses as the working set". This one is yours alone', { timeout: 30_000 });
+  // The approval names the version it is for (17 Nov, L-247), then says it is the user's.
+  await expect(card).toContainText('"I accept these hypotheses as the working set". It is for Hypothesis v1, the version on the page now. This one is yours alone', { timeout: 30_000 });
   await expect(card).toContainText('Needs your approval:');
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('03-reserved-approval-asked.png') });

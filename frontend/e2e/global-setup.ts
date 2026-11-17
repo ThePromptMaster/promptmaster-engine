@@ -35,6 +35,21 @@ export default async function globalSetup() {
   if (!res.ok) throw new Error(`Could not create the E2E user: ${res.status} ${await res.text()}`);
   const user = (await res.json()) as { id: string };
 
+  // 17 Nov: a project made from the start screen opens with Go running (L-250). The specs
+  // were written for a page the user drives, so this user has it off, as anyone may in
+  // Settings; the specs that are about Go start it themselves.
+  const pref = await fetch(`${sb.API_URL}/rest/v1/user_preferences`, {
+    method: 'POST',
+    headers: {
+      apikey: sb.SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${sb.SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify({ user_id: user.id, go_autostart: false }),
+  });
+  if (!pref.ok) throw new Error(`Could not turn Go's auto-start off for the E2E user: ${pref.status} ${await pref.text()}`);
+
   mkdirSync(AUTH_DIR, { recursive: true });
   writeFileSync(USER_FILE, JSON.stringify({ id: user.id, email, password }, null, 2));
 }
