@@ -3434,6 +3434,7 @@ export function WorkflowWorkspace({
             )}
 
             <TasksPanel
+              stageName={(id) => stageNameShown(id)}
               tasks={recommendations.tasks}
               onResolve={(id, status) => void recommendations.resolveTask(id, status)}
               busy={recommendations.busy}
