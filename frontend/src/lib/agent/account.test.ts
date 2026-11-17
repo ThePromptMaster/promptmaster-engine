@@ -101,7 +101,7 @@ describe('what a run checked and kept, and what is left (17 Nov, Sean: "whether 
       step('recheck_stage', { stage_id: 'method', params: { stage_id: 'method' }, changes: { stage_closed: true } }),
     ];
     expect(runAccount(run('budget_exhausted'), steps, label)?.did).toBe(
-      'Repaired Method after a change; checked Analysis against a change and kept it as it was: nothing there relied on it.'
+      'Repaired Method after a change; checked Analysis against a change and found nothing there relied on it, so nothing was rewritten.'
     );
   });
 

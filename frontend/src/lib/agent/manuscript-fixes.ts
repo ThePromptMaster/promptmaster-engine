@@ -19,7 +19,7 @@ import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { effectiveRenderer, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { CARRIED_OUT_REASON, isTriageTable } from '@/lib/workflow/triage';
-import type { WorkflowTemplate } from '@/lib/workflow/types';
+import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 
 export interface FixToCarry {
@@ -91,4 +91,25 @@ const COPY = /\b(?:consolidated|corrected|revised|updated|clean|final|amended)\s
 /** Whether a stage Go wants to add would only copy or correct the manuscript. */
 export function copiesTheManuscript(title: string, work: string): boolean {
   return COPY.test(title) || COPY.test(work.slice(0, 600));
+}
+
+/**
+ * The work a return to the manuscript was for, not yet done (17 Nov, production
+ * pass): Go went back to a book's Manuscript to "add one line to Chapter 1", had no
+ * move that edits chapters, and asked for the manuscript's approval instead, with
+ * the line never added. The latest return to it with work named, once.
+ */
+export function returnWorkToCarry(
+  template: Pick<WorkflowTemplate, 'stages'>,
+  events: readonly Pick<WorkflowEvent, 'type' | 'to_stage_id' | 'payload' | 'created_at'>[],
+  holderId: string | undefined,
+  carried: ReadonlySet<string>
+): FixToCarry[] {
+  const manuscript = loneManuscript(template, holderId);
+  if (!manuscript) return [];
+  const back = [...events].reverse().find((e) => e.type === 'stage_returned' && e.to_stage_id === manuscript);
+  const work = typeof back?.payload?.work === 'string' ? back.payload.work.trim() : '';
+  if (!back || !work) return [];
+  const key = `return:${back.created_at}`;
+  return carried.has(key) ? [] : [{ key, text: `[went back for] ${work.slice(0, 1_100)}` }];
 }

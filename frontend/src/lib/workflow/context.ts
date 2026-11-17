@@ -21,7 +21,7 @@ import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { MeasuredLine } from '@/types';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { carriedForwardUnmet, carriedRows, carriedText, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { carriedForwardUnmet, carriedRows, carriedText, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, isPendingResearch, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import { keptOpen, type CarriedRow } from './settled-rows';
 import type { OpenFindingRow, StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage, rowsRequired } from './engine';
@@ -102,6 +102,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const deferred: Record<string, { row: string; reason: string }[]> = {};
   const openUnmetRows: Record<string, number> = {};
   const openRows: Record<string, OpenFindingRow[]> = {};
+  const pendingResearch: Record<string, OpenFindingRow[]> = {};
 
   for (const s of template.stages) {
     const bundle = bundles[s.id];
@@ -170,9 +171,18 @@ export function buildStageContext(input: BuildContextInput): StageContext {
       }
       const later = deferredNotBlocking(items, schema, optional);
       if (later.length) deferred[s.id] = later;
-      const unmet = openUnmet(items, schema);
+      // 17 Nov: a source that still has to be read in full is research to do, not a
+      // fault in the work. Listed as pending research; it holds nothing up.
+      const research = items.filter((i) => isPendingResearch(i));
+      const researchIds = new Set(research.map((i) => i.id));
+      const decidable = research.length ? items.filter((i) => !researchIds.has(i.id)) : items;
+      if (research.length) {
+        pendingResearch[s.id] = openFindingRows(research, schema, 12);
+        findings[s.id] = { total: decidable.length, triaged: findings[s.id].triaged };
+      }
+      const unmet = openUnmet(decidable, schema);
       if (unmet) openUnmetRows[s.id] = unmet;
-      const rows = openFindingRows(items, schema);
+      const rows = openFindingRows(decidable, schema);
       if (rows.length) openRows[s.id] = rows;
     }
   }
@@ -197,6 +207,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     deferred,
     openUnmet: openUnmetRows,
     openRows,
+    ...(Object.keys(pendingResearch).length ? { pendingResearch } : {}),
     fields: {
       objective: project.objective,
       audience: project.audience,

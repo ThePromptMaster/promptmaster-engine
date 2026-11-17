@@ -44,7 +44,10 @@ export function getStage(
  * rows its own page called optional (Sean, emails 2, 4, 6.6, 8).
  */
 export function rowsRequired(stage: Pick<StageDefinition, 'exit_criteria'>): boolean {
-  return stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status' || c.rule?.type === 'all_findings_triaged');
+  // 17 Nov (Sean, Hidden Innovation): a check stage whose "every finding decided"
+  // rule says it does not block was still read as requiring every row, and its
+  // undecided rows blocked the finish of a written memo. The rule's own word counts.
+  return stage.exit_criteria.some((c) => (c.rule?.type === 'every_item_has_status' || c.rule?.type === 'all_findings_triaged') && c.blocking !== false);
 }
 
 /** Renderers whose artifact is a list of items that count rules can count. */
@@ -853,6 +856,8 @@ export type OutstandingItem =
   | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
   /** Written sections the model stopped at its length limit (8 Nov): the text ends mid-sentence. */
   | { kind: 'cut_sections'; stageId: string; label: string; sections: string[] }
+  /** Sources still to be read in full (17 Nov): listed, never holding up the finish. */
+  | { kind: 'pending_research'; stageId: string; label: string; rows: OpenFindingRow[] }
   /**
    * The latest check of the stage's current draft says it is incomplete or
    * off the objective, and Go will not move on past it (18 Oct). A model's
@@ -927,6 +932,8 @@ export function outstandingWork(
     }
     const proposals = Math.max(0, proposed - rest);
     if (proposals > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposals, ...optional });
+    const research = ctx.pendingResearch?.[stage.id] ?? [];
+    if (research.length) out.push({ kind: 'pending_research', stageId: stage.id, label, rows: research });
     const carried = ctx.carriedForward?.[stage.id] ?? [];
     if (carried.length) {
       const items = ctx.carriedRows?.[stage.id];
@@ -1045,6 +1052,8 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
       return t('out.stuck', { label: item.label, reason: item.reason });
     case 'cut_sections':
       return t('out.cutSections', { label: item.label, names: item.sections.join('; ') });
+    case 'pending_research':
+      return t('out.pendingResearch', { label: item.label, count: item.rows.length }) + namedRows(item.rows);
     case 'check_says':
       return t('out.checkSays', { label: item.label, says: shownCheckText(locale, item.says) });
     case 'go_waiting':
@@ -1068,7 +1077,7 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
 /** Whether an outstanding item holds up "Objective met" and plain "Finish project". Optional rows do not. */
 export function blocksCompletion(item: OutstandingItem): boolean {
   // A repair after an approval is routine: said, but no reason asked to finish past it.
-  if (item.kind === 'check_says' || item.kind === 'approval_on_earlier_version') return false;
+  if (item.kind === 'check_says' || item.kind === 'approval_on_earlier_version' || item.kind === 'pending_research') return false;
   return !('optional' in item && item.optional);
 }
 

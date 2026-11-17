@@ -106,3 +106,18 @@ describe('the list of what else waits on the user', () => {
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
   });
 });
+
+describe('findings that say they are resolved, accepted in one press (17 Nov, Sean)', () => {
+  it('one button accepts each of them, and only them', async () => {
+    const onAnswer = vi.fn(async () => undefined);
+    const resolved = [
+      one(item({ id: 'h1', kind: 'finding', rowId: 'h1', text: 'Resolved in consolidated manuscript v2, Section 1.' })),
+      one(item({ id: 'h2', kind: 'finding', rowId: 'h2', text: 'Resolved in v2 text. Section 7 is additive.' })),
+    ];
+    render(<QuestionQueue entries={[...resolved, one(finding)]} onAnswer={onAnswer} />);
+    fireEvent.click(screen.getByText('Accept the 2 findings that say they are resolved'));
+    await waitFor(() => expect(onAnswer).toHaveBeenCalledTimes(2));
+    expect(onAnswer.mock.calls.map((c) => (c as unknown as [QueueEntry, { kind: string }])[0].key)).toEqual(['h1', 'h2']);
+    expect(onAnswer.mock.calls.every((c) => (c as unknown as [QueueEntry, { kind: string }])[1].kind === 'accept')).toBe(true);
+  });
+});

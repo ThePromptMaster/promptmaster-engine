@@ -439,7 +439,11 @@ export function allowedActions(
   // passed through, and the round could not be proposed). Draft it first.
   const staleRoundDraft =
     template.stages.some((s) => s.transitions.loop_to) && stageDrafts(stage) && !stageHasDraft;
-  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to && !staleRoundDraft) keys.push('advance_stage');
+  // 17 Nov (Sean, Hidden Innovation): on the last stage, already complete, an advance
+  // moves nothing ("It is the last stage; nothing follows it"), and each try set the
+  // same question aside again in new words. What is left there is the objective check.
+  const lastAndDone = !stage.transitions.default_next && ['complete', 'completed_with_artifact'].includes(state.stages[stage.id]?.status ?? '');
+  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to && !staleRoundDraft && !lastAndDone) keys.push('advance_stage');
   // Nothing is stuck before it has been tried: a stage that drafts and has no
   // draft yet is drafted first. Offered both, the planner on an empty review
   // stage chose "stuck — no draft text" over drafting the review from the

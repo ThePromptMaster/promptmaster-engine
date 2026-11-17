@@ -313,3 +313,29 @@ export function entryHoldsUp(entry: Pick<QueueEntry, 'items'>): string {
   const stages = [...new Set(entry.items.flatMap((i) => i.holdsUp))];
   return holdsUpLine({ holdsUp: stages, blocksFinish: entry.items.some((i) => i.blocksFinish) });
 }
+
+/**
+ * What is still waiting once an answer is given on Go's own card (17 Nov). Sean:
+ * "When I clicked one, Go continued before I could answer the others … Could I
+ * record all four answers while Go stays paused, then hit Resume once?" The card's
+ * answer resumes the run only when nothing else on the list waits.
+ */
+export function stillWaiting(
+  entries: readonly QueueEntry[],
+  answered: { criterionIds?: readonly string[]; rowIds?: readonly string[] }
+): QueueEntry[] {
+  const criteria = new Set(answered.criterionIds ?? []);
+  const rows = new Set(answered.rowIds ?? []);
+  return entries.filter((e) => e.items.some((i) => !(i.criterionId && criteria.has(i.criterionId)) && !(i.rowId && rows.has(i.rowId))));
+}
+
+/**
+ * Findings whose own text says they are resolved (17 Nov). Sean, Hidden Innovation:
+ * completion was blocked on "three manuscript findings it described as resolved" —
+ * "Resolved in consolidated manuscript v2 …", undecided. They are the user's to accept,
+ * so they are offered together as one press, never closed by Go.
+ */
+export function resolvedFindings(entries: readonly QueueEntry[]): QueueEntry[] {
+  return entries.filter((e) => e.items.length === 1 && e.items[0].kind === 'finding' && RESOLVED.test(e.items[0].text));
+}
+const RESOLVED = /^\s*(?:\*\*)?(?:resolved|fixed|addressed|already (?:fixed|resolved|carried|in the (?:text|manuscript)))\b/i;

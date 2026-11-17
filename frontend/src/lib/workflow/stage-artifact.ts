@@ -1011,3 +1011,21 @@ export function statusContradictsRow(item: StageItem): string | null {
   if (item.status !== 'independently_reproduced' && item.status !== 'reproduced') return null;
   return saysNotReproduced(item) ? 'This row says it was not reproduced, but its status says it was. Check which is right.' : null;
 }
+
+const PENDING_RESEARCH = /\bcould not be (?:read|retrieved|opened|accessed|checked)(?: in full)?\b|\bnot (?:in|among) the saved (?:sources|material|text|record)\b|\b(?:retrieve|obtain|fetch|get) the full (?:text|pdf|paper|report|article|dataset|description|record)\b|\bfull (?:text|pdf|paper) (?:is |was )?not (?:available|saved|in the project)\b|\bthe saved (?:text|record|source) is (?:only )?(?:a )?(?:short )?(?:excerpt|abstract|snippet)\b/i;
+
+/**
+ * A finding that only says a source could not be read in full and has to be
+ * retrieved (17 Nov). Sean, Hidden Innovation: six such source checks ("could
+ * not be read in full … Next step: retrieve the full PDF") blocked completion of
+ * a finished memo. They are research still to do, not a fault in the work: listed
+ * as pending research, and they do not hold up the finish.
+ */
+export function isPendingResearch(item: Pick<StageItem, 'status'> & Record<string, string | undefined>): boolean {
+  if (item.status) return false;
+  const text = Object.entries(item)
+    .filter(([k]) => !['id', 'status', 'status_source', 'reason', 'severity'].includes(k))
+    .map(([, v]) => v ?? '')
+    .join(' ');
+  return PENDING_RESEARCH.test(text);
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { carriedKeys, fixesToCarry } from '@/lib/agent/manuscript-fixes';
+import { carriedKeys, fixesToCarry, returnWorkToCarry } from '@/lib/agent/manuscript-fixes';
 import { shownStepActionLabel } from '@/lib/i18n/go';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { sourcesToCheck } from '@/lib/workflow/lookup';
@@ -670,6 +670,7 @@ export function useGoLoop(opts: Options) {
       const plan = planFromScreen(screen, {
         question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made,
         approvalStands: approvalStandsThroughRepairs(o.project, stage, o.bundles[stage.id]?.versions ?? []),
+        correctionsBeyondLimit: stepsRef.current.filter((st) => st.stage_id === stage.id && st.params?.correction_beyond_limit).length,
       });
       if (plan.kind === 'leave_out') {
         // 15 Nov (Sean, guest invitation): Go's own extra is not a question for the
@@ -1045,7 +1046,10 @@ export function useGoLoop(opts: Options) {
           : null;
         // 17 Nov (Hidden Innovation): what the review after a manuscript accepted
         // is carried into the manuscript itself, each row once.
-        const fixRows = holder ? fixesToCarry(o.template, o.bundles, holder.id, carriedKeys([...priorStepsRef.current, ...stepsRef.current])) : [];
+        const carriedSoFar = carriedKeys([...priorStepsRef.current, ...stepsRef.current]);
+        const fixRows = holder
+          ? [...returnWorkToCarry(o.template, freshEvents, holder.id, carriedSoFar), ...fixesToCarry(o.template, o.bundles, holder.id, carriedSoFar)]
+          : [];
         const fixes = holder && fixRows.length ? { deliverableId: holder.id, rows: fixRows } : null;
         // After a loop of repairs was withdrawn, the next choice is the
         // planner's, not the same repair forced again (13 Oct).

@@ -475,6 +475,7 @@ export const hi: Record<keyof typeof en, string> = {
   'out.stuck': '{label} अटका हुआ है — {reason}',
   'pnl.stillOpenInWorld': 'दस्तावेज़ पूरा हुआ। वास्तविक दुनिया में अभी बाकी:',
   'out.cutSections': '{label} में पाठ वाक्य के बीच में कटा है — {names}',
+  'out.pendingResearch': '{label}: {count} स्रोत जाँच शोध के लिए बाकी — ऐसा स्रोत जिसे अभी पूरा पढ़ना है; रुकावट नहीं',
   'out.checkSays': '{label}: नवीनतम जाँच के अनुसार {says}',
   'out.goWaiting': 'Go आपकी प्रतीक्षा कर रहा है: {need}',
   'out.objWaiting': 'उद्देश्य पूरा नहीं हुआ — प्रतीक्षा: {list}',
