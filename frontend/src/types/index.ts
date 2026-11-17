@@ -272,13 +272,13 @@ export interface ChatContext {
   outline: string;
   manuscript: string;
   /** null when not known; [] when the page has none. */
-  buttons: { label: string; where: string }[] | null;
+  buttons: { label: string; where: string; does?: string }[] | null;
   /** The latest Go run as recorded; null when there has been none (7 Oct). */
   go_run?: {
     status: string;
     policy: string;
     stop_reason: string;
-    steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string }[];
+    steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string; stage?: string }[];
     objective: string;
     /** What Go is asking, one item per question (31 Oct). */
     questions?: string[];
@@ -579,6 +579,8 @@ export interface ReplyAction {
 export interface SuggestActionsRequest {
   inputs: PMInput;
   stage_label: string;
+  /** The workflow's other stages: an action changes this stage only (17 Nov). */
+  other_stages?: string[];
   question: string;
   reply: string;
   table?: {

@@ -1116,6 +1116,7 @@ export function WorkflowWorkspace({
         {
           inputs: inputsFrom(project),
           stage_label: stage.label,
+          other_stages: template.stages.filter((s) => s.id !== stage.id).map((s) => s.label),
           question,
           reply,
           table: rendererHoldsItems(stage.renderer)
@@ -1137,7 +1138,7 @@ export function WorkflowWorkspace({
       );
       return res.actions;
     },
-    [stage, project, headItems]
+    [stage, project, headItems, template.stages]
   );
   const previewReplyRows = useCallback(
     (action: ReplyAction) => (stage ? previewRowAction(headItems, action, itemSchemaFor(stage)).changes : []),

@@ -752,6 +752,10 @@ export const api = {
     questions?: boolean;
     /** Items "Start this" carried from the person's accounts: titles only (7 Nov). */
     third_party?: ThirdPartyItem[];
+    /** Search the person's connected accounts when a turn needs them (17 Nov). */
+    account_search?: 'on' | 'off';
+    /** What this conversation read from them so far, sent back each turn. */
+    account_items?: ThirdPartyItem[];
   }): Promise<{
     reply: string;
     draft?: string;
@@ -761,6 +765,10 @@ export const api = {
     /** Sources new to the conversation, cited after the ones sent. */
     web_sources?: { url: string; title: string; excerpt: string }[];
     web_note?: string;
+    /** What this turn read from the person's accounts (17 Nov). */
+    account_query?: string;
+    account_items?: ThirdPartyItem[];
+    account_note?: string;
   }> {
     return apiFetch('/api/front-door', { method: 'POST', body: JSON.stringify(req) });
   },

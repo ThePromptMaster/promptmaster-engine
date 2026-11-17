@@ -136,6 +136,8 @@ class SuggestActionsRequest(BaseModel):
     reply: str = Field(min_length=1, max_length=20_000)
     #: Set when the stage's work is a table; actions are then row changes.
     table: ActionTable | None = None
+    #: The workflow's other stages: an action may change this stage only (17 Nov).
+    other_stages: list[str] = Field(default_factory=list, max_length=60)
     model: str = ""
 
 
@@ -350,7 +352,8 @@ async def api_suggest_actions(
     """A chat answer as at most four things to do about it. One JSON call; changes nothing."""
     try:
         actions = await suggest_reply_actions(
-            client, req.model or None, req.inputs, req.stage_label, req.question, req.reply, req.table
+            client, req.model or None, req.inputs, req.stage_label, req.question, req.reply, req.table,
+            [o[:200] for o in req.other_stages],
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

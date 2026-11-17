@@ -102,7 +102,7 @@ export function buildChatContext(input: {
   /** The latest Go run and its steps, so the chat answers "why did it stop?" from the record. */
   goRun?: {
     run: { status: string; policy: string; stop_reason: string | null; questions?: readonly string[] } | null;
-    steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string }[];
+    steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string; stage_id?: string; params?: Record<string, unknown> }[];
     objective?: string;
   };
   /** The version on screen; the latest when not given. */
@@ -133,7 +133,8 @@ export function buildChatContext(input: {
     outline: stage.renderer === 'outline' ? '' : outlineOf(template, bundles),
     manuscript,
     buttons: controls
-      ? controls.slice(0, BUTTONS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] }))
+      // What each does, so the chat picks a button by its effect (17 Nov: "Realign" for a retitle).
+      ? controls.slice(0, BUTTONS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place], ...(c.does ? { does: c.does.slice(0, 300) } : {}) }))
       : null,
     go_run: goRun?.run
       ? {
@@ -148,7 +149,10 @@ export function buildChatContext(input: {
               status: s.status,
               execution_label: s.execution_label,
               block_kind: s.block_kind ?? null,
-              output: s.output.slice(0, 400),
+              // Whole enough to read, and on which stage (17 Nov: a cut at 400 dropped
+              // "still being written when the wait ran out", and the chat misread the run).
+              output: s.output.slice(0, 1_200),
+              ...(s.stage_id ? { stage: nameOf(template.stages.find((x) => x.id === (String(s.params?.stage_id ?? '') || s.stage_id)) ?? stage).slice(0, 200) } : {}),
             })),
           objective: (goRun.objective ?? '').slice(0, 2_000),
           ...(goRun.run.questions?.length ? { questions: goRun.run.questions.slice(0, 8).map((q) => q.slice(0, 600)) } : {}),

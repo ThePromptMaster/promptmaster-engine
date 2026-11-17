@@ -303,6 +303,8 @@ export const pt: Messages = {
   "door.review": "Revisar a configuração antes",
   "door.removeItem": "Remover: {item}",
   "door.searched": "Pesquisa na web: “{query}” · {found}",
+  "door.connectAccount": "Conecte uma conta (Gmail, Drive, Outlook, Salesforce…) para que esta conversa possa lê-la",
+  "door.accountsRead": "Lido das suas contas: {count} item(ns), guardado(s) com o projeto quando for criado",
   "door.newSources_one": "{count} fonte nova",
   "door.newSources_other": "{count} fontes novas",
   "door.noSources": "nenhuma fonte nova",

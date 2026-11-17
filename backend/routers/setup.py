@@ -7,7 +7,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from deps import get_client
+from deps import account_owner, get_client, optional_composio
+from promptmaster.composio_client import Composio
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS, MAX_THIRD_PARTY
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
@@ -233,10 +234,21 @@ class FrontDoorRequest(BaseModel):
     #: Items from the user's accounts this start carries (7 Nov): titles are read,
     #: never text, and never by the search (`brought_titles`).
     third_party: list[ThirdPartyItem] = Field(default=[], max_length=MAX_THIRD_PARTY)
+    #: The person's connected accounts are searched when a turn needs them (17 Nov). A new
+    #: project has them on, so the start screen sends "on"; a guest has none to search.
+    account_search: Literal["on", "off"] = "off"
+    #: What this conversation has read from those accounts so far, sent back each turn so
+    #: the reply can quote it and the search does not open it again.
+    account_items: list[ThirdPartyItem] = Field(default=[], max_length=MAX_THIRD_PARTY)
 
 
 @router.post("/front-door")
-async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depends(get_client)) -> FrontDoorTurn:
+async def api_front_door(
+    req: FrontDoorRequest,
+    client: OpenRouterClient = Depends(get_client),
+    composio: Composio | None = Depends(optional_composio),
+    owner: str | None = Depends(account_owner),
+) -> FrontDoorTurn:
     """One turn of talking a project into shape: a reply, and the draft brief as
     it stands (6 Oct, email 8). 1 LLM call, or 3 when Web access is on and the
     turn needs a search (22 Oct); saves nothing."""
@@ -244,6 +256,7 @@ async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depen
         return await front_door_turn(
             client, req.model or None, req.turns, req.brief, req.edited, req.material, req.web_access, req.sources,
             questions=req.questions, third_party=req.third_party,
+            composio=composio, owner=owner, account_search=req.account_search, read_items=req.account_items,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

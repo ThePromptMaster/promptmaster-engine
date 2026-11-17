@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { FrontDoor, sourcesFound } from './front-door';
+import { FrontDoor, itemsRead, sourcesFound } from './front-door';
 
 const frontDoor = vi.fn();
 vi.mock('@/lib/api/client', () => ({ api: { frontDoor: (...a: unknown[]) => frontDoor(...a) } }));
@@ -76,5 +76,26 @@ describe('FrontDoor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Make it a project' }));
     const turns = onReady.mock.calls[0][3];
     expect(sourcesFound(turns).map((s) => s.url)).toEqual(['https://example.org/1', 'https://example.org/2']);
+  });
+});
+
+describe('the start conversation reads connected accounts (17 Nov, Sean: Drive and Salesforce)', () => {
+  const item = { kind: 'file' as const, source: 'Google Drive', title: 'Q3 board pack', text: 'Revenue grew 12%.', when: '2 Nov' };
+  it('asks for an account search, shows what was read, and sends it back with the next turn', async () => {
+    frontDoor.mockResolvedValueOnce({ ...reply('A Q3 summary'), reply: 'Your board pack says revenue grew 12% [T1].', account_query: 'Q3 board pack', account_items: [item] });
+    frontDoor.mockResolvedValueOnce(reply('A Q3 summary'));
+    render(<FrontDoor opening="Summarise my Q3 board pack from Drive" onReady={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText('Your board pack says revenue grew 12% [T1].');
+    expect(frontDoor.mock.calls[0][0].account_search).toBe('on');
+    expect(screen.getByText(/Read from your accounts: 1 item/)).toBeTruthy();
+    expect(screen.getByText(/\[T1\] Google Drive · Q3 board pack/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Your message'), 'Keep it to one page');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(frontDoor).toHaveBeenCalledTimes(2));
+    expect(frontDoor.mock.calls[1][0].account_items).toEqual([item]);
+  });
+
+  it('what was read is listed for the project', () => {
+    expect(itemsRead([{ role: 'user', content: 'x' }, { role: 'assistant', content: 'y', accounts: { query: 'q', items: [item] } }])).toEqual([item]);
   });
 });

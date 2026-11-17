@@ -1225,7 +1225,10 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const superseded = supersededFactValues(ctx.project.facts);
       const why = withUserNote(measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
-        : carriedRepair && params.accepted_fixes
+        : carriedRepair && params.accepted_fixes && carriedRows.every((r) => r.startsWith('[went back for] '))
+          // 17 Nov: the work Go went back to the manuscript for, done in the chapters it concerns.
+          ? `do the work Go went back to ${target.label} for, in the sections it concerns: ${carriedRows.map((r) => `"${r.replace('[went back for] ', '')}"`).join('; ')}`
+          : carriedRepair && params.accepted_fixes
           // 17 Nov: the review's accepted findings, carried into the chapters they concern.
           ? `carry into the text the findings the review accepted, each where it applies: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
           : carriedRepair

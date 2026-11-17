@@ -296,6 +296,8 @@ export const ar: Messages = {
   'door.review': 'مراجعة الإعداد أولًا',
   'door.removeItem': 'إزالة: {item}',
   'door.searched': 'بحث في الويب عن «{query}» · {found}',
+  'door.connectAccount': 'اربط حسابًا (Gmail وDrive وOutlook وSalesforce…) لتتمكن هذه المحادثة من قراءته',
+  'door.accountsRead': 'قُرئ من حساباتك: {count} عنصر، يُحفظ مع المشروع عند إنشائه',
   'door.newSources_one': '{count} مصدر جديد',
   'door.newSources_other': 'مصادر جديدة: {count}',
   'door.noSources': 'لا مصادر جديدة',

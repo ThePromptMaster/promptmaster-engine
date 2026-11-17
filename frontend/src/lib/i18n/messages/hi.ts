@@ -303,6 +303,8 @@ export const hi: Messages = {
   "door.review": "पहले सेटअप की समीक्षा करें",
   "door.removeItem": "हटाएँ: {item}",
   "door.searched": "वेब पर “{query}” खोजा गया · {found}",
+  "door.connectAccount": "एक खाता जोड़ें (Gmail, Drive, Outlook, Salesforce…) ताकि यह बातचीत उसे पढ़ सके",
+  "door.accountsRead": "आपके खातों से पढ़ा गया: {count} आइटम, प्रोजेक्ट बनने पर उसके साथ रखा जाएगा",
   "door.newSources_one": "{count} नया स्रोत",
   "door.newSources_other": "{count} नए स्रोत",
   "door.noSources": "कोई नया स्रोत नहीं",

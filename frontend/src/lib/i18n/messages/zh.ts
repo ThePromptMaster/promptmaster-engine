@@ -303,6 +303,8 @@ export const zh: Messages = {
   'door.review': '先检查设置',
   'door.removeItem': '移除：{item}',
   'door.searched': '在网络上搜索了“{query}” · {found}',
+  'door.connectAccount': '连接一个账户（Gmail、Drive、Outlook、Salesforce…），让这段对话可以读取它',
+  'door.accountsRead': '从你的账户中读取了 {count} 项，创建项目时一并保存',
   'door.newSources_one': '{count} 个新来源',
   'door.newSources_other': '{count} 个新来源',
   'door.noSources': '没有新来源',
