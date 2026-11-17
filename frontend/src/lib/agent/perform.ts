@@ -1234,7 +1234,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       // is checked before it is rewritten. If nothing in it relied on what
       // changed, it is kept as it is.
       if (st?.status === 'stale' && st.stale?.since && isDone(st.stale.was) && !measuredRepair && !carriedRepair && !userNote) {
-        const kept = await keptAfterCheck(ctx, key, target, st.stale.since, why);
+        const kept = await keptAfterCheck(ctx, key, target, why);
         if (kept) return kept;
       }
       const headVersion = ctx.bundles[target.id]?.versions.at(-1);
@@ -2758,10 +2758,11 @@ async function recheckManuscript(
  * any doubt (no single earlier stage, a version not loaded, a failed call, a
  * gate that does not hold): null, and the stage is rewritten as before.
  */
-async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDefinition, since: string, why: string): Promise<StepOutcome | null> {
+async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDefinition, why: string): Promise<StepOutcome | null> {
   const head = ctx.bundles[target.id]?.versions.at(-1);
   if (!head?.content?.trim()) return null;
-  const changes = upstreamChanges(ctx.template, ctx.bundles, target.id, since);
+  // What this stage was built on: the earlier stages as they stood when its current version was written.
+  const changes = upstreamChanges(ctx.template, ctx.bundles, target.id, head.created_at);
   if (!changes?.length) return null;
   if (!evaluateStage(ctx.template, target.id, ctx.context).canAdvance) return null;
   const artifact = ctx.bundles[target.id]?.artifact;

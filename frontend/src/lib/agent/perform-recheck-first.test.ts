@@ -133,3 +133,13 @@ describe('what changed before a reopened stage', () => {
     expect(upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', SINCE)).toBeNull();
   });
 });
+
+describe('the save that reopens a stage lands before the event that says so (17 Nov, production pass)', () => {
+  it('a brief edited at 17:31:40.9 and the stages reopened at 17:31:41.2: the edit is still the change', () => {
+    const b = bundles();
+    b.input.versions.push(v('i2', 2, 'The brief, with the revision log line.', '2026-11-17T17:31:40.941Z'));
+    // The realignment was written on 14 Nov, against the brief's v1.
+    const out = upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', '2026-11-14T01:00:00Z');
+    expect(out?.map((c) => `${c.stageId} v${c.before.number}→v${c.after.number}`)).toEqual(['input v1→v2', 'output v3→v4']);
+  });
+});

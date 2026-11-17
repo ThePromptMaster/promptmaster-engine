@@ -26,8 +26,11 @@ export interface UpstreamChange {
 }
 
 /**
- * Each earlier stage whose current text differs from what it held when `since`
- * came (the moment the target was reopened), with both texts. Null when a
+ * Each earlier stage whose current text differs from what it held when the
+ * target's current version was written (`baselineAt`), with both texts: what
+ * this stage was built on, and what is there now. Not the moment it was
+ * reopened: the save that reopens it lands a moment before the event that says
+ * so, and was missed (17 Nov, production pass). Null when a
  * changed earlier stage cannot be read this way — a manuscript, whose text is
  * its chapters, or one with no version from before — so the target is rewritten
  * as before. An empty list when nothing earlier changed: the target was reopened
@@ -37,7 +40,7 @@ export function upstreamChanges(
   template: Pick<WorkflowTemplate, 'stages'>,
   bundles: Record<string, StageArtifactBundle | undefined>,
   targetId: string,
-  since: string
+  baselineAt: string
 ): UpstreamChange[] | null {
   const at = template.stages.findIndex((s) => s.id === targetId);
   if (at < 0) return null;
@@ -46,10 +49,10 @@ export function upstreamChanges(
     const versions = bundles[stage.id]?.versions ?? [];
     const head = versions.at(-1);
     if (!head) continue;
-    const before = [...versions].reverse().find((v) => v.created_at <= since);
+    const before = [...versions].reverse().find((v) => v.created_at <= baselineAt);
     if (!before) {
-      // Written only after the target was reopened: a change we cannot compare.
-      if (head.created_at > since) return null;
+      // Written only after the target was: a change we cannot compare.
+      if (head.created_at > baselineAt) return null;
       continue;
     }
     if (before.id === head.id || before.content === head.content) continue;
