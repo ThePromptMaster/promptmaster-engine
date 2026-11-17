@@ -87,6 +87,11 @@ def test_the_start_conversation_reads_the_accounts_and_returns_what_it_read(star
     prompt = stub.generate_json.await_args.kwargs["prompt"]
     assert "Revenue grew 12% in Q3." in prompt
     assert "Never write any of it into the brief" in prompt
+    # It is told it can reach the accounts, and what this turn's search did (17 Nov, production:
+    # without it the reply said "I can't open your Google Drive or your HubSpot account").
+    system = stub.generate_json.await_args.kwargs["system"]
+    assert "CONNECTED ACCOUNTS IN THIS CHAT: on" in system or "CONNECTED ACCOUNTS IN THIS CHAT: on" in prompt
+    assert 'THEIR ACCOUNTS WERE JUST SEARCHED for "Q3 board pack"' in system + prompt
     # What "Start this" carried in stays titles only (7 Nov).
     assert "Carried in" in prompt and "Secret" not in prompt
 
@@ -98,3 +103,12 @@ def test_off_or_a_guest_reads_nothing(start):
     app.dependency_overrides[account_owner] = lambda: None
     r = TestClient(app).post("/api/front-door", json={"turns": [{"role": "user", "content": "Summarise it"}], "account_search": "on"})
     assert r.status_code == 200 and found.await_count == 0
+
+
+def test_a_search_that_opened_nothing_is_said(start):
+    stub, found = start
+    found.return_value = (None, AccountUse(account_query="PromptMaster deals"))
+    r = TestClient(app).post("/api/front-door", json={"turns": [{"role": "user", "content": "Use my HubSpot deals"}], "account_search": "on"})
+    assert r.status_code == 200
+    kw = stub.generate_json.await_args.kwargs
+    assert 'SEARCHED for "PromptMaster deals" and nothing was opened' in kw["system"] + kw["prompt"]
