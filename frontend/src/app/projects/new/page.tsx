@@ -1,5 +1,7 @@
 'use client';
 
+import { isQuickAnswer } from '@/lib/workflow/quick';
+import { loadGoAutostart } from '@/lib/supabase/preferences';
 import { designDepth, isConcise } from '@/lib/workflow/request-size';
 import { formOf } from '@/lib/workflow/work-form';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -695,7 +697,10 @@ export default function NewProjectPage() {
         return;
       }
       await clearSetupDraft(user.id).catch(() => undefined);
-      router.push(`/projects/${project.id}`);
+      // 17 Nov (Sean): Go starts by itself once the project is made, unless the person turned
+      // it off in Settings. Not the one-stage quick route: it drafts and checks itself.
+      const goStarts = selected.stages.length > 1 && !isQuickAnswer(selected) && (await loadGoAutostart(user.id).catch(() => true));
+      router.push(`/projects/${project.id}${goStarts ? '?go=start' : ''}`);
     } catch (e) {
       // Four writes, not one transaction: a failure part-way left a project
       // with no workflow pinned and no history, and pressing Start again made

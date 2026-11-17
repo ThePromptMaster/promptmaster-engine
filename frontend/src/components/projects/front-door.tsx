@@ -449,7 +449,7 @@ export function FrontDoor({
               {busyLabel ?? t('door.make')}
             </button>
             <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
-              {ready ? `${t('door.enough')} ` : ''}{t('door.record')}
+              {ready ? `${t('door.enough')} ` : ''}{t('door.record')} {t('start.goStarts')}
             </p>
             {onReview && (
               <button

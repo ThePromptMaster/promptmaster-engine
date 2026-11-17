@@ -432,3 +432,18 @@ export function contextFromDocuments(
   }
   return { context, cut };
 }
+
+/**
+ * A document's words swapped for its new version's, where the context holds them under
+ * "### From <name>" (17 Nov, Sean: "When a source changes, I want PromptMaster to carry it
+ * through the affected drafts, show what changed, and ask me when it actually needs my
+ * judgment"). Null when the context holds no block for it. Pure.
+ */
+export function replaceDocumentInContext(context: string, name: string, text: string): string | null {
+  const heading = `### From ${name}\n\n`;
+  const at = context.indexOf(heading);
+  if (at < 0) return null;
+  const next = context.indexOf('\n\n### From ', at + heading.length);
+  const end = next < 0 ? context.length : next;
+  return `${context.slice(0, at)}${heading}${text.trim()}${context.slice(end)}`;
+}

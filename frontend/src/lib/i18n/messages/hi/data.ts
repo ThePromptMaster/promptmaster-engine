@@ -15,6 +15,7 @@ export const hi: Record<keyof typeof en, string> = {
   'data.imageError': 'इमेज जोड़ी नहीं जा सकी।',
   'data.imageErrorWhy': 'इमेज जोड़ी नहीं जा सकी: {message}',
   'data.removeError': '{name} हटाई नहीं जा सकी।',
+  'data.replaced': '{name} बदला गया: इसके नए शब्दों ने प्रोजेक्ट संदर्भ में पुराने शब्दों की जगह ली है, और जिन चरणों ने उन पर भरोसा किया उनकी जाँच होती है।',
   'data.toAdd': 'जोड़ने के लिए इमेज',
   'data.captionHint': 'बताइए कि हर इमेज में क्या दिखता है। PromptMaster इमेज नहीं देख सकता; वह कैप्शन में लिखी बात के आधार पर उन्हें आपके काम में रखता है।',
   'data.captionFor': '{name} का कैप्शन',
