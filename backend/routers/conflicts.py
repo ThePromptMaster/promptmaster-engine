@@ -49,7 +49,10 @@ async def api_check_conflicts(
 class AssessChangeRequest(BaseModel):
     #: `facts`: the accepted facts as a list, before and after one was added,
     #: changed or retired (F1, 7 Oct).
-    field: str = Field(pattern="^(objective|audience|constraints|output_format|context|facts)$")
+    field: str = Field(pattern="^(objective|audience|constraints|output_format|context|facts|earlier_stage)$")
+    #: `earlier_stage` (17 Nov): a reopened stage checked against what changed in the
+    #: stages before it, named here ("the earlier stage \"Output\""), before it is rewritten.
+    label: str = Field(default="", max_length=600)
     before: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     after: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     stages: list[StageConclusion] = Field(default_factory=list, max_length=40)
@@ -61,6 +64,7 @@ async def api_assess_change(req: AssessChangeRequest, client: OpenRouterClient =
     """Which finished stages relied on what changed in the brief (5 Oct). One
     call; nothing is written — the client records the result as an event."""
     try:
-        return await assess_change(client, req.model or None, req.field, req.before, req.after, req.stages)
+        field = (req.label.strip() or "an earlier stage") if req.field == "earlier_stage" else req.field
+        return await assess_change(client, req.model or None, field, req.before, req.after, req.stages)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

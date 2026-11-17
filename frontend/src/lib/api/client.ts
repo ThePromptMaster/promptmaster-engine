@@ -941,7 +941,8 @@ export const api = {
 
   /** Which finished stages relied on what changed in the brief (5 Oct). Writes nothing. */
   async assessChange(req: {
-    field: string; before: string; after: string;
+    /** A brief field, or `earlier_stage` with the stage named in `label`. */
+    field: string; label?: string; before: string; after: string;
     stages: { stage_id: string; label: string; summary: string; figures: string[]; computed: boolean }[];
     model?: string;
   }): Promise<{ kind: 'fact' | 'intent' | 'wording'; affected: { stage_id: string; reason: string }[]; calculations_hold: boolean }> {

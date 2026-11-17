@@ -49,9 +49,9 @@ class ChangeImpact(BaseModel):
 
 
 _IMPACT_INSTRUCTION = (
-    "You judge what a change to a project's brief invalidates. You are given the field "
-    "that changed, its old and new text, and what each finished stage of the project "
-    "concluded. Decide:\n"
+    "You judge what a change to a project's brief, or to an earlier stage of its work, invalidates. "
+    "You are given the field or stage that changed, its old and new text, and what each finished "
+    "stage of the project concluded. Decide:\n"
     "- kind: 'wording' if the meaning is the same; 'fact' if a fact the work relies on "
     "changed; 'intent' if the objective, priority or what the user wants changed.\n"
     "- affected: ONLY the stages whose conclusions relied on what changed, each with one "
