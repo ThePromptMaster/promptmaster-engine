@@ -34,6 +34,8 @@ export const ar: Record<keyof typeof en, string> = {
   'acct.stopped': 'أوقفتَه بنفسك. كل ما أُنجز حتى الآن محفوظ.',
   'acct.or': ' أو ',
   'acct.seeBelow': 'انظر أدناه.',
+  'acct.clearedWaiting_one': 'تم التسجيل. يبقى {count} أمر آخر ينتظرك أدناه: أجب الآن، أو اضغط استئناف وسيسأل Go عنه عند الوصول إليه.',
+  'acct.clearedWaiting_other': 'تم التسجيل. تبقى {count} أمور أخرى تنتظرك أدناه: أجب الآن، أو اضغط استئناف وسيسأل Go عنها عند الوصول إليها.',
   'acct.checkedKept': "فحص {stages} بعد تغيير وأبقاه كما هو: لم يعتمد عليه شيء فيه",
   'acct.leftForGo': "متبقٍّ لـ Go: {work}.",
   'acct.recheckStage': "إعادة فحص {stage}",

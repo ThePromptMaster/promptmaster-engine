@@ -54,6 +54,9 @@ function answeredSince(steps: readonly AgentStep[], from: number, kept: string):
   );
 }
 
+/** Two kept questions on one stage that share this much are the same request, worded again. */
+const SAME_KEPT = 0.5;
+
 /** A question Go set aside for the user rather than stop for, still unanswered. */
 export interface KeptQuestion { stepId: string; stageId: string; question: string; choices: string[] }
 
@@ -72,6 +75,10 @@ export function keptQuestions(steps: readonly AgentStep[], answeredElsewhere: Re
     if (!question || answeredElsewhere.has(s.id) || answeredSince(steps, i, question)) return;
     const key = question.toLowerCase().replace(/\s+/g, ' ').slice(0, 160);
     if (seen.has(key)) return;
+    // 17 Nov (Sean, Hidden Innovation): the same request to record the authorship,
+    // set aside at three steps in three wordings, was listed three times. The same
+    // question on the same stage, however worded, is listed once.
+    if (out.some((k) => k.stageId === s.stage_id && questionOverlap(k.question, question) >= SAME_KEPT)) return;
     seen.add(key);
     const choices = Array.isArray(s.params?.choices) ? (s.params.choices as unknown[]).filter((c): c is string => typeof c === 'string' && Boolean(c.trim())).slice(0, 4) : [];
     out.push({ stepId: s.id, stageId: s.stage_id, question: question.slice(0, 600), choices });
@@ -98,7 +105,9 @@ export function runAccount(
   /** A stage's English name, as the screen says it: for the names inside a recorded reason. */
   stageByEnglish?: (english: string) => string,
   /** The approval Go waits for is given by choosing one of the options on its card: there is no "Approve and resume" there. */
-  choosing = false
+  choosing = false,
+  /** How many things on the list still wait on the user (17 Nov). */
+  waitingOnUser = 0
 ): RunAccount | null {
   if (!run) return null;
   const t = (key: string, vars?: Vars) => translate(locale, key, vars);
@@ -147,9 +156,8 @@ export function runAccount(
 
   // Each said once: a question Go set aside at three steps running was listed three times (12 Nov).
   const setAside = [...new Set([
-    ...steps
-      .filter((s, i) => typeof s.params?.set_aside_question === 'string' && !answeredSince(steps, i, String(s.params!.set_aside_question)))
-      .map((s) => t('acct.questionKept', { question: String(s.params!.set_aside_question).slice(0, 300) })),
+    // The same request in other words is one line (17 Nov).
+    ...keptQuestions(steps).map((k) => t('acct.questionKept', { question: k.question.slice(0, 300) })),
     ...steps.filter((s) => typeof s.changes?.set_aside === 'string').map((s) => t('acct.couldNot', { what: String(s.changes!.set_aside) })),
     ...steps.filter((s) => s.action_key === ROUTINE_DEFAULT_STEP && s.status === 'succeeded').map((s) => firstSentence(s.output).replace(/^Routine default taken by Go under your routine-decision policy \(yours to change\): /, t('acct.routine'))),
   ])];
@@ -183,7 +191,9 @@ export function runAccount(
       // is needed" over a sentence that asked nothing).
       // A cleared request asks nothing (15 Oct screenshot: "Your decision is
       // needed: That is done. Press Resume and I will carry on.").
-      if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: shown, setAside };
+      // 17 Nov (Sean): "Ready to carry on — press Resume" while a question on the list
+      // still held up later stages. With anything else waiting, the line says so.
+      if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: waitingOnUser > 0 ? t('acct.clearedWaiting', { count: waitingOnUser }) : shown, setAside };
       return { did, kind: 'decision', now: t('acct.decision', { what: decisionAsked(run.needs ?? null, shown, stageLabel, locale, choosing) }), setAside };
     case 'completed':
       // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).

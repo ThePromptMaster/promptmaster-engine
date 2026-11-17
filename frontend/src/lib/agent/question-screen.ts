@@ -47,6 +47,9 @@ export type ScreenPlan =
       move: { action_key: string; params: Record<string, unknown>; rationale: string; expected_outcome: string };
     };
 
+/** A request that fixes an error of fact in the text, not one that polishes it. */
+const CORRECTION = /\b(?:citation|cite[sd]?|reference|attribut(?:ion|ed|e)|author(?:ship|s)?|misattribut\w*|wrong (?:year|date|name|figure|number|title)|incorrect(?:ly)?|correct (?:the|its|a)\b|typo|misspell\w*)\b/i;
+
 export function planFromScreen(
   screen: QuestionScreen,
   input: {
@@ -57,6 +60,8 @@ export function planFromScreen(
     returnsLeft: number;
     /** The approval was given on an earlier version, and only Go's routine repairs came since. */
     approvalStands?: boolean;
+    /** Corrections this run already made on this stage beyond its edit limit (17 Nov). */
+    correctionsBeyondLimit?: number;
   }
 ): ScreenPlan {
   if (screen.verdict === 'real_world_action') return { kind: 'record', action: screen.action, reason: screen.reason };
@@ -101,6 +106,21 @@ export function planFromScreen(
         params: { stage_id: target.id, work: screen.instruction, reason: screen.reason || screen.instruction },
         rationale: instead,
         expected_outcome: `${screen.instruction} Done on ${target.label}, and what depends on it rechecked.`,
+      },
+    };
+  }
+  // 17 Nov (Sean, Hidden Innovation): "Go described a citation correction as something
+  // it could do, then paused after hitting its edit limit and asked me whether to make
+  // the correction." The limit is for polishing. A wrong citation, author, figure or
+  // date is an error in the text: one such correction is made beyond the limit.
+  if (!input.allowed.includes('revise_stage') && CORRECTION.test(`${screen.instruction} ${input.question}`) && (input.correctionsBeyondLimit ?? 0) < 1) {
+    return {
+      kind: 'repair',
+      move: {
+        action_key: 'revise_stage',
+        params: { instruction: screen.instruction, correction_beyond_limit: true },
+        rationale: `${instead} It corrects an error in the text rather than polishing it, so I make this one correction although the run has used its edits on this stage.`,
+        expected_outcome: screen.instruction,
       },
     };
   }

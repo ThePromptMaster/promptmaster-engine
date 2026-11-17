@@ -31,7 +31,7 @@ export function RunAccountCard({
 }) {
   const t = useT();
   const locale = useLocale();
-  const account = runAccount(run, steps, stageLabel, locale, stageByEnglish, choosing);
+  const account = runAccount(run, steps, stageLabel, locale, stageByEnglish, choosing, left?.forYou ?? 0);
   if (!account || (!account.did && account.kind === 'working')) return null;
   return (
     <section aria-label={t('acc.label')} data-kind={account.kind} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">

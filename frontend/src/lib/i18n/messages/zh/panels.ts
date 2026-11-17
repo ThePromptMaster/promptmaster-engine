@@ -475,6 +475,7 @@ export const zh: Record<keyof typeof en, string> = {
   'out.stuck': '{label} 受阻：{reason}',
   'pnl.stillOpenInWorld': '文档已完成。实际工作中尚待完成：',
   'out.cutSections': '{label} 有文字在句中被截断：{names}',
+  'out.pendingResearch': '{label}：{count} 项来源核查待研究——仍需完整阅读的来源；不阻碍完成',
   'out.checkSays': '{label}：最新检查结果为 {says}',
   'out.goWaiting': 'Go 正在等你：{need}',
   'out.objWaiting': '目标未达成，正在等待：{list}',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { entryHoldsUp, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
+import { entryHoldsUp, resolvedFindings, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { DecisionOffer } from '@/lib/workflow/decision-options';
 
@@ -59,6 +59,21 @@ export function QuestionQueue({
       .finally(() => setBusy(null));
   };
 
+  // 17 Nov (Sean): findings that say they are resolved, accepted in one press.
+  const resolved = resolvedFindings(entries);
+  const acceptResolved = async () => {
+    if (busy) return;
+    setBusy('resolved');
+    setFailed(null);
+    try {
+      for (const entry of resolved) await onAnswer(entry, { kind: 'accept' });
+    } catch (e) {
+      setFailed({ key: resolved[0].key, message: e instanceof Error && e.message ? e.message : t('nyc.failed') });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const what = (item: QueueItem) =>
     item.kind === 'approval' ? t('qq.kindApproval', { stage: item.stageLabel })
       : item.kind === 'finding' ? t('qq.kindFinding', { id: item.rowId ?? '', stage: item.stageLabel })
@@ -76,6 +91,14 @@ export function QuestionQueue({
         <p role="status" data-queue-still-open className="mt-2 text-label text-[var(--on-surface)]">
           {t('qq.stillOpen', { list: stillOpen.map(what).join('; ') })}
         </p>
+      )}
+      {resolved.length > 0 && (
+        <div data-accept-resolved className="mt-3 flex flex-wrap items-center gap-2">
+          <button type="button" disabled={busy !== null} onClick={acceptResolved} className={primary}>
+            {t('qq.acceptResolved', { count: resolved.length })}
+          </button>
+          <span className="text-label text-[var(--on-surface-variant)]">{resolved.map((e) => e.items[0].rowId).join(', ')}</span>
+        </div>
       )}
       <ol className="mt-3 space-y-4">
         {entries.map((entry, n) => {

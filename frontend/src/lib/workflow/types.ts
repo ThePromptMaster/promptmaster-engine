@@ -498,6 +498,8 @@ export interface StageContext {
    * (1 Nov, Sean, recruitment plan, i11).
    */
   openRows?: Record<string, OpenFindingRow[]>;
+  /** Findings that only say a source has to be read in full (17 Nov): research to do, holding nothing up. */
+  pendingResearch?: Record<string, OpenFindingRow[]>;
 }
 
 /** One undecided review row, as every surface that names it shows it. */

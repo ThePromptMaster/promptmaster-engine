@@ -4433,3 +4433,35 @@ manuscript, still at v1, and so did the export.
   the approved text and the current one.
 - **Not done:** the approval line names the stage's own version, not the manuscript version a review read;
   a review's text says which manuscript version it checked only when its writer says so.
+
+### L-248 — One list, answered once; research left is not a blocker (2026-11-17)
+
+Sean, Hidden Innovation (15–16 Nov): "When I clicked one, Go continued before I could answer the others";
+"Ready to carry on — press Resume" while a question still held up later stages; completion blocked on three
+findings that said they were resolved, beside six source checks that could not be read in full, and three
+wordings of the same authorship request.
+
+- **An answer on Go's own card resumes only when nothing else waits.** A tick, an option or a row decided on
+  the stop card (and each approval ticked under a question that names several) is recorded; while the list
+  still holds anything, the panel says "Recorded: … N more things wait below: answer them here, then press
+  Resume once", with Resume beside it (`stillWaiting`). The list itself never resumed.
+- **"Ready to carry on" says what still waits**: "Recorded. N more things wait on you below …".
+- **Findings that say they are resolved are accepted in one press** on the list ("Accept the N findings that
+  say they are resolved"). They stay the user's: Go never closes them.
+- **Pending research.** An undecided finding that only says a source could not be read in full, or has to be
+  retrieved, is research to do, not a fault in the work: listed as "pending research" and never holding up
+  the finish (`isPendingResearch`). The stage's own "every finding decided" gate still counts it.
+- **A table whose "every finding decided" rule is marked not blocking** no longer requires every row before
+  the finish (`rowsRequired` reads `blocking`). Rows that say a requirement is unmet still hold it up.
+- **One question, once.** A kept question on the same stage that shares most of its words with one already
+  kept is the same request (`keptQuestions`); and a finished last stage is not offered "advance", which did
+  nothing there and set the same question aside again each time.
+- **A correction is not polish.** When the run has used its edits on a stage, one request that corrects an
+  error of fact (a citation, author, figure, date, name) is still made, instead of being turned into a
+  question or an objective check. A second, or anything that only polishes, is not.
+- **The work Go went back to the manuscript for is carried into it** (seen 17 Nov on a test book: Go went
+  back to "add one line to Chapter 1", could not edit chapters, and asked for the manuscript's approval with
+  the line never added). The latest return with work named, once, through the same repair as L-247.
+- **Not done:** Sean's own "I accept h1–h3 as resolved", typed as an answer, is still recorded as a fact and
+  read by the settle check, which closes carried rows and kept questions, not undecided findings; the
+  one-press accept above is the way to close them.

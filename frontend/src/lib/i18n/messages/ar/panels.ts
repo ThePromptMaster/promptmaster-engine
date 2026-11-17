@@ -475,6 +475,7 @@ export const ar: Record<keyof typeof en, string> = {
   'out.stuck': '{label} متعثرة — {reason}',
   'pnl.stillOpenInWorld': 'اكتمل المستند. ما يزال مطلوبًا في الواقع:',
   'out.cutSections': '{label} فيها نص انقطع في منتصف الجملة — {names}',
+  'out.pendingResearch': '{label}: {count} من فحوص المصادر بانتظار البحث — مصدر لم يُقرأ كاملًا بعد؛ لا يعيق الإنهاء',
   'out.checkSays': '{label}: يقول الفحص الأخير {says}',
   'out.goWaiting': 'Go بانتظارك: {need}',
   'out.objWaiting': 'الهدف لم يتحقق — بانتظار: {list}',

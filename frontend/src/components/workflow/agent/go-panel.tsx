@@ -23,7 +23,7 @@ import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import type { AgentStep } from '@/types/agent';
 import { givenByChoosing, type DecisionOffer } from '@/lib/workflow/decision-options';
-import { showsQueue, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
+import { showsQueue, stillWaiting, type QueueEntry, type QueueItem } from '@/lib/agent/user-queue';
 import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
@@ -193,6 +193,22 @@ export function GoPanel({
       : go.run?.status === 'completed'
         ? t('go.nextNothing')
         : t('go.nextPress', { button });
+  // 17 Nov (Sean): "When I clicked one, Go continued before I could answer the others …
+  // Could I record all four answers while Go stays paused, then hit Resume once?" An
+  // answer on the card is recorded; the run resumes only when nothing else waits.
+  // Shown only until another step runs: then it is out of date.
+  const [recordedAt, setRecorded] = useState<{ what: string; open: number; resume: () => Promise<unknown>; steps: number } | null>(null);
+  const recorded = recordedAt && recordedAt.steps === go.steps.length ? recordedAt : null;
+  const tickedHere = useRef<{ runId: string | null; ids: Set<string>; labels: string[] }>({ runId: null, ids: new Set(), labels: [] });
+  const resumeUnlessMoreWaits = async (answered: { criterionIds?: string[]; rowIds?: string[] }, what: string, resume: () => Promise<unknown>) => {
+    const left = queue ? stillWaiting(queue.entries, answered) : [];
+    if (left.length) {
+      setRecorded({ what, open: left.length, resume, steps: go.steps.length });
+      return;
+    }
+    setRecorded(null);
+    await resume();
+  };
   const act = async (option?: StuckOption, note?: string) => {
     if (!need) return;
     switch (need.kind) {
@@ -230,11 +246,11 @@ export function GoPanel({
             row.stageId, row.id, option === 'accept_row' ? 'accepted' : 'rejected',
             option === 'reject_row' ? `Rejected from Go's request on ${stageLabel}.` : undefined
           );
-          await go.go();
+          await resumeUnlessMoreWaits({ rowIds: [row.id] }, `${row.id} ${option === 'accept_row' ? 'accepted' : 'rejected'}`, () => go.go());
           return;
         }
         await needsActions?.tick(need.criterionId, note, need.stageId);
-        await go.go();
+        await resumeUnlessMoreWaits({ criterionIds: [need.criterionId] }, `“${need.label}”`, () => go.go());
         return;
       case 'skip_stage':
         await needsActions?.skip?.(need.reason);
@@ -455,7 +471,7 @@ export function GoPanel({
                 need.kind === 'tick_criterion' && needsActions?.decide
                   ? async (choice) => {
                       await needsActions.decide!(need.criterionId, need.stageId, choice);
-                      await go.go();
+                      await resumeUnlessMoreWaits({ criterionIds: [need.criterionId] }, `“${choice}”`, () => go.go());
                     }
                   : undefined
               }
@@ -502,13 +518,42 @@ export function GoPanel({
                 needsActions
                   ? async (a) => {
                       await needsActions.tick(a.id);
-                      await go.answer(`I ticked “${a.label}”.`);
+                      // Every approval the question named, each ticked here: one answer for them all (17 Nov).
+                      const here = tickedHere.current.runId === (go.run?.id ?? null) ? tickedHere.current : { runId: go.run?.id ?? null, ids: new Set<string>(), labels: [] };
+                      here.ids.add(a.id);
+                      here.labels.push(a.label);
+                      tickedHere.current = here;
+                      const asked = approvalsAskedFor(go.run?.stop_reason ?? '', needContext?.openApprovals);
+                      const notYet = asked.filter((x) => !here.ids.has(x.id));
+                      const answer = () => go.answer(`I ticked ${here.labels.map((l) => `“${l}”`).join(' and ')}.`);
+                      const others = queue ? stillWaiting(queue.entries, { criterionIds: [...here.ids, ...notYet.map((x) => x.id)] }) : [];
+                      if (notYet.length || others.length) {
+                        setRecorded({ what: here.labels.map((l) => `“${l}”`).join(', '), open: notYet.length + others.length, resume: answer, steps: go.steps.length });
+                        return;
+                      }
+                      setRecorded(null);
+                      await answer();
                     }
                   : undefined
               }
             />
           )}
-          {queue && showsQueue({ entries: queue.entries.length, active: go.active, pendingStep: Boolean(go.pendingStep), need: Boolean(need), canResume }) && (
+          {recorded && !go.active && (
+            <div role="status" data-recorded className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-body text-[var(--on-surface)]">
+              <span className="me-auto">{t('go.recorded', { what: recorded.what, count: recorded.open })}</span>
+              <button
+                onClick={() => {
+                  const resume = recorded.resume;
+                  setRecorded(null);
+                  void resume();
+                }}
+                className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)]"
+              >
+                {t('go.resume')}
+              </button>
+            </div>
+          )}
+          {queue && showsQueue({ entries: queue.entries.length, active: go.active, pendingStep: Boolean(go.pendingStep), need: Boolean(need), canResume: canResume || Boolean(recorded) }) && (
             <QuestionQueue entries={queue.entries} offers={queue.offers} onAnswer={queue.onAnswer} />
           )}
           {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
