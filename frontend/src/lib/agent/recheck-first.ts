@@ -1,78 +1,65 @@
 /**
- * Which earlier stage's new version reopened a stage (17 Nov). Pure.
+ * What changed in the stages before a reopened one (17 Nov). Pure.
  *
- * A save on any stage reopens every finished stage after it, whatever each one
- * reads (`laterDoneStages`), and a reopened stage was always rewritten whole.
- * Sean (17 Nov): "a small change [should] get a quick check of the two drafts it
- * affects". So before rewriting, the recheck looks at what changed in that
- * earlier stage, and asks one small question (`assess-change`): did this stage
- * rely on it? If not, the stage is kept as it is and closed again.
+ * A change to an earlier stage reopens every finished stage after it, whatever
+ * each one reads (`laterDoneStages`), and a reopened stage was always rewritten
+ * whole. Sean (17 Nov): "a small change [should] get a quick check of the two
+ * drafts it affects, while a bigger change gets a deeper review". So before
+ * rewriting, the recheck looks at what changed in the earlier stages since this
+ * one was reopened, and asks one small question (`assess-change`): did this
+ * stage rely on it? If not, the stage is kept as it is and closed again.
+ *
+ * The change is read from the versions, not from the events that reopened the
+ * stage: a stage is reopened by a save, by a completion on another version, or
+ * by the user going back to edit an earlier stage ("Edit this stage"), and in
+ * each case what matters is the earlier stage's text then and now.
  */
 
-import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import type { WorkflowTemplate } from '@/lib/workflow/types';
 
 export interface UpstreamChange {
   stageId: string;
   label: string;
-  /** The version this stage was built on, and the one it is now. */
-  beforeId: string;
-  afterId: string;
-  beforeNumber: number | null;
-  afterNumber: number | null;
+  before: { id: string; number: number; content: string };
+  after: { id: string; number: number; content: string };
 }
 
 /**
- * The single earlier stage whose saves since `since` reopened `targetId`, with
- * the version before the first and after the last. Two kinds of event reopen a
- * later stage this way: a new version saved (`stage_version_saved`) and the
- * stage marked complete again on a different version (`stage_marked_complete`
- * with other evidence). Null when it was reopened some other way (a brief
- * change) or by more than one stage: those are rewritten as before.
+ * Each earlier stage whose current text differs from what it held when `since`
+ * came (the moment the target was reopened), with both texts. Null when a
+ * changed earlier stage cannot be read this way — a manuscript, whose text is
+ * its chapters, or one with no version from before — so the target is rewritten
+ * as before. An empty list when nothing earlier changed: the target was reopened
+ * by something else (a brief or fact change), which is not judged here.
  */
-export function upstreamChange(
-  template: WorkflowTemplate,
-  events: readonly WorkflowEvent[],
+export function upstreamChanges(
+  template: Pick<WorkflowTemplate, 'stages'>,
+  bundles: Record<string, StageArtifactBundle | undefined>,
   targetId: string,
   since: string
-): UpstreamChange | null {
-  const order = template.stages.map((s) => s.id);
-  const at = order.indexOf(targetId);
+): UpstreamChange[] | null {
+  const at = template.stages.findIndex((s) => s.id === targetId);
   if (at < 0) return null;
-  const earlier = (e: WorkflowEvent) => {
-    const from = order.indexOf(e.stage_id);
-    return from >= 0 && from < at;
-  };
-  const evidenceOf = (e: WorkflowEvent) => (typeof e.payload?.evidence_version_id === 'string' ? (e.payload.evidence_version_id as string) : null);
-  // Each change as [before, after] version ids, in order.
-  const changes: { stageId: string; before: string | null; after: string | null; n: number | null }[] = [];
-  events.forEach((e, i) => {
-    if (e.created_at < since || !earlier(e)) return;
-    if (e.type === 'stage_version_saved') {
-      const affected = e.payload?.affected;
-      if (Array.isArray(affected) && !affected.includes(targetId)) return;
-      changes.push({
-        stageId: e.stage_id,
-        before: typeof e.payload?.prior_version_id === 'string' ? e.payload.prior_version_id : null,
-        after: typeof e.payload?.version_id === 'string' ? e.payload.version_id : null,
-        n: typeof e.payload?.version_number === 'number' ? (e.payload.version_number as number) : null,
-      });
-    } else if (e.type === 'stage_marked_complete' && !e.to_stage_id && evidenceOf(e)) {
-      const prior = events.slice(0, i).reverse().find((p) => p.stage_id === e.stage_id && p.type === 'stage_marked_complete' && evidenceOf(p));
-      const before = prior ? evidenceOf(prior) : null;
-      if (before && before !== evidenceOf(e)) changes.push({ stageId: e.stage_id, before, after: evidenceOf(e), n: null });
+  const out: UpstreamChange[] = [];
+  for (const stage of template.stages.slice(0, at)) {
+    const versions = bundles[stage.id]?.versions ?? [];
+    const head = versions.at(-1);
+    if (!head) continue;
+    const before = [...versions].reverse().find((v) => v.created_at <= since);
+    if (!before) {
+      // Written only after the target was reopened: a change we cannot compare.
+      if (head.created_at > since) return null;
+      continue;
     }
-  });
-  if (!changes.length) return null;
-  if (new Set(changes.map((c) => c.stageId)).size > 1) return null;
-  const first = changes[0];
-  const last = changes[changes.length - 1];
-  if (!first.before || !last.after || first.before === last.after) return null;
-  return {
-    stageId: first.stageId,
-    label: template.stages[order.indexOf(first.stageId)]?.label ?? first.stageId,
-    beforeId: first.before,
-    afterId: last.after,
-    beforeNumber: null,
-    afterNumber: last.n,
-  };
+    if (before.id === head.id || before.content === head.content) continue;
+    if (stage.renderer === 'long_form') return null;
+    out.push({
+      stageId: stage.id,
+      label: stage.label,
+      before: { id: before.id, number: before.version_number, content: before.content },
+      after: { id: head.id, number: head.version_number, content: head.content },
+    });
+  }
+  return out;
 }

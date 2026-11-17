@@ -31,14 +31,19 @@ export function changeOutcomes(
   stages: readonly Pick<StageDefinition, 'id' | 'renderer'>[],
   versionsOf: (stageId: string) => readonly VersionLike[],
   evaluations: Readonly<Record<string, EvaluationLike>> | undefined,
-  undecidedRows: (stageId: string) => number
+  undecidedRows: (stageId: string) => number,
+  /**
+   * Versions Go's own completion of a stage saved: a manuscript's "Full draft
+   * saved" carries no `agent_` operation, and read as the user's (17 Nov, prod pass).
+   */
+  savedByGo: ReadonlySet<string> = new Set()
 ): ChangeOutcome[] {
   return stageIds.map((stageId) => {
     const stage = stages.find((s) => s.id === stageId);
     const after = versionsOf(stageId).filter((v) => v.created_at > since);
     const last = after.at(-1) ?? null;
     const version = last?.version_number ?? null;
-    const by = last ? ((last.source_operation ?? '').startsWith('agent_') ? 'go' : 'you') : null;
+    const by = last ? ((last.source_operation ?? '').startsWith('agent_') || savedByGo.has(last.id) ? 'go' : 'you') : null;
     // A findings table says how many are undecided; a plain table (facts, figures) has nothing to decide (4 Nov, prod pass).
     if (stage && stage.renderer === 'review') return { stageId, version, by, check: 'table', count: undecidedRows(stageId) };
     if (stage && stage.renderer !== 'prose' && stage.renderer !== 'long_form') return { stageId, version, by, check: 'none', count: 0 };

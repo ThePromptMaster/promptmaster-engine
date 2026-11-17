@@ -4382,15 +4382,18 @@ while the last pass was still running.
   at most 90. When it runs out the step says Resume waits for them.
 - **A section a rewrite does not concern is not written out again.** The model answers `SECTION UNCHANGED`;
   the section keeps its text, its revision advances, and no record call is made.
-- **A stage reopened only because an earlier stage changed is checked first**: the earlier stage saved a
-  new version, or was marked complete again on a different version (seen 17 Nov on a test book: the chapter
-  plan's repair reopened the review). The earlier stage's text before and after goes beside this stage's
-  summary in one `assess-change` call. If nothing relied on it, the stage is marked complete again on the
+- **A stage reopened because an earlier stage changed is checked first**, however it was reopened: a new
+  version saved, a completion on a different version (seen 17 Nov on a test book: the chapter plan's repair
+  reopened the review), or the user going back with "Edit this stage". What changed is read from the
+  versions: each earlier stage's text when this one was reopened and now, side by side in one
+  `assess-change` call with this stage's summary. An earlier manuscript that changed is not compared
+  (its text is its chapters), and the stage is rewritten as before. If nothing relied on it, the stage is marked complete again on the
   version it has ("Checked after a change: …"). Not checked first: a stage reopened by a brief or fact
-  change (already judged by the same call), by more than one stage, or with a measured requirement, carried
-  rows or the user's note on it; and a draft that was in progress.
+  change with no earlier stage changed (already judged by the same call), or with a measured requirement,
+  carried rows or the user's note on it; and a draft that was in progress.
 - **A check that closes the stage is a change**: its step records the `stage_marked_complete` event, so it is
-  not "reported success, but no change" (seen as a failed step on the 17 Nov test book, #707).
+  not "reported success, but no change" (seen as a failed step on the 17 Nov test book, #707). The change
+  notice says a manuscript's "Full draft saved" that Go's close made was Go's, not "updated by you".
 - **Still by position:** a save still reopens every finished stage after it (`laterDoneStages`); the
   check above is what keeps that from costing a rewrite each.
 - **The run's account** says what was checked and kept, what is left for Go, and how many things wait on
