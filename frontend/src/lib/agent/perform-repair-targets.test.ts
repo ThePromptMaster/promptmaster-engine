@@ -24,6 +24,7 @@ vi.mock('@/lib/supabase/sources', () => ({ saveSources: vi.fn(async () => []) })
 
 import { performStep, type PerformContext } from './perform';
 import { repairWaitMs } from './repair-targets';
+import { assertHonestOutcome } from './outcome';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 
 const REASON = 'The drafted manuscript\'s Chapter 5 section carries the old title, which must change to "Beyond the Growth Narrative".';
@@ -68,6 +69,9 @@ describe('a manuscript repair rewrites only what the change concerns (17 Nov)', 
     expect(out.status).toBe('succeeded');
     expect(out.output).toContain('Checked the chapters before rewriting any: The new title already heads Chapter 5. Nothing was rewritten.');
     expect(out.changes.checked_unchanged).toBe(true);
+    // The close is the change: a check that closed the stage is not "no change" (17 Nov, production).
+    expect(out.changes.event_types).toEqual(['stage_marked_complete']);
+    expect(assertHonestOutcome('recheck_stage', out).status).toBe('succeeded');
     const closed = appendWorkflowEvent.mock.calls.map((c) => c[2]).find((e) => e.type === 'stage_marked_complete');
     expect(closed.payload.checked_unchanged).toBe(true);
     expect(closed.reason).toMatch(/^Checked after a change:/);

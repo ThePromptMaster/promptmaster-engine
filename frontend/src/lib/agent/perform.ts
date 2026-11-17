@@ -2765,8 +2765,10 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
   const change = upstreamChange(ctx.template, events, target.id, since);
   if (!change) return null;
   const upstream = ctx.bundles[change.stageId]?.versions ?? [];
-  const before = upstream.find((v) => v.id === change.beforeId)?.content;
-  const after = upstream.find((v) => v.id === change.afterId)?.content;
+  const beforeVersion = upstream.find((v) => v.id === change.beforeId);
+  const afterVersion = upstream.find((v) => v.id === change.afterId);
+  const before = beforeVersion?.content;
+  const after = afterVersion?.content;
   if (!before || !after) return null;
   if (!evaluateStage(ctx.template, target.id, ctx.context).canAdvance) return null;
   const artifact = ctx.bundles[target.id]?.artifact;
@@ -2792,7 +2794,7 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
   }
   if (affected) return null;
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
-  const versions = change.beforeNumber && change.afterNumber ? ` (v${change.beforeNumber} to v${change.afterNumber})` : '';
+  const versions = beforeVersion?.version_number && afterVersion?.version_number ? ` (v${beforeVersion.version_number} to v${afterVersion.version_number})` : '';
   await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
     type: 'stage_marked_complete',
     stage_id: target.id,
@@ -2805,7 +2807,7 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
   return done(key, {
     status: 'succeeded',
     toolsUsed: ['model'],
-    changes: { checked_unchanged: true, stage_closed: true },
+    changes: { checked_unchanged: true, stage_closed: true, event_types: ['stage_marked_complete'] },
     output: `Checked ${target.label} against the change to ${change.label}${versions} before rewriting it: nothing in it relied on what changed, so v${head.version_number} was kept as it is and marked complete again.`,
   });
 }
@@ -2869,9 +2871,12 @@ async function closeRepairedManuscript(ctx: PerformContext, key: string, target:
   }
   const closed = evaluation.canAdvance && Boolean(evidence || actor === 'user');
   const verb = wrote.changes?.checked_unchanged ? 'was checked' : 'was repaired';
+  // A check that closed the stage changed the project by that event: without it
+  // in the record the step read as "reported success, but no change" (17 Nov).
+  const events = closed ? [...(wrote.changes?.event_types ?? []), 'stage_marked_complete'] : wrote.changes?.event_types;
   return done(key, {
     ...wrote,
-    changes: { ...wrote.changes, stage_closed: closed },
+    changes: { ...wrote.changes, stage_closed: closed, ...(events?.length ? { event_types: events } : {}) },
     output: `${wrote.output} ${target.label} ${verb} (${why})${closed ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
   });
 }
