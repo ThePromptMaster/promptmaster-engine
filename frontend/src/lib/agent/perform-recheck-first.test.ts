@@ -27,6 +27,7 @@ vi.mock('@/lib/supabase/sources', () => ({ saveSources: vi.fn(async () => []) })
 
 import { performStep, type PerformContext } from './perform';
 import { upstreamChange } from './recheck-first';
+import { assertHonestOutcome } from './outcome';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 
 const SINCE = '2026-11-15T01:51:00Z';
@@ -79,7 +80,8 @@ describe('a reopened stage is checked before it is rewritten (17 Nov)', () => {
     const out = await performStep(ctx());
     expect(generateStageArtifact).not.toHaveBeenCalled();
     expect(out.status).toBe('succeeded');
-    expect(out.changes).toMatchObject({ checked_unchanged: true, stage_closed: true });
+    expect(out.changes).toMatchObject({ checked_unchanged: true, stage_closed: true, event_types: ['stage_marked_complete'] });
+    expect(assertHonestOutcome('recheck_stage', out).status).toBe('succeeded');
     expect(out.output).toBe('Checked Realignment against the change to Output and evaluation (v3 to v4) before rewriting it: nothing in it relied on what changed, so v2 was kept as it is and marked complete again.');
     const sent = assessChange.mock.calls[0][0];
     expect(sent.field).toBe('the earlier stage "Output and evaluation"');
@@ -107,7 +109,15 @@ describe('a reopened stage is checked before it is rewritten (17 Nov)', () => {
 describe('which earlier save reopened a stage', () => {
   it('one stage saved twice: the version before the first save and after the last', () => {
     const events = [save('2026-11-15T01:51:00Z', 'o3', 'o4', 4), save('2026-11-15T02:10:00Z', 'o4', 'o5', 5)];
-    expect(upstreamChange(SINGLE_OUTPUT_V1, events as never, 'realign', SINCE)).toMatchObject({ stageId: 'output', beforeId: 'o3', afterId: 'o5', beforeNumber: 3, afterNumber: 5 });
+    expect(upstreamChange(SINGLE_OUTPUT_V1, events as never, 'realign', SINCE)).toMatchObject({ stageId: 'output', beforeId: 'o3', afterId: 'o5', afterNumber: 5 });
+  });
+
+  it('a stage marked complete again on a different version (17 Nov, production: a chapter plan repaired)', () => {
+    const done = (at: string, evidence: string, n: number) => ({ id: `c${n}`, project_id: 'p', user_id: 'u', seq: n, type: 'stage_marked_complete', stage_id: 'output', to_stage_id: null, actor: 'system', reason: null, created_at: at, payload: { evidence_version_id: evidence } });
+    const events = [done('2026-11-14T00:00:00Z', 'o3', 1), done('2026-11-15T02:00:00Z', 'o4', 2)];
+    expect(upstreamChange(SINGLE_OUTPUT_V1, events as never, 'realign', SINCE)).toMatchObject({ stageId: 'output', beforeId: 'o3', afterId: 'o4' });
+    // Completed again on the same version: nothing changed.
+    expect(upstreamChange(SINGLE_OUTPUT_V1, [done('2026-11-14T00:00:00Z', 'o3', 1), done('2026-11-15T02:00:00Z', 'o3', 2)] as never, 'realign', SINCE)).toBeNull();
   });
 
   it('two different earlier stages, a save that did not name it, or one before it was reopened: none', () => {

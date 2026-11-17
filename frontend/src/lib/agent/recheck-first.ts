@@ -23,9 +23,11 @@ export interface UpstreamChange {
 
 /**
  * The single earlier stage whose saves since `since` reopened `targetId`, with
- * the version before the first save and after the last. Null when it was
- * reopened some other way (a brief change, a completion on other evidence) or
- * by more than one stage: those are rewritten as before.
+ * the version before the first and after the last. Two kinds of event reopen a
+ * later stage this way: a new version saved (`stage_version_saved`) and the
+ * stage marked complete again on a different version (`stage_marked_complete`
+ * with other evidence). Null when it was reopened some other way (a brief
+ * change) or by more than one stage: those are rewritten as before.
  */
 export function upstreamChange(
   template: WorkflowTemplate,
@@ -36,29 +38,41 @@ export function upstreamChange(
   const order = template.stages.map((s) => s.id);
   const at = order.indexOf(targetId);
   if (at < 0) return null;
-  const saves = events.filter((e) => {
-    if (e.type !== 'stage_version_saved' || e.created_at < since) return false;
+  const earlier = (e: WorkflowEvent) => {
     const from = order.indexOf(e.stage_id);
-    if (from < 0 || from >= at) return false;
-    const affected = e.payload?.affected;
-    return Array.isArray(affected) ? affected.includes(targetId) : true;
+    return from >= 0 && from < at;
+  };
+  const evidenceOf = (e: WorkflowEvent) => (typeof e.payload?.evidence_version_id === 'string' ? (e.payload.evidence_version_id as string) : null);
+  // Each change as [before, after] version ids, in order.
+  const changes: { stageId: string; before: string | null; after: string | null; n: number | null }[] = [];
+  events.forEach((e, i) => {
+    if (e.created_at < since || !earlier(e)) return;
+    if (e.type === 'stage_version_saved') {
+      const affected = e.payload?.affected;
+      if (Array.isArray(affected) && !affected.includes(targetId)) return;
+      changes.push({
+        stageId: e.stage_id,
+        before: typeof e.payload?.prior_version_id === 'string' ? e.payload.prior_version_id : null,
+        after: typeof e.payload?.version_id === 'string' ? e.payload.version_id : null,
+        n: typeof e.payload?.version_number === 'number' ? (e.payload.version_number as number) : null,
+      });
+    } else if (e.type === 'stage_marked_complete' && !e.to_stage_id && evidenceOf(e)) {
+      const prior = events.slice(0, i).reverse().find((p) => p.stage_id === e.stage_id && p.type === 'stage_marked_complete' && evidenceOf(p));
+      const before = prior ? evidenceOf(prior) : null;
+      if (before && before !== evidenceOf(e)) changes.push({ stageId: e.stage_id, before, after: evidenceOf(e), n: null });
+    }
   });
-  if (!saves.length) return null;
-  if (new Set(saves.map((e) => e.stage_id)).size > 1) return null;
-  const first = saves[0];
-  const last = saves[saves.length - 1];
-  const beforeId = typeof first.payload?.prior_version_id === 'string' ? first.payload.prior_version_id : null;
-  const afterId = typeof last.payload?.version_id === 'string' ? last.payload.version_id : null;
-  if (!beforeId || !afterId || beforeId === afterId) return null;
-  const n = (e: WorkflowEvent) => (typeof e.payload?.version_number === 'number' ? (e.payload.version_number as number) : null);
-  const afterNumber = n(last);
-  const beforeNumber = afterNumber === null ? null : Math.max(1, (n(first) ?? afterNumber) - 1);
+  if (!changes.length) return null;
+  if (new Set(changes.map((c) => c.stageId)).size > 1) return null;
+  const first = changes[0];
+  const last = changes[changes.length - 1];
+  if (!first.before || !last.after || first.before === last.after) return null;
   return {
-    stageId: first.stage_id,
-    label: template.stages[order.indexOf(first.stage_id)]?.label ?? first.stage_id,
-    beforeId,
-    afterId,
-    beforeNumber,
-    afterNumber,
+    stageId: first.stageId,
+    label: template.stages[order.indexOf(first.stageId)]?.label ?? first.stageId,
+    beforeId: first.before,
+    afterId: last.after,
+    beforeNumber: null,
+    afterNumber: last.n,
   };
 }
