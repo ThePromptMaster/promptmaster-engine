@@ -4461,7 +4461,9 @@ wordings of the same authorship request.
   question or an objective check. A second, or anything that only polishes, is not.
 - **The work Go went back to the manuscript for is carried into it** (seen 17 Nov on a test book: Go went
   back to "add one line to Chapter 1", could not edit chapters, and asked for the manuscript's approval with
-  the line never added). The latest return with work named, once, through the same repair as L-247.
+  the line never added). The latest return to the last long-form stage with work named, once, through the
+  same repair as L-247, whichever stage delivers the text (#713: that book's deliverable is its Final book, and
+  the first version looked only at the deliverable).
 - **Not done:** Sean's own "I accept h1–h3 as resolved", typed as an answer, is still recorded as a fact and
   read by the settle check, which closes carried rows and kept questions, not undecided findings; the
   one-press accept above is the way to close them.

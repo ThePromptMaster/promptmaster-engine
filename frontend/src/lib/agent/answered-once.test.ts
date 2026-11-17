@@ -98,10 +98,12 @@ describe('a correction is not polish (17 Nov: a citation fix was asked about at 
 });
 
 describe('the work Go went back to the manuscript for is carried into it', () => {
-  it('the latest return with work named, once', () => {
+  it('the latest return with work named, once, whichever stage delivers (17 Nov, production pass: the Final book did)', () => {
     const template = { stages: [{ id: 'manuscript', renderer: 'long_form' }, { id: 'final', renderer: 'prose' }] } as never;
     const events = [{ type: 'stage_returned', to_stage_id: 'manuscript', created_at: 't1', payload: { work: 'Add one line to Chapter 1 giving Alex a rough time frame.' } }] as never;
-    expect(returnWorkToCarry(template, events, 'manuscript', new Set())).toEqual([{ key: 'return:t1', text: '[went back for] Add one line to Chapter 1 giving Alex a rough time frame.' }]);
-    expect(returnWorkToCarry(template, events, 'manuscript', new Set(['return:t1']))).toEqual([]);
+    expect(returnWorkToCarry(template, events, new Set())).toEqual({ stageId: 'manuscript', rows: [{ key: 'return:t1', text: '[went back for] Add one line to Chapter 1 giving Alex a rough time frame.' }] });
+    expect(returnWorkToCarry(template, events, new Set(['return:t1']))).toBeNull();
+    // A return to a prose stage is that stage's own work, not this.
+    expect(returnWorkToCarry(template, [{ type: 'stage_returned', to_stage_id: 'final', created_at: 't2', payload: { work: 'x' } }] as never, new Set())).toBeNull();
   });
 });
