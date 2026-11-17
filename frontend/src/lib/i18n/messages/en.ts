@@ -319,6 +319,8 @@ export const en = {
   "door.review": "Review the setup first",
   "door.removeItem": "Remove: {item}",
   "door.searched": "Searched the web for “{query}” · {found}",
+  "door.connectAccount": "Connect an account (Gmail, Drive, Outlook, Salesforce…) so this conversation can read it",
+  "door.accountsRead": "Read from your accounts: {count} item(s), kept with the project when it is made",
   "door.newSources_one": "{count} new source",
   "door.newSources_other": "{count} new sources",
   "door.noSources": "no new sources",

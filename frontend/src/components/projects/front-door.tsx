@@ -40,6 +40,8 @@ export type Turn = {
   content: string;
   draft?: string;
   web?: FrontDoorSearch;
+  /** What this reply read from the person's connected accounts (17 Nov). */
+  accounts?: { query: string; items: ThirdPartyItem[]; note?: string };
   question?: GuideQuestion;
   /** The question was skipped: no answer follows it. */
   skipped?: boolean;
@@ -71,6 +73,15 @@ export interface FrontDoorSearch {
  */
 export function sourcesFound(turns: readonly Turn[]): NewSource[] {
   return turns.flatMap((t) => t.web?.sources ?? []);
+}
+
+/**
+ * What the conversation read from the person's accounts (17 Nov, Sean: "trying to connect to
+ * Google Drive and Salesforce … it wasn't able to read or access it there"): sent with each
+ * turn, and kept as the project's account items when it is made.
+ */
+export function itemsRead(turns: readonly Turn[]): ThirdPartyItem[] {
+  return turns.flatMap((t) => t.accounts?.items ?? []);
 }
 
 export interface FrontDoorState {
@@ -176,13 +187,19 @@ export function FrontDoor({
         ...(carried.length ? { third_party: titlesOnly(carried) } : {}),
         web_access: 'on',
         sources: sourcesFound(from),
+        // A new project searches the person's accounts as its side chat does (17 Nov).
+        account_search: 'on',
+        ...(itemsRead(from).length ? { account_items: itemsRead(from) } : {}),
         // The next question comes as a card; a reply asking its own put two in a row (31 Oct).
         ...(questions ? { questions: true } : {}),
       });
       const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
+      const accounts = res.account_items?.length || res.account_note
+        ? { query: res.account_query ?? '', items: res.account_items ?? [], ...(res.account_note ? { note: res.account_note } : {}) }
+        : null;
       const after: Turn[] = [
         ...next,
-        { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}), ...(web ? { web } : {}) },
+        { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}), ...(web ? { web } : {}), ...(accounts ? { accounts } : {}) },
       ];
       setTurns(after);
       setBrief(res.brief);
@@ -336,6 +353,7 @@ export function FrontDoor({
                 )}
                 {t.draft && <DraftBlock text={t.draft} />}
                 {t.web && <SearchNote search={t.web} first={sourcesFound(turns.slice(0, i)).length + 1} />}
+                {t.accounts && <AccountsNote read={t.accounts} first={carried.length + itemsRead(turns.slice(0, i)).length + 1} />}
               </div>
             )
           )}
@@ -528,6 +546,29 @@ export function SearchNote({ search, first }: { search: FrontDoorSearch; first: 
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/** What a reply read from the person's accounts, numbered as the reply cites them ([T n]). */
+export function AccountsNote({ read, first }: { read: { query: string; items: ThirdPartyItem[]; note?: string }; first: number }) {
+  const t = useT();
+  return (
+    <div data-accounts-read className="text-label text-[var(--on-surface-variant)]">
+      <p className="flex items-start gap-1.5">
+        <span aria-hidden className="material-symbols-outlined text-[16px]">{'inbox'}</span>
+        <span>{read.items.length ? t('door.accountsRead', { count: read.items.length }) : read.note}</span>
+      </p>
+      {read.items.length > 0 && (
+        <ol className="mt-1 space-y-0.5 ps-6">
+          {read.items.map((item, i) => (
+            <li key={`${item.kind}:${item.title}`} className="break-words">
+              {`[T${first + i}] `}{item.source ? `${item.source} · ` : ''}{item.title}
+            </li>
+          ))}
+        </ol>
+      )}
+      {read.items.length > 0 && read.note && <p className="mt-1">{read.note}</p>}
     </div>
   );
 }

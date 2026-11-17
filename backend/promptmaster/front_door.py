@@ -17,8 +17,14 @@ import re
 from pydantic import BaseModel, Field
 
 from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
-from .schemas import ChatMessage, PMInput, SavedSource, ThirdPartyItem
-from .project_context import brought_titles, highest_source_number
+from typing import TYPE_CHECKING
+
+from .account_search import with_accounts
+from .schemas import AccountUse, ChatMessage, PMInput, SavedSource, ThirdPartyItem
+from .project_context import brought_titles, highest_source_number, third_party_block
+
+if TYPE_CHECKING:
+    from .composio_client import Composio
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .catchphrases import without_repeated_catchphrases
 from .source_access import links_rule
@@ -95,6 +101,12 @@ class FrontDoorTurn(BaseModel):
     web_sources: list[WebSource] = Field(default_factory=list)
     #: Set when a search was wanted but failed: the reply was made without it.
     web_note: str = ""
+    #: What this turn read from the person's connected accounts (17 Nov, Sean: "trying to
+    #: connect to Google Drive and Salesforce … it wasn't able to read or access it there").
+    #: Carried into the project as its account items when it is made.
+    account_query: str = ""
+    account_items: list[ThirdPartyItem] = Field(default_factory=list)
+    account_note: str = ""
 
 
 #: The brief's parts a user can edit in the outline beside the chat.
@@ -306,9 +318,29 @@ async def front_door_turn(
     sources: list[SavedSource] | None = None,
     questions: bool = False,
     third_party: list[ThirdPartyItem] | None = None,
+    composio: Composio | None = None,
+    owner: str | None = None,
+    account_search: str = "off",
+    read_items: list[ThirdPartyItem] | None = None,
 ) -> FrontDoorTurn:
     web_query, new_sources, web_note, found = "", [], "", ""
     saved = sources or []
+    # Carried in by "Start this": titles only, whatever is sent (7 Nov).
+    carried = [i.model_copy(update={"text": ""}) for i in (third_party or [])]
+    read = list(read_items or [])
+    held = [*carried, *read]
+    account_use = AccountUse()
+    if account_search == "on" and composio is not None and owner:
+        # 17 Nov (Sean): the start conversation reads the person's accounts as the side
+        # chat does, from their own words, with nothing to type or tick.
+        asked = next((t.content for t in reversed(turns) if t.role == "user"), "")
+        base = PMInput(objective=(brief.objective or asked[:300]).strip() or "A new project", mode="analyst", third_party=held)
+        own = [
+            ChatMessage(id=str(i), iteration_number=1, role="user", content=t.content, created_at="")
+            for i, t in enumerate(turns[:-1][-4:]) if t.role == "user"
+        ]
+        _with, account_use = await with_accounts(client, composio, owner, base, "on", task=asked[:4_000], turns=own)
+        read = [*read, *account_use.account_items]
     if web_access == "on":
         # The side chat's search (22 Oct, client: "I don't think the internet
         # works with the initial chatbox"): the same decision and search, with
@@ -330,9 +362,7 @@ async def front_door_turn(
         except (OpenRouterError, ValueError, AttributeError) as e:
             logger.warning("front door web search failed: %s", e)
             web_note = "The web search failed, so this reply uses only what you have said."
-    result, prose, dropped = await _answer(
-        client, model, turns, brief, edited, material, web_access, found, questions, brought_titles(third_party or [])
-    )
+    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found, questions, held_items(carried, read))
     if dropped:
         new_sources, web_note = [], "The search results could not be used in this reply, so it uses only what you have said."
     turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)
@@ -342,4 +372,23 @@ async def front_door_turn(
     if web_query:
         turn.reply = strip_unknown_citations(turn.reply, highest_source_number(saved) + len(new_sources))
     turn.web_query, turn.web_sources, turn.web_note = web_query, new_sources, web_note
+    turn.account_query, turn.account_items, turn.account_note = account_use.account_query, account_use.account_items, account_use.account_note
     return turn
+
+
+#: The start conversation may read what it found in the person's accounts, and quote it; the
+#: brief it drafts is the user's word, so nothing in it comes from there (7 Nov, kept 17 Nov).
+HELD_RULE = (
+    "Quote this material in your reply when it answers what the user asked, citing [T1] and so on. "
+    "Never write any of it into the brief as the user's own words or as an accepted fact: it is carried "
+    "into the project as the user's account items, and the user decides what of it becomes theirs."
+)
+
+
+def held_items(carried: list[ThirdPartyItem], read: list[ThirdPartyItem]) -> str:
+    """Account items for the start conversation: titles only for those "Start this"
+    carried in, the text fenced for those read in this conversation, numbered together."""
+    if not read:
+        return brought_titles(carried)
+    items = [*[i.model_copy(update={"text": "(its text is not shown here)"}) for i in carried], *read]
+    return f"{third_party_block(PMInput(objective='-', mode='analyst', third_party=items))}\n{HELD_RULE}"

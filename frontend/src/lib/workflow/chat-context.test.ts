@@ -68,6 +68,21 @@ describe('the side chat sees the project (3 Oct call)', () => {
     expect(ctx.buttons).toEqual([{ label: 'Draft this stage', where: 'the main button at the bottom of the stage' }]);
   });
 
+  it('says what a More-menu tool does, and which stage each Go step worked on (17 Nov, Sean)', () => {
+    const ctx = buildChatContext({
+      template: BOOK_V1, state, project: PROJECT, stage: stage('continuity'), bundles,
+      controls: [{ id: 'drift_alert', label: 'Realign to the objective', place: 'more_menu', does: 'rewrites the whole draft back toward the objective, as a new version' }],
+      goRun: {
+        run: { status: 'awaiting_decision', policy: 'autonomous', stop_reason: '' } as never,
+        steps: [{ action_key: 'recheck_stage', status: 'interrupted', execution_label: null, output: `Repaired 13 sections. ${'x'.repeat(500)} still being written when the wait ran out.`, stage_id: 'continuity', params: { stage_id: 'drafting' } }],
+        objective: '',
+      },
+    });
+    expect(ctx.buttons).toEqual([{ label: 'Realign to the objective', where: 'under "More" at the bottom of the stage', does: 'rewrites the whole draft back toward the objective, as a new version' }]);
+    expect(ctx.go_run?.steps[0].stage).toBe(stage('drafting').label);
+    expect(ctx.go_run?.steps[0].output).toContain('still being written when the wait ran out');
+  });
+
   it('falls back to the Outline stage when nothing is drafted yet', () => {
     const json = JSON.stringify({ items: [{ id: 'a', title: 'Habitat', abstract: 'Where lions live' }] });
     const ctx = buildChatContext({

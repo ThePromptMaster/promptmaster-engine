@@ -31,6 +31,9 @@ class PageButton(BaseModel):
 
     label: str = Field(max_length=200)
     where: str = Field(default="", max_length=200)
+    #: What pressing it does to the work (17 Nov, Sean: the chat sent him to "Realign to the
+    #: objective", which rewrites the whole draft, to settle a chapter retitle).
+    does: str = Field(default="", max_length=300)
 
 
 class GoStepTrace(BaseModel):
@@ -39,7 +42,9 @@ class GoStepTrace(BaseModel):
     #: Derived from what happened (labels.ts), never from a model.
     execution_label: str | None = Field(default=None, max_length=40)
     block_kind: str | None = Field(default=None, max_length=40)
-    output: str = Field(default="", max_length=400)
+    output: str = Field(default="", max_length=1_200)
+    #: The stage the step worked on (17 Nov: the chat called a manuscript repair "rechecking downstream stages").
+    stage: str = Field(default="", max_length=200)
 
 
 class GoRunTrace(BaseModel):
@@ -143,10 +148,21 @@ def format_buttons(buttons: list[PageButton] | None) -> str:
         return "BUTTONS ON THIS PAGE NOW: not known. Do not name any button."
     if not buttons:
         return "BUTTONS ON THIS PAGE NOW: none. Do not name any button."
+    def line(b: PageButton) -> str:
+        out = f'- "{b.label}"'
+        if b.where:
+            out += f" — {b.where}"
+        if b.does:
+            out += f" — {b.does}"
+        return out
+
     return (
         "BUTTONS ON THIS PAGE NOW (the user presses these; name one only in these exact words, "
-        "in quotes, and never a button that is not listed):\n"
-        + "\n".join(f'- "{b.label}" — {b.where}' if b.where else f'- "{b.label}"' for b in buttons)
+        "in quotes, and never a button that is not listed). Each time you name one, say where it is, "
+        "in the words given (\"under \"More\" at the bottom of the stage\"): a button under a menu cannot "
+        "be seen until the menu is opened. Choose a button by what it does: never send the user to one "
+        "that does more than they need (one that rewrites the whole draft, to change one title):\n"
+        + "\n".join(line(b) for b in buttons)
     )
 
 
@@ -203,8 +219,9 @@ def format_go_run(run: GoRunTrace | None, read: bool = True) -> str:
         for s in run.steps:
             label = s.execution_label or "no execution"
             extra = f", blocked: {s.block_kind}" if s.block_kind else ""
-            out = f" — {' '.join(s.output.split())[:300]}" if s.output.strip() else ""
-            lines.append(f"- {s.action} [{s.status}; {label}{extra}]{out}")
+            out = f" — {' '.join(s.output.split())[:900]}" if s.output.strip() else ""
+            on = f" on {s.stage}" if s.stage.strip() else ""
+            lines.append(f"- {s.action}{on} [{s.status}; {label}{extra}]{out}")
     lines.append(
         "When asked why Go stopped or what it did, answer from this record only. If the record does "
         "not show it, say you cannot verify it from the run record — never offer an inference as the reason."
@@ -365,6 +382,12 @@ def scrub_button_mentions(text: str, buttons: list | None, also: tuple[str, ...]
     if not text:
         return text
     real = {_norm(b.label): b.label for b in (buttons or []) if getattr(b, "label", "").strip()}
+    # 17 Nov (Sean, iPad): the chat said press "Continue to Final register" "here"; it was
+    # under "More", and he could not find it. A menu's button is said with its place.
+    hidden = {
+        _norm(b.label): b.where for b in (buttons or [])
+        if getattr(b, "label", "").strip() and '"More"' in (getattr(b, "where", "") or "")
+    }
     # Buttons that are always there for this caller (Go's own: Resume, Stop).
     real.update({_norm(label): label for label in also})
 
@@ -372,6 +395,10 @@ def scrub_button_mentions(text: str, buttons: list | None, also: tuple[str, ...]
         verb, name = m.group(1), m.group(2).strip()
         hit = real.get(_norm(name))
         if hit:
+            where = hidden.get(_norm(name))
+            said = m.string[m.end(): m.end() + 120].lower()
+            if where and "more" not in said:
+                return f'{verb} "{hit}" ({where})'
             return f'{verb} "{hit}"'
         words = name.lower()
         before = m.string[: m.start()].rstrip()

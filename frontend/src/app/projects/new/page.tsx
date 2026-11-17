@@ -14,7 +14,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { ColourMenu } from '@/components/shared/colour-preferences';
-import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { FrontDoor, itemsRead, type DraftBrief, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
@@ -46,7 +46,7 @@ import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
 import { takeStartFiles } from '@/lib/projects/start-handoff';
 import { looksLikeManuscript, splitChapters } from '@/lib/data/chapters';
 import { importManuscript, manuscriptNote, takesManuscript } from '@/lib/outline/import-manuscript';
-import { takeStartItems } from '@/lib/connections/items';
+import { mergeThirdParty, takeStartItems } from '@/lib/connections/items';
 import { CarriedItems } from '@/components/personalize/carried-items';
 import type { ThirdPartyItem } from '@/types';
 import { attachProjectFile } from '@/lib/supabase/project-files';
@@ -611,7 +611,8 @@ export default function NewProjectPage() {
         .update({
           workflow_template_id: selected.id,
           stage: selected.stages[0]?.id ?? '',
-          ...(startItems.length ? { third_party: startItems } : {}),
+          // What the start conversation read from the person's accounts comes along too (17 Nov).
+          ...(startItems.length || itemsRead(chat).length ? { third_party: mergeThirdParty(startItems, itemsRead(chat)).items } : {}),
         })
         .eq('id', project.id);
       if (pinError) throw pinError;
@@ -1068,6 +1069,15 @@ export default function NewProjectPage() {
                   onReading={setReading}
                 />
                 <CarriedItems items={startItems} onRemove={dropItem} disabled={working !== null} />
+                {/* 17 Nov (Sean): connecting an account from the conversation too, not only the first screen. */}
+                <Link
+                  href="/projects/settings"
+                  data-connect-from-conversation
+                  className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
+                >
+                  <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
+                  {t('door.connectAccount')}
+                </Link>
               </>
             }
           />

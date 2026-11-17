@@ -153,12 +153,20 @@ _SHAPE = (
 
 
 def build_reply_actions_prompt(
-    inputs: PMInput, stage_label: str, question: str, reply: str, table: ActionTable | None
+    inputs: PMInput, stage_label: str, question: str, reply: str, table: ActionTable | None,
+    other_stages: list[str] | None = None,
 ) -> tuple[str, str]:
     """Build (system, user). Pure."""
     kinds = _TABLE_KINDS if table else _PROSE_KINDS
     system = _shared_system(inputs, [], f"{_REPLY_ACTIONS_INSTRUCTION}\n{kinds}{_FACTS_KIND}\n{_SHAPE}")
     parts = [f"STAGE: {stage_label or '(unnamed)'}", f"OBJECTIVE: {inputs.objective or '(none)'}", ""]
+    if other_stages:
+        parts += [
+            "Every action changes THIS stage only. A change another stage needs ("
+            + ", ".join(other_stages[:20])
+            + ") is not an action here; leave it out.",
+            "",
+        ]
     facts = facts_block(inputs)
     if facts:
         parts += [facts, ""]
@@ -192,8 +200,16 @@ def _clean_label(value: object) -> str:
     return label[:60]
 
 
+def _names_another_stage(label: str, others: list[str] | None) -> bool:
+    """A button on this stage that says it changes another one (17 Nov, Sean: "Apply pending
+    fixes to manuscript text" on a prose stage, which could only revise that prose)."""
+    text = f" {_norm(label)} "
+    return any(len(_norm(o)) >= 5 and f" {_norm(o)} " in text for o in (others or []))
+
+
 def parse_reply_actions(
-    raw: object, table: ActionTable | None, question: str = "", known_facts: list[str] | None = None
+    raw: object, table: ActionTable | None, question: str = "", known_facts: list[str] | None = None,
+    other_stages: list[str] | None = None,
 ) -> list[ReplyAction]:
     """Keep only actions that can be carried out as stated.
 
@@ -223,7 +239,7 @@ def parse_reply_actions(
                 out.append(ReplyAction(label=label, kind="record_facts", facts=facts))
         elif kind == "revise" and not table:
             instruction = str(item.get("instruction") or "").strip()
-            if instruction:
+            if instruction and not _names_another_stage(label, other_stages):
                 out.append(ReplyAction(label=label, kind="revise", instruction=instruction[:1_500]))
         elif kind == "row_updates" and table:
             updates: list[RowUpdate] = []
@@ -289,9 +305,9 @@ def parse_record_facts(item: dict, question: str, known: list[str] | None = None
 
 async def suggest_reply_actions(
     client: OpenRouterClient, model: str | None, inputs: PMInput, stage_label: str,
-    question: str, reply: str, table: ActionTable | None,
+    question: str, reply: str, table: ActionTable | None, other_stages: list[str] | None = None,
 ) -> list[ReplyAction]:
-    system, user = build_reply_actions_prompt(inputs, stage_label, question, reply, table)
+    system, user = build_reply_actions_prompt(inputs, stage_label, question, reply, table, other_stages)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.2, max_tokens=1_500, model=model)
     known = [f.statement for f in (inputs.facts or [])]
-    return parse_reply_actions(raw, table, question, known)
+    return parse_reply_actions(raw, table, question, known, other_stages)

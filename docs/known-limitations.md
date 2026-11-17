@@ -4467,3 +4467,27 @@ wordings of the same authorship request.
 - **Not done:** Sean's own "I accept h1–h3 as resolved", typed as an answer, is still recorded as a fact and
   read by the settle check, which closes carried rows and kept questions, not undecided findings; the
   one-press accept above is the way to close them.
+
+### L-249 — The chat says where a button is; the start conversation reads connected accounts (2026-11-17)
+
+Sean (15 Nov, iPad): the side chat told him to press "Realign to the objective", "Go back to Manuscript"
+and "Continue to Final register", and he could not find them: all three are under **More** at the bottom of
+the stage. It also suggested "Realign", which rewrites the whole draft, to settle one chapter retitle, and
+offered a chip "Apply pending fixes to manuscript text" that could only revise the stage he was on. And on 15
+Nov: "trying to connect to Google Drive and Salesforce … it wasn't able to read or access it" in "Build a
+plan with me".
+
+- **Each button reaches the chat with its place and what it does**, and the chat is told to say where it is
+  and to choose a button by what it does. A reply that names a button under More without saying so gets the
+  place added in code (`scrub_button_mentions`).
+- **A chip on one stage never promises to change another**: a revise chip whose label names another stage of
+  the workflow is dropped, and the prompt says so (`reply_actions`, `other_stages`).
+- **Go's steps reach the chat with their stage**, and up to 1,200 characters of each output (was 400), so
+  "still being written when the wait ran out" is no longer cut off.
+- **"Build a plan with me" searches the person's connected accounts** as the side chat does, from their own
+  words (`with_accounts`; signed-in users only, guests read nothing). The reply may quote what it read, as
+  [T n]; nothing of it goes into the brief as the user's words (the 7 Nov rule, kept). What was read is shown
+  under the reply, sent back each turn, and saved as the project's account items when it is made. Items
+  "Start this" carried in stay titles only. A "Connect an account" link is in the conversation too.
+- **Not done:** the chat still sees every More button whether or not the menu holds it at that moment for
+  that stage; a button that the chat names in words other than its label is not matched.

@@ -295,6 +295,8 @@ export const sw: Messages = {
   'door.review': 'Pitia usanidi kwanza',
   'door.removeItem': 'Ondoa: {item}',
   'door.searched': 'Imetafuta kwenye wavuti “{query}” · {found}',
+  'door.connectAccount': 'Unganisha akaunti (Gmail, Drive, Outlook, Salesforce…) ili mazungumzo haya yaweze kuisoma',
+  'door.accountsRead': 'Imesomwa kutoka akaunti zako: kipengele {count}, kinahifadhiwa pamoja na mradi utakapoundwa',
   'door.newSources_one': 'chanzo {count} kipya',
   'door.newSources_other': 'vyanzo {count} vipya',
   'door.noSources': 'hakuna vyanzo vipya',
