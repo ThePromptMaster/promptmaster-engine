@@ -56,6 +56,17 @@ describe('FrontDoor', () => {
     expect(turns.map((t: { role: string }) => t.role)).toEqual(['user', 'assistant']);
   });
 
+  it('says Go starts on its own only when the person has it on (17 Nov hand pass)', async () => {
+    frontDoor.mockResolvedValue(reply('Plan the offsite'));
+    const { unmount } = render(<FrontDoor opening="Plan the offsite" onReady={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText('Who is it for?');
+    expect(screen.getByText(/Go starts on its own once the project is made/)).toBeInTheDocument();
+    unmount();
+    render(<FrontDoor opening="Plan the offsite" onReady={vi.fn()} onBack={vi.fn()} goStarts={false} />);
+    await screen.findByText('Who is it for?');
+    expect(screen.queryByText(/Go starts on its own/)).toBeNull();
+  });
+
   it('searches the web (22 Oct), shows what it found, and numbers the next search after it', async () => {
     const source = (n: number) => ({ url: `https://example.org/${n}`, title: `Source ${n}`, excerpt: '' });
     frontDoor

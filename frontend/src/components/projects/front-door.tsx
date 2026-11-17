@@ -125,6 +125,7 @@ export function FrontDoor({
   maxQuestions,
   foldWhy = false,
   carried = [],
+  goStarts = true,
 }: {
   opening: string;
   /** `said`: the user's own turns, to tell what they said from what the brief's drafter assumed. */
@@ -148,6 +149,8 @@ export function FrontDoor({
   foldWhy?: boolean;
   /** Items "Start this" carried from the person's accounts: the conversation sees their titles only (7 Nov). */
   carried?: ThirdPartyItem[];
+  /** Whether Go starts by itself once the project is made: the person's setting (17 Nov hand pass). */
+  goStarts?: boolean;
 }) {
   const t = useT();
   const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
@@ -449,7 +452,7 @@ export function FrontDoor({
               {busyLabel ?? t('door.make')}
             </button>
             <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
-              {ready ? `${t('door.enough')} ` : ''}{t('door.record')} {t('start.goStarts')}
+              {ready ? `${t('door.enough')} ` : ''}{t('door.record')}{goStarts ? ` ${t('start.goStarts')}` : ''}
             </p>
             {onReview && (
               <button

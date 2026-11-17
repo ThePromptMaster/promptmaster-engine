@@ -324,6 +324,7 @@ export const en = {
   "auto.failed": "Could not save this setting. Try again.",
   "start.goStarts": "Go starts on its own once the project is made — you can stop it at any time, or turn this off in Settings.",
   "door.connectAccount": "Connect an account (Gmail, Drive, Outlook, Salesforce…) so this conversation can read it",
+  "door.connectAnother": "Your connected accounts are read here when a question needs them · Connect another",
   "door.accountsRead": "Read from your accounts: {count} item(s), kept with the project when it is made",
   "door.newSources_one": "{count} new source",
   "door.newSources_other": "{count} new sources",

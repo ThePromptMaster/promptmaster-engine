@@ -301,6 +301,7 @@ export const ar: Messages = {
   'auto.failed': 'تعذّر حفظ هذا الإعداد. حاول مرة أخرى.',
   'start.goStarts': 'يبدأ Go من تلقاء نفسه بعد إنشاء المشروع — يمكنك إيقافه في أي وقت أو إيقاف هذا من الإعدادات.',
   'door.connectAccount': 'اربط حسابًا (Gmail وDrive وOutlook وSalesforce…) لتتمكن هذه المحادثة من قراءته',
+  'door.connectAnother': 'تُقرأ حساباتك المرتبطة هنا عندما يحتاجها سؤال · اربط حسابًا آخر',
   'door.accountsRead': 'قُرئ من حساباتك: {count} عنصر، يُحفظ مع المشروع عند إنشائه',
   'door.newSources_one': '{count} مصدر جديد',
   'door.newSources_other': 'مصادر جديدة: {count}',

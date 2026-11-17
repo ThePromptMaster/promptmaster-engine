@@ -300,6 +300,7 @@ export const sw: Messages = {
   'auto.failed': 'Imeshindwa kuhifadhi mpangilio huu. Jaribu tena.',
   'start.goStarts': 'Go inaanza yenyewe mradi unapoundwa — unaweza kuisimamisha wakati wowote, au kuzima hili kwenye Mipangilio.',
   'door.connectAccount': 'Unganisha akaunti (Gmail, Drive, Outlook, Salesforce…) ili mazungumzo haya yaweze kuisoma',
+  'door.connectAnother': 'Akaunti zako zilizounganishwa husomwa hapa swali linapozihitaji · Unganisha nyingine',
   'door.accountsRead': 'Imesomwa kutoka akaunti zako: kipengele {count}, kinahifadhiwa pamoja na mradi utakapoundwa',
   'door.newSources_one': 'chanzo {count} kipya',
   'door.newSources_other': 'vyanzo {count} vipya',

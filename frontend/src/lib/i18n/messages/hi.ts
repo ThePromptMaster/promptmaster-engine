@@ -308,6 +308,7 @@ export const hi: Messages = {
   "auto.failed": "यह सेटिंग सहेजी नहीं जा सकी। फिर से कोशिश करें।",
   "start.goStarts": "प्रोजेक्ट बनते ही Go अपने आप शुरू हो जाता है — आप इसे कभी भी रोक सकते हैं, या सेटिंग्स में बंद कर सकते हैं।",
   "door.connectAccount": "एक खाता जोड़ें (Gmail, Drive, Outlook, Salesforce…) ताकि यह बातचीत उसे पढ़ सके",
+  "door.connectAnother": "जब किसी सवाल को ज़रूरत हो, आपके जुड़े खाते यहाँ पढ़े जाते हैं · एक और जोड़ें",
   "door.accountsRead": "आपके खातों से पढ़ा गया: {count} आइटम, प्रोजेक्ट बनने पर उसके साथ रखा जाएगा",
   "door.newSources_one": "{count} नया स्रोत",
   "door.newSources_other": "{count} नए स्रोत",
