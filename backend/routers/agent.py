@@ -45,6 +45,7 @@ from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, c
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
+from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
@@ -522,6 +523,18 @@ async def api_settles(req: SettlesRequest, client: OpenRouterClient = Depends(ge
     except Exception:  # noqa: BLE001 - "still open" is the safe answer to any failure here
         logger.warning("Settled-items check failed; the findings stay open", exc_info=True)
         return SettlesResponse()
+
+
+@router.post("/sections-to-repair", response_model=SectionsToRepairResponse)
+async def api_sections_to_repair(req: SectionsToRepairRequest, client: OpenRouterClient = Depends(get_client)) -> SectionsToRepairResponse:
+    """Which sections of a reopened manuscript the reason concerns, and whether the change is
+    already in them (17 Nov). 1 small LLM call; commits nothing. Any failure says it was not
+    checked, and the browser never takes that as "rewrite everything"."""
+    try:
+        return await sections_to_repair(client, req)
+    except Exception:  # noqa: BLE001 - "not checked" is the safe answer to any failure here
+        logger.warning("Sections-to-repair check failed", exc_info=True)
+        return SectionsToRepairResponse()
 
 
 @router.post("/check-answer")

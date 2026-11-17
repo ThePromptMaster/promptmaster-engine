@@ -226,7 +226,7 @@ export interface SectionGenerator {
     continuation?: SectionContinuationRequest;
     /** The earlier stages' current text. */
     governing?: string;
-  }): Promise<{ content: string; finish_reason: string }>;
+  }): Promise<{ content: string; finish_reason: string; unchanged?: boolean }>;
 
   extractSectionRecord(req: {
     section_id: string;

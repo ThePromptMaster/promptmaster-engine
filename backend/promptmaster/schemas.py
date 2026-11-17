@@ -535,6 +535,8 @@ class GenerateSectionProseResponse(BaseModel):
     """
     content: str
     finish_reason: str
+    #: A rewrite the model said does not concern this section: `content` is the section as it was (17 Nov).
+    unchanged: bool = False
 
 
 # Resolve forward reference for Iteration.continuity_snapshot

@@ -370,6 +370,8 @@ async def api_generate_section_prose(
         raise llm_http_error(
             e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
         )
+    if written.unchanged:
+        return written
     # 28 Oct: a catchphrase the previous chapter used is not used again here.
     written.content = without_repeated_catchphrases(written.content, [req.prev_section_content])
     return written

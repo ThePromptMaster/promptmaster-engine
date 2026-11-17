@@ -222,7 +222,7 @@ export class HttpSectionGenerator implements SectionGenerator {
     stage_hint?: string;
     continuation?: SectionContinuationRequest;
     governing?: string;
-  }): Promise<{ content: string; finish_reason: string }> {
+  }): Promise<{ content: string; finish_reason: string; unchanged?: boolean }> {
     return this.post(
       '/api/generate-section-prose',
       {

@@ -4362,3 +4362,33 @@ Extends L-114.
 - **Change it on list and review stages** sends the request as a question about the rows; the reply's
   suggested actions are the row changes, applied by the user. Not on Assess, which has its own verdict
   menu. Seen by hand 16 Nov on a book's Audience stage (a list): a fifth segment, saved as `chat_rows`.
+
+### L-246 — A repair looks before it rewrites (2026-11-17)
+
+Sean's book (15–16 Nov) spent about $63 of $98 rewriting all 26 manuscript sections twelve times for a
+chapter retitle the chapters already carried, and nothing in the text changed. Go waited 10 minutes for a
+pass that takes about 60, so every pass ended "interrupted", and each Resume queued the whole book again
+while the last pass was still running.
+
+- **A manuscript repair rewrites only the sections its reason concerns.** The sections that still state a
+  replaced value are found in code. One small call (`agent/sections-to-repair`, Sonnet 5.5,
+  `promptmaster/section_targets.py`) reads each section's title, opening and the sentences that mention
+  what changed, and names the others. If it says the change is already made, the stage closes with nothing
+  rewritten ("Checked the chapters before rewriting any: …"). If there is no answer and nothing old in the
+  text, the step fails and rewrites nothing. It never falls back to rewriting everything. The check sees
+  excerpts, not whole sections, so an old title mentioned only in passing elsewhere can be missed; the
+  review after it reads the whole text.
+- **A pass still running is waited for, never queued again.** The wait is 10 minutes plus 2.5 a section,
+  at most 90. When it runs out the step says Resume waits for them.
+- **A section a rewrite does not concern is not written out again.** The model answers `SECTION UNCHANGED`;
+  the section keeps its text, its revision advances, and no record call is made.
+- **A stage reopened only because an earlier stage was saved again is checked first.** The earlier stage's
+  text before and after goes beside this stage's summary in one `assess-change` call. If nothing relied on
+  it, the stage is marked complete again on the version it has ("Checked after a change: …"). Not checked
+  first: a stage reopened by a brief or fact change (already judged by the same call), by more than one
+  stage, by a completion on other evidence, or with a measured requirement, carried rows or the user's
+  note on it; and a draft that was in progress.
+- **Still by position:** a save still reopens every finished stage after it (`laterDoneStages`); the
+  check above is what keeps that from costing a rewrite each.
+- **The run's account** says what was checked and kept, what is left for Go, and how many things wait on
+  the user.

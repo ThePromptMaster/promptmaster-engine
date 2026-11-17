@@ -302,7 +302,7 @@ class CountingGenerator implements SectionGenerator {
   /** Sections whose prose call should throw, and with what. */
   proseFailures = new Map<string, Error>();
   /** Replies handed out first, in order, before the counting reply. */
-  scripted: { content: string; finish_reason: string }[] = [];
+  scripted: { content: string; finish_reason: string; unchanged?: boolean }[] = [];
   /** What each continuation call was shown. */
   continuations: { text_so_far: string; unfinished: string; revision_brief?: string; rest_of_current?: string }[] = [];
 
@@ -319,7 +319,7 @@ class CountingGenerator implements SectionGenerator {
     revision?: unknown;
     stage_hint?: string;
     continuation?: { text_so_far: string; unfinished: string; revision_brief?: string; rest_of_current?: string };
-  }): Promise<{ content: string; finish_reason: string }> {
+  }): Promise<{ content: string; finish_reason: string; unchanged?: boolean }> {
     const section = req.outline[req.section_index];
     if (req.revision) this.revisions.set(section.id, req.revision);
     this.hints.set(section.id, req.stage_hint);
@@ -551,6 +551,22 @@ describe('FR-05: resumable ten-section drafting', () => {
       ...revise,
       current_content: 'The chapter after a hand edit.',
     });
+  });
+
+  it('a rewrite the model says does not concern the section keeps it, advances it, and makes no record call (17 Nov)', async () => {
+    const { clock, store, generator } = setup();
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+    const before = store.outline[0].content;
+    const revision = store.outline[0].revision ?? 0;
+    const records = generator.recordCalls.length;
+
+    generator.scripted.push({ content: before, finish_reason: 'stop', unchanged: true });
+    store.enqueue(0, store.outline[0], revision + 1, { stage_label: 'Repair', instruction: 'Retitle chapter 5.', notes: '' });
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+
+    expect(store.outline[0].content).toBe(before);
+    expect(store.outline[0].revision).toBe(revision + 1);
+    expect(generator.recordCalls.length).toBe(records);
   });
 
   it('hands a section back, attempt returned, when the run runs out of time mid-call (PM-04)', async () => {

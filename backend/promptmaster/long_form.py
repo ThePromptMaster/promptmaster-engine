@@ -494,13 +494,19 @@ def build_section_revision_prompt(
         f"THE CURRENT TEXT OF SECTION {section_index + 1}: {target.title}\n"
         f"--- BEGIN SECTION ---\n{revision.current_content}\n--- END SECTION ---\n\n"
         "Return the whole section as it should now read — prose only, no title, no notes "
-        "on what you changed or which instruction you followed or set aside. If nothing here applies to this section, return it unchanged."
+        "on what you changed or which instruction you followed or set aside. If nothing here applies "
+        f"to this section, reply with exactly {SECTION_UNCHANGED} and nothing else: do not write it out again."
     )
     return system, user
 
 
 #: What the model replies when a section it was asked to carry on is already finished.
 SECTION_COMPLETE = "SECTION ALREADY COMPLETE"
+
+#: What the model replies when a rewrite does not concern the section (17 Nov). Writing
+#: the section back out cost about $0.27 a time, and Sean's book paid it 237 times for
+#: a retitle the chapters already carried.
+SECTION_UNCHANGED = "SECTION UNCHANGED"
 
 SECTION_MAX_TOKENS = 4096
 #: The most a rewrite of one section is given. Past this it is carried on, as a draft is.
@@ -654,6 +660,9 @@ async def generate_section_prose(
     )
     if continuation is not None and content.strip().rstrip(".") == SECTION_COMPLETE:
         return GenerateSectionProseResponse(content="", finish_reason="stop")
+    if revision is not None and content.strip().strip("*").rstrip(".").upper() == SECTION_UNCHANGED:
+        # The section as it was, said so: the caller keeps it and makes no record call.
+        return GenerateSectionProseResponse(content=revision.current_content, finish_reason="stop", unchanged=True)
     return GenerateSectionProseResponse(content=strip_process_note(content), finish_reason=finish_reason)
 
 

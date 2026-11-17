@@ -34,4 +34,11 @@ export const zh: Record<keyof typeof en, string> = {
   'acct.stopped': '已由你停止。到目前为止完成的所有内容都已保存。',
   'acct.or': '或',
   'acct.seeBelow': '见下文。',
+  'acct.checkedKept': "在变更后检查了{stages}并保持原样：其中没有内容依赖该变更",
+  'acct.leftForGo': "Go 还可以做：{work}。",
+  'acct.recheckStage': "重新检查{stage}",
+  'acct.finishStage': "完成{stage}",
+  'acct.nothingForGo': "Go 已没有可以自行完成的工作。",
+  'acct.waitingOnYou_one': "有 {count} 项在等你处理（见下文）。",
+  'acct.waitingOnYou_other': "有 {count} 项在等你处理（见下文）。",
 };

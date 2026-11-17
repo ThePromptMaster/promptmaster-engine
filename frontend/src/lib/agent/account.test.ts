@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runAccount } from './account';
+import { leftForGo, runAccount } from './account';
 
 const run = (status: string, stop_reason: string | null = null) => ({ status, stop_reason }) as never;
 const step = (action_key: string, extra: Record<string, unknown> = {}) => ({ action_key, status: 'succeeded', stage_id: 'experiment', params: {}, changes: {}, output: '', execution_label: null, ...extra }) as never;
@@ -92,4 +92,24 @@ describe('11 Oct, survey brief: "Your decision is needed" names the decision', (
 it('a finish names what was deferred and why it does not block', () => {
   const r = { status: 'completed', stop_reason: 'Objective met. Deferred, not blocking (none says a requirement is unmet): Summary: "Tighten the closing line" — deferred because style only.' } as never;
   expect(runAccount(r, [], (id) => id)!.now).toBe('Finished: the objective is verified as met. Deferred, not blocking (none says a requirement is unmet): Summary: "Tighten the closing line" — deferred because style only.');
+});
+
+describe('what a run checked and kept, and what is left (17 Nov, Sean: "whether another run will get me any closer")', () => {
+  it('a stage checked against a change and kept is said so, not called repaired', () => {
+    const steps = [
+      step('recheck_stage', { stage_id: 'analysis', params: { stage_id: 'analysis' }, changes: { checked_unchanged: true, stage_closed: true } }),
+      step('recheck_stage', { stage_id: 'method', params: { stage_id: 'method' }, changes: { stage_closed: true } }),
+    ];
+    expect(runAccount(run('budget_exhausted'), steps, label)?.did).toBe(
+      'Repaired Method after a change; checked Analysis against a change and kept it as it was: nothing there relied on it.'
+    );
+  });
+
+  it('reopened stages first, then required stages not yet finished, in workflow order', () => {
+    const template = { stages: [
+      { id: 'method', required: true }, { id: 'experiment', required: true }, { id: 'analysis', required: true }, { id: 'extra', required: false },
+    ] } as never;
+    const state = { stages: { method: { status: 'complete' }, experiment: { status: 'stale' }, analysis: { status: 'in_progress' }, extra: { status: 'not_started' } } } as never;
+    expect(leftForGo(template, state)).toEqual([{ kind: 'recheck', stageId: 'experiment' }, { kind: 'finish', stageId: 'analysis' }]);
+  });
 });

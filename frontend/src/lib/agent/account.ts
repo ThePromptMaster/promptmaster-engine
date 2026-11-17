@@ -11,6 +11,8 @@
  */
 
 import type { AgentRun, AgentStep } from '@/types/agent';
+import type { WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import { isDone } from '@/lib/workflow/types';
 import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from './actions';
 import { questionOverlap, SAME_QUESTION } from './repeat-question';
 import { translate, type Vars } from '@/lib/i18n/translate';
@@ -110,7 +112,7 @@ export function runAccount(
   // repaired while the latest repair of the plan had failed).
   const lastRepair = new Map<string, AgentStep>();
   for (const s of steps) {
-    if (s.action_key !== 'recheck_stage' || s.params?.measured || s.params?.cut) continue;
+    if (s.action_key !== 'recheck_stage' || s.params?.measured || s.params?.cut || s.changes?.checked_unchanged) continue;
     if (s.status !== 'succeeded' && s.status !== 'failed') continue;
     const id = String(s.params?.stage_id ?? s.stage_id ?? '');
     if (id) lastRepair.set(id, s);
@@ -124,6 +126,8 @@ export function runAccount(
   const written = new Set(
     ok.filter((s) => ['draft_stage', 'revise_stage', 'apply_findings', 'draft_sections', 'revise_sections'].includes(s.action_key) && s.stage_id).map((s) => s.stage_id!)
   );
+  // 17 Nov: a stage checked against a change and kept as it was is not "repaired".
+  const checkedKept = [...new Set(ok.filter((s) => s.action_key === 'recheck_stage' && s.changes?.checked_unchanged).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')).filter(Boolean))];
   const returns = ok.filter((s) => s.action_key === 'return_to_stage');
   const parts = [
     executed ? t('acct.computations', { count: executed }) : '',
@@ -133,6 +137,7 @@ export function runAccount(
     repaired.length ? t('acct.repaired', { stages: repaired.map(stageLabel).join(', ') }) : '',
     repairedOpen.length ? t('acct.repairOpen', { stages: repairedOpen.map(stageLabel).join(', ') }) : '',
     repairFailed.length ? t('acct.repairFailed', { stages: repairFailed.map(stageLabel).join(', ') }) : '',
+    checkedKept.length ? t('acct.checkedKept', { stages: checkedKept.map(stageLabel).join(', ') }) : '',
     fitted.size ? t('acct.fitted', { stages: [...fitted].filter(Boolean).map(stageLabel).join(', ') }) : '',
     returns.length
       ? t('acct.returns', { count: returns.length, stages: returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ') })
@@ -206,4 +211,23 @@ function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: 
     if (choices.length) return `${choices.map((c) => `“${c}”`).join(translate(locale, 'acct.or'))}. ${firstSentence(d.message)}`;
   }
   return firstSentence(reason) || translate(locale, 'acct.seeBelow');
+}
+
+/**
+ * What Go could still do on its own, in a few words each (17 Nov, Sean: "I can't
+ * always tell what it fixed, why it needs me again, or whether another run will
+ * get me any closer to finishing"). Reopened stages to recheck, then required
+ * stages not yet finished, in workflow order. Pure.
+ */
+export function leftForGo(template: Pick<WorkflowTemplate, 'stages'>, state: Pick<WorkflowState, 'stages'>): { kind: 'recheck' | 'finish'; stageId: string }[] {
+  const out: { kind: 'recheck' | 'finish'; stageId: string }[] = [];
+  for (const stage of template.stages) {
+    const status = state.stages[stage.id]?.status ?? 'not_started';
+    if (status === 'stale') out.push({ kind: 'recheck', stageId: stage.id });
+  }
+  for (const stage of template.stages) {
+    const status = state.stages[stage.id]?.status ?? 'not_started';
+    if (stage.required && status !== 'skipped' && status !== 'stale' && !isDone(status)) out.push({ kind: 'finish', stageId: stage.id });
+  }
+  return out;
 }
