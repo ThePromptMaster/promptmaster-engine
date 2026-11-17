@@ -350,6 +350,10 @@ export function buildAgentState(input: {
     // A check that could not run judged nothing (2 Nov); the planner is told so.
     evaluation: ev && isFailedEvaluation(ev)
       ? 'the last check could not run (the model returned nothing); it has not been checked'
+      // 17 Nov (Hidden Innovation): a check of v1 read as the verdict on v2,
+      // saved 13 seconds before; Go asked again for a fix v2 already had.
+      : ev && versions.length && ev.version_id !== versions.at(-1)!.id
+      ? `not checked yet: the last check was of v${versions.find((v) => v.id === ev.version_id)?.version_number ?? '?'}, and the current version is v${versions.at(-1)!.version_number}; what that check found says nothing about v${versions.at(-1)!.version_number} — check it before relying on any finding`
       : ev
       ? `alignment ${ev.alignment_score}, clarity ${ev.clarity_score}, drift ${ev.drift_score}` +
         (ev.findings?.length ? `; ${ev.findings.length} finding(s)` : '') +

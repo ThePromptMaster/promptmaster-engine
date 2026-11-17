@@ -71,11 +71,16 @@ export function StageEvaluationPanel({ evaluation, earlier = null, onRetry, retr
             )}
           </section>
         )}
+        {/* 17 Nov (Sean, Hidden Innovation): v1's check, open beside v2, read as
+            the verdict on v2 ("still missing" for a fix v2 had). It stays closed
+            under a line that says which version it was of. */}
         {earlier && (
-          <div data-earlier-check>
-            <p className="mb-1 text-label text-[var(--on-surface-variant)]">{t('pnl.lastCompleted', { version: earlier.version })}</p>
-            <StageEvaluationPanel evaluation={earlier.evaluation} />
-          </div>
+          <details data-earlier-check className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">{t('pnl.lastCompleted', { version: earlier.version })}</summary>
+            <div className="mt-2">
+              <StageEvaluationPanel evaluation={earlier.evaluation} />
+            </div>
+          </details>
         )}
       </div>
     );

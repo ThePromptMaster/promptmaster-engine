@@ -17,6 +17,7 @@ import { cutSections } from '@/lib/jobs/continuation';
 import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, pendingJobs, writtenSections, type SectionTarget } from '@/lib/jobs/sections';
 import { changeTerms, repairWaitMs, sectionExcerpt, sectionsWithOldValues } from './repair-targets';
 import { upstreamChanges } from './recheck-first';
+import { copiesTheManuscript, loneManuscript } from './manuscript-fixes';
 import { changeWindow } from '@/lib/data/context-for-request';
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
@@ -1224,9 +1225,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const superseded = supersededFactValues(ctx.project.facts);
       const why = withUserNote(measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
-        : carriedRepair
-          ? `a review carried forward, as still unmet: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
-          : st?.stale?.reason ?? 'something it relied on changed');
+        : carriedRepair && params.accepted_fixes
+          // 17 Nov: the review's accepted findings, carried into the chapters they concern.
+          ? `carry into the text the findings the review accepted, each where it applies: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
+          : carriedRepair
+            ? `a review carried forward, as still unmet: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
+            : st?.stale?.reason ?? 'something it relied on changed');
       // L-64 (9 Oct): a manuscript is repaired by revising its sections with
       // the reason, each against its current saved record (C9).
       if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);
@@ -2069,6 +2073,17 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (!title || !work) {
         return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'A stage is added with a title and the work it is to do.' });
       }
+      // 17 Nov (Hidden Innovation): a stage that would only copy or correct the
+      // manuscript left the fixes out of the manuscript Review read. They go into
+      // the manuscript itself.
+      const manuscript = loneManuscript(ctx.template, deliverableDocument(ctx.template, ctx.bundles)?.stage.id);
+      if (manuscript && (typeof params.kind !== 'string' || params.kind === 'write') && copiesTheManuscript(title, work)) {
+        const label = ctx.template.stages.find((s) => s.id === manuscript)?.label ?? manuscript;
+        return done(key, {
+          status: 'failed', toolsUsed: [], changes: {},
+          output: `Not added: "${title}" would be a second copy of ${label}. Accepted fixes go into ${label} itself, the version the review reads next: repair ${label} with them (recheck_stage on ${manuscript} with the rows to carry).`,
+        });
+      }
       const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
       if (!routine) {
         return done(key, {
@@ -2904,7 +2919,7 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
 }
 
 /** Whether the reason a manuscript was reopened names corrections, rather than only that something upstream moved. */
-const NAMES_A_CORRECTION = /\b(?:correct(?:ed|ion|ions)?|replace|cite|fix|fixes|left this to me)\b/i;
+const NAMES_A_CORRECTION = /\b(?:correct(?:ed|ion|ions)?|replace|cite|fix|fixes|left this to me|the review accepted)\b/i;
 
 /**
  * What a chapter repair should have changed and didn't, in one sentence, or

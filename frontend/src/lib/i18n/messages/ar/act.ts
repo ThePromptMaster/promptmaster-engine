@@ -131,6 +131,7 @@ export const ar: Record<keyof typeof en, string> = {
   'cl.cantCheck': 'لا يستطيع PromptMaster التحقق من هذا البند هنا — تأكيده لك.',
   'cl.routine': 'روتيني',
   'cl.approvedVersion': 'الموافق عليها v{approved} · الحالية v{current}',
+  'cl.whatChanged': 'ما تغيّر منذ v{approved}، النسخة التي وافقت عليها',
   'cl.committed': 'اعتُمد وفق سياستك للقرارات الروتينية، بعد التحقق من: {what}',
   'cl.title': 'لإنهاء هذه المرحلة',
   'cl.finishNow': 'إنهاء — شاهد عملك المنجز',

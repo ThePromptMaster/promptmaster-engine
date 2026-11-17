@@ -16,6 +16,7 @@ import { countWords, isPart, measure, parseRequirements, wholeLengthTarget } fro
 import { effectiveRenderer, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { isTriageTable } from '@/lib/workflow/triage';
+import { loneManuscript } from './manuscript-fixes';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { isDone, type WorkflowEvent, type WorkflowState, type WorkflowTemplate } from '@/lib/workflow/types';
 
@@ -142,7 +143,11 @@ export function acceptedRowsBefore(
   const reached = state && template.stages[holderAt]?.renderer === 'long_form'
     ? template.stages.reduce((last, s, i) => (s.renderer === 'long_form' && isDone(state.stages[s.id]?.status) ? i : last), holderAt)
     : holderAt;
-  return template.stages.slice(0, reached < 0 ? template.stages.length : reached).flatMap((stage) => {
+  // 17 Nov (Hidden Innovation): a manuscript with no revision stage after it is
+  // where the review after it carries its accepted findings (`fixesToCarry`), so
+  // that review's accepted rows are checked against it too.
+  const lone = loneManuscript(template, holderId) !== null;
+  return template.stages.slice(0, lone || reached < 0 ? template.stages.length : reached).flatMap((stage) => {
     if (effectiveRenderer(stage) !== 'review') return [];
     const schema = itemSchemaFor(stage);
     if (!isTriageTable(schema)) return [];

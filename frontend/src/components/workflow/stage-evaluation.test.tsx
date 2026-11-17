@@ -315,7 +315,7 @@ describe('a check that could not run (4 Nov, Sean: "preserve the prior valid …
     const onRetry = vi.fn();
     render(<StageEvaluationPanel evaluation={failed} earlier={{ evaluation: evaluation(), version: 3 }} onRetry={onRetry} />);
     expect(screen.getByText(/This check could not run/i)).toBeTruthy();
-    expect(screen.getByText('Last completed check: v3 — an earlier version. This version has no completed check yet.')).toBeTruthy();
+    expect(screen.getByText('This version has not been checked yet. The last check was of v3, an earlier version, and what it found may already be fixed here. Show that check')).toBeTruthy();
     // The earlier check's findings are shown, not "No specific defects found".
     expect(screen.getByText(/approved outline does not contain/i)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Run the check again' }));
@@ -325,7 +325,7 @@ describe('a check that could not run (4 Nov, Sean: "preserve the prior valid …
   it('a version never checked shows the last completed check, labelled', () => {
     render(<StageEvaluationPanel evaluation={undefined} earlier={{ evaluation: evaluation(), version: 2 }} />);
     expect(screen.queryByText(/This check could not run/i)).toBeNull();
-    expect(screen.getByText(/Last completed check: v2/)).toBeTruthy();
+    expect(screen.getByText(/The last check was of v2, an earlier version/)).toBeTruthy();
   });
 
   it('shows nothing when there is no check at all', () => {

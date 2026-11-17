@@ -840,7 +840,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // A reopened draft in progress is answered by this version (13 Oct); the
       // event is what says so, even when nothing after it is affected.
       const answersReopen = state.stages[stageId]?.status === 'stale' && state.stages[stageId]?.stale?.was === 'in_progress';
-      if (later.length || answersReopen) {
+      // 17 Nov (Hidden Innovation): with the stages after it already reopened,
+      // no event was written, and their reason went on saying "(now v1)" beside
+      // a current v2; Go then told the user v1 was the latest. The event names the
+      // version, and the projection updates the reason it already gives.
+      const laterStale = template.stages.slice(template.stages.findIndex((s) => s.id === stageId) + 1).some((s) => state.stages[s.id]?.status === 'stale');
+      if (later.length || answersReopen || laterStale) {
         await get()
           .appendEvent({
             type: 'stage_version_saved',

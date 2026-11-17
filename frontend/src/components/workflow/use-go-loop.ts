@@ -1,5 +1,6 @@
 'use client';
 
+import { carriedKeys, fixesToCarry } from '@/lib/agent/manuscript-fixes';
 import { shownStepActionLabel } from '@/lib/i18n/go';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { sourcesToCheck } from '@/lib/workflow/lookup';
@@ -1042,12 +1043,16 @@ export function useGoLoop(opts: Options) {
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }
           : null;
+        // 17 Nov (Hidden Innovation): what the review after a manuscript accepted
+        // is carried into the manuscript itself, each row once.
+        const fixRows = holder ? fixesToCarry(o.template, o.bundles, holder.id, carriedKeys([...priorStepsRef.current, ...stepsRef.current])) : [];
+        const fixes = holder && fixRows.length ? { deliverableId: holder.id, rows: fixRows } : null;
         // After a loop of repairs was withdrawn, the next choice is the
         // planner's, not the same repair forced again (13 Oct).
         const outlineToo = current.policy === 'autonomous' && routine === 'handle';
         const repair = reconsider?.withdrawn.includes('recheck_stage')
           ? null
-          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])), outlineToo);
+          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])), outlineToo, fixes);
         if (repair) allowed.push('recheck_stage');
         // A reopened stage whose repairs are used up is the user's next
         // decision, said with what is unresolved (13 Oct, screenplay).

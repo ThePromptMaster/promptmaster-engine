@@ -4398,3 +4398,35 @@ while the last pass was still running.
   check above is what keeps that from costing a rewrite each.
 - **The run's account** says what was checked and kept, what is left for Go, and how many things wait on
   the user.
+
+### L-247 — Accepted fixes land in the manuscript itself; versions named right (2026-11-17)
+
+Sean, Hidden Innovation (15–16 Nov). The review after the manuscript accepted fixes, and nothing in the
+workflow wrote them into the chapters: there was no revision stage, and Go had no move that edits a finished
+manuscript (`revisionBrief` is null for the first long-form stage, and `fixesToMerge` skipped any workflow
+with a manuscript). Go added "Manuscript corrections" and then "Consolidated manuscript", tried to go back
+and was refused, because the return check read only the pinned template. Review went on reading the main
+manuscript, still at v1, and so did the export.
+
+- **The accepted findings of the review after a manuscript are carried into it** (`lib/agent/manuscript-fixes.ts`),
+  when no later long-form stage exists to carry them. It is a required move, under any policy, because the
+  user accepted them: a repair of the manuscript (`recheck_stage` with the rows), which rewrites only the
+  sections they concern (L-246). Each row is carried once (`fix_keys` on the step). The manuscript is then
+  marked complete on the new version, so the review is reopened and reads it.
+- **The final check reads that review too** (`acceptedRowsBefore`), so a fix that did not land is found and
+  repaired like any other unmet change.
+- **A carried-forward row reaches a manuscript as well**; until now only a prose deliverable got one.
+- **A stage that would only copy or correct the manuscript is refused** ("Not added: … would be a second copy
+  of …"), by its title or work (`copiesTheManuscript`). A memo or a source check is not refused.
+- **An added stage may go back** to the stage it was added after, or any before it (migration
+  `20261203000000_added_stage_returns.sql`), as the page already let it.
+- **Versions named right.** A save writes `stage_version_saved` even when the stages after it are already
+  reopened, so their reason says "(now v2)", not "(now v1)". The planner is told when the last check was of
+  an earlier version ("not checked yet … says nothing about v2"), and the page folds that check under "This
+  version has not been checked yet. The last check was of v1 …".
+- **Approvals you can read.** A repeated question is no longer cut at 300 characters (2,000 now). An
+  approval stop names the version it is for ("It is for Independent critical review v6"). An approval given
+  on an earlier version shows, closed until opened, one line per later version and the word changes between
+  the approved text and the current one.
+- **Not done:** the approval line names the stage's own version, not the manuscript version a review read;
+  a review's text says which manuscript version it checked only when its writer says so.

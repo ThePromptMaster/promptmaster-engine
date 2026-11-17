@@ -121,7 +121,7 @@ export const en = {
   "pnl.checkDidNotRun": "This check could not run, so nothing was judged. Nothing was lost — run the check again.",
   "pnl.runAgain": "Run the check again",
   "pnl.simulate": "Test: simulate a failed check",
-  "pnl.lastCompleted": "Last completed check: v{version} — an earlier version. This version has no completed check yet.",
+  "pnl.lastCompleted": "This version has not been checked yet. The last check was of v{version}, an earlier version, and what it found may already be fixed here. Show that check",
   "pnl.furtherFindings_one": "{count} further finding",
   "pnl.furtherFindings_other": "{count} further findings",
   "pnl.ratingLabel": "{label} rating",

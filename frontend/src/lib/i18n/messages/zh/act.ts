@@ -131,6 +131,7 @@ export const zh: Record<keyof typeof en, string> = {
   'cl.cantCheck': 'PromptMaster 无法在这里检查此项——需要由你确认。',
   'cl.routine': '常规',
   'cl.approvedVersion': '已批准 v{approved} · 当前 v{current}',
+  'cl.whatChanged': '自你批准的 v{approved} 以来的改动',
   'cl.committed': '已按你的常规决定策略提交，提交前已检查：{what}',
   'cl.title': '完成本阶段需要',
   'cl.finishNow': '完成——查看最终成果',
