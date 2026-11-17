@@ -237,3 +237,18 @@ describe('what the planner is told about its own limits and the page (4 Nov, Lak
     expect(digest.controls).toEqual([{ label: 'Refine: make it shorter', where: 'under "More" at the bottom of the stage', does: 'rewrites the whole draft shorter' }]);
   });
 });
+
+describe('a check of an earlier version is not the verdict on this one (17 Nov, Sean, Hidden Innovation)', () => {
+  it('the planner is told v2 is not checked yet, not what v1\'s check found', () => {
+    const versions = [
+      { id: 'v1', version_number: 1, content: 'Section 7: multiplicative.', created_at: 't1', source_operation: 'agent_draft' },
+      { id: 'v2', version_number: 2, content: 'Section 7: additive.', created_at: 't2', source_operation: 'agent_apply' },
+    ];
+    const ev = { version_id: 'v1', alignment_score: 'Medium', clarity_score: 'High', drift_score: 'Low', findings: [{ id: 'f', text: 'The h2 fix is missing from section 7.' }] };
+    const digest = buildAgentState({
+      template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('objective'), bundles: { objective: { artifact: null, versions } } as never,
+      steps: [], stageEvaluation: evaluation('objective'), latestEvaluation: ev as never,
+    });
+    expect(digest.evaluation).toBe('not checked yet: the last check was of v1, and the current version is v2; what that check found says nothing about v2 — check it before relying on any finding');
+  });
+});

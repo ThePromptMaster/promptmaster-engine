@@ -33,7 +33,7 @@ describe('an approval says which version it was given on (19 Oct)', () => {
   const versions = [{ id: 'v3', version_number: 3 }, { id: 'v4', version_number: 4 }];
 
   it('only an approval given on an earlier version than the current one is listed', () => {
-    expect(approvedVersions(versions, { m: 'v3', other: 'v4', gone: 'v1' })).toEqual({ m: { approved: 3, current: 4 } });
+    expect(approvedVersions(versions, { m: 'v3', other: 'v4', gone: 'v1' })).toEqual({ m: { approved: 3, current: 4, since: ['v4: (no note on this version)'] } });
     expect(approvedVersions([], { m: 'v3' })).toEqual({});
   });
 
@@ -101,5 +101,37 @@ describe('an approval that is a decision is given by choosing (12 Nov)', () => {
     expect(screen.queryByRole('button', { name: 'Option B: keep $180,000' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: /I approve this decision on the cap/ }));
     expect(onToggleManual).toHaveBeenCalledWith('cap.approved', true);
+  });
+});
+
+describe('what changed since an approval on an earlier version (17 Nov, Sean: "I\'d like to see what changed and what I\'m approving")', () => {
+  it('one line per later version, and the text then and now', () => {
+    const vs = [
+      { id: 'a', version_number: 7, content: 'Plan: use the measurement paper.', change_summary: 'Your choice recorded.' },
+      { id: 'b', version_number: 8, content: 'Plan: use the measurement paper and available sources.', change_summary: 'Applied 6 points from the stage check.\nMore detail.' },
+      { id: 'c', version_number: 9, content: 'Plan: use the measurement paper and available sources only.', change_summary: null },
+    ];
+    expect(approvedVersions(vs, { m: 'a' })).toEqual({
+      m: {
+        approved: 7, current: 9,
+        since: ['v8: Applied 6 points from the stage check.', 'v9: (no note on this version)'],
+        before: 'Plan: use the measurement paper.', after: 'Plan: use the measurement paper and available sources only.',
+      },
+    });
+  });
+
+  it('is offered under the ticked box, closed until opened', () => {
+    const vs = [
+      { id: 'a', version_number: 7, content: 'Old plan.', change_summary: 'x' },
+      { id: 'b', version_number: 9, content: 'New plan.', change_summary: 'Applied 6 points.' },
+    ];
+    const { container } = render(
+      <ExitCriteriaChecklist criteria={[{ ...approve, satisfied: true }]} onToggleManual={() => {}} approvedVersions={approvedVersions(vs, { m: 'a' })} />
+    );
+    const details = container.querySelector('[data-approval-changes]') as HTMLDetailsElement;
+    expect(details).toBeTruthy();
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('What changed since v7, the version you approved');
+    expect(details.textContent).toContain('v9: Applied 6 points.');
   });
 });

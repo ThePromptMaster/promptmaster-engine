@@ -2064,6 +2064,7 @@ export function WorkflowWorkspace({
     openApprovals: (currentStageDef?.exit_criteria ?? [])
       .filter((c) => c.check === 'manual' && !project.manual_checks?.[c.id])
       .map((c) => ({ id: c.id, label: c.label })),
+    versionOf: Object.fromEntries(Object.entries(stageBundles).flatMap(([id, b]) => (b?.versions.length ? [[id, b.versions.at(-1)!.version_number]] : []))),
   };
 
   // The stage area takes the background colour of the version on show (Sean,

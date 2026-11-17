@@ -1,5 +1,6 @@
 'use client';
 
+import { DiffText, useWordDiff } from './revised-preview';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownCheckText } from '@/lib/i18n/check-text';
 import { templateWord } from '@/lib/i18n/templates';
@@ -50,7 +51,7 @@ interface Props {
    * Approvals given on an earlier version than the one now current, by
    * criterion id (`approvedVersions`): "approved v3 · current v4".
    */
-  approvedVersions?: Record<string, { approved: number; current: number }>;
+  approvedVersions?: Record<string, ApprovedVersion>;
   /**
    * On the workflow's last stage: finish from here once every box that is the
    * user's is ticked, rather than at the foot of the page under More (Sean,
@@ -65,18 +66,59 @@ interface Props {
  * after the user approved, and nothing said which one the tick was for). Pure.
  */
 export function approvedVersions(
-  versions: readonly { id: string; version_number: number }[],
+  versions: readonly { id: string; version_number: number; content?: string; change_summary?: string | null }[],
   given: Readonly<Record<string, string>> = {}
-): Record<string, { approved: number; current: number }> {
+): Record<string, ApprovedVersion> {
   const head = versions.at(-1);
   if (!head) return {};
-  const out: Record<string, { approved: number; current: number }> = {};
+  const out: Record<string, ApprovedVersion> = {};
   for (const [criterion, versionId] of Object.entries(given)) {
     if (versionId === head.id) continue;
     const approved = versions.find((v) => v.id === versionId);
-    if (approved) out[criterion] = { approved: approved.version_number, current: head.version_number };
+    if (!approved) continue;
+    // 17 Nov (Sean): "my approval was on v7 while the plan had moved to v9. If I
+    // need to reapprove a new version, I'd like to see what changed and what I'm
+    // approving." Each later version's own line, and the text then and now.
+    const since = versions
+      .filter((v) => v.version_number > approved.version_number)
+      .map((v) => `v${v.version_number}: ${(v.change_summary ?? '').split('\n')[0].trim().slice(0, 200) || '(no note on this version)'}`);
+    out[criterion] = {
+      approved: approved.version_number,
+      current: head.version_number,
+      since,
+      ...(approved.content !== undefined && head.content !== undefined ? { before: approved.content, after: head.content } : {}),
+    };
   }
   return out;
+}
+
+export interface ApprovedVersion {
+  approved: number;
+  current: number;
+  /** One line per version after the approved one: "v8: Applied 6 points from the stage check." */
+  since?: string[];
+  /** The approved text and the current one, for the changes between them. */
+  before?: string;
+  after?: string;
+}
+
+/** What changed between the version approved and the current one, closed until opened. */
+function ApprovalChanges({ v }: { v: ApprovedVersion }) {
+  const t = useT();
+  const changed = v.before !== undefined && v.after !== undefined && v.before !== v.after;
+  const { parts, added, removed } = useWordDiff(changed ? v.before! : '', changed ? v.after! : '');
+  if (!v.since?.length && !changed) return null;
+  return (
+    <details data-approval-changes className="mt-1 text-label text-[var(--on-surface-variant)]">
+      <summary className="cursor-pointer">{t('cl.whatChanged', { approved: v.approved })}{changed ? ` · +${added} −${removed}` : ''}</summary>
+      {v.since?.length ? (
+        <ul className="mt-1 list-disc space-y-0.5 ps-5">
+          {v.since.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      ) : null}
+      {changed && <DiffText parts={parts} testId="approval-diff" className="mt-2 max-h-[40vh]" />}
+    </details>
+  );
 }
 
 /**
@@ -191,6 +233,7 @@ export function ExitCriteriaChecklist({
                 {t('cl.approvedVersion', { approved: olderApprovals[c.id].approved, current: olderApprovals[c.id].current })}
               </span>
             )}
+            {c.satisfied && olderApprovals[c.id] && <ApprovalChanges v={olderApprovals[c.id]} />}
             {c.satisfied && decided[c.id] && (
               <span data-decided className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
                 {t('cl.decided', { choice: decided[c.id] })}

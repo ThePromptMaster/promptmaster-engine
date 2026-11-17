@@ -191,7 +191,9 @@ const clip = (text: string, max: number) => {
  * sentence in `messages/areas/stop.ts`, so the screen shows it translated.
  */
 export function repeatPause(repeat: Repeat, stageLabel: string, open: string): string {
-  const still = clip(open.split(/\n\s*\n/)[0] ?? open, 300);
+  // 17 Nov (Sean): the review's conclusion was cut at 300 characters, "not ready
+  // for submission un…", and he was asked to accept a condition he could not read.
+  const still = clip(open.split(/\n\s*\n/)[0] ?? open, 2_000);
   const stated = /[.?!…]$/.test(still) ? still : `${still}.`;
   if (repeat.byButton) {
     return (
@@ -202,7 +204,7 @@ export function repeatPause(repeat: Repeat, stageLabel: string, open: string): s
     );
   }
   return (
-    `I asked this before — "${clip(repeat.asked, 300)}" — and you answered "${clip(repeat.answer, 200)}". ` +
+    `I asked this before — "${clip(repeat.asked, 1_000)}" — and you answered "${clip(repeat.answer, 600)}". ` +
     `${repeat.moves} moves on ${stageLabel} since then have not settled it, so I have stopped rather than ask you again. ` +
     `Still open: ${stated} ` +
     'Nothing more is spent until you act: change the text yourself, or tell me what to do differently here.'

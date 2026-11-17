@@ -781,3 +781,11 @@ describe('a reopened chapter plan under "handle them for me" (8 Nov, production)
   });
 });
 
+
+describe('an approval says the version it is for (17 Nov, Sean: "with a link to that exact version")', () => {
+  it('names the stage and its current version', () => {
+    const need = { kind: 'tick_criterion' as const, stageId: 'review', criterionId: 'review.approved', label: 'I accept what this review concludes', authority: 'reserved' as const };
+    const out = describeNeed(need, (id) => (id === 'review' ? 'Independent critical review' : id), { versionOf: { review: 6 } });
+    expect(out.message).toContain('It is for Independent critical review v6, the version on the page now.');
+  });
+});

@@ -131,6 +131,7 @@ export const hi: Record<keyof typeof en, string> = {
   "cl.cantCheck": "PromptMaster इसे यहाँ जाँच नहीं सकता — इसकी पुष्टि आपको करनी है।",
   "cl.routine": "नियमित",
   "cl.approvedVersion": "स्वीकृत v{approved} · मौजूदा v{current}",
+  "cl.whatChanged": "v{approved} के बाद क्या बदला, जो संस्करण आपने स्वीकृत किया था",
   "cl.committed": "आपकी नियमित-निर्णय नीति के तहत दर्ज किया गया, यह जाँचने के बाद: {what}",
   "cl.title": "इस चरण को पूरा करने के लिए",
   "cl.finishNow": "पूरा करें — अपना पूरा काम देखें",

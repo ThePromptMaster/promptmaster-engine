@@ -131,6 +131,7 @@ export const sw: Record<keyof typeof en, string> = {
   'cl.cantCheck': 'PromptMaster haiwezi kukagua hiki hapa — ni chako kuthibitisha.',
   'cl.routine': 'cha kawaida',
   'cl.approvedVersion': 'imeidhinishwa v{approved} · ya sasa v{current}',
+  'cl.whatChanged': 'Kilichobadilika tangu v{approved}, toleo ulilloidhinisha',
   'cl.committed': 'Imethibitishwa chini ya sera yako ya maamuzi ya kawaida, baada ya kukagua: {what}',
   'cl.title': 'Ili kumaliza hatua hii',
   'cl.finishNow': 'Maliza — ona kazi yako iliyokamilika',

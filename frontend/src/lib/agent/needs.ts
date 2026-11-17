@@ -9,6 +9,7 @@
  * the panel can render the message and the one button that clears it.
  */
 
+import type { FixToCarry } from './manuscript-fixes';
 import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -482,7 +483,13 @@ export function staleRepair(
   /** Per long-form stage: sections cut off at the length limit (8 Nov). Finished before anything else. */
   cut: Readonly<Record<string, readonly string[]>> = {},
   /** Under "handle them for me" a reopened chapter plan is Go's too, keeping its chapters (8 Nov). */
-  outlineToo = false
+  outlineToo = false,
+  /**
+   * Findings the reviews after a manuscript accepted, not yet in it (17 Nov,
+   * Hidden Innovation): carried into the chapters they concern, under any policy,
+   * because the user accepted them. Without this Go copied the manuscript.
+   */
+  fixes: { deliverableId: string; rows: readonly FixToCarry[] } | null = null
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -527,7 +534,17 @@ export function staleRepair(
       };
     }
     if (st?.status !== 'stale') {
-      if (carried?.rows.length && stage.id === carried.deliverableId && (isDone(st?.status) || open) && stage.renderer === 'prose') {
+      if (fixes?.rows.length && stage.id === fixes.deliverableId && stage.renderer === 'long_form' && (isDone(st?.status) || st?.status === 'in_progress')) {
+        const rows = fixes.rows.slice(0, 8);
+        return {
+          key: 'recheck_stage',
+          rationale: `The review accepted ${rows.length === 1 ? 'a finding' : `${rows.length} findings`} that ${rows.length === 1 ? 'is' : 'are'} not in ${stage.label} yet: ${rows.map((r) => `"${r.text.length > 160 ? `${r.text.slice(0, 157).trimEnd()}…` : r.text}"`).join('; ')}. I carry ${rows.length === 1 ? 'it' : 'them'} into the chapters ${rows.length === 1 ? 'it concerns' : 'they concern'}, keep everything else, save the manuscript and have the review read it again.`,
+          expected: `A new version of ${stage.label} with the accepted findings in its chapters; the review is then rechecked against it.`,
+          params: { stage_id: stage.id, carried: rows.map((r) => r.text), fix_keys: rows.map((r) => r.key), accepted_fixes: true },
+        };
+      }
+      // A manuscript gets what a review carried forward too (17 Nov): until then only prose did.
+      if (carried?.rows.length && stage.id === carried.deliverableId && (isDone(st?.status) || open || (stage.renderer === 'long_form' && st?.status === 'in_progress')) && (stage.renderer === 'prose' || stage.renderer === 'long_form')) {
         const rows = carried.rows.slice(0, 8);
         return {
           key: 'recheck_stage',
@@ -1083,6 +1100,12 @@ export interface NeedContext {
   advanceControl?: string | null;
   /** The current stage's approvals the user has not given yet (manual criteria, unticked). */
   openApprovals?: { id: string; label: string }[];
+  /**
+   * The version an approval would be given on, by stage id (17 Nov, Sean: "make
+   * the approval screen show the full conclusion with a link to that exact
+   * version"): an approval is said with the version it is for.
+   */
+  versionOf?: Record<string, number>;
 }
 
 const norm = (text: string) =>
@@ -1188,7 +1211,8 @@ export function describeNeed(
       const why =
         need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk')
           : need.checkReason ? t('need.approvalRefused', { reason: need.checkReason }) : '';
-      const message = [t('need.approval', { label: word(need.label) }), why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
+      const on = ctx.versionOf?.[need.stageId];
+      const message = [t('need.approval', { label: word(need.label) }), on ? t('need.approvalOn', { stage: stageLabel(need.stageId), version: on }) : '', why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
       const open = need.openRows ?? [];
       if (open.length === 0) return { message, action: t('need.approveResume') };
       // A finding still undecided elsewhere is named before the approval, and
