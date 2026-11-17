@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * 17 Nov (Sean): "a small change [should] get a quick check of the two drafts it
- * affects, while a bigger change gets a deeper review". A save on an earlier
+ * affects, while a bigger change gets a deeper review". A change to an earlier
  * stage reopens every finished stage after it; a reopened stage is now checked
  * against what changed before it is rewritten.
  */
@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const generateStageArtifact = vi.fn();
 const assessChange = vi.fn();
 const appendWorkflowEvent = vi.fn();
-const listWorkflowEvents = vi.fn();
 vi.mock('@/lib/api/client', () => ({
   api: {
     generateStageArtifact: (...a: unknown[]) => generateStageArtifact(...a),
@@ -21,22 +20,27 @@ vi.mock('@/lib/api/client', () => ({
 }));
 vi.mock('@/lib/supabase/workflow', () => ({
   appendWorkflowEvent: (...a: unknown[]) => appendWorkflowEvent(...a),
-  listWorkflowEvents: (...a: unknown[]) => listWorkflowEvents(...a),
+  listWorkflowEvents: vi.fn(async () => []),
 }));
 vi.mock('@/lib/supabase/sources', () => ({ saveSources: vi.fn(async () => []) }));
 
 import { performStep, type PerformContext } from './perform';
-import { upstreamChange } from './recheck-first';
+import { upstreamChanges } from './recheck-first';
 import { assertHonestOutcome } from './outcome';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 
 const SINCE = '2026-11-15T01:51:00Z';
-const save = (at: string, prior: string, version: string, n: number, affected: string[] = ['realign', 'summary']) => ({
-  id: `e${n}`, project_id: 'p', user_id: 'u', seq: n, type: 'stage_version_saved', stage_id: 'output', to_stage_id: null,
-  actor: 'system', reason: null, created_at: at, payload: { version_id: version, version_number: n, prior_version_id: prior, affected },
-});
+const v = (id: string, n: number, content: string, created_at: string) => ({ id, version_number: n, content, source_operation: 'agent_revise', created_at, finish_reason: 'stop' });
 
-function ctx(): PerformContext {
+function bundles(output = [v('o3', 3, '## Chapter 5: The Growth Story\nText.', '2026-11-14T00:00:00Z'), v('o4', 4, '## Chapter 5: Beyond the Growth Narrative\nText.', '2026-11-15T01:52:00Z')]) {
+  return {
+    input: { artifact: null, versions: [v('i1', 1, 'The brief.', '2026-11-01T00:00:00Z')] },
+    output: { artifact: null, versions: output },
+    realign: { artifact: { id: 'ar', summary: 'Moves the argument back to the objective: state pensions.' }, versions: [v('r2', 2, 'The correction applied: the argument is about pensions.', '2026-11-14T01:00:00Z')] },
+  };
+}
+
+function ctx(b = bundles()): PerformContext {
   return {
     project: { id: 'p', user_id: 'u', objective: 'A short book', data_files: [], sources: [], web_access: 'off', facts: [] },
     template: SINGLE_OUTPUT_V1,
@@ -45,15 +49,7 @@ function ctx(): PerformContext {
       stages: { realign: { status: 'stale', stale: { reason: 'Output was changed (now v4) after this stage used it.', since: SINCE, was: 'completed_with_artifact' } } },
     },
     stage: SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'summary')!,
-    bundles: {
-      output: { artifact: null, versions: [
-        { id: 'o3', version_number: 3, content: '## Chapter 5: The Growth Story\nText.', source_operation: 'agent_revise', created_at: 't' },
-        { id: 'o4', version_number: 4, content: '## Chapter 5: Beyond the Growth Narrative\nText.', source_operation: 'agent_revise', created_at: 't' },
-      ] },
-      realign: { artifact: { id: 'ar', summary: 'Moves the argument back to the objective: state pensions.' }, versions: [
-        { id: 'r2', version_number: 2, content: 'The correction applied: the argument is about pensions.', finish_reason: 'stop', source_operation: 'agent_revise', created_at: 't' },
-      ] },
-    },
+    bundles: b,
     context: { fields: {}, itemCounts: {}, itemsMissingStatus: {}, artifactNonEmpty: { realign: true }, outlineApproved: false, sections: {}, findings: {}, manualChecks: { 'realign.applied': true } },
     approvedOutline: [],
     run: { id: 'run1', policy: 'autonomous' },
@@ -69,8 +65,7 @@ function ctx(): PerformContext {
 }
 
 beforeEach(() => {
-  for (const f of [generateStageArtifact, assessChange, appendWorkflowEvent, listWorkflowEvents]) f.mockReset();
-  listWorkflowEvents.mockResolvedValue([save('2026-11-15T01:51:00Z', 'o3', 'o4', 4)]);
+  for (const f of [generateStageArtifact, assessChange, appendWorkflowEvent]) f.mockReset();
   generateStageArtifact.mockResolvedValue({ content: 'What changed: nothing.\nThe correction applied.', finish_reason: 'stop', model: 'm' });
 });
 
@@ -104,26 +99,37 @@ describe('a reopened stage is checked before it is rewritten (17 Nov)', () => {
     await performStep(ctx());
     expect(generateStageArtifact).toHaveBeenCalled();
   });
+
+  it('nothing earlier changed (a brief change reopened it): no check, rewritten as before', async () => {
+    const same = bundles([v('o3', 3, 'Same.', '2026-11-14T00:00:00Z')]);
+    await performStep(ctx(same));
+    expect(assessChange).not.toHaveBeenCalled();
+    expect(generateStageArtifact).toHaveBeenCalled();
+  });
 });
 
-describe('which earlier save reopened a stage', () => {
-  it('one stage saved twice: the version before the first save and after the last', () => {
-    const events = [save('2026-11-15T01:51:00Z', 'o3', 'o4', 4), save('2026-11-15T02:10:00Z', 'o4', 'o5', 5)];
-    expect(upstreamChange(SINGLE_OUTPUT_V1, events as never, 'realign', SINCE)).toMatchObject({ stageId: 'output', beforeId: 'o3', afterId: 'o5', afterNumber: 5 });
+describe('what changed before a reopened stage', () => {
+  it('each earlier stage whose text then and now differ, from the last version before the reopening', () => {
+    const b = bundles([v('o3', 3, 'old', '2026-11-14T00:00:00Z'), v('o4', 4, 'mid', '2026-11-15T02:00:00Z'), v('o5', 5, 'new', '2026-11-15T03:00:00Z')]);
+    expect(upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', SINCE)).toEqual([
+      { stageId: 'output', label: 'Output and evaluation', before: { id: 'o3', number: 3, content: 'old' }, after: { id: 'o5', number: 5, content: 'new' } },
+    ]);
   });
 
-  it('a stage marked complete again on a different version (17 Nov, production: a chapter plan repaired)', () => {
-    const done = (at: string, evidence: string, n: number) => ({ id: `c${n}`, project_id: 'p', user_id: 'u', seq: n, type: 'stage_marked_complete', stage_id: 'output', to_stage_id: null, actor: 'system', reason: null, created_at: at, payload: { evidence_version_id: evidence } });
-    const events = [done('2026-11-14T00:00:00Z', 'o3', 1), done('2026-11-15T02:00:00Z', 'o4', 2)];
-    expect(upstreamChange(SINGLE_OUTPUT_V1, events as never, 'realign', SINCE)).toMatchObject({ stageId: 'output', beforeId: 'o3', afterId: 'o4' });
-    // Completed again on the same version: nothing changed.
-    expect(upstreamChange(SINGLE_OUTPUT_V1, [done('2026-11-14T00:00:00Z', 'o3', 1), done('2026-11-15T02:00:00Z', 'o3', 2)] as never, 'realign', SINCE)).toBeNull();
+  it('a user who went back and edited an earlier stage: the same comparison (Sean, 17 Nov: "go back and change things")', () => {
+    const b = bundles();
+    b.input.versions.push(v('i2', 2, 'The brief, with one more sentence.', '2026-11-15T01:55:00Z'));
+    const out = upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', SINCE);
+    expect(out?.map((c) => c.stageId)).toEqual(['input', 'output']);
   });
 
-  it('two different earlier stages, a save that did not name it, or one before it was reopened: none', () => {
-    const other = { ...save('2026-11-15T02:00:00Z', 'i1', 'i2', 2), stage_id: 'review' };
-    expect(upstreamChange(SINGLE_OUTPUT_V1, [save(SINCE, 'o3', 'o4', 4), other] as never, 'realign', SINCE)).toBeNull();
-    expect(upstreamChange(SINGLE_OUTPUT_V1, [save(SINCE, 'o3', 'o4', 4, ['summary'])] as never, 'realign', SINCE)).toBeNull();
-    expect(upstreamChange(SINGLE_OUTPUT_V1, [save('2026-11-14T00:00:00Z', 'o3', 'o4', 4)] as never, 'realign', SINCE)).toBeNull();
+  it('saved again with the same text: no change', () => {
+    const b = bundles([v('o3', 3, 'same', '2026-11-14T00:00:00Z'), v('o4', 4, 'same', '2026-11-15T02:00:00Z')]);
+    expect(upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', SINCE)).toEqual([]);
+  });
+
+  it('an earlier stage first written after the reopening cannot be compared', () => {
+    const b = bundles([v('o1', 1, 'new', '2026-11-15T02:00:00Z')]);
+    expect(upstreamChanges(SINGLE_OUTPUT_V1, b as never, 'realign', SINCE)).toBeNull();
   });
 });

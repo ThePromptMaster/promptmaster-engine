@@ -16,7 +16,7 @@ import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
 import { cutSections } from '@/lib/jobs/continuation';
 import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, pendingJobs, writtenSections, type SectionTarget } from '@/lib/jobs/sections';
 import { changeTerms, repairWaitMs, sectionExcerpt, sectionsWithOldValues } from './repair-targets';
-import { upstreamChange } from './recheck-first';
+import { upstreamChanges } from './recheck-first';
 import { changeWindow } from '@/lib/data/context-for-request';
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
@@ -2761,23 +2761,22 @@ async function recheckManuscript(
 async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDefinition, since: string, why: string): Promise<StepOutcome | null> {
   const head = ctx.bundles[target.id]?.versions.at(-1);
   if (!head?.content?.trim()) return null;
-  const events = await listWorkflowEvents(ctx.project.id).catch(() => [] as WorkflowEvent[]);
-  const change = upstreamChange(ctx.template, events, target.id, since);
-  if (!change) return null;
-  const upstream = ctx.bundles[change.stageId]?.versions ?? [];
-  const beforeVersion = upstream.find((v) => v.id === change.beforeId);
-  const afterVersion = upstream.find((v) => v.id === change.afterId);
-  const before = beforeVersion?.content;
-  const after = afterVersion?.content;
-  if (!before || !after) return null;
+  const changes = upstreamChanges(ctx.template, ctx.bundles, target.id, since);
+  if (!changes?.length) return null;
   if (!evaluateStage(ctx.template, target.id, ctx.context).canAdvance) return null;
   const artifact = ctx.bundles[target.id]?.artifact;
   const figures = artifact?.key_figures?.figures ?? [];
+  // Each earlier stage's change, side by side, within one request.
+  const room = Math.max(3_000, Math.floor(12_000 / changes.length));
+  const windows = changes.map((c) => ({ c, ...changeWindow(c.before.content, c.after.content, room) }));
+  const one = changes.length === 1;
+  const named = changes.map((c) => `"${c.label}"`).join(one ? '' : ' and ');
   let affected = true;
   try {
     const impact = await api.assessChange({
-      field: `the earlier stage "${change.label}"`,
-      ...changeWindow(before, after, 12_000),
+      field: one ? `the earlier stage ${named}` : `the earlier stages ${named}`,
+      before: one ? windows[0].before : windows.map((w) => `## ${w.c.label}\n${w.before}`).join('\n\n'),
+      after: one ? windows[0].after : windows.map((w) => `## ${w.c.label}\n${w.after}`).join('\n\n'),
       stages: [{
         stage_id: target.id,
         label: target.label,
@@ -2794,13 +2793,13 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
   }
   if (affected) return null;
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
-  const versions = beforeVersion?.version_number && afterVersion?.version_number ? ` (v${beforeVersion.version_number} to v${afterVersion.version_number})` : '';
+  const what = changes.map((c) => `${c.label} (v${c.before.number} to v${c.after.number})`).join(' and ');
   await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
     type: 'stage_marked_complete',
     stage_id: target.id,
     actor,
     agent_run_id: actor === 'system' ? ctx.run.id : null,
-    reason: `Checked after a change: ${change.label} changed${versions}, and nothing in ${target.label} relied on what changed.`,
+    reason: `Checked after a change: ${what} changed, and nothing in ${target.label} relied on what changed.`,
     payload: { evidence_version_id: head.id, checked_unchanged: true, repaired_after: why, ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}) },
   });
   await ctx.afterStageEvent();
@@ -2808,7 +2807,7 @@ async function keptAfterCheck(ctx: PerformContext, key: string, target: StageDef
     status: 'succeeded',
     toolsUsed: ['model'],
     changes: { checked_unchanged: true, stage_closed: true, event_types: ['stage_marked_complete'] },
-    output: `Checked ${target.label} against the change to ${change.label}${versions} before rewriting it: nothing in it relied on what changed, so v${head.version_number} was kept as it is and marked complete again.`,
+    output: `Checked ${target.label} against the change to ${what} before rewriting it: nothing in it relied on what changed, so v${head.version_number} was kept as it is and marked complete again.`,
   });
 }
 

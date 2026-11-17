@@ -44,3 +44,12 @@ describe('what became of each stage a change reopened', () => {
     expect(changeOutcomes(['final'], since, stages, (id) => versions[id] ?? [], {}, () => 0)[0].check).toBe('not_checked');
   });
 });
+
+describe('a full draft Go saved when it closed a manuscript (17 Nov, production pass)', () => {
+  it('is said to be Go\'s, not the user\'s', () => {
+    const versions = [{ id: 'm2', version_number: 2, created_at: '2026-11-17T17:16:00Z', source_operation: 'long_form_complete' }];
+    const stages = [{ id: 'manuscript', renderer: 'long_form' as const }];
+    expect(changeOutcomes(['manuscript'], '2026-11-17T17:14:00Z', stages, () => versions, {}, () => 0)[0].by).toBe('you');
+    expect(changeOutcomes(['manuscript'], '2026-11-17T17:14:00Z', stages, () => versions, {}, () => 0, new Set(['m2']))[0].by).toBe('go');
+  });
+});

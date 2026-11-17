@@ -1339,10 +1339,11 @@ export function WorkflowWorkspace({
             template.stages,
             (id) => stageBundles[id]?.versions ?? [],
             evaluations,
-            (id) => context.openRows?.[id]?.length ?? 0
+            (id) => context.openRows?.[id]?.length ?? 0,
+            new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string))
           )
         : [],
-    [settled, template, stageBundles, evaluations, context]
+    [settled, template, stageBundles, evaluations, context, events]
   );
 
   // A version the user saved themselves that states values the facts do not
