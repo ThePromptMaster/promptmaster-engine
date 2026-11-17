@@ -1,6 +1,7 @@
 'use client';
 
 import { isQuickAnswer } from '@/lib/workflow/quick';
+import { hasConnectedAccount } from '@/lib/connections/account-found';
 import { loadGoAutostart } from '@/lib/supabase/preferences';
 import { designDepth, isConcise } from '@/lib/workflow/request-size';
 import { formOf } from '@/lib/workflow/work-form';
@@ -122,6 +123,20 @@ export default function NewProjectPage() {
   // The user's presets taken off the list, to put back (Sean, 23 Oct).
   const [removedTemplates, setRemovedTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
+  // What the start conversation says about Go and accounts follows the person's own
+  // settings (17 Nov hand pass: "Go starts on its own" with the switch off, and
+  // "Connect an account … so this conversation can read it" with three connected).
+  const [goAutostart, setGoAutostart] = useState(true);
+  const [accountsConnected, setAccountsConnected] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void loadGoAutostart(user.id).catch(() => true).then((on) => live && setGoAutostart(on));
+    void hasConnectedAccount().then((on) => live && setAccountsConnected(on));
+    return () => {
+      live = false;
+    };
+  }, [user]);
   // Each step starts at its top (15 Nov, CI): pressing a way in low on the first
   // screen left the next one scrolled past its own Start button.
   useEffect(() => {
@@ -1056,6 +1071,7 @@ export default function NewProjectPage() {
             onStateChange={setFrontDoorState}
             material={material}
             carried={startItems}
+            goStarts={goAutostart}
             busyLabel={
               working === 'setup' ? t('start.workingTheSetup')
                 : working === 'creating' ? t('start.creatingProject')
@@ -1081,7 +1097,7 @@ export default function NewProjectPage() {
                   className="mt-2 inline-flex items-center gap-1 text-label font-medium text-[var(--pm-primary)] hover:underline"
                 >
                   <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
-                  {t('door.connectAccount')}
+                  {accountsConnected ? t('door.connectAnother') : t('door.connectAccount')}
                 </Link>
               </>
             }

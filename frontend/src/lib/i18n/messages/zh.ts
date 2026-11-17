@@ -308,6 +308,7 @@ export const zh: Messages = {
   'auto.failed': '无法保存此设置，请重试。',
   'start.goStarts': '项目创建后 Go 会自行开始——你可以随时停止它，或在设置中关闭此项。',
   'door.connectAccount': '连接一个账户（Gmail、Drive、Outlook、Salesforce…），让这段对话可以读取它',
+  'door.connectAnother': '问题需要时，这里会读取你已连接的账户 · 再连接一个',
   'door.accountsRead': '从你的账户中读取了 {count} 项，创建项目时一并保存',
   'door.newSources_one': '{count} 个新来源',
   'door.newSources_other': '{count} 个新来源',

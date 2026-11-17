@@ -9,6 +9,7 @@ const updateProject = vi.hoisted(() => vi.fn());
 const listArtifacts = vi.hoisted(() => vi.fn());
 const listVersions = vi.hoisted(() => vi.fn());
 const getEvaluation = vi.hoisted(() => vi.fn());
+const recentEvaluationsOf = vi.hoisted(() => vi.fn());
 const appendVersionRow = vi.hoisted(() => vi.fn());
 const restoreVersionRow = vi.hoisted(() => vi.fn());
 const rateVersionRow = vi.hoisted(() => vi.fn());
@@ -27,6 +28,7 @@ vi.mock('@/lib/supabase/versions', () => ({
   listArtifacts,
   listVersions,
   getEvaluation,
+  recentEvaluationsOf,
   appendVersion: appendVersionRow,
   restoreVersion: restoreVersionRow,
   rateVersion: rateVersionRow,
@@ -66,6 +68,7 @@ async function loadFixture() {
   listArtifacts.mockResolvedValue([ARTIFACT]);
   listVersions.mockResolvedValue([V1]);
   getEvaluation.mockResolvedValue(null);
+  recentEvaluationsOf.mockResolvedValue([]);
   listWorkflowEvents.mockResolvedValue([]);
   listRecommendations.mockResolvedValue([]);
   listTasks.mockResolvedValue([]);
@@ -120,6 +123,25 @@ describe('loadProject', () => {
     expect(s.artifact?.id).toBe('a1');
     expect(s.versions).toHaveLength(1);
     expect(s.activeVersionId).toBe('v1');
+  });
+
+  it('loads the last check of an earlier version when the newest has none (17 Nov hand pass)', async () => {
+    const brief = { ...ARTIFACT, id: 'a2', stage_id: 'brief', current_version_id: 'v3', version_count: 2 };
+    const v2 = { ...V1, id: 'v2', artifact_id: 'a2', version_number: 1 };
+    const v3 = { ...V1, id: 'v3', artifact_id: 'a2', version_number: 2 };
+    const check = { id: 'e1', version_id: 'v2', alignment_score: 'High' };
+    getProject.mockResolvedValue(project());
+    listArtifacts.mockResolvedValue([ARTIFACT, brief]);
+    listVersions.mockImplementation(async (id: string) => (id === 'a2' ? [v2, v3] : [V1]));
+    getEvaluation.mockResolvedValue(null);
+    recentEvaluationsOf.mockResolvedValue([check]);
+    listWorkflowEvents.mockResolvedValue([]);
+    listRecommendations.mockResolvedValue([]);
+    listTasks.mockResolvedValue([]);
+    await useProjectStore.getState().loadProject('p1');
+    expect(recentEvaluationsOf).toHaveBeenCalledWith(['v2']);
+    expect(useProjectStore.getState().evaluations.v2).toMatchObject({ id: 'e1' });
+    expect(useProjectStore.getState().evaluations.v3).toBeUndefined();
   });
 
   it('reports a missing project instead of hanging in loading', async () => {

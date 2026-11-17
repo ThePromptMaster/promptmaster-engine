@@ -308,6 +308,7 @@ export const pt: Messages = {
   "auto.failed": "Não foi possível salvar esta configuração. Tente de novo.",
   "start.goStarts": "O Go começa sozinho quando o projeto é criado; você pode pará-lo a qualquer momento ou desativar isso em Configurações.",
   "door.connectAccount": "Conecte uma conta (Gmail, Drive, Outlook, Salesforce…) para que esta conversa possa lê-la",
+  "door.connectAnother": "Suas contas conectadas são lidas aqui quando uma pergunta precisa · Conectar outra",
   "door.accountsRead": "Lido das suas contas: {count} item(ns), guardado(s) com o projeto quando for criado",
   "door.newSources_one": "{count} fonte nova",
   "door.newSources_other": "{count} fontes novas",

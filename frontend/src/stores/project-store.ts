@@ -18,6 +18,7 @@ import {
   appendVersion as appendVersionRow,
   createArtifact,
   getEvaluation,
+  recentEvaluationsOf,
   listArtifacts,
   listVersions,
   rateVersion as rateVersionRow,
@@ -47,6 +48,7 @@ import { onlyConfirmsProposals } from '@/lib/workflow/stage-artifact';
 import { onlyRewords } from '@/lib/workflow/rewording';
 import { onlyRecordsCarriedOut } from '@/lib/workflow/triage';
 import { onlySettles } from '@/lib/workflow/settled-rows';
+import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 import {
   ProjectConflictError,
   type Artifact,
@@ -473,6 +475,20 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       );
       for (const [id, evaluation] of loaded) {
         if (evaluation) evaluations[id] = evaluation;
+      }
+      // A stage whose newest version has no check, or one that did not run: its last
+      // check of an earlier version, for the page to show folded under that version
+      // (17 Nov hand pass: only heads were loaded, so after a reload the line saying
+      // "not checked yet; the last check was of v2" never appeared).
+      const unchecked = Object.values(stages).filter((b) => {
+        const head = b.versions.at(-1);
+        return head && b.versions.length > 1 && (!evaluations[head.id] || isFailedEvaluation(evaluations[head.id]));
+      });
+      const earlier = await Promise.all(
+        unchecked.map((b) => recentEvaluationsOf(b.versions.slice(0, -1).map((v) => v.id)).catch(() => [] as Evaluation[]))
+      );
+      for (const evaluation of earlier.flat()) {
+        if (evaluation.version_id && !evaluations[evaluation.version_id]) evaluations[evaluation.version_id] = evaluation;
       }
       const head = projectHead;
       const events = loadedEvents ?? (background ? get().events : null);

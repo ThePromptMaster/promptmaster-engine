@@ -308,6 +308,7 @@ export const es: Messages = {
   "auto.failed": "No se pudo guardar este ajuste. Inténtalo de nuevo.",
   "start.goStarts": "Go empieza solo cuando se crea el proyecto; puedes detenerlo cuando quieras o desactivarlo en Ajustes.",
   "door.connectAccount": "Conecta una cuenta (Gmail, Drive, Outlook, Salesforce…) para que esta conversación pueda leerla",
+  "door.connectAnother": "Tus cuentas conectadas se leen aquí cuando una pregunta lo necesita · Conectar otra",
   "door.accountsRead": "Leído de tus cuentas: {count} elemento(s), que se guardan con el proyecto al crearlo",
   "door.newSources_one": "{count} fuente nueva",
   "door.newSources_other": "{count} fuentes nuevas",

@@ -309,6 +309,25 @@ export async function getEvaluation(versionId: string): Promise<Evaluation | nul
   return (data as unknown as Evaluation) ?? null;
 }
 
+/**
+ * The latest checks of these versions, newest first (17 Nov hand pass). Loaded for a
+ * stage whose newest version has no check, so the page can say which earlier version
+ * the last check was of, and keep it folded rather than lose it on a reload.
+ */
+export async function recentEvaluationsOf(versionIds: readonly string[], limit = 3): Promise<Evaluation[]> {
+  if (!versionIds.length) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('evaluations')
+    .select(EVAL_COLUMNS)
+    .in('version_id', [...versionIds])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as unknown as Evaluation[];
+}
+
 export async function listEvaluations(projectId: string): Promise<Evaluation[]> {
   const supabase = createClient();
   const { data, error } = await supabase

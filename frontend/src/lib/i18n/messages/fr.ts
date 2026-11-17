@@ -308,6 +308,7 @@ export const fr: Messages = {
   "auto.failed": "Impossible d’enregistrer ce réglage. Réessayez.",
   "start.goStarts": "Go démarre seul une fois le projet créé ; vous pouvez l’arrêter à tout moment ou le désactiver dans Réglages.",
   "door.connectAccount": "Connecter un compte (Gmail, Drive, Outlook, Salesforce…) pour que cette conversation puisse le lire",
+  "door.connectAnother": "Vos comptes connectés sont lus ici quand une question le demande · En connecter un autre",
   "door.accountsRead": "Lu dans vos comptes : {count} élément(s), conservé(s) avec le projet à sa création",
   "door.newSources_one": "{count} nouvelle source",
   "door.newSources_other": "{count} nouvelles sources",
