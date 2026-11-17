@@ -129,7 +129,7 @@ import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange, proposedChange, settledChange, type ProposedChange } from '@/lib/workflow/brief-change';
-import { contextFromDocuments } from '@/lib/data/extract-text';
+import { replaceDocumentInContext, contextFromDocuments } from '@/lib/data/extract-text';
 import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
@@ -460,8 +460,11 @@ export function WorkflowWorkspace({
   const chatSeen = useRef<Record<string, PageSnapshot>>({});
   // Below md the rail is not on the page; this is the drawer that replaces it.
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
+  // 17 Nov (Sean): a project made from the start screen opens with Go running (`?go=start`).
+  const [autoStart] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('go') === 'start' && !project.example_key);
   // Go mode drafts stages itself; the entry auto-draft must not race it.
-  const [goDriving, setGoDriving] = useState(false);
+  const [goDriving, setGoDriving] = useState(autoStart);
+  const [autoStarting, setAutoStarting] = useState(autoStart);
 
   /**
    * FR-18: attribute this project's usage rows.
@@ -1777,7 +1780,17 @@ export function WorkflowWorkspace({
   // made versions no Go step accounted for (Sean, 10 Oct, email 6.7). The stage
   // can still be drafted by hand from its menu.
   const goPaused = go.run?.status === 'awaiting_decision' || go.run?.status === 'blocked' || go.run?.status === 'budget_exhausted';
-  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting' || goPaused), [go.active, go.phase, goPaused]);
+  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting' || goPaused || autoStarting), [go.active, go.phase, goPaused, autoStarting]);
+  // Started once, when the page can work: the parameter is taken off the address first, so a
+  // reload never starts a second run. A project that already has a run is left as it is.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || events === null || !appendStageVersion) return;
+    autoStarted.current = true;
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', window.location.pathname);
+    if (!go.run) go.handsOff();
+    setAutoStarting(false);
+  }, [autoStart, events, appendStageVersion, go]);
 
   // What Go can ask the user for, done from its card with one click (B4):
   // the same writes the stage's own controls make.
@@ -3122,11 +3135,17 @@ export function WorkflowWorkspace({
               onAddToContext={(documents) =>
                 onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
               }
+              onReplaceInContext={(name, text) => {
+                const next = replaceDocumentInContext(project.context ?? '', name, text);
+                if (next === null) return false;
+                onPatchProject({ context: next });
+                return true;
+              }}
               readOnly={project.status === 'finalized'}
               zone={mainZone}
             />
             {/* On every stage: what the project has cost so far (31 Oct). */}
-            <ProjectCost projectId={project.id} refreshKey={`${stage.id}:${project.revision ?? ''}:${go.run?.cost_usd ?? ''}`} />
+            <ProjectCost projectId={project.id} refreshKey={`${stage.id}:${project.revision ?? ''}:${go.run?.cost_usd ?? ''}`} stageLabel={(id) => stageNameShown(id)} />
 
             {outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
             {addSectionsFrom && (

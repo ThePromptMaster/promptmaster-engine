@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { ConnectedAccounts } from '@/components/personalize/connected-accounts';
+import { GoAutostartSetting } from '@/components/projects/go-autostart-setting';
 import { useT } from '@/lib/i18n/i18n-provider';
 
 /** Connected accounts (the client's call, 7 Nov): what each reads, and connecting or disconnecting it. */
@@ -23,6 +24,7 @@ export default function SettingsPage() {
         {t('conn.useThem')}
         <span aria-hidden className="material-symbols-outlined text-[18px] rtl:-scale-x-100">arrow_forward</span>
       </Link>
+      <GoAutostartSetting />
     </main>
   );
 }

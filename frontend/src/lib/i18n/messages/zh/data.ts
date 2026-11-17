@@ -15,6 +15,7 @@ export const zh: Record<keyof typeof en, string> = {
   'data.imageError': '无法添加该图片。',
   'data.imageErrorWhy': '无法添加该图片：{message}',
   'data.removeError': '无法移除 {name}。',
+  'data.replaced': '已替换 {name}：新文本替换了项目上下文中的旧文本，依赖它的阶段会被检查。',
   'data.toAdd': '要添加的图片',
   'data.captionHint': '说明每张图片显示的内容。PromptMaster 看不到图片；它会根据说明文字把图片放到你的工作中。',
   'data.captionFor': '{name} 的说明',

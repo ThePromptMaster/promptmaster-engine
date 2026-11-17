@@ -15,6 +15,7 @@ export const ar: Record<keyof typeof en, string> = {
   'data.imageError': 'تعذّرت إضافة الصورة.',
   'data.imageErrorWhy': 'تعذّرت إضافة الصورة: {message}',
   'data.removeError': 'تعذّرت إزالة {name}.',
+  'data.replaced': 'تم استبدال {name}: حلّ نصه الجديد محل القديم في سياق المشروع، وتُفحص المراحل التي اعتمدت عليه.',
   'data.toAdd': 'صور للإضافة',
   'data.captionHint': 'اذكر ما تُظهره كل صورة. لا يستطيع PromptMaster رؤية الصور؛ بل يضعها في عملك وفق ما يقوله التعليق.',
   'data.captionFor': 'تعليق لـ {name}',

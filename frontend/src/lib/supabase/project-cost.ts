@@ -12,21 +12,52 @@ export const PROJECT_COST_ROWS = 10_000;
  * unknown and is counted, never added as zero (FR-18). Null when it cannot
  * be read.
  */
-export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean; goSteps: number; goCalls: number; byKind: CostByKind }) | null> {
+export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean; goSteps: number; goCalls: number; byKind: CostByKind; byStage: CostByStage }) | null> {
   try {
-    const { data, error } = await createClient()
-      .from('model_usage')
-      .select('cost_usd, operation, agent_step_id')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(PROJECT_COST_ROWS);
-    if (error || !data) return null;
-    const rows = data as { cost_usd: string | number | null; operation?: string | null; agent_step_id?: string | null }[];
+    const supabase = createClient();
+    const [usage, steps] = await Promise.all([
+      supabase
+        .from('model_usage')
+        .select('cost_usd, operation, agent_step_id')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(PROJECT_COST_ROWS),
+      // Which stage each of Go's steps worked on (17 Nov): what a stage's repairs cost.
+      supabase.from('agent_steps').select('id, stage_id, params').eq('project_id', projectId).limit(PROJECT_COST_ROWS),
+    ]);
+    if (usage.error || !usage.data) return null;
+    const rows = usage.data as { cost_usd: string | number | null; operation?: string | null; agent_step_id?: string | null }[];
     const spent = totalOf(rows.map((r) => ({ costUsd: r.cost_usd === null ? null : Number(r.cost_usd) })));
-    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS, ...goShare(rows), byKind: costByKind(rows) };
+    const stageOf = stageOfStep((steps.data ?? []) as { id: string; stage_id: string; params?: Record<string, unknown> | null }[]);
+    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS, ...goShare(rows), byKind: costByKind(rows), byStage: costByStage(rows, stageOf) };
   } catch {
     return null;
   }
+}
+
+/** Spend by the stage Go's step worked on; drain rows as the chapters; anything else as outside Go. */
+export type CostByStage = Record<string, number>;
+/** The keys for spend that is not one stage's: chapters written in the background, and calls made outside Go. */
+export const SECTIONS_KEY = '_sections';
+export const OUTSIDE_GO_KEY = '_outside_go';
+
+/** Each step's stage: the stage it worked on (a repair names it in its params), else the stage it ran on. Pure. */
+export function stageOfStep(steps: readonly { id: string; stage_id: string; params?: Record<string, unknown> | null }[]): Map<string, string> {
+  return new Map(steps.map((s) => [s.id, String(s.params?.stage_id ?? '') || s.stage_id]));
+}
+
+/**
+ * What each stage's work cost (17 Nov, Sean: "I'd also like to see which steps are driving
+ * the cost"; his book had spent $63 repairing one stage). Pure; a call with no price is not added.
+ */
+export function costByStage(rows: readonly { cost_usd: string | number | null; operation?: string | null; agent_step_id?: string | null }[], stageOf: ReadonlyMap<string, string>): CostByStage {
+  const out: CostByStage = {};
+  for (const r of rows) {
+    if (r.cost_usd === null) continue;
+    const key = (r.agent_step_id && stageOf.get(r.agent_step_id)) || ((r.operation ?? '').startsWith('drain:') ? SECTIONS_KEY : OUTSIDE_GO_KEY);
+    out[key] = (out[key] ?? 0) + Number(r.cost_usd);
+  }
+  return out;
 }
 
 /** The drain's usage rows that belong to these jobs, summed (pure). */

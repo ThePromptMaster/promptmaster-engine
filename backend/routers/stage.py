@@ -9,6 +9,8 @@ engine.
 
 from __future__ import annotations
 
+import asyncio
+
 from typing import Literal
 
 from promptmaster.project_context import highest_source_number
@@ -100,17 +102,29 @@ async def api_generate_stage_artifact(
     """
     try:
         own_task = "\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint) if t.strip())
-        with_items, accounts = await with_accounts(client, composio, owner, req.inputs, req.account_search, task=own_task)
-        inputs, web = await with_web(
-            client,
-            req.model or None,
-            with_items,
-            req.web_access,
-            task="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint, req.instruction) if t.strip()),
-            # Go writes instructions too, having read the items: the stage's own words then.
-            task_if_held=own_task,
-            current=req.existing_content,
-        )
+        web_task = "\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint, req.instruction) if t.strip())
+        if req.inputs.third_party:
+            with_items, accounts = await with_accounts(client, composio, owner, req.inputs, req.account_search, task=own_task)
+            inputs, web = await with_web(
+                client,
+                req.model or None,
+                with_items,
+                req.web_access,
+                task=web_task,
+                # Go writes instructions too, having read the items: the stage's own words then.
+                task_if_held=own_task,
+                current=req.existing_content,
+            )
+        else:
+            # 17 Nov (Paul: slower than ChatGPT): with nothing held from the accounts yet, the
+            # two lookups do not depend on each other, so they run at once. The web query is
+            # written before anything from the accounts is read, as L-200 asks.
+            (with_items, accounts), (inputs, web) = await asyncio.gather(
+                with_accounts(client, composio, owner, req.inputs, req.account_search, task=own_task),
+                with_web(client, req.model or None, req.inputs, req.web_access, task=web_task, task_if_held=own_task, current=req.existing_content),
+            )
+            if with_items.third_party:
+                inputs = inputs.model_copy(update={"third_party": with_items.third_party})
         result = await generate_stage_artifact(
             client=client,
             model=req.model or None,

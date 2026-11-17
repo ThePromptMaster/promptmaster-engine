@@ -15,6 +15,7 @@ export const sw: Record<keyof typeof en, string> = {
   'data.imageError': 'Haikuweza kuongeza picha.',
   'data.imageErrorWhy': 'Haikuweza kuongeza picha: {message}',
   'data.removeError': 'Haikuweza kuondoa {name}.',
+  'data.replaced': '{name} imebadilishwa: maneno yake mapya yamechukua nafasi ya yale ya zamani katika muktadha wa mradi, na hatua zilizoyategemea zinakaguliwa.',
   'data.toAdd': 'Picha za kuongeza',
   'data.captionHint': 'Eleza kila picha inaonyesha nini. PromptMaster haiwezi kuona picha; inaziweka kwenye kazi yako kulingana na maelezo yake.',
   'data.captionFor': 'Maelezo ya {name}',

@@ -26,6 +26,7 @@ export function ProjectData({
   files,
   onChanged,
   onAddToContext,
+  onReplaceInContext,
   readOnly = false,
   zone,
 }: {
@@ -34,6 +35,11 @@ export function ProjectData({
   onChanged: () => void | Promise<void>;
   /** A document's words into the project context, when the user says so. */
   onAddToContext?: (documents: { name: string; text: string }[]) => void;
+  /**
+   * A new version of a document already attached (17 Nov): its words replace the old ones
+   * where the context holds them. Returns false when the context held none.
+   */
+  onReplaceInContext?: (name: string, text: string) => boolean;
   readOnly?: boolean;
   /** The stage column: a file dropped on it, or pasted into it, is attached here (15 Nov). */
   zone?: RefObject<HTMLElement | null>;
@@ -58,12 +64,21 @@ export function ProjectData({
     setNote(null);
     setReadable([]);
     try {
-      const prepared = await prepareFiles(Array.from(picked), files.map((f) => f.name));
+      // 17 Nov (Sean: "When a source changes …"): a document with the name of one already
+      // attached is its new version. The old file goes; the new one takes its place, and its
+      // words replace the old ones in the context, where the change check reads them.
+      const chosen = Array.from(picked);
+      const replacing = readOnly ? [] : files.filter((f) => f.preview.kind !== 'image' && chosen.some((c) => c.name === f.name && !isImage(c.name)));
+      for (const old of replacing) await removeProjectFile(old);
+      const replaced = new Set(replacing.map((f) => f.name));
+      const prepared = await prepareFiles(chosen, files.map((f) => f.name).filter((n) => !replaced.has(n)));
       // A document too large to store keeps only its words (15 Nov): offered below for the context.
       for (const p of prepared.ready) if (storesFile(p)) await attachProjectFile(project, p.file, p.preview);
       if (prepared.errors.length) setError(prepared.errors.join(' '));
-      if (prepared.notes.length) setNote(prepared.notes.join(' '));
-      setReadable(prepared.ready.flatMap((p) => (p.text ? [{ name: p.file.name, text: p.text }] : [])));
+      const swapped = prepared.ready.filter((p) => replaced.has(p.file.name) && p.text && onReplaceInContext?.(p.file.name, p.text));
+      const notes = [...prepared.notes, ...swapped.map((p) => t('data.replaced', { name: p.file.name }))];
+      if (notes.length) setNote(notes.join(' '));
+      setReadable(prepared.ready.flatMap((p) => (p.text && !swapped.includes(p) ? [{ name: p.file.name, text: p.text }] : [])));
       await onChanged();
     } catch (e) {
       setError(errorMessage(e) ? t('data.attachErrorWhy', { message: errorMessage(e) }) : t('data.attachError'));

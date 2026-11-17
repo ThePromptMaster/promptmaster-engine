@@ -157,6 +157,10 @@ def build_chat_decision_prompt(
     return _CHAT_DECIDE_SYSTEM, user
 
 
+#: The search decision's model (17 Nov): small, fast, and the same for every project.
+DECIDE_MODEL = "anthropic/claude-haiku-5.5"
+
+
 async def decide_chat_search(
     client: OpenRouterClient,
     model: str | None,
@@ -167,7 +171,9 @@ async def decide_chat_search(
 ) -> str | None:
     """The words to search for, or None when the question needs no search."""
     system, user = build_chat_decision_prompt(inputs, chat_history, user_message, current)
-    data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
+    # 17 Nov (Paul, via Sean: about 3x slower than ChatGPT): whether to search, and for what,
+    # is a small judgement made before every reply and draft; it runs on the small model.
+    data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=DECIDE_MODEL)
     if not isinstance(data, dict):
         return None
     query = " ".join(str(data.get("query") or "").split())[:400]
@@ -274,7 +280,9 @@ async def decide_work_search(
 ) -> str | None:
     """The words to search for before a piece of work, or None when it needs no search."""
     system, user = build_work_decision_prompt(inputs, task, current)
-    data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
+    # 17 Nov (Paul, via Sean: about 3x slower than ChatGPT): whether to search, and for what,
+    # is a small judgement made before every reply and draft; it runs on the small model.
+    data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=DECIDE_MODEL)
     if not isinstance(data, dict):
         return None
     query = " ".join(str(data.get("query") or "").split())[:400]

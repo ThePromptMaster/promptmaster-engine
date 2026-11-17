@@ -4494,3 +4494,29 @@ plan with me".
   account" and asked for exports).
 - **Not done:** the chat still sees every More button whether or not the menu holds it at that moment for
   that stage; a button that the chat names in words other than its label is not matched.
+
+### L-250 — Go starts itself; a replaced document is carried through; cost by stage; faster lookups (2026-11-17)
+
+Sean (17 Nov): "whether Go should start automatically once the user starts the project"; "When a source
+changes, I want PromptMaster to carry it through the affected drafts, show what changed, and ask me when it
+actually needs my judgment"; "I'd also like to see which steps are driving the cost". Paul (16 Nov): about
+three times slower than ChatGPT.
+
+- **Go starts itself.** A project of more than one stage made from the start screen opens with Go running
+  under Autonomous (`?go=start`, taken off the address at once so a reload never starts a second run). Not
+  the one-stage quick route (it drafts and checks itself), not an example, and not when the person turned
+  it off: "Start Go when I make a project" in Settings (`user_preferences.go_autostart`, on by default).
+  Routine decisions stay as the project has them; reserved approvals still stop it.
+- **A replaced document.** Attaching a document with the name of one already attached replaces it: the old
+  file is removed, and the new words replace the old under "### From <name>" in the context. The context
+  change goes through the existing change check (`assess-change`), so only the stages that relied on it
+  reopen, with the before and after shown, and each is checked before it is rewritten (L-246). A document
+  whose words were never added to the context is only replaced as a file.
+- **Cost by stage**, most first, under the project's cost line: Go's calls by the stage each step worked on,
+  chapters written in the background, and calls outside Go.
+- **Faster before the first draft.** The search decisions run on Haiku 5.5. A draft's account and web
+  lookups run at once when nothing is held from the accounts yet (the web query is then written before
+  anything from the accounts is read, as L-200 asks). The start conversation's turns are still saved one
+  at a time, in order.
+- **Not done:** Go reshaping the workflow itself (shortening, combining or skipping stages beyond an
+  optional skip under Handle) is an estimate in the reply, not built. Streaming the first draft is not built.
