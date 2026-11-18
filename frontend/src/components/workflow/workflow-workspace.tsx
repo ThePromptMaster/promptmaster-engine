@@ -2224,7 +2224,8 @@ export function WorkflowWorkspace({
     noFurtherPassReason:
       headEvaluation?.further_pass_needed === false ? headEvaluation.further_pass_reason || null : null,
     applyableFixes: applyable.length,
-    canAdvance: evaluation.canAdvance,
+    // On the last stage, work open on other stages makes finishing an override (18 Nov).
+    canAdvance: evaluation.canAdvance && !(isCurrent && !stage.transitions.default_next && blockingElsewhere.length > 0),
     checkSays: isCurrent ? currentCheckSays : null,
     isLast: !stage.transitions.default_next,
     accepted: evaluation.criteria.some((c) => c.manual) && evaluation.criteria.filter((c) => c.manual).every((c) => c.satisfied),

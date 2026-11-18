@@ -31,6 +31,7 @@ export const ADDED_STAGE_PREFIX = 'added_';
 export const CARRIED_FROM_QUICK = 'carried_from_quick';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { itemSchemaFor, parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
+import type { StageItem } from './stage-artifact';
 import { carriesForward, isDone } from './types';
 import { supersededFactValues } from './facts';
 import { leftoverValues, type SupersededValue } from './fact-values';
@@ -211,6 +212,51 @@ export function summariseStageContent(
   return truncate(content);
 }
 
+/** The most of the pasted profiles an assessment hands on, after its rows. */
+export const PROFILES_MAX = 60_000;
+
+/**
+ * An assessment as a later stage reads it: every row whole — its verdict, all
+ * of its reasons, the evidence quoted for it, its gaps and its batch — then
+ * each row's part of the paste. 18 Nov (Sean, Executive Search): a row went on
+ * as its first reason cut at 220 characters, with no evidence at all, so the
+ * shortlist wrote "Met at batch assessment; profile wording not held" for nine
+ * candidates and its repairs could not put the evidence back.
+ */
+export function assessmentText(items: readonly StageItem[]): string {
+  const one = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const lines = (v: unknown) => String(v ?? '').split('\n').map((l) => l.replace(/^\s*[-*]\s*/, '').trim()).filter(Boolean);
+  const rows = items.map((item, i) => {
+    const why = lines(item.rationale);
+    return [
+      `${i + 1}. ${one(item.subject) || '(unnamed)'} — ${one(item.verdict) || 'no verdict'}${item.batch ? ` (batch ${item.batch})` : ''}${item.verdict_source === 'user' ? ' (verdict set by the user)' : ''}`,
+      ...(why.length ? [`   Why: ${why.join('; ')}`] : []),
+      ...(one(item.evidence) ? [`   Evidence: ${one(item.evidence)}`] : []),
+      ...(one(item.gaps) ? [`   Gaps: ${one(item.gaps)}`] : []),
+    ].join('\n');
+  });
+  const out = [`${items.length} assessed:`, ...rows];
+  // The rows going forward first (Advance, Shortlist, Strong): the shortlist quotes those.
+  const forward = (v: string | undefined) => /\b(?:advance|shortlist|strong|proceed|recommend|yes)\w*/i.test(v ?? '');
+  const withProfile = items.filter((i) => (i.profile ?? '').trim()).sort((a, b) => Number(forward(b.verdict)) - Number(forward(a.verdict)));
+  if (!withProfile.length) return out.join('\n');
+  let room = PROFILES_MAX;
+  const shown: string[] = [];
+  let left = 0;
+  for (const item of withProfile) {
+    const text = `### ${one(item.subject) || item.id}\n${(item.profile ?? '').trim()}`;
+    if (text.length > room) {
+      left += 1;
+      continue;
+    }
+    room -= text.length;
+    shown.push(text);
+  }
+  out.push('', 'THE PROFILES AS PASTED (each row\'s own part of what the user gave):', ...shown);
+  if (left) out.push(`(${left} more profile${left === 1 ? '' : 's'} not shown here for length; their rows above are whole.)`);
+  return out.join('\n');
+}
+
 /**
  * A stage's saved version as a later stage should read it: prose as written,
  * a table as one line per row with every field and its status. '' for the
@@ -225,17 +271,7 @@ export function documentText(stage: StageDefinition, content: string | null | un
   // An assessment is everyone judged (15 Nov, Sean: "choose when to finish and get a
   // summary of everyone assessed"). Each row is its subject, its verdict and why in
   // one line, so a hundred rows fit beside the criteria; no row status, as it has none.
-  if (stage.renderer === 'assess') {
-    const one = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').replace(/^-\s*/, '').trim();
-    return [
-      `${items.length} assessed:`,
-      ...items.map((item, i) => {
-        const why = one(String(item.rationale ?? '').split(/\n/)[0]).slice(0, 220);
-        const gaps = one(item.gaps).slice(0, 160);
-        return `${i + 1}. ${one(item.subject) || '(unnamed)'} — ${one(item.verdict) || 'no verdict'}${why ? ` — ${why}` : ''}${gaps ? ` (gaps: ${gaps})` : ''}`;
-      }),
-    ].join('\n');
-  }
+  if (stage.renderer === 'assess') return assessmentText(items);
   // A findings row keeps its id, so the chat can say "i11" as the table does (1 Nov).
   const review = stage.renderer === 'review';
   return items
