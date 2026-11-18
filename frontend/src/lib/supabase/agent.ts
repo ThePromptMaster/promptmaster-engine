@@ -49,6 +49,13 @@ export async function createAgentRun(args: {
   return data as AgentRun;
 }
 
+/** One run as the database has it now (18 Nov: a loop told its run had ended reads why). */
+export async function getAgentRun(runId: string): Promise<AgentRun | null> {
+  const { data, error } = await createClient().from('agent_runs').select('*').eq('id', runId).maybeSingle();
+  if (error) throw error;
+  return (data as AgentRun | null) ?? null;
+}
+
 /** The project's live run, if any — what a refreshed tab resumes. */
 export async function getLiveAgentRun(projectId: string): Promise<AgentRun | null> {
   const { data, error } = await createClient()

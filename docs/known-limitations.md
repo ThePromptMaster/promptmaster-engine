@@ -4575,3 +4575,21 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
 - **Not seen by hand:** Go asking to add a stage that copies the manuscript (the refusal is unit-tested
   only), and an edit-limit correction. Neither came up in the runs. The finish with research still pending
   was not reached: the review's own recheck decided that row before the project got there.
+
+### L-252 — One Go per project: a new project never runs on the last one's workflow (2026-11-18)
+- **What happened** (Sean, 17–18 Nov: Warehouse run 36e80b91, and three more of his new projects). The
+  project page kept the last project in the store while it loaded the next one, so for one render it
+  held the new project with the *previous* project's workflow. Go's auto-start (L-250) ran in that
+  render. It drafted the old workflow's first stage into the new project (a stray artifact on a stage
+  the project doesn't have), then the page redrew and a second loop adopted the same run. The two loops
+  wrote the same step number; the one that lost marked the run failed, and the other carried on. Each
+  approval it then tried was refused by the database ("agent run … is failed, not running") and
+  recorded as an ordinary failed step, so it revised and tried again, three times.
+- **Now:** the page draws the workspace only for the route's own project with the workflow it pins
+  (`templateFitsProject`), and switching projects clears the old row from the store. A loop whose page
+  has gone does not start or carry on. In one tab, a run is driven by one page's loop (`claimDrive`).
+  A write the database refuses because the run is over, or a second loop's step number, stops the loop
+  at once: nothing is retried, the run keeps whatever ended it, and the page says so.
+- **Left as it is:** the stray artifacts in Sean's four projects (on stages their workflows don't have,
+  so nothing shows them). A run created by a page that went away before its loop started stays
+  "running" with no driver until Go is pressed again; with the page check this no longer happens.

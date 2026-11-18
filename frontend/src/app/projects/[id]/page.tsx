@@ -10,6 +10,7 @@ import { ProjectImagesProvider } from '@/components/shared/project-images';
 import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
+import { templateFitsProject } from '@/lib/workflow/template-fit';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
@@ -62,7 +63,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const setStageFigures = useProjectStore((s) => s.setStageFigures);
   const ensureStageArtifact = useProjectStore((s) => s.ensureStageArtifact);
 
-  const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
+  const [template, setTemplate] = useState<(WorkflowTemplate & { id?: string }) | null>(null);
   // "Not loaded yet", "failed" and "genuinely missing" are three different
   // pages. With one null for all three, every project opened on "this
   // project's workflow could not be loaded … nothing generated yet" for a
@@ -105,7 +106,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.workflow_template_id, project?.workflow, templateAttempt]);
 
-  if (loading || (storedProject && templateLoad === 'loading')) {
+  // The workspace is drawn only for this route's project with its own pinned
+  // workflow (18 Nov): for one render after opening a new project, the store
+  // could still hold the last project's workflow, and Go's auto-start ran on it.
+  const mismatched = storedProject ? storedProject.id !== id || (template !== null && !templateFitsProject(template, storedProject)) : false;
+  if (loading || (storedProject && (templateLoad === 'loading' || mismatched))) {
     // A skeleton in the shape of the thing being loaded, rather than the bare
     // "Loading…" string this used to be. The project list one click earlier
     // already shows three shaped cards; arriving here from it and getting a
