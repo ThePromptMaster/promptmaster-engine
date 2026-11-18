@@ -394,7 +394,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       clearTimer();
       pendingPatch = {};
       retryAttempt = 0;
-      set({ loading: true, error: null, projectId: id, saveState: 'idle', conflict: null });
+      // Another project's row is not shown, or worked on, under this one's page
+      // while it loads (18 Nov): the page paired it with the old workflow.
+      const switching = get().projectId !== id;
+      set({ loading: true, error: null, projectId: id, saveState: 'idle', conflict: null, ...(switching ? { project: null } : {}) });
     }
 
     try {

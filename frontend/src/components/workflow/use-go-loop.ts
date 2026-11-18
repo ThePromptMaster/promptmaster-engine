@@ -78,6 +78,7 @@ import {
   createAgentRun,
   endAgentRun,
   finishAgentStep,
+  getAgentRun,
   getLatestAgentRun,
   getLiveAgentRun,
   listAgentSteps,
@@ -115,6 +116,43 @@ export type GoPhase = 'idle' | 'thinking' | 'performing' | 'awaiting' | 'ended' 
 export function isDuplicateRun(e: unknown): boolean {
   const err = e as { code?: string; message?: string } | null;
   return err?.code === '23505' || /agent_runs_one_running_per_project/.test(err?.message ?? '');
+}
+
+/**
+ * Another loop already wrote this step number on the run (18 Nov, Sean's
+ * Warehouse run: two loops drove one run, and the one that lost the race
+ * marked the run failed under the other).
+ */
+export function isStepClash(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  return /agent_steps_run_idx_key/.test(err?.message ?? '');
+}
+
+/** The database refused a write because the run is no longer running (it ended, or was ended elsewhere). */
+export function isRunEnded(e: unknown): boolean {
+  const message = (e as { message?: string } | null)?.message ?? '';
+  return /agent run \S+ (?:is \w+, not running|has ended)/i.test(message);
+}
+
+/**
+ * The runs a loop in this tab drives now, and which page instance drives each
+ * (18 Nov). A page that replaced another one in the same tab used to adopt the
+ * run the old page's loop was still driving, and start a second loop on it.
+ */
+const drivingRuns = new Map<string, { owner: object; token: object }>();
+
+/** Take the run for one loop of `owner`; null while another page's loop holds it. */
+export function claimDrive(runId: string, owner: object): object | null {
+  const held = drivingRuns.get(runId);
+  if (held && held.owner !== owner) return null;
+  const token = {};
+  drivingRuns.set(runId, { owner, token });
+  return token;
+}
+
+/** Let the run go, only if this loop still holds it. */
+export function releaseDrive(runId: string, token: object): void {
+  if (drivingRuns.get(runId)?.token === token) drivingRuns.delete(runId);
 }
 
 /** A running run another tab holds and is still beating for: this tab watches it, never starts its own. */
@@ -174,6 +212,17 @@ interface Options {
 }
 
 class Stopped extends Error {}
+
+/**
+ * The run this loop drives ended elsewhere, or another loop holds it (18 Nov).
+ * The loop stops at once: nothing is retried, the run is not marked failed over
+ * whatever ended it, and the page shows the run as it really is.
+ */
+class RunGone extends Error {
+  constructor(readonly clash: boolean, cause: unknown, readonly outcome?: StepOutcome) {
+    super(asError(cause, 'The run has ended.').message);
+  }
+}
 
 /**
  * The project's current stage is not in its workflow. Was a silent `Stopped`:
@@ -372,6 +421,10 @@ export function useGoLoop(opts: Options) {
   const runRef = useRef<AgentRun | null>(null);
   const stepsRef = useRef<AgentStep[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  /** False once this page has gone: a loop it started, or was about to start, does not drive (18 Nov). */
+  const mountedRef = useRef(true);
+  /** This page instance, as the holder of the runs its loops drive. */
+  const ownerRef = useRef<object>({});
   // One press at a time (12 Nov): an answer pressed twice started a second loop on
   // the same run, which closed the first loop's step and ended the run failed.
   const pressRef = useRef(onePress());
@@ -522,6 +575,9 @@ export function useGoLoop(opts: Options) {
         outcome = assertHonestOutcome(step.action_key, await performStep(ctx));
       } catch (e) {
         if (signal.aborted || (e as Error)?.name === 'AbortError') throw new Stopped();
+        // A write the database refused because the run is over is not a failed
+        // move to plan around: three refused approvals were retried (18 Nov).
+        if (isRunEnded(e) || isStepClash(e)) throw new RunGone(isStepClash(e), e);
         outcome = isOutOfCredits(e) ? creditStop((e as Error).message) : {
           status: 'failed', label: null, toolsUsed: [], changes: {},
           // A refused revision tells the next plan what a retry must do; a
@@ -568,7 +624,7 @@ export function useGoLoop(opts: Options) {
         toolsUsed: done.toolsUsed, changes: done.setAside ? { ...done.changes, set_aside: done.setAside } : done.changes, params: done.params,
         costUsd,
       })).catch((e) => {
-        throw new StepNotRecorded(done, e);
+        throw isRunEnded(e) || isStepClash(e) ? new RunGone(isStepClash(e), e, done) : new StepNotRecorded(done, e);
       });
       upsertStep(finished);
       setProgress(null);
@@ -640,9 +696,48 @@ export function useGoLoop(opts: Options) {
     [upsertStep, commitRun, setRunStatus]
   );
 
+  /**
+   * The run ended elsewhere, or another loop drives it (18 Nov). Read it as it
+   * is, close this loop's open step without retrying it, and say so. The run's
+   * own status and reason are left as whatever ended it.
+   */
+  const standDown = useCallback(async (e: unknown) => {
+    const clash = e instanceof RunGone ? e.clash : isStepClash(e);
+    const kept = e instanceof RunGone ? e.outcome : undefined;
+    const current = runRef.current;
+    const found = current ? await getAgentRun(current.id).catch(() => null) : null;
+    const message = clash
+      ? 'Go is already running this project elsewhere, so this copy stopped: only one may drive a run.'
+      : `This run had already ended${found ? ` (${found.status})` : ''}, so nothing more was done and nothing was retried. Press Go to start a new run.`;
+    for (const s of stepsRef.current.filter((x) => x.status === 'running')) {
+      const closed = await finishAgentStep(s.id, kept
+        ? { status: kept.status, label: kept.label, output: kept.output, blockKind: kept.blockKind ?? null, toolsUsed: kept.toolsUsed, changes: kept.changes }
+        : { status: 'cancelled', label: null, output: `Not done: ${message}` }
+      ).catch(() => null);
+      upsertStep(closed ?? { ...s, status: 'cancelled', output: `Not done: ${message}` });
+    }
+    void recordErrorEvent({
+      code: clash ? 'go_step_clash' : 'go_run_ended', title: 'Go stood down', message,
+      technical: asError(e, '').message, route: 'go', projectId: latest.current.project.id,
+    });
+    if (found) commitRun(found);
+    setError(message);
+    setPhase(clash && found?.status === 'running' ? 'watching' : 'ended');
+  }, [commitRun, upsertStep]);
+
   // --- the loop -----------------------------------------------------------------
 
   const loop = useCallback(async () => {
+    // A page that has gone does not drive: its run is left for the page that
+    // replaced it to pick up (18 Nov, Sean's Warehouse run).
+    if (!mountedRef.current) return;
+    // One loop per run in this tab: another page's loop holds it, so watch.
+    const driving = runRef.current?.id ?? null;
+    const claim = driving ? claimDrive(driving, ownerRef.current) : null;
+    if (driving && !claim) {
+      setPhase('watching');
+      return;
+    }
     const controller = new AbortController();
     abortRef.current = controller;
     const { signal } = controller;
@@ -710,7 +805,7 @@ export function useGoLoop(opts: Options) {
     };
     try {
       for (;;) {
-        if (signal.aborted) throw new Stopped();
+        if (signal.aborted || !mountedRef.current) throw new Stopped();
         let o = latest.current;
         // A stage just added is entered before the page has drawn it: wait for
         // the page to catch up rather than call the stage missing (25 Oct).
@@ -1413,6 +1508,10 @@ export function useGoLoop(opts: Options) {
       }
     } catch (e) {
       if (e instanceof Stopped || signal.aborted) return;
+      if (e instanceof RunGone || isRunEnded(e) || isStepClash(e)) {
+        await standDown(e);
+        return;
+      }
       // Postgrest throws plain objects; say what actually went wrong (client, 21 Oct).
       const err = asError(e, 'Go mode hit an error.');
       const message = err.message;
@@ -1439,8 +1538,9 @@ export function useGoLoop(opts: Options) {
       setPhase('ended');
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
+      if (driving && claim) releaseDrive(driving, claim);
     }
-  }, [perform, setRunStatus, upsertStep, stageLabelFor]);
+  }, [perform, setRunStatus, upsertStep, stageLabelFor, standDown]);
 
   // --- controls -----------------------------------------------------------------
 
@@ -2123,7 +2223,14 @@ export function useGoLoop(opts: Options) {
   }, [phase, opts.project.id, commitRun, commitSteps, adopt]);
 
   // Unmount: stop driving, but leave the run "running" so reopening resumes it.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  // A loop not yet started (its run still being created) never starts (18 Nov).
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const active = phase === 'thinking' || phase === 'performing';
   const pendingStep = useMemo(() => steps.find((s) => s.id === pendingStepId) ?? null, [steps, pendingStepId]);
