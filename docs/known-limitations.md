@@ -4663,6 +4663,17 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
     approval. The check judges the kind the sign-off names.
   - A draft that is mostly placeholders ("Not supplied") is no longer checked and repaired: Go asks once
     for the material, or "Keep it as a blank template".
+- **Seen by hand (18 Nov):**
+  - On the East Dock test, the last stage read "3 of 3 done · 1 still open on other stages", with
+    "Override and finish".
+  - A forced question naming finding i8: "Do whatever is best" decided it on Check as "Left to Go by
+    you — …". Go then checked the Final against that change and kept it.
+  - A reusable template with no role brief (2d972bf1): no commitments sign-off was designed. The role
+    brief was drafted as a template of what the client must supply, with one check and one round, then
+    the approval. That was 8 calls and $0.28, where Sean's stage 1 took 12 steps and $0.88.
+  - Not seen by hand: a version recorded as not applicable (no designed workflow on the passes had
+    that sign-off), and the placeholder question (the template draft was not blanks). Both are tested
+    in code only.
 - **Left as it is:** Sean's projects keep their states; h16/h17 are decided on his next answer. Rows a
   question names only in words ("the two parameter findings") are not matched; ids are.
 
@@ -4681,6 +4692,16 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
     Then come the profiles as pasted, the rows going forward first, up to 60,000 characters, with a line
     saying how many were left out.
   - Rows judged before this change have their evidence but no profile.
+  - **Production pass (#735):** the first batch on a test copy kept no profiles. The model writes a row's
+    subject as "Nora Bennett, COO of a Midwest valve maker", and the paste has "Nora Bennett" on a line
+    of its own. A profile is now found by the subject, else the name before the first comma or dash,
+    else its first two words. After the fix, batches 2 and 3 kept every profile. The shortlist for 14
+    candidates quoted the profile for every rule of every candidate and said nothing was "not held".
+  - **Setup cost seen by hand:** a fresh screening setup on a test copy, under Handle, reached the
+    first paste at 45 calls and $1.89 (Sean's was 32 and $1.04). The designed workflow had four setup
+    stages (objective, rules, workflow, a workflow check), and Go's Opus planner runs before every move.
+    The setup-stage cap held: the objective got one check and one round. Skipping the planner where the
+    next move is fixed would cut the rest; it is not built.
 - **Setup cost** (32 calls, $1.04 before the first paste). The stage that sets the project up from what
   the user supplied (the one with the setup-field criteria) now gets one check once it can move on, and
   at most two polishing moves otherwise (it had four checks and four apply rounds). Part of that cost was
