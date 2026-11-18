@@ -93,6 +93,18 @@ describe('findings left to Go', () => {
   });
 });
 
+describe('findings decided before the answer came', () => {
+  it('are said to be decided already, with no model call and no new question', async () => {
+    const decidedRows = [{ id: 'h1', stageId: review.id }];
+    const out = await performStep(ctx({ rows: decidedRows }));
+    expect(agentTriage).not.toHaveBeenCalled();
+    expect(appendStageVersion).not.toHaveBeenCalled();
+    expect(out.status).toBe('succeeded');
+    expect(out.stop).toBeUndefined();
+    expect(out.output).toMatch(/^Nothing left to decide: h1 on .* was already decided\.$/);
+  });
+});
+
 describe('carried into the work', () => {
   it("a row the user left to Go is the user's, so the carry limit on Go's own rows never drops it", () => {
     const fix = (byUser: boolean) => ({ stageId: review.id, stageLabel: review.label, id: 'h16', text: 'x', byUser }) as never;
