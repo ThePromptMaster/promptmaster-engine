@@ -16,7 +16,7 @@
  */
 
 import type { ProjectFact } from '@/types/project';
-import { answered, describeValue, valueMentions, type FactValues, type ValueMention } from './fact-values';
+import { answered, describeValue, timeRanges, valueMentions, type FactValues, type ValueMention } from './fact-values';
 import { currentFacts } from './facts';
 import { getLocale, tr } from '@/lib/i18n/store';
 
@@ -86,19 +86,44 @@ const MONTH_WORDS = new Set(['january', 'february', 'march', 'april', 'may', 'ju
  * November 6 to November 7, and the first new date found — November 7 — was
  * offered as Elena's approved launch.
  */
-function inItsPlace(old: ValueMention, oldTexts: readonly string[], candidates: readonly { m: ValueMention; text: string }[]): ValueMention {
+function inItsPlace(
+  old: ValueMention, oldTexts: readonly string[], candidates: readonly { m: ValueMention; text: string }[], instruction: string
+): ValueMention | null {
   const before = new Set(oldTexts.flatMap((t) => [...aroundWords(t, old.raw)]));
-  let best = candidates[0];
-  let bestScore = -1;
-  for (const c of candidates) {
-    const around = aroundWords(c.text, c.m.raw);
-    const score = [...around].filter((w) => before.has(w)).length;
-    if (score > bestScore) {
-      best = c;
-      bestScore = score;
-    }
+  const scored = candidates.map((c) => ({ c, score: [...aroundWords(c.text, c.m.raw)].filter((w) => before.has(w)).length }));
+  const top = Math.max(...scored.map((x) => x.score));
+  const best = scored.filter((x) => x.score === top);
+  if (new Set(best.map((x) => x.c.m.value)).size === 1) return best[0].c.m;
+  // Equals: the user's own words where they name one value, else no guess (18 Nov, East Dock:
+  // "from 9 a.m. to noon" tied for the 11 a.m. reopening, and 9 a.m. — the first — was recorded).
+  const own = new Set(best.filter((x) => x.c.text === instruction).map((x) => x.c.m.value));
+  if (own.size === 1) return best.find((x) => x.c.text === instruction)!.c.m;
+  return null;
+}
+
+/**
+ * What took the place of a span of the day the fact states ("from 7 to 11 a.m."): a sentence of
+ * the instruction that replaces something and states one span, else the one span the new version
+ * states that the old did not. 'keep' when the instruction says it again or nothing moved it;
+ * 'unsure' when the revision dropped it and nothing says what replaced it (18 Nov, East Dock:
+ * "7 to 11 a.m." became "7 to 9 a.m." and the reopening "9 a.m." — each time matched alone).
+ */
+function spanInItsPlace(
+  span: { raw: string; start: string; end: string },
+  input: { instruction: string; before: string; after: string }
+): { raw: string } | 'keep' | 'unsure' {
+  const same = (x: { start: string; end: string }) => x.start === span.start && x.end === span.end;
+  for (const piece of input.instruction.split(/(?<=[.!?;])(?<!\b[ap]\.m\.)\s+|\n+/)) {
+    const here = timeRanges(piece);
+    if (here.some(same)) return 'keep';
+    const others = here.filter((x) => !same(x));
+    if (REPLACING.test(piece) && others.length === 1) return { raw: others[0].raw };
   }
-  return best.m;
+  const before = timeRanges(input.before);
+  const after = timeRanges(input.after);
+  if (!before.some(same) || after.some(same)) return 'keep';
+  const fresh = after.filter((x) => !before.some((b) => b.start === x.start && b.end === x.end));
+  return fresh.length === 1 ? { raw: fresh[0].raw } : 'unsure';
 }
 
 const has = (list: readonly ValueMention[] | undefined, value: string) => (list ?? []).some((m) => m.value === value);
@@ -228,8 +253,22 @@ export function factChangesFromRevision(input: {
     const own = answered(fact.statement);
     const asked = fact.statement.slice(0, fact.statement.length - own.length);
     let proposed = own;
-    for (const m of valueMentions(own)) {
+    // A fact the code cannot settle without a guess is left to the model's check, whole (18 Nov).
+    let unsure = false;
+    for (const span of timeRanges(own)) {
+      const took = spanInItsPlace(span, input);
+      if (took === 'keep') continue;
+      if (took === 'unsure') {
+        unsure = true;
+        break;
+      }
+      changes.push({ kind: 'times', was: span.raw, now: took.raw });
+      proposed = proposed.split(span.raw).join(took.raw);
+    }
+    for (const m of unsure ? [] : valueMentions(own)) {
       if (!RECONCILED.includes(m.kind)) continue;
+      // A time inside a span is changed with its span, above.
+      if (m.range) continue;
       // What the fact records it replaced is its history: "The ticket price is
       // $30 per person, replacing $40" keeps its $40 (2 Nov, production pass:
       // it was offered as "replacing $30").
@@ -256,7 +295,12 @@ export function factChangesFromRevision(input: {
           if (!has(before.get(m.kind), m.value) || has(after.get(m.kind), m.value)) continue;
           // The value written where the old one stood; among equals, the user's
           // own words where they gave them, else the new version's.
-          replacement = inItsPlace(m, [own, input.before], candidates);
+          const placed = inItsPlace(m, [own, input.before], candidates, input.instruction);
+          if (!placed) {
+            unsure = true;
+            break;
+          }
+          replacement = placed;
         }
       }
       if (changes.some((c) => c.kind === m.kind && c.was === describeValue(m))) continue;
@@ -269,6 +313,7 @@ export function factChangesFromRevision(input: {
       const cased = /^[A-Z]/.test(m.raw) ? words.charAt(0).toUpperCase() + words.slice(1) : words;
       proposed = proposed.split(m.raw).join(cased);
     }
+    if (unsure) continue;
     proposed = asked + proposed;
     if (changes.length && proposed !== fact.statement) {
       out.push({ fact: { id: fact.id, statement: fact.statement, subject: fact.subject, kind: fact.kind }, changes, proposed });

@@ -13,7 +13,7 @@ from __future__ import annotations
 from promptmaster.conversation import build_chat_reply_prompt
 from promptmaster.criterion_check import build_check_prompt
 from promptmaster.objective_assessment import build_assessment_prompt
-from promptmaster.project_context import FACTS_HEADER, context_block, facts_block, SUPPLIED_RULE
+from promptmaster.project_context import FACTS_HEADER, context_block, facts_block, SUPPLIED_RULE, today_line
 from promptmaster.reply_actions import build_reply_actions_prompt, parse_reply_actions
 from promptmaster.schemas import AcceptedFact, PMInput, StageDescriptor, StageDigest
 from promptmaster.stage import build_stage_prompt
@@ -38,7 +38,8 @@ def test_the_block_names_each_fact_its_source_and_says_it_is_authoritative():
     assert "never call one unsupported or suggest removing it" in block
     # Carried with the context, and on its own when there is no context.
     # …followed by the rule that what the user supplied is given (8 Nov).
-    assert context_block(_inputs()) == f"{block}\n\n{SUPPLIED_RULE}"
+    # …and last, today's date, so years and weekdays are not the model's own (18 Nov).
+    assert context_block(_inputs()) == f"{block}\n\n{SUPPLIED_RULE}\n\n{today_line()}"
     assert context_block(_inputs(context="Board pack.")).startswith(block)
     assert facts_block(PMInput(objective="x", mode="analyst")) == ""
 
@@ -194,3 +195,18 @@ def test_the_writer_and_both_final_checks_carry_the_rule():
     assert "Never ask for a condition or a caveat of that kind to be added" in judge_system
     assert "WHAT THE USER SUPPLIED IS GIVEN" in judge_user
 
+
+
+def test_today_is_said_with_the_facts_and_in_the_start_conversation():
+    # 18 Nov (production pass): "December 1, 2025 is a Monday" was written after the user said it was 2026.
+    from datetime import date
+
+    from promptmaster.front_door import DraftBrief, Turn, build_front_door_prompt
+
+    line = today_line(date(2026, 11, 18))
+    assert line.startswith("TODAY'S DATE — Wednesday, November 18, 2026.")
+    assert "never from memory" in line
+    assert context_block(_inputs()).endswith(today_line())
+    assert context_block(PMInput(objective="x", mode="analyst")) == ""
+    _, user = build_front_door_prompt([Turn(role="user", content="Move the meeting to December 1.")], DraftBrief())
+    assert user.startswith(today_line())

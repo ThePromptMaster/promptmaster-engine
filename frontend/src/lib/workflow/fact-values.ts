@@ -21,6 +21,10 @@ const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satur
 const WEEKDAY = /\b(monday|tuesday|tues|wednesday|weds|thursday|thurs|friday|saturday|sunday)s?\b/gi;
 // "12:30", "1:00 p.m.", "1 pm", "noon": a time of day (10 Oct, Sean: Thursday at 12:30 → Wednesday at 1:00 p.m.).
 const TIME = /\b(?:(\d{1,2}):(\d{2})(?:\s*([ap])\.?\s?m\b\.?)?|(\d{1,2})\s*([ap])\.?\s?m\b\.?|(noon|midday))/gi;
+// "7 to 11 a.m.", "7–11 a.m.", "9 a.m. to noon": a span of the day, read as both of its times. A bare
+// first number takes the half of the day that keeps it before the second (18 Nov, Sean's East Dock:
+// "closed from 7 to 11 a.m." was read as 11 a.m. alone, and the 7 as a plain number).
+const TIME_RANGE = /\b(\d{1,2})(?::(\d{2}))?(?:\s*([ap])\.?\s?m\b\.?)?\s{0,2}(?:to|until|till|through|–|—|-)\s{0,2}(?:(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\b\.?|(noon|midday))/gi;
 const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const UNIT = '(words?|pages?|characters?|sentences?|paragraphs?|slides?|minutes?)';
 const COUNT = '(\\d[\\d,]*|one|two|three|four|five|six|seven|eight|nine|ten)';
@@ -49,6 +53,8 @@ export interface ValueMention {
   kind: keyof FactValues;
   value: string;
   raw: string;
+  /** For a time inside a span ("7 to 11 a.m."): the whole span as written, which is changed as one. */
+  range?: string;
 }
 
 const KINDS = ['dates', 'money', 'weekdays', 'times', 'limits', 'numbers'] as const;
@@ -88,6 +94,14 @@ export function valueMentions(text: string): ValueMention[] {
   take(LIMIT_BEFORE, (m) => ({ kind: 'limits', value: `${unit(m[2])}:${count(m[1])}` }));
   take(LIMIT_AFTER, (m) => ({ kind: 'limits', value: `${unit(m[2])}:${count(m[1])}` }));
   take(SINGLE, (m) => ({ kind: 'limits', value: `${unit(m[2])}:1` }));
+  // Before the weekdays: a span is read only where it is written whole, as "9 a.m. to noon" —
+  // never across a day taken out of "Monday 9 a.m. to Tuesday 10 a.m.".
+  rest = rest.replace(TIME_RANGE, (...args) => {
+    const span = readSpan(args.slice(0, -2) as unknown as RegExpExecArray);
+    if (!span || !text.includes(span.raw)) return args[0] as string;
+    out.push(span.start, span.end);
+    return ' ';
+  });
   take(WEEKDAY, (m) => ({ kind: 'weekdays', value: weekday(m[1]) }));
   take(TIME, (m) => {
     if (m[6]) return { kind: 'times', value: '12:00' };
@@ -101,6 +115,44 @@ export function valueMentions(text: string): ValueMention[] {
     if (!/^(19|20)\d\d$/.test(value)) out.push({ kind: 'numbers', value, raw: n });
   }
   return out;
+}
+
+/** One span of the day as written, with its two times; null when either is not a time of day. */
+function readSpan(m: RegExpExecArray): { raw: string; start: ValueMention; end: ValueMention } | null {
+  const raw = m[0].trim();
+  const endH = m[7] ? 12 : Number(m[4]);
+  const endMin = m[7] ? 0 : m[5] !== undefined ? Number(m[5]) : 0;
+  const endHalf = m[7] ? 'p' : m[6];
+  const startH = Number(m[1]);
+  const startMin = m[2] !== undefined ? Number(m[2]) : 0;
+  if (startH > 23 || endH > 23 || startMin > 59 || endMin > 59) return null;
+  const end = clock(endH, endMin, endHalf);
+  let start = clock(startH, startMin, m[3] ?? endHalf);
+  // "11 to 1 p.m." starts in the morning: a bare first time never comes after the second.
+  if (!m[3] && minutes(start) > minutes(end)) start = clock(startH, startMin, endHalf?.toLowerCase() === 'p' ? 'a' : 'p');
+  const startRaw = raw.match(/^\d{1,2}(?::\d{2})?(?:\s*[ap]\.?\s?m\b\.?)?/i)?.[0] ?? String(startH);
+  const endRaw = raw.slice(raw.search(/(?:to|until|till|through|–|—|-)\s*(?:\d|noon|midday)/i)).replace(/^(?:to|until|till|through|–|—|-)\s*/i, '');
+  return {
+    raw,
+    start: { kind: 'times', value: start, raw: startRaw.trim(), range: raw },
+    end: { kind: 'times', value: end, raw: endRaw.trim(), range: raw },
+  };
+}
+const minutes = (hm: string) => {
+  const [h, m] = hm.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/** The spans of the day a text states ("7 to 11 a.m."), each with its start and end time. */
+export function timeRanges(text: string): { raw: string; start: string; end: string }[] {
+  return valueMentions(text)
+    .filter((m) => m.kind === 'times' && m.range)
+    .reduce<{ raw: string; start: string; end: string }[]>((acc, m) => {
+      const last = acc.at(-1);
+      if (last && last.raw === m.range && last.end === '') last.end = m.value;
+      else acc.push({ raw: m.range!, start: m.value, end: '' });
+      return acc;
+    }, []);
 }
 
 export function factValues(text: string): FactValues {
@@ -195,7 +247,9 @@ const RANGE = new RegExp(
 function sentencesOf(text: string): string[] {
   return text
     .replace(/\\n/g, '\n')
-    .split(/(?<=[.!?;])\s+|\s*\n\s*|",\s*"/)
+    // Not after "a.m."/"p.m." or a common abbreviation: "…7 to 11 a.m. Central, reopening at 11 a.m."
+    // is one sentence, whose "earlier" covers both times (18 Nov, East Dock).
+    .split(/(?<=[.!?;])(?<!\b[ap]\.m\.)(?<!\b(?:e\.g|i\.e|etc|vs|Dr|Mr|Mrs|Ms|No|St|U\.S)\.)\s+|\s*\n\s*|",\s*"/)
     .map((p) => p.trim())
     .filter(Boolean);
 }

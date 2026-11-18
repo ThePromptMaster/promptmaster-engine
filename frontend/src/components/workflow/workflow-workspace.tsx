@@ -1316,9 +1316,11 @@ export function WorkflowWorkspace({
     return out;
   }, [events, stageId, project.manual_checks]);
   // A saved change to the brief reopens only what relied on it (5 Oct).
+  // The stage a side-chat revision was applied to already carries the setup change that came with it (18 Nov).
+  const revisedWith = useRef<{ stageId: string; at: number } | null>(null);
   const judgingChange = useBriefChange({
     project, template, state, bundles: stageBundles, stageId, appendEvent,
-    enabled: project.status !== 'finalized' && events !== null,
+    enabled: project.status !== 'finalized' && events !== null, revisedWith,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   // What was attached in the side chat, until the next message carries it (5 Nov).
@@ -3655,6 +3657,7 @@ export function WorkflowWorkspace({
               // Written before the facts reload the project, or the reload brings
               // back the old objective over the one just set (2 Nov, prod pass).
               onPatchSetup={async (patch) => {
+                revisedWith.current = { stageId: stage.id, at: Date.now() };
                 onPatchProject(patch);
                 await useProjectStore.getState().flush();
               }}

@@ -84,10 +84,17 @@ export function finishedConclusions(
     .map((s) => {
       const bundle = bundles[s.id];
       const figures = bundle?.artifact?.key_figures?.figures ?? [];
+      // The stored summary is written when a stage finishes; a version saved
+      // since (a side-chat revision) is judged on its own text (18 Nov, East
+      // Dock: the announcement already said 9 a.m. to noon and was reopened
+      // for "the old Monday, November 30 start" its v1 summary still held).
+      const head = bundle?.versions.at(-1);
+      const completed = state.stages[s.id]?.completed_at;
+      const newer = Boolean(head?.created_at && completed && head.created_at > completed);
       return {
         stage_id: s.id,
         label: s.label,
-        summary: (bundle?.artifact?.summary?.trim() || summariseStageContent(s, bundle?.versions.at(-1)?.content)).slice(0, 2_000),
+        summary: ((!newer && bundle?.artifact?.summary?.trim()) || summariseStageContent(s, head?.content)).slice(0, 2_000),
         figures: figures.slice(0, 60).map((f) => `${f.name}: ${f.value}`),
         computed: figures.some((f) => f.source === 'sandbox'),
       };
