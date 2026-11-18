@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { replaceDocumentInContext } from './extract-text';
+import { documentInContext, replaceDocumentInContext } from './extract-text';
 import { costByStage, OUTSIDE_GO_KEY, SECTIONS_KEY, stageOfStep } from '@/lib/supabase/project-cost';
 
 describe('a new version of an attached document (17 Nov, Sean: "When a source changes …")', () => {
@@ -13,6 +13,11 @@ describe('a new version of an attached document (17 Nov, Sean: "When a source ch
   });
   it('none when the context never held it', () => {
     expect(replaceDocumentInContext(context, 'other.pdf', 'x')).toBeNull();
+  });
+  it('the words a document holds there are read back, to see which lines changed (18 Nov)', () => {
+    expect(documentInContext(context, 'pricing.docx')).toBe('Price: $400.\nTerms: 30 days.');
+    expect(documentInContext(context, 'team.pdf')).toBe('Five people.');
+    expect(documentInContext(context, 'other.pdf')).toBeNull();
   });
 });
 

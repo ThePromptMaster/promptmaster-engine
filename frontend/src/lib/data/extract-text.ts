@@ -439,6 +439,15 @@ export function contextFromDocuments(
  * through the affected drafts, show what changed, and ask me when it actually needs my
  * judgment"). Null when the context holds no block for it. Pure.
  */
+/** The words a document's "### From <name>" block holds in the context, or null when it has none. */
+export function documentInContext(context: string, name: string): string | null {
+  const heading = `### From ${name}\n\n`;
+  const at = context.indexOf(heading);
+  if (at < 0) return null;
+  const next = context.indexOf('\n\n### From ', at + heading.length);
+  return context.slice(at + heading.length, next < 0 ? context.length : next).trim();
+}
+
 export function replaceDocumentInContext(context: string, name: string, text: string): string | null {
   const heading = `### From ${name}\n\n`;
   const at = context.indexOf(heading);
