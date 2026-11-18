@@ -1,6 +1,6 @@
 'use client';
 
-import { carriedKeys, fixesToCarry, returnWorkToCarry } from '@/lib/agent/manuscript-fixes';
+import { carriedKeys, carryThisRun, fixesToCarry, returnWorkToCarry } from '@/lib/agent/manuscript-fixes';
 import { unmetElsewhere, unmetOfJudged } from '@/lib/agent/unmet-owner';
 import { shownStepActionLabel } from '@/lib/i18n/go';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
@@ -1056,7 +1056,8 @@ export function useGoLoop(opts: Options) {
         const carriedSoFar = carriedKeys([...priorStepsRef.current, ...stepsRef.current]);
         // The work a return to a manuscript named goes into that manuscript, whichever stage delivers.
         const back = returnWorkToCarry(o.template, freshEvents, carriedSoFar);
-        const fixRows = holder ? fixesToCarry(o.template, o.bundles, holder.id, carriedSoFar) : [];
+        // Go's own accepted findings for two rounds a run, then only the user's (18 Nov).
+        const fixRows = holder ? carryThisRun(fixesToCarry(o.template, o.bundles, holder.id, carriedSoFar), stepsRef.current) : [];
         const fixes = back
           ? { deliverableId: back.stageId, rows: [...back.rows, ...(holder?.id === back.stageId ? fixRows : [])] }
           : holder && fixRows.length ? { deliverableId: holder.id, rows: fixRows } : null;

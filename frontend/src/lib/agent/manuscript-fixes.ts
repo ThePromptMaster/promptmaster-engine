@@ -27,7 +27,12 @@ export interface FixToCarry {
   key: string;
   /** The row as the repair is told it: "[h2] (Review) the change — what was found". */
   text: string;
+  /** The user accepted it; a row Go decided under the routine policy has no such mark. */
+  byUser?: boolean;
 }
+
+/** A row that itself says nothing in the text needs to change (18 Nov: one was carried into the paper). */
+const NO_CHANGE = /^\s*(?:no (?:change|edit|fix|revision)s?\b[^.]{0,40}?\b(?:is |are )?(?:needed|required)|nothing (?:in the (?:paper|manuscript|text|chapters?) )?(?:needs (?:to )?|to )change)/i;
 
 /**
  * The manuscript stage the reviews after it have no later stage to carry their
@@ -64,15 +69,39 @@ export function fixesToCarry(
     return items
       .filter((i) => i.status === 'accepted' && i.status_source !== 'proposed' && !isSuperseded(i))
       .filter((i) => !(i.status_source === 'model' && (i.reason ?? '').startsWith(CARRIED_OUT_REASON)))
+      .filter((i) => !asksNoChange(i, first))
       .map((i) => ({ key: `${stage.id}:${i.id}`, i }))
       .filter(({ key }) => !carried.has(key))
       .map(({ key, i }) => {
         const change = (i.suggested_change ?? '').trim();
         const found = (i[first] ?? '').trim();
         const text = `[${i.id}] (${stage.short_label || stage.label}) ${change || found}${change && found ? ` — what was found: ${found}` : ''}`;
-        return { key, text: text.slice(0, 1_200) };
+        return { key, text: text.slice(0, 1_200), ...(i.status_source === 'user' ? { byUser: true } : {}) };
       });
   }).slice(0, 12);
+}
+
+/**
+ * Rounds of carrying accepted findings into the manuscript one run makes before
+ * only the user's own accepted rows are carried (18 Nov, hand pass). Each recheck
+ * of the review after a carry decides new findings of its own under the routine
+ * policy; each of those, carried, reopened the review again: a run went paper,
+ * review, paper, review, five rounds deep before it was stopped by hand.
+ */
+export const GO_CARRY_ROUNDS = 2;
+
+/** What this run still carries: everything for its first rounds, then only what the user accepted. */
+export function carryThisRun(
+  rows: readonly FixToCarry[],
+  runSteps: readonly Pick<AgentStep, 'action_key' | 'status' | 'params'>[]
+): FixToCarry[] {
+  const rounds = runSteps.filter((s) => s.action_key === 'recheck_stage' && s.params?.accepted_fixes && (s.status === 'succeeded' || s.status === 'failed')).length;
+  return rounds >= GO_CARRY_ROUNDS ? rows.filter((r) => r.byUser) : [...rows];
+}
+
+/** Whether an accepted row itself says the text needs no change: nothing to carry, nothing to check for. */
+export function asksNoChange(row: Record<string, string | undefined>, first = 'finding'): boolean {
+  return NO_CHANGE.test((row.suggested_change ?? '').trim() || (row[first] ?? '').trim());
 }
 
 /** Failed attempts at carrying the same row before it is no longer tried. */

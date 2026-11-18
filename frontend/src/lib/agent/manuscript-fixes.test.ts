@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { carriedKeys, copiesTheManuscript, fixesToCarry, loneManuscript } from './manuscript-fixes';
+import { carriedKeys, carryThisRun, copiesTheManuscript, fixesToCarry, GO_CARRY_ROUNDS, loneManuscript } from './manuscript-fixes';
 import { repairTries, staleRepair } from './needs';
 import { acceptedRowsBefore } from './deliverable-check';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
@@ -92,5 +92,32 @@ describe('a stage that would only copy or correct the manuscript', () => {
     expect(copiesTheManuscript('Apply remaining accepted changes', 'Write the changes into the chapters.')).toBe(true);
     expect(copiesTheManuscript('Research decision memo', 'Decide whether to proceed.')).toBe(false);
     expect(copiesTheManuscript('P0 and S77 linkage check', 'Check each source for match rates by group.')).toBe(false);
+  });
+});
+
+describe('rounds of carrying in one run (18 Nov, hand pass: paper, review, paper, review, five rounds deep)', () => {
+  const carry = (status = 'succeeded') => ({ action_key: 'recheck_stage', status, params: { accepted_fixes: true, fix_keys: ['review:x'] } }) as never;
+
+  it('marks the rows the user accepted', () => {
+    const fixes = fixesToCarry(TEMPLATE, BUNDLES, 'manuscript', new Set());
+    expect(fixes.map((f) => [f.key, Boolean(f.byUser)])).toEqual([['review:h2', true], ['review:h3', false]]);
+  });
+
+  it('carries Go\'s own accepted rows for two rounds, then only the user\'s', () => {
+    const fixes = fixesToCarry(TEMPLATE, BUNDLES, 'manuscript', new Set());
+    expect(GO_CARRY_ROUNDS).toBe(2);
+    expect(carryThisRun(fixes, [carry()]).map((f) => f.key)).toEqual(['review:h2', 'review:h3']);
+    expect(carryThisRun(fixes, [carry(), carry('failed')]).map((f) => f.key)).toEqual(['review:h2']);
+    // Other repairs are not rounds of carrying.
+    expect(carryThisRun(fixes, [carry(), { action_key: 'recheck_stage', status: 'succeeded', params: {} } as never]).map((f) => f.key)).toEqual(['review:h2', 'review:h3']);
+  });
+
+  it('never carries a row that says no change is needed', () => {
+    const bundles = { review: rows([
+      { id: 'n1', finding: 'The paper uses [S1] within the saved excerpt.', suggested_change: 'No change to the paper is needed. Next step, if wanted: read the full article.', status: 'accepted', status_source: 'model', reason: 'Fine.' },
+      { id: 'n2', finding: 'Nothing in the paper needs to change for this.', status: 'accepted', status_source: 'model', reason: 'Fine.' },
+      { id: 'n3', finding: 'Chapter 2 gives no turnover figure.', suggested_change: 'Add the 4% against 9% turnover figure.', status: 'accepted', status_source: 'model', reason: 'Fine.' },
+    ]) } as never;
+    expect(fixesToCarry(TEMPLATE, bundles, 'manuscript', new Set()).map((f) => f.key)).toEqual(['review:n3']);
   });
 });
