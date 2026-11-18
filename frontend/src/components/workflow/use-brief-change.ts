@@ -1,7 +1,7 @@
 'use client';
 
 import { changeWindow } from '@/lib/data/context-for-request';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 
 import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, onlyFromTheChat, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
@@ -14,6 +14,8 @@ import type { Project } from '@/types/project';
 
 /** How long a field must stay unchanged before its change is judged: typing is not a change. */
 const SETTLE_MS = 2_500;
+/** How long a revision's mark holds: its setup change is saved within seconds of it. */
+const CARRIED_MS = 120_000;
 /** How much of each version a brief_changed event keeps, for reading the brief back. */
 const BRIEF_TEXT_KEPT = 20_000;
 
@@ -41,6 +43,7 @@ export function useBriefChange({
   stageId,
   appendEvent,
   enabled,
+  revisedWith,
 }: {
   project: Project;
   template: WorkflowTemplate;
@@ -49,6 +52,12 @@ export function useBriefChange({
   stageId: string;
   appendEvent: (event: NewWorkflowEvent) => Promise<unknown>;
   enabled: boolean;
+  /**
+   * The stage a side-chat revision was just applied to, set as the setup
+   * change that came with it is saved: that stage already carries the change
+   * and is not reopened for it (18 Nov, East Dock).
+   */
+  revisedWith?: MutableRefObject<{ stageId: string; at: number } | null>;
 }) {
   const baseline = useRef<Record<WatchedField, string> | null>(null);
   /** When the brief was last edited away from the baseline. */
@@ -82,6 +91,9 @@ export function useBriefChange({
         return;
       }
       baseline.current = is;
+      const mark = revisedWith?.current ?? null;
+      if (revisedWith) revisedWith.current = null;
+      const carried = mark && Date.now() - mark.at < CARRIED_MS ? mark.stageId : null;
       const since = changedAt.current ?? new Date().toISOString();
       changedAt.current = null;
       void (async () => {
@@ -95,7 +107,7 @@ export function useBriefChange({
             await append({ type: 'brief_changed', stage_id: at, payload: { field, kind: 'wording', presentation_only: true, affected: [], ...texts } });
             continue;
           }
-          const stages = finishedConclusions(t, s, b, since);
+          const stages = finishedConclusions(t, s, b, since).filter((st) => st.stage_id !== carried);
           // A fact changed or taken out (L-52): what used the old value is in
           // the text. Only those stages reopen, each with the sentence; the
           // change is recorded even when nothing is finished yet.
@@ -105,7 +117,7 @@ export function useBriefChange({
             if (removed.length) {
               const affected = stagesUsingFacts(
                 removed,
-                finishedConclusions(t, s, b, since, true).map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
+                finishedConclusions(t, s, b, since, true).filter((st) => st.stage_id !== carried).map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
               );
               await append({
                 type: 'brief_changed', stage_id: at,

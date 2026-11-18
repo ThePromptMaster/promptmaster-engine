@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from .account_search import chat_accounts_line, with_accounts
 from .schemas import AccountUse, ChatMessage, PMInput, SavedSource, ThirdPartyItem
-from .project_context import brought_titles, highest_source_number, third_party_block
+from .project_context import brought_titles, highest_source_number, third_party_block, today_line
 
 if TYPE_CHECKING:
     from .composio_client import Composio
@@ -141,6 +141,7 @@ def build_front_door_prompt(
     convo = "\n".join(f"{'USER' if t.role == 'user' else 'YOU'}: {t.content.strip()}" for t in turns[-MAX_TURNS:])
     owned = [f for f in BRIEF_FIELDS if f in (edited or [])]
     user = (
+        f"{today_line()}\n\n"
         f"THE CONVERSATION SO FAR:\n{convo}\n\n"
         + (f"WHAT THE USER ATTACHED (their own material; it counts as something they said):\n{material.strip()[:MAX_MATERIAL]}\n\n" if material.strip() else "")
         + (f"{brought}\n\n" if brought else "")

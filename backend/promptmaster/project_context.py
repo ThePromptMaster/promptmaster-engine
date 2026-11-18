@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import date
+from datetime import date, datetime, timezone
 
 from .limits import SAMPLE_PROMPT_CHARS
 from .schemas import PMInput, ThirdPartyItem
@@ -104,6 +104,21 @@ def as_of_dates(text: str) -> list[date]:
 
 def _spoken(d: date) -> str:
     return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+
+def today_line(today: date | None = None) -> str:
+    """Today's date, for years and weekdays.
+
+    18 Nov (production pass): asked to move a meeting to "December 1", the start
+    conversation wrote "December 1, 2025 is a Monday, so the first Tuesday meeting
+    would be December 2" after the user had said it was 2026. No prompt said what
+    day it was, so the model's own year was used.
+    """
+    d = today or datetime.now(timezone.utc).date()
+    return (
+        f"TODAY'S DATE — {d.strftime('%A')}, {_spoken(d)}. Work out years and weekdays from this date, "
+        "never from memory; what the user says about a date outranks both."
+    )
 
 
 def reporting_date_line(inputs: PMInput) -> str:
@@ -436,7 +451,9 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     third_party = third_party_block(inputs, limit)
     # The rule about what the user supplied goes wherever their facts or material go.
     given = SUPPLIED_RULE if facts or context else ""
-    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, given, sample, references, third_party) if b)
+    blocks = [b for b in (facts, approved, sources, said, removed, boundary, context, given, sample, references, third_party) if b]
+    # Dates in the facts and material are read against today, not the model's own year (18 Nov).
+    return "\n\n".join([*blocks, today_line()]) if blocks else ""
 
 
 #: 4 Nov (Sean, after Jordan's niche science talk "got the general information

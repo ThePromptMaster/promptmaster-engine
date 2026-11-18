@@ -4598,3 +4598,31 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
 - **Left as it is:** the stray artifacts in Sean's four projects (on stages their workflows don't have,
   so nothing shows them). A run created by a page that went away before its loop started stays
   "running" with no driver until Go is pressed again; with the page check this no longer happens.
+
+### L-253 — A revision's facts, its history lines and the stage it was applied to (2026-11-18)
+- **What happened** (Sean, East Dock Closure Announcement). He moved a "7 to 11 a.m., Monday, November 30"
+  closure to "Tuesday, December 1, 9 a.m. to noon" through the side chat. The revision was right, but:
+  - The facts came out wrong: "closed from 7 to 9 a.m." and "reopen at 9 a.m.". A time was read alone,
+    so "7 to 11 a.m." was only 11 a.m. Picking its replacement, 9 a.m. and noon tied, and the first was
+    taken.
+  - Both repairs of the first stage were then failed on a correct history line: "The earlier schedule
+    was … from 7 to 11 a.m. Central, reopening at 11 a.m.". The check split the sentence after "a.m.",
+    and the half without "earlier" read as the old time still stated.
+  - The announcement itself was reopened for the change it already carried. It was judged on the summary
+    stored when it was first finished.
+  - Two tries, then the run stopped with every stage "Awaiting recheck".
+- **Now:**
+  - A span of the day ("7 to 11 a.m.", "9 a.m. to noon") is read as both its times, and a fact's span is
+    replaced as a whole by the one span the instruction (or else the new text) gives.
+  - Where code would have to guess between values, it offers no change for that fact; the model's check
+    of the revision words the fact instead, quoting the new text. One value the user's own instruction
+    names still wins, as before.
+  - Sentences are not split after "a.m."/"p.m." or common abbreviations.
+  - A finished stage with a newer version is judged on that version's text. The stage a side-chat
+    revision was just applied to is not reopened by the setup change saved with it.
+- **And:** no prompt said what day it was. On the production pass the start conversation wrote
+  "December 1, 2025 is a Monday" after the user had said it was 2026. Today's date now goes last in the
+  context block (wherever facts or material go) and at the top of the start conversation.
+- **Left as it is:** Sean's East Dock project keeps its two wrong facts until he corrects them. A history
+  line that splits for another reason (a sentence ending in a time followed by a new sentence now stays
+  joined to it) is read as one.
