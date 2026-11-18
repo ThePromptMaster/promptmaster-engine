@@ -113,11 +113,17 @@ function spanInItsPlace(
   input: { instruction: string; before: string; after: string }
 ): { raw: string } | 'keep' | 'unsure' {
   const same = (x: { start: string; end: string }) => x.start === span.start && x.end === span.end;
+  // The revision still states the fact's span: the fact still holds, as for a single value.
+  if (timeRanges(input.after).some(same)) return 'keep';
   for (const piece of input.instruction.split(/(?<=[.!?;])(?<!\b[ap]\.m\.)\s+|\n+/)) {
     const here = timeRanges(piece);
     if (here.some(same)) return 'keep';
     const others = here.filter((x) => !same(x));
-    if (REPLACING.test(piece) && others.length === 1) return { raw: others[0].raw };
+    // A span's own "from 7 to 11 a.m." is not a replacement: only the sentence's other words
+    // can say one replaces another (18 Nov manual pass: a history line, "The earlier schedule
+    // was … from 7 to 11 a.m. …", was offered as the fact's new hours).
+    const rest = here.reduce((t, x) => t.split(x.raw).join(' '), piece);
+    if (REPLACING.test(rest) && others.length === 1) return { raw: others[0].raw };
   }
   const before = timeRanges(input.before);
   const after = timeRanges(input.after);
