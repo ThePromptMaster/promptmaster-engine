@@ -876,7 +876,8 @@ export function useGoLoop(opts: Options) {
         // check or repair until the material comes: asked once for each such version.
         const blankHead = o.bundles[o.stage.id]?.versions.at(-1);
         const blank = blankHead?.content ? placeholderShare(blankHead.content) : null;
-        if (blankHead && blank && blank.share >= 0.5 && ![...priorStepsRef.current, ...stepsRef.current].some((s) => s.params?.placeholder_version === blankHead.id)) {
+        // A prose stage's first draft only: later versions were worked on, and a table of findings is never blanks.
+        if (blankHead && blank && blank.share >= 0.5 && blankHead.version_number === 1 && o.stage.renderer === 'prose' && ![...priorStepsRef.current, ...stepsRef.current].some((s) => s.params?.placeholder_version === blankHead.id)) {
           const question = `${o.stage.label} is mostly placeholders: ${blank.blanks} of its ${blank.fields} fields say nothing was supplied, so there is nothing yet to check or improve. Paste the material in your answer (or attach it), or keep it as a blank template and I will carry on.`;
           const step = await startAgentStep({
             runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
