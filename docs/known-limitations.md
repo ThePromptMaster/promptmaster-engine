@@ -4663,6 +4663,17 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
     approval. The check judges the kind the sign-off names.
   - A draft that is mostly placeholders ("Not supplied") is no longer checked and repaired: Go asks once
     for the material, or "Keep it as a blank template".
+- **Seen by hand (18 Nov):**
+  - On the East Dock test, the last stage read "3 of 3 done · 1 still open on other stages", with
+    "Override and finish".
+  - A forced question naming finding i8: "Do whatever is best" decided it on Check as "Left to Go by
+    you — …". Go then checked the Final against that change and kept it.
+  - A reusable template with no role brief (2d972bf1): no commitments sign-off was designed. The role
+    brief was drafted as a template of what the client must supply, with one check and one round, then
+    the approval. That was 8 calls and $0.28, where Sean's stage 1 took 12 steps and $0.88.
+  - Not seen by hand: a version recorded as not applicable (no designed workflow on the passes had
+    that sign-off), and the placeholder question (the template draft was not blanks). Both are tested
+    in code only.
 - **Left as it is:** Sean's projects keep their states; h16/h17 are decided on his next answer. Rows a
   question names only in words ("the two parameter findings") are not matched; ids are.
 
