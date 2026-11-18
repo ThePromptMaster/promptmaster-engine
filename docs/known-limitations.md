@@ -4655,6 +4655,12 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
     leaves it the user's.
   - The workflow designer no longer gives that sign-off to a stage told to add nothing beyond what was
     supplied, nor to a template whose material is not in yet.
+  - **Production pass (#732):** a designed `.decision` is not always about commitments. On production
+    they include choices ("I choose how the gap will be resolved"), recommendations ("I accept the
+    recommended option") and assumptions ("I accept the assumptions it adds beyond what I said"). Only a
+    conditional acceptance of what the stage adds ("I accept any new …", "… it adds beyond …", "… this
+    brief proposes") is checked now, never a choice, a recommendation, marked or kept proposals, or an
+    approval. The check judges the kind the sign-off names.
   - A draft that is mostly placeholders ("Not supplied") is no longer checked and repaired: Go asks once
     for the material, or "Keep it as a blank template".
 - **Left as it is:** Sean's projects keep their states; h16/h17 are decided on his next answer. Rows a

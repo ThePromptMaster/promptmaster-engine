@@ -19,9 +19,24 @@ export interface CommitmentsToCheck {
   content: string;
 }
 
-/** The commitments sign-off of a stage, when it has one. */
+/**
+ * A sign-off that accepts only what the stage adds, if it adds any: "I accept
+ * any new commitments this brief proposes", "I accept the assumptions it adds
+ * beyond what I said". Never a choice ("I choose how the gap is resolved", "I
+ * decide…"), a recommendation ("I accept the recommended option") or an
+ * approval: those always have something to decide (18 Nov production pass: a
+ * designed `.decision` is any of these).
+ */
+const CONDITIONAL = /^\W*I\s+accept\b.*(?:\bany\b|\bnew\b|\bbeyond\b|\b(?:it|this\s+\w+)\s+(?:proposes|adds|introduces|sets\s+out)\b)/i;
+const DECIDES = /\b(?:choose|chose|choice|decide|decision|recommend\w*|option|marked|kept)\b/i;
+
+export function conditionalSignOff(label: string): boolean {
+  return CONDITIONAL.test(label) && !DECIDES.test(label);
+}
+
+/** The stage's sign-off for what it adds, when it has one that can be found not to apply. */
 export function commitmentsCriterion(stage: WorkflowTemplate['stages'][number]) {
-  return stage.exit_criteria.find((c) => c.check === 'manual' && c.id === `${stage.id}.decision`) ?? null;
+  return stage.exit_criteria.find((c) => c.check === 'manual' && c.id === `${stage.id}.decision` && conditionalSignOff(c.label)) ?? null;
 }
 
 /** Each stage's newest version that has a commitments sign-off and has not been looked at yet. */
