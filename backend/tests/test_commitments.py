@@ -67,3 +67,18 @@ def test_the_designer_gives_no_commitments_sign_off_to_a_stage_that_adds_nothing
     prompt = " ".join(f"{system} {user}".split())
     assert "Never give a decision to a stage whose own instruction says to add nothing beyond what the user supplied" in prompt
     assert "a reusable template whose material the user has not supplied yet" in prompt
+
+
+def test_a_version_that_puts_things_forward_is_never_none_proposed():
+    # 18 Nov production pass, Saturday workshop plan: the check said "none" and quoted the heading of the
+    # very section that proposed seats and refreshments against the cap.
+    plan = (
+        "### B. Open lines (proposed, not committed)\n\n"
+        "| Proposed item | Amount | Rule | Status |\n|---|---|---|---|\n"
+        "| Seats beyond what the room provides | Not priced | Goes to the user if it exceeds $30. | Open |\n"
+    )
+    assert parse_commitments({"proposes": False, "quote": "**Open lines (proposed, not committed)**"}, plan).proposes is True
+    # A quote that does not say there is none is not enough either.
+    assert parse_commitments({"proposes": False, "quote": "Role: Not supplied."}, BRIEF).proposes is True
+    # Sean's brief still reads as proposing none: its one "proposed" line says there is none.
+    assert parse_commitments({"proposes": False, "quote": "No timeline, no fee and no number of candidates is proposed."}, BRIEF).proposes is False
