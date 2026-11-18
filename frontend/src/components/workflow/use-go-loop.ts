@@ -1,6 +1,7 @@
 'use client';
 
 import { carriedKeys, fixesToCarry, returnWorkToCarry } from '@/lib/agent/manuscript-fixes';
+import { unmetElsewhere, unmetOfJudged } from '@/lib/agent/unmet-owner';
 import { shownStepActionLabel } from '@/lib/i18n/go';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { sourcesToCheck } from '@/lib/workflow/lookup';
@@ -1039,7 +1040,13 @@ export function useGoLoop(opts: Options) {
         // same way, not put to the user as a button (8 Nov): it is routine, and
         // the repair limit still applies.
         const assessed = latestObjectiveAssessment(freshEvents);
-        const checkUnmet = holder && assessed && assessed.outcome !== 'met' && !assessed.blockers.length && assessed.basis?.version_id && assessed.basis.version_id === o.bundles[holder.id]?.versions.at(-1)?.id ? (assessed.unmet ?? []) : [];
+        const checkAll = holder && assessed && assessed.outcome !== 'met' && !assessed.blockers.length && assessed.basis?.version_id && assessed.basis.version_id === o.bundles[holder.id]?.versions.at(-1)?.id ? (assessed.unmet ?? []) : [];
+        // Only what is the deliverable's own (18 Nov, hand pass): a later memo's page
+        // limit, carried into the paper, rewrote its chapters twice and left the memo long.
+        const checkUnmet = unmetOfJudged(checkAll, [
+          ...(assessed?.unmet_elsewhere ?? []),
+          ...unmetElsewhere(o.template, context.measured ?? {}, holder?.id, checkAll),
+        ]);
         const carriedRows = [...Object.values(context.carriedForward ?? {}).flat(), ...checkUnmet];
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }
@@ -1828,11 +1835,14 @@ export function useGoLoop(opts: Options) {
    * repair revises it (L-64). Returns the unmet assessment, or null when
    * there is none to act on.
    */
-  const reopenJudged = useCallback(async (title: string, why: string) => {
+  const reopenJudged = useCallback(async (title: string, why: string, stageId?: string) => {
     const o = latest.current;
     const unmet = objectiveUnmet(o.events);
-    // The stage the check read, as it recorded (5 Nov): not the chapters, when a later stage holds the work.
-    const judged = o.template.stages.find((s) => s.id === unmet?.basis?.stage_id) ?? deliverableDocument(o.template, o.bundles)?.stage;
+    // The stage the items are about, when the card names one (18 Nov: a memo's
+    // length, found by a check of the paper); else the stage the check read, as
+    // it recorded (5 Nov): not the chapters, when a later stage holds the work.
+    const judged = (stageId ? o.template.stages.find((s) => s.id === stageId) : undefined)
+      ?? o.template.stages.find((s) => s.id === unmet?.basis?.stage_id) ?? deliverableDocument(o.template, o.bundles)?.stage;
     const judgedStatus = judged ? o.state.stages[judged.id]?.status : undefined;
     if (judged && unmet && (isDone(judgedStatus) || judgedStatus === 'in_progress')) {
       await appendWorkflowEvent(o.project.id, o.project.user_id, {
@@ -1863,7 +1873,7 @@ export function useGoLoop(opts: Options) {
   );
 
   const fixObjective = useCallback(
-    async (items: readonly string[]) => {
+    async (items: readonly string[], stageId?: string) => {
       const o = latest.current;
       if (phaseRef.current === 'watching') {
         setError(WATCHING_ELSEWHERE);
@@ -1874,7 +1884,8 @@ export function useGoLoop(opts: Options) {
         try {
           const unmet = await reopenJudged(
             FIX_OBJECTIVE_REASON,
-            `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`
+            `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`,
+            stageId
           );
           if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
           await go();

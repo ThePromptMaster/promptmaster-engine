@@ -31,6 +31,8 @@ export interface ObjectiveAssessment {
   criteria?: CriterionResult[];
   /** What was found unmet, by name (11 Oct); absent on older records. */
   unmet?: string[];
+  /** Of those, the ones that are another stage's than the one read, each with it (18 Nov); absent on older records. */
+  unmet_elsewhere?: { item: string; stage_id: string }[];
   /** The model's own sentence when code overruled its "met" — kept, never shown as the reason. */
   model_note?: string;
   /** Gaps the brief allows to remain, with its words that allow them (19 Oct, HARBOR). */
@@ -126,6 +128,7 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       proposed_next: Array.isArray(p.proposed_next) ? p.proposed_next : [],
       ...(Array.isArray(p.criteria) ? { criteria: p.criteria } : {}),
       ...(Array.isArray(p.unmet) ? { unmet: p.unmet } : {}),
+      ...(Array.isArray(p.unmet_elsewhere) ? { unmet_elsewhere: p.unmet_elsewhere.filter((e) => e && typeof e.item === 'string' && typeof e.stage_id === 'string') } : {}),
       // 20 Oct (prod pass): recorded since #330, but not read back, so the
       // pause card never showed what was carried as a limitation.
       ...(Array.isArray(p.limitations) ? { limitations: p.limitations } : {}),

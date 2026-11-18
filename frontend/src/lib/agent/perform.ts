@@ -18,6 +18,7 @@ import { enqueueContinueJobs, enqueueDraftJobs, enqueueRevisionJobs, pendingJobs
 import { changeTerms, repairWaitMs, sectionExcerpt, sectionsWithOldValues } from './repair-targets';
 import { upstreamChanges } from './recheck-first';
 import { copiesTheManuscript, loneManuscript } from './manuscript-fixes';
+import { ownerOfAll, redoesStage, unmetElsewhere } from './unmet-owner';
 import { changeWindow } from '@/lib/data/context-for-request';
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
@@ -2336,7 +2337,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // three a run); otherwise it proposes it, with the button to add it.
         // Investigations only: a writing workflow's unmet objective is fixed in
         // its own stages ("Have Go fix it"), not by adding new ones.
-        const next = mayAddStages(ctx.template) ? executableNext(assessment) : null;
+        const proposedNext = mayAddStages(ctx.template) ? executableNext(assessment) : null;
+        // A task that only redoes a stage with text is that stage's repair, not a new
+        // stage (18 Nov, hand pass: "Trim board memo to one page" beside the memo).
+        const written = new Set(Object.entries(ctx.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
+        const redone = proposedNext ? redoesStage(ctx.template, written, proposedNext.title, proposedNext.work ?? '') : null;
+        const next = redone ? null : proposedNext;
         if (next) {
           const open = openWithNextLine(assessment, next);
           const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
@@ -2390,6 +2396,10 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // What was found unmet, by name, and what each button does (11 Oct,
         // survey brief: a pause that named nothing and asked nothing).
         const failed = unmetItems(assessment);
+        // Every item about one other stage (18 Nov: the memo's length, on a check of
+        // the paper): the card, its "fix" and Go's own repair go to that stage.
+        const owner = ownerOfAll(failed, unmetElsewhere(ctx.template, ctx.context.measured ?? {}, holder?.id, failed));
+        const notAdded = redone && proposedNext ? ` "${proposedNext.title}" is a change to ${redone.label}, not new work, so it was not added as a stage.` : '';
         // Tried twice since the user last changed anything, and still not met:
         // another repair is not offered (5 Nov, five presses on one review note).
         const fixes = failed.length
@@ -2401,11 +2411,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           : 0;
         return done(key, {
           ...judged, status: 'succeeded',
-          output: `${line}${performed}${proposed} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
+          output: `${line}${performed}${proposed}${notAdded} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
           stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: asks.length ? `${line} ${asks.join(' ')}` : line },
           ...(blocked ? {} : asks.length ? { needs: { kind: 'answer_question' as const, question: `${line} ${asks.join(' ')}` } } : {
             needs: {
-              kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id,
+              kind: 'objective_check' as const, stageId: owner ?? holder?.id ?? ctx.stage.id,
               finding: fixes >= MAX_OBJECTIVE_FIXES ? 'repair_limit' as const : failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,
               ...(fixes >= MAX_OBJECTIVE_FIXES ? { tried: fixes } : {}),
             },
@@ -3254,6 +3264,8 @@ async function judgeObjective(
   // What the verdict rests on, recorded with it (10 Oct, emails 3, 5, 8).
   const head = saved ? saved.version : holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
   const criteria = assessment.criteria ?? [];
+  // What it found unmet on another stage than the one it read (18 Nov): repaired there, not here.
+  const elsewhere = unmetElsewhere(ctx.template, ctx.context.measured ?? {}, holder?.id, assessment.unmet ?? []);
   const basis: ObjectiveBasis = {
     stage_id: holder?.id ?? '',
     stage_label: labelOverride ?? holder?.short_label ?? label,
@@ -3273,6 +3285,7 @@ async function judgeObjective(
     ...(check ? { deliverable_check: check } : {}),
     ...(assessment.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
     ...(assessment.unmet?.length ? { unmet: assessment.unmet } : {}),
+    ...(elsewhere.length ? { unmet_elsewhere: elsewhere } : {}),
     ...(assessment.model_note ? { model_note: assessment.model_note } : {}),
     // The next task, with what it needs: read back by the project's "still
     // open — next" line and Go's add-stage offer (26 Oct: it was never saved,

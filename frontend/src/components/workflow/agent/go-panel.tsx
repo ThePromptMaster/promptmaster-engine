@@ -276,7 +276,7 @@ export function GoPanel({
       case 'objective_check':
         // What each button does is on it (11 Oct): fix and check again, carry
         // on to what the workflow still holds, or stop here.
-        if (option === 'fix') return go.fixObjective(need.items);
+        if (option === 'fix') return go.fixObjective(need.items, need.stageId);
         if (option === 'stop') return go.stop();
         // Tried twice (5 Nov): open it to change it, or finish with it stated. Neither runs Go again.
         if (option === 'open') return needsActions?.openStage?.(need.stageId);
