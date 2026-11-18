@@ -4520,3 +4520,49 @@ three times slower than ChatGPT.
   at a time, in order.
 - **Not done:** Go reshaping the workflow itself (shortening, combining or skipping stages beyond an
   optional skip under Handle) is an estimate in the reply, not built. Streaming the first draft is not built.
+
+### L-251 — The 17–18 Nov hand pass: what it found and fixed (#719–#724) (2026-11-18)
+
+The work of L-246 to L-250 was run by hand on production, on test projects on the developer's account.
+Six faults turned up that the unit tests had not caught. Each is fixed and live.
+
+- **The earlier check went missing on reload** (#719). The page loaded only the newest version's
+  evaluation, so after a reload "This version has not been checked yet. The last check was of v1 …" was
+  gone. The last checks of earlier versions are now loaded when the newest has none, or a failed one.
+- **The start screen ignored the person's settings** (#719). It said Go starts on its own with the setting
+  off, and offered "Connect an account" with accounts connected. It now reads the setting ("Go starts on
+  its own …" shows only when it is on) and says "Connect another" when an account is connected.
+- **"From finished_book_and_review_note"** (#720). Carried-forward tasks named the stage by its id. They
+  now use its name.
+- **Accepted major findings were not carried** (#721). Each carry of accepted fixes counted as a repair try.
+  After two, Go asked for the review's approval with two accepted findings still outside the manuscript.
+  Carries no longer count as repair tries. A row whose carrying failed twice is not tried again.
+- **What the objective check found unmet on a later stage was carried into the deliverable** (#722). A
+  check of the paper listed the board memo's one-page limit as unmet. Go rewrote the paper's chapters
+  twice and the review once (about $0.75), never shortened the memo, and added a "Trim board memo to
+  one page" stage beside it. Which stage an item is about is now decided in code: the "<stage>: …"
+  prefix a failed check is sent with, or that stage's failed count quoted in the item. Only the
+  deliverable's own items go into it. When every item belongs to one other stage, the card, its "fix" and
+  Go's own repair go there. A next task that only revises a written stage is not added as a stage.
+- **Settings showed an expired connection over a working one** (#723). Composio keeps an expired
+  connection beside the one that replaced it. Settings showed the newest, which had expired, as "Needs
+  reconnecting", and Reconnect was refused with "Salesforce is already connected". Settings now shows the
+  working one. The expired duplicates stay in Composio; nothing deletes them.
+- **The review and the manuscript carried fixes back and forth** (#724). After a carry, each recheck of
+  the review decided new findings of its own under the routine policy (13, then 17). Carrying those
+  reopened the review again, about $0.6 a round, and nothing ended it: since #721, carries no longer
+  used up repair tries. Rows the user accepted are still carried, each once. Go's own accepted rows are
+  carried for the first two rounds of a run, then left for the final check and its card. A row that says
+  no change is needed is never carried, and is not checked for.
+- **Seen by hand after the fixes:** the memo's page limit stayed on the memo (Go repaired it, then asked
+  "shorten it again?", and the answer closed the earlier copy of that question too). An unread source
+  ("could not be read in full") was not listed as holding up the approval. A "Resolved in …" row was
+  offered as one press on the approval card. Salesforce showed Connected, and the start conversation
+  read an opportunity, a contact and an account by name. With #724, a run carried Go's own rows twice,
+  rechecked the review, and went on to the memo's approval (5 steps, $1.50).
+- **Also seen, not changed:** rows added through the side chat get generated ids ("imwldwbdd3"), and the
+  stop card names a row by its id beside its text. Salesforce is searched by record name, so a request
+  for "all open opportunities" finds nothing.
+- **Not seen by hand:** Go asking to add a stage that copies the manuscript (the refusal is unit-tested
+  only), and an edit-limit correction. Neither came up in the runs. The finish with research still pending
+  was not reached: the review's own recheck decided that row before the project got there.
