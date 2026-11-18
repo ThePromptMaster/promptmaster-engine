@@ -211,7 +211,9 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "commitments (a deadline, a budget, a promise, a scope change not in the source), keep "
         "those apart — approval is the routine check of the extraction, and decision is the "
         "user's own sign-off on the new commitments, in the first person (\"I accept the new "
-        "commitments it proposes\"). Otherwise \"\"\n"
+        "commitments it proposes\"). Otherwise \"\". Never give a decision to a stage whose own instruction "
+        "says to add nothing beyond what the user supplied, and never to a stage of a reusable template "
+        "whose material the user has not supplied yet: there is nothing new for the user to accept\n"
         # 8 Nov, production: a brief saying "recommend how to resolve any gaps" and "document
         # preparation only" got a stage whose approval was "I choose how the gap will be resolved".
         "When the work is a document, never make an approval or a stop condition out of something the "

@@ -66,7 +66,9 @@ function evaluateCriterion(
     ...(criterion.hint ? { hint: criterion.hint } : {}),
   };
 
-  const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
+  // A sign-off recorded as not applying to the current version is met, and says why (18 Nov).
+  const na = ctx.manualChecks[criterion.id] ? undefined : ctx.notApplicable?.[criterion.id];
+  const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) || Boolean(na), ...(na ? { notApplicable: na.quote } : {}) };
 
   if (criterion.check === 'manual') return criterion.authority === 'delegable' ? { ...manual, authority: 'delegable' } : manual;
 
@@ -264,7 +266,13 @@ export interface TransitionOption {
 export function availableTransitions(
   template: WorkflowTemplate,
   state: WorkflowState,
-  evaluation: StageEvaluation
+  evaluation: StageEvaluation,
+  /**
+   * Work that holds up the finish beyond this stage's own criteria (18 Nov,
+   * Sean, Hidden Innovation: "3 of 3 done" and Finish, while two findings
+   * stayed undecided on the review and Go said the objective was open).
+   */
+  opts: { blockingElsewhere?: number } = {}
 ): TransitionOption[] {
   const stage = getStage(template, state.current_stage_id);
   if (!stage) return [];
@@ -282,11 +290,12 @@ export function availableTransitions(
   } else {
     // Same rule as advancing: finishing past an unmet blocking criterion is
     // allowed, but it is a deviation, so it is named and asks why.
+    const clear = evaluation.canAdvance && !opts.blockingElsewhere;
     options.push({
       kind: 'finish',
       toStageId: null,
-      label: evaluation.canAdvance ? 'Finish' : 'Override and finish',
-      requiresNote: !evaluation.canAdvance,
+      label: clear ? 'Finish' : 'Override and finish',
+      requiresNote: !clear,
     });
   }
 

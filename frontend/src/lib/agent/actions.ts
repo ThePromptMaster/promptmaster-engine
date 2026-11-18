@@ -104,6 +104,8 @@ export const USER_ANSWER_STEP = 'user_answer';
 export const ROUTINE_DEFAULT_STEP = 'routine_default';
 /** Not planner-selectable: open rows the user's own answer settled, marked before anything stops for them (12 Nov). */
 export const SETTLED_STEP = 'settled_by_answer';
+/** Not planner-selectable: the findings a question named, decided on their own stage by the user's answer or as left to Go (18 Nov). */
+export const LEFT_TO_GO_STEP = 'decide_named_findings';
 /** Not planner-selectable: waiting for section jobs already queued (after a reload, or ones the user started). */
 export const AWAIT_SECTIONS_STEP = 'await_sections';
 
@@ -128,6 +130,7 @@ export function actionLabel(key: string): string {
   if (key === AWAIT_SECTIONS_STEP) return 'Wait for the sections being written';
   if (key === ROUTINE_DEFAULT_STEP) return 'Take the routine default';
   if (key === SETTLED_STEP) return 'Close what your answer settled';
+  if (key === LEFT_TO_GO_STEP) return 'Decide the findings your answer covers';
   return BY_KEY.get(key)?.label ?? key.replace(/_/g, ' ');
 }
 

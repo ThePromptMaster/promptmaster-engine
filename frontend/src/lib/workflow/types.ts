@@ -383,6 +383,14 @@ export type WorkflowEventType =
   /** Go committed a delegable approval under that policy; payload.criterion_id. */
   | 'criterion_committed'
   /**
+   * A sign-off that does not apply to a version (18 Nov, Sean, Executive Search:
+   * "I accept any new commitments this brief proposes" on a brief that proposes
+   * none). payload: criterion_id, version_id, quote, applies. Recorded by a check
+   * of the version (actor system, applies false, with the words that show it) or
+   * by the user saying it does apply (actor user, applies true).
+   */
+  | 'criterion_not_applicable'
+  /**
    * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
    * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only
    * the affected done stages for recheck.
@@ -437,6 +445,8 @@ export interface WorkflowEvent {
  */
 export interface StageContext {
   fields: Record<string, string>;
+  /** Per criterion id: a sign-off recorded as not applying to its stage's current version, with the words that show it (18 Nov). */
+  notApplicable?: Record<string, { versionId: string; quote: string }>;
   /** Per stage id: how many items that stage's list artifact holds. */
   itemCounts: Record<string, number>;
   /** Per stage id: items still lacking a status value. */
@@ -538,6 +548,8 @@ export interface CriterionResult {
   degraded?: boolean;
   /** The criterion's plain-language hint, carried through for display. */
   hint?: string;
+  /** Met because it does not apply to this version: the words of the version that show it (18 Nov). */
+  notApplicable?: string;
 }
 
 export interface StageEvaluation {

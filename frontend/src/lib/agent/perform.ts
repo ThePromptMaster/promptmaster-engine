@@ -102,10 +102,11 @@ import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
 import type { Evaluation, Project } from '@/types/project';
-import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
+import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP, LEFT_TO_GO_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
 import { carriedRowsOf, listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
+import { namedRows, type NamedRow, type RowDecision } from './left-to-go';
 import { addressedRows, carriedOutReason, describeAddressed, type AddressedRow } from './addressed-rows';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
@@ -434,6 +435,86 @@ async function recordCarriedOut(
   return out;
 }
 
+/**
+ * The findings a question named, decided on their own stage (18 Nov, Sean,
+ * Hidden Innovation: "Do whatever is best" on h16/h17 rewrote the memo to say
+ * both were accepted while the review still had them undecided, so neither fix
+ * reached the manuscript). With the user's own choice ("Accept both h16 and
+ * h17") the decisions are theirs as given; left to Go, Go decides each row
+ * against the objective and the accepted facts. Either way it is recorded as
+ * the user's decision, made by them or left by them to Go, so it is carried
+ * into the work like any finding the user accepted.
+ */
+async function decideNamedFindings(ctx: PerformContext, key: string, inputs: ReturnType<typeof inputsFrom>, model: string | undefined): Promise<StepOutcome> {
+  const params = ctx.step.params ?? {};
+  const rows = (Array.isArray(params.rows) ? params.rows : []).filter(
+    (r): r is NamedRow => !!r && typeof (r as NamedRow).id === 'string' && typeof (r as NamedRow).stageId === 'string'
+  );
+  const given = Array.isArray(params.decisions) ? (params.decisions as RowDecision[]) : null;
+  if (!rows.length) return done(key, { status: 'failed', output: 'No finding was named.', toolsUsed: [], changes: {} });
+  if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+  const decided: string[] = [];
+  const versionIds: string[] = [];
+  const left: string[] = [];
+  for (const stageId of [...new Set(rows.map((r) => r.stageId))]) {
+    const stage = ctx.template.stages.find((s) => s.id === stageId);
+    const head = ctx.bundles[stageId]?.versions.at(-1);
+    const items = parseItems(head?.content);
+    if (!stage || !items) continue;
+    const schema = itemSchemaFor(stage);
+    if (!isTriageTable(schema)) continue;
+    const ids = rows.filter((r) => r.stageId === stageId).map((r) => r.id);
+    const targets = items.filter((i) => ids.includes(i.id) && !(i.status ?? '').trim());
+    if (!targets.length) continue;
+    const statuses = proposableStatuses(schema);
+    const decisions = given
+      ? given.filter((d) => targets.some((t) => t.id === d.id)).map((d) => ({ id: d.id, status: statuses.some((s) => s.value === d.status) ? d.status : '', reason: 'Your answer.' }))
+      : (await api.agentTriage(
+          {
+            inputs, state: ctx.digest,
+            items: targets.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
+            statuses: statuses.map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+            model,
+          },
+          ctx.signal
+        )).decisions.filter((d) => targets.some((t) => t.id === d.id));
+    const { items: next, applied } = applyTriage(items, decisions, schema);
+    left.push(...targets.filter((t) => !applied.includes(t.id)).map((t) => t.id));
+    if (!applied.length) continue;
+    const why = given ? 'Your answer' : 'Left to Go by you';
+    // The user's decision, made by them or left by them to Go: never Go's own triage.
+    const marked = next.map((i) => (applied.includes(i.id) ? { ...i, status_source: 'user', reason: `${why}${i.reason && i.reason !== 'Your answer.' ? ` — ${i.reason}` : '.'}` } : i));
+    const created = await ctx.appendStageVersion(stageId, stage.label, {
+      content: serializeItems(marked),
+      source_operation: 'agent_triage',
+      base_content: head?.content ?? '',
+      instruction: given ? `Your answer: ${String(params.answer ?? '').slice(0, 300)}` : 'You left these findings to Go to decide.',
+      model: ctx.project.model,
+      mode: modeForStage(ctx.project, stage),
+      change_summary: `${applied.join(', ')} decided on ${stage.label}: ${given ? 'as you answered' : 'left to Go by you'}.`,
+    });
+    const id = (created as { id?: unknown } | null)?.id;
+    if (typeof id === 'string') versionIds.push(id);
+    const labelOf = (v: string | undefined) => (schema.statuses ?? []).find((s) => s.value === v)?.label ?? v ?? '';
+    decided.push(...marked.filter((i) => applied.includes(i.id)).map((i) => `${i.id} on ${stage.label}: ${labelOf(i.status)}${i.reason ? ` (${i.reason})` : ''}`));
+  }
+  if (!decided.length) {
+    // Nothing usable: asked plainly, on the rows themselves, and not left to Go again.
+    const question = `I could not decide ${left.join(', ') || 'these findings'} myself. Decide ${left.length === 1 ? 'it' : 'them'} on the review, or answer here.`;
+    return done(key, {
+      status: 'failed', toolsUsed: given ? [] : ['model'], changes: {}, output: question,
+      stop: { status: 'awaiting_decision', reason: question },
+      needs: { kind: 'answer_question', question, rows, repeat: true, choices: ['Accept them', 'Reject them'] },
+    });
+  }
+  return done(key, {
+    status: 'succeeded', toolsUsed: given ? [] : ['model'],
+    changes: { version_ids: versionIds, items_triaged: decided.map((d) => d.split(' ')[0]) },
+    output: `Decided as ${given ? 'you answered' : 'you left it to Go'}, recorded as your decision:\n${decided.map((d) => `- ${d}`).join('\n')}` +
+      (left.length ? `\n\nNot decided: ${left.join(', ')}; ${left.length === 1 ? 'it stays' : 'they stay'} for you.` : ''),
+  });
+}
+
 async function recordRun(
   ctx: PerformContext,
   rowNumber: unknown,
@@ -628,6 +709,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
     const ids = (ctx.facts?.manuscript?.pendingJobs ?? []).map((j) => j.payload?.section_id as string).filter(Boolean);
     return waitForSections(ctx, key, ids, 'Finished writing');
   }
+
+  if (key === LEFT_TO_GO_STEP) return decideNamedFindings(ctx, key, inputs, model);
 
   if (key === INTERPRET_STEP) {
     const run = ctx.interpret!;
@@ -2210,12 +2293,16 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       // Q3a: a question for an expert carries the package for them, on the record.
       const expertPackage = typeof params.expert_package === 'string' && params.expert_package.trim() ? params.expert_package : '';
       const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
+      // The findings the question names, on whatever stage they are: the answer decides them
+      // there (18 Nov, Hidden Innovation: h16/h17 asked about on the memo stayed undecided).
+      const rows = namedRows([ctx.step.decision_question ?? '', ...choices], openRowsElsewhere(ctx.template, ctx.state, ctx.context, ''))
+        .filter((r) => !saved.rows.some((x) => x.id === r.id && x.stageId === r.stageId));
       return done(key, {
         status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [],
         changes: saved.versionIds.length ? { version_ids: saved.versionIds, items_triaged: saved.rows.map((r) => r.id) } : {},
         output: `${question}${audit}${expertPackage ? `\n\nPrepared for an expert's review:\n\n${expertPackage}` : ''}`,
         stop: { status: 'awaiting_decision', reason: question },
-        needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}), ...(choices.length >= 2 ? { choices } : {}) },
+        needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}), ...(choices.length >= 2 ? { choices } : {}), ...(rows.length ? { rows } : {}) },
       });
     }
 

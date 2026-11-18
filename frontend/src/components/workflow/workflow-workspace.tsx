@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
 import { approvedVersions, ExitCriteriaChecklist } from './exit-criteria-checklist';
+import { commitmentsToCheck } from '@/lib/workflow/not-applicable';
 import { MORE_GROUPS, StageTransitionBar, type MoreAction } from './stage-transition-bar';
 import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
@@ -717,9 +718,15 @@ export function WorkflowWorkspace({
     [template, state]
   );
 
+  // What holds up the finish beyond the current stage's own criteria: the last
+  // stage reads "Override and finish" while it stands (18 Nov, Hidden Innovation).
+  const blockingElsewhere = useMemo(
+    () => outstandingBeyondCriteria(outstanding, state.current_stage_id).filter(blocksCompletion),
+    [outstanding, state.current_stage_id]
+  );
   const transitions = useMemo(
-    () => availableTransitions(template, state, evaluation),
-    [template, state, evaluation]
+    () => availableTransitions(template, state, evaluation, { blockingElsewhere: blockingElsewhere.length }),
+    [template, state, evaluation, blockingElsewhere.length]
   );
 
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
@@ -1323,6 +1330,31 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null, revisedWith,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  // A commitments sign-off on a version that proposes none is recorded as not
+  // applying to that version, with the words that show it (18 Nov, Sean,
+  // Executive Search). Each version is looked at once; a failure leaves the
+  // sign-off to the user.
+  const commitmentsAsked = useRef(new Set<string>());
+  useEffect(() => {
+    if (!events || project.status === 'finalized' || project.example_key) return;
+    for (const c of commitmentsToCheck(template, stageBundles, events, project.manual_checks ?? {})) {
+      const key = `${c.criterionId}@${c.versionId}`;
+      if (commitmentsAsked.current.has(key)) continue;
+      commitmentsAsked.current.add(key);
+      const inputs = inputsFrom(project);
+      const supplied = [inputs.objective, inputs.constraints, inputs.context].filter(Boolean).join('\n\n');
+      void api
+        .agentCheckCommitments({ criterion: c.criterion, stage_label: c.stageLabel, content: c.content.slice(0, 400_000), supplied: supplied.slice(0, 200_000) })
+        .then((r) =>
+          appendEvent({
+            type: 'criterion_not_applicable', stage_id: c.stageId, actor: 'system',
+            reason: r.proposes ? 'This version may propose a new commitment: the sign-off stays yours.' : 'This version proposes no new commitment.',
+            payload: { criterion_id: c.criterionId, version_id: c.versionId, quote: r.proposes ? '' : r.quote, applies: r.proposes },
+          })
+        )
+        .catch(() => commitmentsAsked.current.delete(key));
+    }
+  }, [events, stageBundles, template, project, appendEvent]);
   // What was attached in the side chat, until the next message carries it (5 Nov).
   const forNextMessage = useRef<MessageAttachment[]>([]);
   // Where a dropped or pasted file lands (15 Nov): the side chat, or the stage column's data panel.
@@ -3359,6 +3391,14 @@ export function WorkflowWorkspace({
               onDecide={(id, choice) => decideApproval(id, stageId, choice)}
               openMajors={openMajorFindings(outstanding)}
               headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
+              openElsewhere={finishHere ? blockingElsewhere.length : 0}
+              onDoesApply={(id) =>
+                void appendEvent({
+                  type: 'criterion_not_applicable', stage_id: stageId, actor: 'user',
+                  reason: 'You said this version does propose a new commitment.',
+                  payload: { criterion_id: id, version_id: stageBundles[stageId]?.versions.at(-1)?.id ?? '', quote: '', applies: true },
+                }).catch(() => undefined)
+              }
               readOnly={!isEditable}
               collapsible={foldStageExtras}
               onFinish={finishHere ? () => setFinishing({ option: finishHere, from: 'checklist' }) : undefined}

@@ -48,6 +48,7 @@ const UNION: WorkflowEventType[] = [
   'stage_added',
   'web_access_changed',
   'workflow_switched',
+  'criterion_not_applicable',
 ];
 
 function checkConstraintValues(): string[] {

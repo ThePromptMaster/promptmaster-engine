@@ -44,6 +44,7 @@ from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
+from promptmaster.commitments import CommitmentsRequest, CommitmentsResponse, check_commitments
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
 from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
@@ -499,6 +500,18 @@ async def api_decision_options(req: DecisionOptionsRequest, client: OpenRouterCl
     except Exception:  # noqa: BLE001 - no options is the safe answer to any failure here
         logger.warning("Decision options could not be read; the plain approval is shown", exc_info=True)
         return DecisionOptionsResponse()
+
+
+@router.post("/check-commitments", response_model=CommitmentsResponse)
+async def api_check_commitments(req: CommitmentsRequest, client: OpenRouterClient = Depends(get_client)) -> CommitmentsResponse:
+    """Whether a version proposes any new commitment (18 Nov). 1 small LLM call; writes
+    nothing. "None" comes back only with a passage of the version that shows it; any
+    failure answers "proposes", so the sign-off stays the user's."""
+    try:
+        return await check_commitments(client, req)
+    except Exception:  # noqa: BLE001 - "proposes" is the safe answer to any failure here
+        logger.warning("Commitments check failed; the sign-off stays the user's", exc_info=True)
+        return CommitmentsResponse()
 
 
 @router.post("/group-questions", response_model=GroupQuestionsResponse)
