@@ -4626,3 +4626,36 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
 - **Left as it is:** Sean's East Dock project keeps its two wrong facts until he corrects them. A history
   line that splits for another reason (a sentence ending in a time followed by a new sentence now stays
   joined to it) is read as one.
+
+### L-254 — Delegation reaches the findings; finishing says what is open; a sign-off with nothing to sign (2026-11-18)
+- **Hidden Innovation** (Sean, 17 Nov). Go asked on the decision memo whether to accept review findings
+  h16 and h17.
+  - "Do whatever is best" reopened the *memo*, which then said both were accepted. The review still had
+    them undecided, so neither fix reached the manuscript.
+  - Go then asked again: four moves and about $2.
+  - **Now:** a question that names open findings by id carries them (`needs.rows`). The answer decides
+    them on their own stage before Go plans again (`decide_named_findings`). A chosen answer
+    ("Accept both h16 and h17", "Accept h16, reject h17") is applied as given, with no model call. Left
+    to Go, Go decides each row within the objective and accepted facts.
+  - Either way it is recorded as the user's decision ("Left to Go by you — …", `status_source: user`). So
+    it is carried into the manuscript like any finding the user accepted, and the carry limit on Go's
+    own rows (L-251) never drops it.
+  - When nothing usable comes back, Go asks on the rows themselves and does not offer "do whatever is
+    best" again.
+- **"3 of 3 done" + Finish while Go said the objective was open.** On the last stage the count now adds
+  "· N still open on other stages", and Finish becomes "Override and finish", with a reason asked, while
+  anything that blocks completion stands elsewhere.
+- **Executive Search.** "I accept any new commitments this brief proposes" stopped Go on a brief that
+  proposed none.
+  - **Now:** each new version of a stage with that sign-off (only the designed `<stage>.decision`) gets
+    one small check. Where the version shows it proposes no new commitment, quoted from its own text, a
+    `criterion_not_applicable` event records it for that version alone. The checklist shows "Not
+    applicable to this version: …", with "It does propose one" to put it back.
+  - This is the one approval a check can settle. A new version needs a fresh check, and any failure
+    leaves it the user's.
+  - The workflow designer no longer gives that sign-off to a stage told to add nothing beyond what was
+    supplied, nor to a template whose material is not in yet.
+  - A draft that is mostly placeholders ("Not supplied") is no longer checked and repaired: Go asks once
+    for the material, or "Keep it as a blank template".
+- **Left as it is:** Sean's projects keep their states; h16/h17 are decided on his next answer. Rows a
+  question names only in words ("the two parameter findings") are not matched; ids are.

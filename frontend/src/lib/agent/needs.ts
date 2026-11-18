@@ -59,6 +59,11 @@ type Need =
       choices?: string[];
       /** A pause on a question already answered: "do whatever is best" would only bring it back. */
       repeat?: boolean;
+      /**
+       * The open findings the question names (18 Nov): the answer decides them on
+       * their own stage, as the user's, rather than reopening the stage it was asked on.
+       */
+      rows?: { id: string; stageId: string }[];
     }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   /**

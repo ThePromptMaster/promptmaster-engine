@@ -982,6 +982,14 @@ export const api = {
    * passage that states it (12 Nov). None on any failure: the plain approval
    * is shown then.
    */
+  /** Whether a version proposes any new commitment (18 Nov). "None" only with a passage of it; any failure is "proposes". */
+  async agentCheckCommitments(
+    req: { criterion: string; stage_label: string; content: string; supplied: string },
+    signal?: AbortSignal
+  ): Promise<{ proposes: boolean; quote: string }> {
+    return apiFetch('/api/agent/check-commitments', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentDecisionOptions(
     req: { inputs: PMInput; approval: string; stage_label: string; content: string; model?: string },
     signal?: AbortSignal

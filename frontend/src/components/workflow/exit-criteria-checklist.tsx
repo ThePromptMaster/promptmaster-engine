@@ -33,6 +33,10 @@ interface Props {
   openMajors?: readonly OpenFindingRow[];
   /** The stage's current version number: what an approval is given on. */
   headVersion?: number;
+  /** A sign-off recorded as not applying to this version, which the user says does apply after all (18 Nov). */
+  onDoesApply?: (id: string) => void;
+  /** On the last stage: what still holds up the finish on other stages, counted beside this stage's own (18 Nov). */
+  openElsewhere?: number;
   /** Viewing a stage that cannot be worked on from here: boxes shown, not clickable. */
   readOnly?: boolean;
   /**
@@ -145,6 +149,8 @@ export function ExitCriteriaChecklist({
   onFinish,
   openMajors = [],
   headVersion,
+  openElsewhere = 0,
+  onDoesApply,
   offers = {},
   onDecide,
   decided = {},
@@ -189,7 +195,9 @@ export function ExitCriteriaChecklist({
               checked={c.satisfied}
               disabled={readOnly || choosing}
               onChange={(e) => {
-                if (e.target.checked && openMajors.length && c.authority !== 'delegable') setAskingWhy(c.id);
+                // Met because it does not apply: unticking says it does, and puts it back to you.
+                if (!e.target.checked && c.notApplicable !== undefined) onDoesApply?.(c.id);
+                else if (e.target.checked && openMajors.length && c.authority !== 'delegable') setAskingWhy(c.id);
                 else onToggleManual(c.id, e.target.checked);
               }}
               className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
@@ -237,6 +245,23 @@ export function ExitCriteriaChecklist({
             {c.satisfied && decided[c.id] && (
               <span data-decided className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
                 {t('cl.decided', { choice: decided[c.id] })}
+              </span>
+            )}
+            {c.satisfied && c.notApplicable !== undefined && (
+              <span data-not-applicable className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
+                {t('cl.notApplicable', { quote: c.notApplicable })}
+                {!readOnly && onDoesApply && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onDoesApply(c.id);
+                    }}
+                    className="ms-2 underline underline-offset-2 hover:text-[var(--on-surface)]"
+                  >
+                    {t('cl.doesApply')}
+                  </button>
+                )}
               </span>
             )}
             {c.satisfied && committedByPolicy[c.id] !== undefined && (
@@ -340,6 +365,7 @@ export function ExitCriteriaChecklist({
         </h3>
         <span className="text-label text-[var(--on-surface-variant)]">
           {t('cl.done', { met, total: criteria.length })}
+          {openElsewhere > 0 && t('cl.openElsewhere', { n: openElsewhere })}
           {requiredOpen && !expanded && t('cl.requiredOpen')}
           {readOnly && t('cl.viewingOnly')}
         </span>

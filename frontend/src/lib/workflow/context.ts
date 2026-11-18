@@ -86,6 +86,32 @@ export function manuscriptSourceFor(template: WorkflowTemplate, stage: StageDefi
   return index > draftingIndex ? template.stages[draftingIndex] : null;
 }
 
+/**
+ * The sign-offs recorded as not applying to their stage's current version (18
+ * Nov, Sean, Executive Search). The latest record for a criterion decides, and
+ * only while its version is still the stage's newest: a new version needs a
+ * new check, so a commitment it adds is never waved through.
+ */
+export function notApplicableNow(
+  events: readonly WorkflowEvent[],
+  bundles: Record<string, StageArtifactBundle>
+): Record<string, { versionId: string; quote: string }> {
+  const latest = new Map<string, { stageId: string; versionId: string; quote: string; applies: boolean }>();
+  for (const e of events) {
+    if (e.type !== 'criterion_not_applicable' || !e.stage_id) continue;
+    const p = (e.payload ?? {}) as { criterion_id?: unknown; version_id?: unknown; quote?: unknown; applies?: unknown };
+    if (typeof p.criterion_id !== 'string' || typeof p.version_id !== 'string') continue;
+    latest.set(p.criterion_id, { stageId: e.stage_id, versionId: p.version_id, quote: typeof p.quote === 'string' ? p.quote : '', applies: p.applies === true });
+  }
+  const out: Record<string, { versionId: string; quote: string }> = {};
+  for (const [id, r] of latest) {
+    if (r.applies || !r.quote.trim()) continue;
+    if (bundles[r.stageId]?.versions.at(-1)?.id !== r.versionId) continue;
+    out[id] = { versionId: r.versionId, quote: r.quote };
+  }
+  return out;
+}
+
 export function buildStageContext(input: BuildContextInput): StageContext {
   const { template, project, bundles, projectVersions = [], events, outlineCounts = {} } = input;
 
@@ -221,6 +247,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     artifactNonEmpty,
     // Approval is an event, not a mode the long-form machine happens to be in.
     outlineApproved: approvedOutlineVersionId(events) !== null,
+    notApplicable: notApplicableNow(events, bundles),
     sections,
     findings,
     manualChecks: project.manual_checks ?? {},

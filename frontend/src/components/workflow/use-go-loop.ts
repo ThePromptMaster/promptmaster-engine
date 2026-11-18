@@ -42,7 +42,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type AnswerContradiction } from '@/lib/api/client';
 import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objective-fixes';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, LEFT_TO_GO_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
+import { decisionsFromAnswer, type NamedRow, type RowDecision } from '@/lib/agent/left-to-go';
+import { KEEP_BLANK, placeholderShare } from '@/lib/workflow/placeholders';
 import { describeSettled, nothingSaid, settleItems, settleKey, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
 import { answeredKept, queueLines, userQueue } from '@/lib/agent/user-queue';
 import { keptQuestions } from '@/lib/agent/account';
@@ -430,6 +432,8 @@ export function useGoLoop(opts: Options) {
   const runRef = useRef<AgentRun | null>(null);
   const stepsRef = useRef<AgentStep[]>([]);
   const abortRef = useRef<AbortController | null>(null);
+  /** Findings the last answer decides, or leaves to Go: decided on their own stage before the next plan (18 Nov). */
+  const namedRef = useRef<{ rows: NamedRow[]; decisions: RowDecision[] | null; answer: string } | null>(null);
   /** False once this page has gone: a loop it started, or was about to start, does not drive (18 Nov). */
   const mountedRef = useRef(true);
   /** This page instance, as the holder of the runs its loops drive. */
@@ -845,6 +849,45 @@ export function useGoLoop(opts: Options) {
           upsertStep(step);
           if ((await perform(step, false, signal)) === 'stop') break;
           continue;
+        }
+
+        // The findings the user's last answer covers are decided on their own
+        // stage first, as the user's (18 Nov, Hidden Innovation h16/h17).
+        if (namedRef.current) {
+          const named = namedRef.current;
+          namedRef.current = null;
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: LEFT_TO_GO_STEP,
+            params: { rows: named.rows, ...(named.decisions ? { decisions: named.decisions, answer: named.answer.slice(0, 500) } : {}) },
+            rationale: named.decisions
+              ? 'Your answer decides the findings the question named: recording it on their own stage.'
+              : 'You left these findings to me: deciding each on its own stage, within the objective and the accepted facts.',
+            expectedOutcome: 'The findings decided where they are, as your decision, so their fixes are carried into the work.',
+            needsDecision: false, decisionQuestion: null,
+          });
+          upsertStep(step);
+          if ((await perform(step, false, signal)) === 'stop') break;
+          continue;
+        }
+
+        // A draft that is mostly placeholders (18 Nov, Sean, Executive Search: a reusable
+        // template with no role brief yet was checked and stopped on). Nothing in it to
+        // check or repair until the material comes: asked once for each such version.
+        const blankHead = o.bundles[o.stage.id]?.versions.at(-1);
+        const blank = blankHead?.content ? placeholderShare(blankHead.content) : null;
+        if (blankHead && blank && blank.share >= 0.5 && ![...priorStepsRef.current, ...stepsRef.current].some((s) => s.params?.placeholder_version === blankHead.id)) {
+          const question = `${o.stage.label} is mostly placeholders: ${blank.blanks} of its ${blank.fields} fields say nothing was supplied, so there is nothing yet to check or improve. Paste the material in your answer (or attach it), or keep it as a blank template and I will carry on.`;
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: 'request_user_decision',
+            params: { placeholder_version: blankHead.id, choices: [KEEP_BLANK] },
+            rationale: 'The draft is placeholders: checking or revising it would cost steps and change nothing until the material is supplied.',
+            expectedOutcome: 'The material, or your word to keep it as a template.', needsDecision: true, decisionQuestion: question,
+          });
+          upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: question }));
+          await setRunStatus('awaiting_decision', question, { kind: 'answer_question', question, choices: [KEEP_BLANK] });
+          break;
         }
 
         // The call ceiling (4 Nov): counted whatever the price, across the
@@ -2040,9 +2083,16 @@ export function useGoLoop(opts: Options) {
           // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
           // objective check read the project's facts, never the run's steps.
           const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
+          // The findings the question named (18 Nov): the answer decides them where they are,
+          // as the user's — chosen ("Accept both h16 and h17") or left to Go.
+          const rows = current.needs?.kind === 'answer_question' ? current.needs.rows ?? [] : [];
+          const delegated = isDelegatedAnswer(text);
+          const chosen = rows.length && !delegated ? decisionsFromAnswer(text, rows) : null;
+          const decidesRows = rows.length > 0 && (delegated || chosen !== null);
+          if (decidesRows) namedRef.current = { rows, decisions: chosen, answer: text.trim() };
           // An answer that made a waiting decision is on record as that decision already
           // (`decideApproval`): a second fact saying the same would outlive a change of mind.
-          const fact = opts?.decided ? null : answerAsFact(asked, text, {
+          const fact = opts?.decided || chosen ? null : answerAsFact(asked, text, {
             run_id: current.id, step_id: step.id, stage_id: stage.id,
             // Recorded knowing the record says otherwise: kept with the fact.
             ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
@@ -2064,7 +2114,7 @@ export function useGoLoop(opts: Options) {
           // "Do whatever is best" on a question the text can settle: the stage is
           // reopened to decide it, so the repair comes before any check (5 Nov).
           const head = o.bundles[stage.id]?.versions.at(-1)?.content ?? '';
-          const reopensForChoice = leftToGo && !onObjective && stage.renderer === 'prose' && st?.status !== 'blocked' &&
+          const reopensForChoice = leftToGo && !decidesRows && !onObjective && stage.renderer === 'prose' && st?.status !== 'blocked' &&
             settlesInTheText(asked, current.needs?.kind === 'answer_question' ? current.needs.choices : undefined, head);
           if (reopensForChoice) {
             await appendWorkflowEvent(o.project.id, o.project.user_id, {
