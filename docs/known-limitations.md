@@ -4708,3 +4708,36 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   the wrong-workflow run fixed in L-252.
 - **And:** on the last stage, the next-step bar's Finish button also reads "Override and finish" while
   work is open on other stages (the checklist button did since #733).
+
+### L-256 — The 18 Nov manual pass of the code-only items, and what it fixed (#737–#741) (2026-11-18)
+- **Fixed on the way:**
+  - **#737:** findings a question named, already decided by the time the answer came, made Go say "I could
+    not decide these myself" and ask again. Now: "Nothing left to decide: … already decided".
+  - **#738:** the commitments check called a plan's sign-off not applicable, quoting "Open lines (proposed,
+    not committed)", the heading of the very section proposing seats and refreshments against the cap.
+    "Nothing proposed" now needs a passage that says none, and no line of the version may put something
+    forward (proposed items, open lines, optional, for approval).
+  - **#739:** a history line the user added ("The earlier schedule was … from 7 to 11 a.m. …") was offered
+    as the fact's new hours. A span's own "from … to" is no longer read as a replacement, and a span the
+    revision still states is kept.
+  - **#740:** a blank intake record (nine rows of "not supplied" beside a guidance column) was checked
+    instead of asked about. Rows are counted, not cells. Only strong words count as blank ("Not stated"
+    and "Pending" are real values), and only a prose stage's first draft is asked about.
+  - **#741:** a finding the user accepted came after twelve rows Go had accepted, was cut by the
+    twelve-row limit, and so never reached the paper. The user's rows now go first.
+- **Seen by hand after the fixes:**
+  - Today's date: the start conversation answered "December 1 falls on a Tuesday, and the year is 2026".
+  - Go's repair of the East Dock objective kept two history lines with the old hours and passed the
+    old-value check first time.
+  - A forced step-number clash stood the loop down without failing the run (`go_step_clash`), and the
+    page took the run back.
+  - A recorded not-applicable showed its note, and "It does propose one" put the sign-off back (forced
+    record). A real check on an assumptions sign-off kept it the user's.
+  - The next-step bar read "Override and finish" with four stages reopened.
+  - The placeholder question fired on the intake record, and "Keep it as a blank template" moved on.
+  - "Accept imwm84hgf3, reject imwm84hgf4" was recorded as given, and #741 carried imwm84hgf3 into
+    Chapter 1 ("This paper asks whether a four-day week raises output…").
+- **Left as it is:**
+  - Go's own accepted rows are carried two rounds a run (L-251). On the test paper that took most of
+    this pass's $8.72.
+  - The "couldn't decide" fallback is tested in code only: a model returning nothing can't be forced.
