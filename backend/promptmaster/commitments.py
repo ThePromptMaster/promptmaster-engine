@@ -15,6 +15,8 @@ leaves the sign-off to the user: a commitment is never waved through on a guess.
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 from .deliverable_check import _found
@@ -34,7 +36,9 @@ COMMITMENTS_INSTRUCTION = (
     "For commitments: something that would bind someone, such as a deadline or date, a budget, fee or cost, a "
     "promise or undertaking, a number of candidates or deliverables, a change of scope. For assumptions, "
     "topics or interpretations: any the text adds beyond what was supplied. Restating what was supplied is "
-    "not an addition, nor is a placeholder (\"not supplied\", \"to confirm\") or a question.\n\n"
+    "not an addition, nor is a placeholder (\"not supplied\", \"to confirm\") or a question. Anything the text "
+    "puts forward for the user to accept or turn down counts as proposed, however it is labelled: items marked "
+    "proposed, open, optional, pending or \"not committed\", options, and recommendations.\n\n"
     "Return JSON only: {\"proposes\": true or false, \"quote\": \"...\"}.\n"
     "- proposes true: quote the passage, copied exactly, that adds or proposes one.\n"
     "- proposes false: quote a passage, copied exactly, that shows none is added: where the text says so, "
@@ -69,12 +73,30 @@ def build_commitments_prompt(req: CommitmentsRequest) -> tuple[str, str]:
     return COMMITMENTS_INSTRUCTION, user
 
 
+#: Words that say there is none: what a passage showing "nothing proposed" has to contain.
+_NONE = re.compile(r"\b(?:no|none|nothing|neither|without|not\s+any)\b", re.I)
+#: A line that puts something forward for the user: proposed items, open lines, options, approvals asked.
+_PUTS_FORWARD = re.compile(
+    r"\bpropos(?:e|es|ed|al|als)\b|\boptional\b|\bopen\s+(?:lines?|items?|points?)\b|\bfor\s+(?:your|the\s+user'?s)\s+approval\b"
+    r"|\bneeds?\s+(?:your|the\s+user'?s)\s+approval\b|\bapproval\s+required\b",
+    re.I,
+)
+
+
+def puts_forward(content: str) -> bool:
+    """A line of the version proposes something and does not say there is none (18 Nov
+    production pass: "Open lines (proposed, not committed)" — seats and refreshments
+    against the cap — was taken for "nothing proposed")."""
+    return any(_PUTS_FORWARD.search(line) and not _NONE.search(line) for line in content.splitlines())
+
+
 def parse_commitments(result: object, content: str) -> CommitmentsResponse:
-    """"None proposed" stands only with its passage found in the version."""
+    """"None proposed" stands only with a passage of the version that says there is
+    none, and only when no line of the version puts something forward."""
     if not isinstance(result, dict) or result.get("proposes") is not False:
         return CommitmentsResponse()
     quote = " ".join(str(result.get("quote") or "").split()).strip("\"“”")[:300]
-    if not _found(quote, content):
+    if not _found(quote, content) or not _NONE.search(quote) or puts_forward(content):
         return CommitmentsResponse()
     return CommitmentsResponse(proposes=False, quote=quote)
 
