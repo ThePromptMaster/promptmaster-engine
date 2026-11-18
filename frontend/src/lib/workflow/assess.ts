@@ -231,10 +231,24 @@ export const PROFILE_MAX = 6_000;
  */
 export function profileSlices(source: string, subjects: readonly string[]): Map<string, string> {
   const lower = source.toLowerCase();
+  // The row's subject as written, else its name: a model writes "Nora Bennett, COO of a
+  // valve maker" where the paste has "Nora Bennett" on a line of its own (18 Nov hand pass).
+  const where = (subject: string) => {
+    const tries = [subject, subject.split(/\s*[,;(—–|]\s*|\s+-\s+/)[0], subject.split(/\s+/).slice(0, 2).join(' ')]
+      .map((t) => t.trim().toLowerCase())
+      .filter((t, k, all) => t.length >= 4 && all.indexOf(t) === k);
+    for (const t of tries) {
+      const i = lower.indexOf(t);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
   const at = subjects
-    .map((s) => ({ s, i: s.trim() ? lower.indexOf(s.trim().toLowerCase()) : -1 }))
+    .map((s) => ({ s, i: s.trim() ? where(s) : -1 }))
     .filter((x) => x.i >= 0)
-    .sort((a, b) => a.i - b.i);
+    .sort((a, b) => a.i - b.i)
+    // Two rows found at the same place (a shared surname): the first keeps it.
+    .filter((x, k, all) => k === 0 || x.i !== all[k - 1].i);
   // Start each slice at the line the name is on, so a heading before the name stays with it.
   const lineStart = (i: number) => source.lastIndexOf('\n', i) + 1;
   const out = new Map<string, string>();
