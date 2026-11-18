@@ -16,7 +16,7 @@ import { countWords, isPart, measure, parseRequirements, wholeLengthTarget } fro
 import { effectiveRenderer, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { isTriageTable } from '@/lib/workflow/triage';
-import { loneManuscript } from './manuscript-fixes';
+import { asksNoChange, loneManuscript } from './manuscript-fixes';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { isDone, type WorkflowEvent, type WorkflowState, type WorkflowTemplate } from '@/lib/workflow/types';
 
@@ -154,7 +154,7 @@ export function acceptedRowsBefore(
     const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
     const first = schema.fields.find((f) => f.key !== 'severity')?.key ?? 'finding';
     return items
-      .filter((i) => i.status === 'accepted' && i.status_source !== 'proposed' && !isSuperseded(i))
+      .filter((i) => i.status === 'accepted' && i.status_source !== 'proposed' && !isSuperseded(i) && !asksNoChange(i, first))
       .map((i) => ({
         id: i.id.slice(0, 40),
         stage_label: stage.short_label || stage.label,
