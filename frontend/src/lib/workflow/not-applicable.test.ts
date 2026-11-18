@@ -51,3 +51,39 @@ describe('which versions are looked at', () => {
     expect(commitmentsToCheck(template, bundles('v2'), [], { 'brief.decision': true })).toEqual([]);
   });
 });
+
+import { conditionalSignOff } from './not-applicable';
+
+describe('which sign-offs can be found not to apply (every designed .decision on production, 18 Nov)', () => {
+  const yes = [
+    'I accept any new commitments this brief proposes',
+    'I accept the assumptions and success tests it adds beyond what I said.',
+    'I accept the resource commitments and any unavailable-evidence limits this plan sets out',
+    'I accept any new commitments the revision introduces',
+    'I accept the topics it adds beyond the supplied material',
+    'I accept any new commitments this draft proposes to the cap or to attendee time, seats or materials.',
+    'I accept the next steps and commitments this update proposes',
+    'I accept the assumptions it proposes for use in the analysis.',
+    'I accept the new commitments and board asks it proposes',
+    'I accept the interpretations it adds beyond what the material states',
+    'I accept the consultation offers, solutions and dates it adds beyond what I named.',
+    'I accept the new commitments it proposes.',
+  ];
+  const no = [
+    'I accept the proposed requirements I have kept',
+    'I accept the recommended option and its stated tradeoff.',
+    'I accept the proposed conditional recommendation',
+    'I choose how the reserve shortfall below $1,000 will be resolved',
+    'I choose this third option and accept these requirement weights.',
+    'I accept the recommended training session pattern and the handling proposed for the open points.',
+    'I accept the proposals I have marked, including any cost or scope changes they introduce.',
+    'I decide how manufacturing-adjacent profiles with unclear operations leadership are sorted',
+    'I accept the proposed assumptions listed, including the trainer count used.',
+    'I approve the proposed redistribution of narration across clip boundaries',
+    'I accept the recommendations and proposed commitments in these decisions.',
+    'I accept the new commitments it proposes: the requests, deadlines and owners marked as proposed.',
+    'I approve this brief as accurate',
+  ];
+  it.each(yes)('checked: %s', (label) => expect(conditionalSignOff(label)).toBe(true));
+  it.each(no)('always the user’s: %s', (label) => expect(conditionalSignOff(label)).toBe(false));
+});

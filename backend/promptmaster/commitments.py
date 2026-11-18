@@ -27,17 +27,18 @@ COMMITMENTS_MODEL = "anthropic/claude-haiku-5.5"
 MAX_STAGE_CHARS = 40_000
 
 COMMITMENTS_INSTRUCTION = (
-    "A project stage has a sign-off for any NEW COMMITMENTS its text proposes. Read the STAGE TEXT and say "
-    "whether it proposes any.\n\n"
-    "A new commitment is something the text puts forward that would bind someone and that the SUPPLIED "
-    "MATERIAL does not already contain: a deadline or date, a budget, fee or cost, a promise or undertaking, "
-    "a number of candidates or deliverables, a change of scope. Restating what was supplied is not a new "
-    "commitment, nor is a placeholder (\"not supplied\", \"to confirm\"), a question, or a recommendation the "
-    "text marks as the user's to decide.\n\n"
+    "A project stage has THE SIGN-OFF, by which the user accepts what the stage adds of the kind the sign-off "
+    "names: new commitments, assumptions, topics, interpretations, or whatever its words say. Read the STAGE "
+    "TEXT and say whether it adds or proposes anything of that kind that the SUPPLIED MATERIAL does not "
+    "already contain.\n\n"
+    "For commitments: something that would bind someone, such as a deadline or date, a budget, fee or cost, a "
+    "promise or undertaking, a number of candidates or deliverables, a change of scope. For assumptions, "
+    "topics or interpretations: any the text adds beyond what was supplied. Restating what was supplied is "
+    "not an addition, nor is a placeholder (\"not supplied\", \"to confirm\") or a question.\n\n"
     "Return JSON only: {\"proposes\": true or false, \"quote\": \"...\"}.\n"
-    "- proposes true: quote the passage, copied exactly, that proposes a new commitment.\n"
-    "- proposes false: quote a passage, copied exactly, that shows none is proposed: where the text says so, "
-    "or the section where commitments would be stated. 8 to 300 characters.\n"
+    "- proposes true: quote the passage, copied exactly, that adds or proposes one.\n"
+    "- proposes false: quote a passage, copied exactly, that shows none is added: where the text says so, "
+    "or the section where they would be stated. 8 to 300 characters.\n"
     "When you cannot tell, answer proposes true with an empty quote."
 )
 
