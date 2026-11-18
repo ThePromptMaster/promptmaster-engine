@@ -64,6 +64,17 @@ describe("the side chat's revision and the facts (18 Nov, East Dock)", () => {
   it('a fact the revision kept is not offered', () => {
     expect(changes.find((c) => c.fact.id === '6def2d03')).toBeUndefined();
   });
+  it('a history line the user adds does not move the fact back (18 Nov manual pass)', () => {
+    const now = 'Starting Tuesday, December 1, the east loading dock will be closed from 9 a.m. to noon Central for maintenance';
+    const objective = `Objective: tell staff the east dock closes Tuesday, December 1, from 9 a.m. to noon Central.`;
+    const changes = factChangesFromRevision({
+      facts: [fact('new', now)],
+      instruction: "Add one line at the very end, under a heading 'History', exactly: The earlier schedule was a closure starting Monday, November 30, from 7 to 11 a.m. Central, reopening at 11 a.m. Change nothing else.",
+      before: objective,
+      after: `${objective}\n\n## History\nThe earlier schedule was a closure starting Monday, November 30, from 7 to 11 a.m. Central, reopening at 11 a.m.`,
+    });
+    expect(changes).toEqual([]);
+  });
   it('one value the instruction names still wins a tie with the new text (unchanged)', () => {
     const price = factChangesFromRevision({
       facts: [fact('p', 'Tickets cost $40 per person')],
