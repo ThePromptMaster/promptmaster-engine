@@ -4590,6 +4590,11 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   has gone does not start or carry on. In one tab, a run is driven by one page's loop (`claimDrive`).
   A write the database refuses because the run is over, or a second loop's step number, stops the loop
   at once: nothing is retried, the run keeps whatever ended it, and the page says so.
+- **Found on the production pass** (#729). A run ended from outside while Go drove it (forced on a test
+  project) still took five more moves: the database refuses a commit on an ended run, but not a new
+  step, a draft or a check. The loop now reads the run before every move and stops there. The refused
+  commit itself was handled as intended: closed as "Not done … nothing was retried", recorded as
+  `go_run_ended`, and the run kept the reason that ended it.
 - **Left as it is:** the stray artifacts in Sean's four projects (on stages their workflows don't have,
   so nothing shows them). A run created by a page that went away before its loop started stays
   "running" with no driver until Go is pressed again; with the page check this no longer happens.

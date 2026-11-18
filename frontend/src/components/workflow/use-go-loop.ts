@@ -128,6 +128,15 @@ export function isStepClash(e: unknown): boolean {
   return /agent_steps_run_idx_key/.test(err?.message ?? '');
 }
 
+/**
+ * Whether the run, as the database has it, is still one a loop may drive (18 Nov
+ * hand pass): the database refuses a commit on an ended run but not a new step,
+ * so a run stopped elsewhere took five more moves before anything said no.
+ */
+export function stillDriving(run: Pick<AgentRun, 'status' | 'ended_at'>): boolean {
+  return run.status === 'running' && !run.ended_at;
+}
+
 /** The database refused a write because the run is no longer running (it ended, or was ended elsewhere). */
 export function isRunEnded(e: unknown): boolean {
   const message = (e as { message?: string } | null)?.message ?? '';
@@ -806,6 +815,14 @@ export function useGoLoop(opts: Options) {
     try {
       for (;;) {
         if (signal.aborted || !mountedRef.current) throw new Stopped();
+        // Read the run before each move: one ended elsewhere stops here, not
+        // at the next write the database happens to guard.
+        const held = runRef.current;
+        if (held) {
+          const now = await getAgentRun(held.id).catch(() => null);
+          if (signal.aborted || !mountedRef.current) throw new Stopped();
+          if (now && !stillDriving(now)) throw new RunGone(false, new Error(`agent run ${now.id} is ${now.status}, not running`));
+        }
         let o = latest.current;
         // A stage just added is entered before the page has drawn it: wait for
         // the page to catch up rather than call the stage missing (25 Oct).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { claimDrive, isDuplicateRun, isRunEnded, isStepClash, releaseDrive } from '@/components/workflow/use-go-loop';
+import { claimDrive, isDuplicateRun, isRunEnded, isStepClash, releaseDrive, stillDriving } from '@/components/workflow/use-go-loop';
 import { templateFitsProject } from '@/lib/workflow/template-fit';
 
 // 18 Nov, Sean's Warehouse run 36e80b91 (and 6be5df58, 279badb4): a new project
@@ -67,5 +67,17 @@ describe('one loop per run in a tab', () => {
     expect(claimDrive('run-2', {})).toBeNull();
     releaseDrive('run-2', second);
     expect(claimDrive('run-2', {})).not.toBeNull();
+  });
+});
+
+describe('a run ended elsewhere stops the loop before its next move', () => {
+  // 18 Nov hand pass: run 2f555ad8 stopped from outside while Go drove it; five
+  // more moves were made before the approval commit was refused.
+  it('only a running run with no end is driven', () => {
+    expect(stillDriving({ status: 'running', ended_at: null })).toBe(true);
+    expect(stillDriving({ status: 'stopped', ended_at: '2026-11-18T11:08:02Z' })).toBe(false);
+    expect(stillDriving({ status: 'failed', ended_at: null })).toBe(false);
+    expect(stillDriving({ status: 'awaiting_decision', ended_at: null })).toBe(false);
+    expect(stillDriving({ status: 'running', ended_at: '2026-11-18T11:08:02Z' })).toBe(false);
   });
 });
