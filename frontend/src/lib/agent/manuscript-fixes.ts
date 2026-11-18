@@ -78,7 +78,12 @@ export function fixesToCarry(
         const text = `[${i.id}] (${stage.short_label || stage.label}) ${change || found}${change && found ? ` — what was found: ${found}` : ''}`;
         return { key, text: text.slice(0, 1_200), ...(i.status_source === 'user' ? { byUser: true } : {}) };
       });
-  }).slice(0, 12);
+  })
+    // The user's own accepted rows first, then the cut (18 Nov manual pass: a review
+    // with twelve rows Go had accepted ahead of one the user accepted lost the user's
+    // to the limit, and after two rounds only the user's are carried, so it never was).
+    .sort((a, b) => Number(Boolean(b.byUser)) - Number(Boolean(a.byUser)))
+    .slice(0, 12);
 }
 
 /**

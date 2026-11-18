@@ -106,6 +106,18 @@ describe('findings decided before the answer came', () => {
 });
 
 describe('carried into the work', () => {
+  it("a finding the user accepted is carried even behind a dozen Go accepted (18 Nov manual pass)", async () => {
+    const { fixesToCarry } = await import('./manuscript-fixes');
+    const manuscript = BOOK_V1.stages.find((s) => s.renderer === 'long_form')!;
+    const goRows = Array.from({ length: 13 }, (_, i) => ({ id: `f${i + 1}`, finding: `Go's finding ${i + 1}`, suggested_change: `Fix ${i + 1}`, severity: 'minor', status: 'accepted', status_source: 'model' }));
+    const mine = { id: 'imwm84hgf3', finding: 'The opening does not state the question', suggested_change: 'Add one opening sentence that states the question', severity: 'major', status: 'accepted', status_source: 'user' };
+    const bundles = { [review.id]: { artifact: null, versions: [{ id: 'r', content: serializeItems([...goRows, mine]) }] } } as never;
+    const paper = { ...BOOK_V1, stages: [manuscript, review] };
+    const rows = fixesToCarry(paper, bundles, manuscript.id, new Set());
+    expect(rows).toHaveLength(12);
+    expect(rows[0]).toMatchObject({ key: `${review.id}:imwm84hgf3`, byUser: true });
+  });
+
   it("a row the user left to Go is the user's, so the carry limit on Go's own rows never drops it", () => {
     const fix = (byUser: boolean) => ({ stageId: review.id, stageLabel: review.label, id: 'h16', text: 'x', byUser }) as never;
     const rounds = [1, 2].map(() => ({ action_key: 'recheck_stage', status: 'succeeded', params: { accepted_fixes: ['x'] } })) as never;
