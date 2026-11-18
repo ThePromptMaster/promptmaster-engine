@@ -74,7 +74,7 @@ import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurab
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, isSetupStage, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -1098,7 +1098,8 @@ export function useGoLoop(opts: Options) {
           offered.filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
           polishedHere,
           stageEvaluation.canAdvance,
-          Boolean(unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id))
+          Boolean(unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id)),
+          isSetupStage(o.stage)
         ), facts.review);
 
         // Runs the data could carry out are tried before the table is handed
@@ -1357,7 +1358,7 @@ export function useGoLoop(opts: Options) {
                   answerReturn,
                   lengthNote: holder?.id === o.stage!.id ? describeLengthTarget(wholeLengthTarget(o.project, o.bundles[o.stage!.id]?.versions.at(-1)?.content ?? '')) : '',
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
-                  polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance) && !allowed.includes('revise_stage') ? polishedHere : undefined,
+                  polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance, Boolean(o.stage && isSetupStage(o.stage))) && !allowed.includes('revise_stage') ? polishedHere : undefined,
                   // What already waits on the user anywhere in the project (12 Nov): not asked one by one.
                   waitingOnUser: queueLines(userQueue({
                     template: o.template, state: o.state, outstanding: outstandingWork(o.template, o.state, context),

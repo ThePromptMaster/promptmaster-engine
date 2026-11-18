@@ -1018,3 +1018,21 @@ describe('an unusable planner reply with nothing waiting on the user (8 Nov, pro
     expect(unplannedMove(false, ['request_user_decision'])).toBeNull();
   });
 });
+
+import { SETUP_POLISH_MAX, isSetupStage, polishCapped as capped, withoutEndlessPolish as withoutPolish } from './policy';
+
+describe('a setup stage gets one check (18 Nov, Sean, Executive Search: 4 checks and 4 apply rounds on the objective)', () => {
+  const setup = { exit_criteria: [{ id: 'f', label: 'Objective set', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' } }] } as never;
+  const other = { exit_criteria: [{ id: 'a', label: 'I approve', check: 'manual' }] } as never;
+  it('is the stage that asks for the setup fields', () => {
+    expect(isSetupStage(setup)).toBe(true);
+    expect(isSetupStage(other)).toBe(false);
+  });
+  it('one polish move once it can move on, two at most; other stages keep theirs', () => {
+    expect(capped(1, true, true)).toBe(true);
+    expect(capped(1, false, true)).toBe(false);
+    expect(capped(SETUP_POLISH_MAX, false, true)).toBe(true);
+    expect(capped(1, true, false)).toBe(false);
+    expect(withoutPolish(['evaluate_stage', 'apply_findings', 'advance_stage'], 1, true, false, true)).toEqual(['advance_stage']);
+  });
+});

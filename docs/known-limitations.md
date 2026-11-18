@@ -4665,3 +4665,25 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
     for the material, or "Keep it as a blank template".
 - **Left as it is:** Sean's projects keep their states; h16/h17 are decided on his next answer. Rows a
   question names only in words ("the two parameter findings") are not matched; ids are.
+
+### L-255 — The shortlist keeps the evidence behind each verdict; a setup stage gets one check (2026-11-18)
+- **What happened** (Sean, Executive Search Screening, f74d57a0). 29 fictional candidates over three
+  batches were all assessed correctly. Shortlist v5's own check then reported nine Advance candidates
+  with "Met at batch assessment; profile wording not held".
+  - The shortlist writer, its check and its repairs read the assessment as one line per candidate: the
+    first reason cut at 220 characters, gaps at 160, and the quoted evidence left out.
+  - The pasted profiles were kept nowhere once judged. The repairs could not put back what they never
+    saw, and Go ran to 24 of 25 steps ($3.12).
+- **Now:**
+  - Each new row keeps its own part of the paste (`profile`, from its name to the next one's, up to
+    6,000 characters).
+  - A later stage reads every row whole: verdict, batch, every reason, the evidence quoted and the gaps.
+    Then come the profiles as pasted, the rows going forward first, up to 60,000 characters, with a line
+    saying how many were left out.
+  - Rows judged before this change have their evidence but no profile.
+- **Setup cost** (32 calls, $1.04 before the first paste). The stage that sets the project up from what
+  the user supplied (the one with the setup-field criteria) now gets one check once it can move on, and
+  at most two polishing moves otherwise (it had four checks and four apply rounds). Part of that cost was
+  the wrong-workflow run fixed in L-252.
+- **And:** on the last stage, the next-step bar's Finish button also reads "Override and finish" while
+  work is open on other stages (the checklist button did since #733).

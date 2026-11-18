@@ -58,7 +58,8 @@ export async function assessPaste(args: {
     calls += 1;
     if (reply.web_query) webQueries.push(reply.web_query);
     const before = items.length;
-    items = appendBatch(items, reply.items, now());
+    // Each row keeps its own part of what was pasted, for the shortlist to quote (18 Nov).
+    items = appendBatch(items, reply.items, now(), chunk);
     const fresh = items.length - before;
     added += fresh;
     ungraded += reply.ungraded ?? 0;

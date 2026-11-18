@@ -88,9 +88,9 @@ describe('a paste of any size is judged a batch at a time (15 Nov, Sean: 25 past
     expect(restAfter('A\n\nB', 'A\n\nB', { not_assessed: 1, next_from: 'Z' })).toBeNull();
   });
 
-  it('hands a later stage everyone, one line each', () => {
+  it('hands a later stage everyone, each row whole (18 Nov: every reason, not the first cut at 220)', () => {
     const items = appendBatch([], [{ id: 'a', subject: 'Jane Doe', verdict: 'Green', rationale: '- Ran a 40M P&L\n- Plant manager', evidence: '', gaps: 'No ERP' }], 'now');
     const text = documentText({ renderer: 'assess', id: 's', label: 'Score', expected_artifacts: [] } as never, serializeAssessment(DEFAULT_SCALE, items));
-    expect(text).toBe('1 assessed:\n1. Jane Doe — Green — Ran a 40M P&L (gaps: No ERP)');
+    expect(text).toBe('1 assessed:\n1. Jane Doe — Green (batch 1)\n   Why: Ran a 40M P&L; Plant manager\n   Gaps: No ERP');
   });
 });

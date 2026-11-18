@@ -220,7 +220,33 @@ export interface AssessedRow {
  * with its batch number and when it was judged. The model's verdict is kept
  * beside the row's, so a verdict the user changes says what it was.
  */
-export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string): StageItem[] {
+/** The most of one item's pasted text kept on its row. */
+export const PROFILE_MAX = 6_000;
+
+/**
+ * Each row's own part of the pasted text: from where its name first appears
+ * to where the next row's does (18 Nov, Sean, Executive Search: the shortlist
+ * and its repairs could not quote the evidence, because nothing kept the
+ * profiles once they were judged). A row whose name is not in the text gets none.
+ */
+export function profileSlices(source: string, subjects: readonly string[]): Map<string, string> {
+  const lower = source.toLowerCase();
+  const at = subjects
+    .map((s) => ({ s, i: s.trim() ? lower.indexOf(s.trim().toLowerCase()) : -1 }))
+    .filter((x) => x.i >= 0)
+    .sort((a, b) => a.i - b.i);
+  // Start each slice at the line the name is on, so a heading before the name stays with it.
+  const lineStart = (i: number) => source.lastIndexOf('\n', i) + 1;
+  const out = new Map<string, string>();
+  at.forEach((x, k) => {
+    const end = k + 1 < at.length ? lineStart(at[k + 1].i) : source.length;
+    const text = source.slice(lineStart(x.i), end).trim();
+    if (text) out.set(x.s, text.length > PROFILE_MAX ? `${text.slice(0, PROFILE_MAX)}…` : text);
+  });
+  return out;
+}
+
+export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string, source?: string): StageItem[] {
   const batch = String(nextBatch(existing));
   // A name already in the table is not added twice (15 Nov: carrying a paste on,
   // or pasting the same profiles again, duplicated rows).
@@ -232,9 +258,11 @@ export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: stri
     seen.add(key);
     return true;
   });
+  const profiles = source ? profileSlices(source, fresh.map((r) => r.subject)) : new Map<string, string>();
   return [
     ...existing,
     ...fresh.map((r) => ({
+      ...(profiles.get(r.subject) ? { profile: profiles.get(r.subject) } : {}),
       id: r.id,
       subject: r.subject,
       verdict: r.verdict,

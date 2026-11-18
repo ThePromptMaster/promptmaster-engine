@@ -296,9 +296,25 @@ export function polishSinceDirection(
     .filter((s) => s.stage_id === stageId && (POLISH_MOVES as readonly string[]).includes(s.action_key)).length;
 }
 
+/**
+ * A stage that sets the project up from what the user supplied: the one whose
+ * exit criteria ask for the setup fields (every template's first stage). It
+ * restates the user's own words, so it gets one check, and one round on what
+ * the check found while it cannot move on (18 Nov, Sean, Executive Search: four
+ * checks and four apply rounds on the objective before any candidate, and 32
+ * calls, $1.04, before the first paste).
+ */
+export function isSetupStage(stage: Pick<StageDefinition, 'exit_criteria'>): boolean {
+  return stage.exit_criteria.some((c) => c.check === 'auto' && c.rule?.type === 'field_non_empty');
+}
+export const SETUP_POLISH_MAX = 2;
+export const SETUP_POLISH_WHEN_READY = 1;
+
 /** Whether the cap has taken the polishing moves away on this stage. */
-export function polishCapped(polishedHere: number, canAdvance: boolean): boolean {
-  return polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
+export function polishCapped(polishedHere: number, canAdvance: boolean, setup = false): boolean {
+  const most = setup ? SETUP_POLISH_MAX : POLISH_MAX;
+  const ready = setup ? SETUP_POLISH_WHEN_READY : POLISH_WHEN_READY;
+  return polishedHere >= most || (canAdvance && polishedHere >= ready);
 }
 
 export function withoutEndlessPolish(
@@ -311,9 +327,10 @@ export function withoutEndlessPolish(
    * Analysis, the stage could not advance before the user's approval, and Go
    * chose "Derive" again and again with nothing reaching the document.
    */
-  unsavedReasoning = false
+  unsavedReasoning = false,
+  setup = false
 ): string[] {
-  if (!polishCapped(polishedHere, canAdvance)) return [...allowed];
+  if (!polishCapped(polishedHere, canAdvance, setup)) return [...allowed];
   return allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k) || (unsavedReasoning && k === 'revise_stage'));
 }
 
