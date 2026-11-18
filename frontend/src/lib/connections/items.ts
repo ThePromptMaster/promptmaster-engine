@@ -60,6 +60,17 @@ export interface Connection {
   connected_at: string;
 }
 
+/**
+ * The connection to show for one kind of account: a working one when there is one
+ * (18 Nov). Composio keeps an expired connection beside the one that replaced it;
+ * Settings showed the newest, expired, as "Needs reconnecting", and Reconnect was
+ * refused with "Salesforce is already connected" because the working one was there.
+ */
+export function shownConnection(accounts: readonly Connection[] | null | undefined, toolkit: ToolkitSlug): Connection | undefined {
+  const mine = (accounts ?? []).filter((a) => a.toolkit === toolkit);
+  return mine.find((a) => a.status === 'ACTIVE') ?? mine[0];
+}
+
 /** One thing in an account, described without its contents. */
 export interface PreviewItem {
   id: string;

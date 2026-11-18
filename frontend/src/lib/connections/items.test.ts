@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { cleanText } from './read-file';
 import {
+  shownConnection,
   MAX_HELD,
   itemKey,
   mergeThirdParty,
@@ -131,5 +132,23 @@ describe('which account an item came from', () => {
 
   it('points each logo at Composio', () => {
     expect(toolkitLogoUrl('googledrive')).toBe('https://logos.composio.dev/api/googledrive');
+  });
+});
+
+describe('the connection Settings shows for one kind of account (18 Nov)', () => {
+  const sf = (id: string, status: string, at: string) => ({ id, toolkit: 'salesforce' as const, label: 'Salesforce', status, connected_at: at });
+
+  it('is the working one, when an expired one is newer (Reconnect was refused as "already connected")', () => {
+    const accounts = [sf('new', 'EXPIRED', '2026-11-13T20:22:00Z'), sf('ok', 'ACTIVE', '2026-11-13T20:21:55Z'), sf('old', 'EXPIRED', '2026-11-13T17:11:11Z')];
+    expect(shownConnection(accounts, 'salesforce')?.id).toBe('ok');
+  });
+
+  it('is the newest expired one when none works, so Reconnect is offered', () => {
+    expect(shownConnection([sf('new', 'EXPIRED', '2'), sf('old', 'EXPIRED', '1')], 'salesforce')?.id).toBe('new');
+  });
+
+  it('is nothing for a kind not connected', () => {
+    expect(shownConnection([sf('ok', 'ACTIVE', '1')], 'hubspot')).toBeUndefined();
+    expect(shownConnection(null, 'salesforce')).toBeUndefined();
   });
 });

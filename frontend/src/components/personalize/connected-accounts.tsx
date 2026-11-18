@@ -7,7 +7,7 @@ import { ToolkitLogo } from '@/components/personalize/toolkit-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { forgetConnectedAccount } from '@/lib/connections/account-found';
 import { api } from '@/lib/api/client';
-import { CONNECT_PATH, TOOLKITS, rememberReturn, type Connection, type ToolkitSlug } from '@/lib/connections/items';
+import { CONNECT_PATH, TOOLKITS, rememberReturn, shownConnection, type Connection, type ToolkitSlug } from '@/lib/connections/items';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
@@ -107,7 +107,7 @@ export function ConnectedAccounts({
     <div>
       <ul className="space-y-2" aria-busy={accounts === null}>
         {TOOLKITS.map((toolkit) => {
-          const held = accounts?.find((a) => a.toolkit === toolkit.slug);
+          const held = shownConnection(accounts, toolkit.slug);
           const active = held?.status === 'ACTIVE';
           return (
             <li key={toolkit.slug} className="flex flex-wrap items-start gap-3 rounded-xl bg-[var(--surface-container-low)] p-4">
