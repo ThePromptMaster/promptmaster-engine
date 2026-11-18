@@ -135,3 +135,27 @@ describe('what changed since an approval on an earlier version (17 Nov, Sean: "I
     expect(details.textContent).toContain('v9: Applied 6 points.');
   });
 });
+
+describe('the last stage while work is open elsewhere (18 Nov, Hidden Innovation)', () => {
+  const given = { ...approve, satisfied: true };
+  it('counts it beside the stage’s own, and the button says Override and finish', () => {
+    render(<ExitCriteriaChecklist criteria={[given]} onToggleManual={() => {}} onFinish={() => {}} openElsewhere={2} finishOverride />);
+    expect(screen.getByText(/1 of 1 done · 2 still open on other stages/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Override and finish/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /see your finished work/ })).not.toBeInTheDocument();
+  });
+  it('a sign-off that does not apply says why, and can be put back', async () => {
+    const user = userEvent.setup();
+    const onDoesApply = vi.fn();
+    render(
+      <ExitCriteriaChecklist
+        criteria={[{ ...approve, id: 'brief.decision', label: 'I accept any new commitments this brief proposes', satisfied: true, notApplicable: 'No timeline, no fee and no number of candidates is proposed.' }]}
+        onToggleManual={() => {}}
+        onDoesApply={onDoesApply}
+      />
+    );
+    expect(screen.getByText(/Not applicable to this version: “No timeline, no fee/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'It does propose one' }));
+    expect(onDoesApply).toHaveBeenCalledWith('brief.decision');
+  });
+});

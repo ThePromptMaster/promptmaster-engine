@@ -62,6 +62,8 @@ interface Props {
    * 22 Oct: "it's hard to know that that is the last step to get to this page").
    */
   onFinish?: () => void;
+  /** Finishing now would leave work open on other stages: the button says so (18 Nov). */
+  finishOverride?: boolean;
 }
 
 /**
@@ -147,6 +149,7 @@ export function ExitCriteriaChecklist({
   committedByPolicy = {},
   approvedVersions: olderApprovals = {},
   onFinish,
+  finishOverride = false,
   openMajors = [],
   headVersion,
   openElsewhere = 0,
@@ -397,10 +400,13 @@ export function ExitCriteriaChecklist({
           <button
             type="button"
             onClick={onFinish}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
+            data-finish-override={finishOverride || undefined}
+            className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-title transition-opacity hover:opacity-90 ${
+              finishOverride ? 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]' : 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+            }`}
           >
             <span aria-hidden className="material-symbols-outlined text-[20px]">task_alt</span>
-            {t('cl.finishNow')}
+            {finishOverride ? t('na.overrideFinish') : t('cl.finishNow')}
           </button>
         )}
       </div>
