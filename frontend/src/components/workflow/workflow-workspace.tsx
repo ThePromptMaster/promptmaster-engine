@@ -3402,6 +3402,7 @@ export function WorkflowWorkspace({
               readOnly={!isEditable}
               collapsible={foldStageExtras}
               onFinish={finishHere ? () => setFinishing({ option: finishHere, from: 'checklist' }) : undefined}
+              finishOverride={Boolean(finishHere?.requiresNote)}
             />
             {finishing?.from === 'checklist' && completionDialog}
 
