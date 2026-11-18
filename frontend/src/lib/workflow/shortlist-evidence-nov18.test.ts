@@ -25,6 +25,11 @@ describe('each row keeps its own part of the paste', () => {
     expect(slices.get('Ethan Wallace')).toMatch(/^Candidate 2: Ethan Wallace\nVP Operations/);
     expect(slices.has('Not In Paste')).toBe(false);
   });
+  it('found by the name when the row\'s subject adds a title (18 Nov hand pass)', () => {
+    const slices = profileSlices(PASTE, ['Nora Bennett, COO of a Midwest valve maker (industrial components)', 'Ethan Wallace — VP Operations']);
+    expect(slices.get('Nora Bennett, COO of a Midwest valve maker (industrial components)')).toMatch(/^Candidate 1: Nora Bennett\nCOO/);
+    expect(slices.get('Ethan Wallace — VP Operations')).toMatch(/^Candidate 2: Ethan Wallace/);
+  });
   it('appendBatch keeps it on the row', () => {
     const items = appendBatch([], [
       { id: 'c1', subject: 'Nora Bennett', verdict: 'Advance', rationale: '- Industrial manufacturing: met (valve maker)\n- P&L scale: met ($640M)', evidence: '"P&L owner for 6 years"', gaps: '' },
