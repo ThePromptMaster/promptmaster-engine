@@ -129,7 +129,8 @@ import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange, proposedChange, settledChange, type ProposedChange } from '@/lib/workflow/brief-change';
-import { replaceDocumentInContext, contextFromDocuments } from '@/lib/data/extract-text';
+import { replaceDocumentInContext, contextFromDocuments, documentInContext } from '@/lib/data/extract-text';
+import { changedLines, factsFromReplacedLines } from '@/lib/data/replaced-lines';
 import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
@@ -3136,9 +3137,19 @@ export function WorkflowWorkspace({
                 onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
               }
               onReplaceInContext={(name, text) => {
+                const old = documentInContext(project.context ?? '', name);
                 const next = replaceDocumentInContext(project.context ?? '', name, text);
                 if (next === null) return false;
                 onPatchProject({ context: next });
+                // A fact that was the document's old words changes with them (18 Nov):
+                // otherwise every prompt carried the old figure beside the new one.
+                const updates = old === null ? [] : factsFromReplacedLines(project.facts ?? [], changedLines(old, text));
+                if (updates.length) {
+                  void Promise.all(updates.map(({ fact, statement }) => {
+                    const held = (project.facts ?? []).find((f) => f.id === fact.id)!;
+                    return supersedeFact(project, held, statement, { replaced_document: name }, 'file');
+                  })).then(() => onReload?.()).catch(() => undefined);
+                }
                 return true;
               }}
               readOnly={project.status === 'finalized'}
