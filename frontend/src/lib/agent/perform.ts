@@ -456,6 +456,8 @@ async function decideNamedFindings(ctx: PerformContext, key: string, inputs: Ret
   const decided: string[] = [];
   const versionIds: string[] = [];
   const left: string[] = [];
+  // Named rows someone decided before the answer came: nothing to ask about them again.
+  const already: string[] = [];
   for (const stageId of [...new Set(rows.map((r) => r.stageId))]) {
     const stage = ctx.template.stages.find((s) => s.id === stageId);
     const head = ctx.bundles[stageId]?.versions.at(-1);
@@ -465,6 +467,7 @@ async function decideNamedFindings(ctx: PerformContext, key: string, inputs: Ret
     if (!isTriageTable(schema)) continue;
     const ids = rows.filter((r) => r.stageId === stageId).map((r) => r.id);
     const targets = items.filter((i) => ids.includes(i.id) && !(i.status ?? '').trim());
+    already.push(...items.filter((i) => ids.includes(i.id) && (i.status ?? '').trim()).map((i) => `${i.id} on ${stage.label}`));
     if (!targets.length) continue;
     const statuses = proposableStatuses(schema);
     const decisions = given
@@ -497,6 +500,13 @@ async function decideNamedFindings(ctx: PerformContext, key: string, inputs: Ret
     if (typeof id === 'string') versionIds.push(id);
     const labelOf = (v: string | undefined) => (schema.statuses ?? []).find((s) => s.value === v)?.label ?? v ?? '';
     decided.push(...marked.filter((i) => applied.includes(i.id)).map((i) => `${i.id} on ${stage.label}: ${labelOf(i.status)}${i.reason ? ` (${i.reason})` : ''}`));
+  }
+  if (!decided.length && !left.length) {
+    // Every named row was decided already (by the user on the table, or a step since): said, not asked again.
+    return done(key, {
+      status: 'succeeded', toolsUsed: [], changes: {},
+      output: already.length ? `Nothing left to decide: ${already.join(', ')} ${already.length === 1 ? 'was' : 'were'} already decided.` : 'Nothing left to decide: the findings the question named are no longer open.',
+    });
   }
   if (!decided.length) {
     // Nothing usable: asked plainly, on the rows themselves, and not left to Go again.
