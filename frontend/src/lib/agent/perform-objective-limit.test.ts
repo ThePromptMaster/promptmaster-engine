@@ -123,3 +123,50 @@ describe('a fixable problem on a workflow that keeps its stages (6 Nov, producti
     expect(out.stop?.status).toBe('blocked');
   });
 });
+
+describe('what the check finds unmet on a later stage (18 Nov, hand pass: a memo after a paper)', () => {
+  const memo = { ...SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'output')!, id: 'memo', label: 'One-page board decision memo', short_label: 'Board memo', exit_criteria: [], required: false };
+  // Not required, so the earlier stage stays the deliverable the check reads, as the paper did.
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  const memoCase = () => {
+    const base = ctx([]);
+    return {
+      ...base,
+      project: { ...base.project, routine_decisions: 'handle' },
+      template: { ...SINGLE_OUTPUT_V1, inquiry: true, stages: [stage, memo] },
+      state: { current_stage_id: 'memo', stages: { output: { status: 'done' }, memo: { status: 'in_progress' } } },
+      stage: memo,
+      bundles: {
+        output: { artifact: null, versions: [{ id: 'v9', version_number: 9, content: words(400), source_operation: 'agent_revise', created_at: '2026-11-17T21:00:00Z' }] },
+        memo: { artifact: null, versions: [{ id: 'm5', version_number: 5, content: words(30), source_operation: 'agent_revise', created_at: '2026-11-17T21:10:00Z' }] },
+      },
+      context: { ...base.context, artifactNonEmpty: { output: true, memo: true }, measured: { memo: [{ id: 'm1', label: 'Memo: at most 1 page (estimated)', satisfied: false, detail: 'about 1.1 pages (605 words; estimated at 550 words a page)' }] } },
+    } as unknown as PerformContext;
+  };
+  const unmet = [
+    'One-page board decision memo: Memo: at most 1 page (estimated) — measured about 1.1 pages (605 words; estimated at 550 words a page)',
+    "A one-page decision memo for a board — The project's own check (S8) measured the memo at about 1.1 pages (605 words; estimated at 550 words a page), over the one-page limit",
+  ];
+
+  beforeEach(() => {
+    agentAssessObjective.mockResolvedValue({
+      outcome: 'not_met', reason: 'The memo is over one page.', basis_quote: '', blockers: [], performed: [], proposed_next: [], unmet,
+      next_task: { title: 'Trim board memo to one page', kind: 'write', work: 'Revise the latest One-page board decision memo (v5) to 550 words or fewer.', needs: [] },
+      read_chars: 24, total_chars: 24, model_used: 'm',
+    });
+  });
+
+  it('records the items as the memo’s, so they are not carried into the paper', async () => {
+    await performStep(memoCase());
+    const [, , event] = appendWorkflowEvent.mock.calls.find((c) => ((c as unknown[])[2] as { type?: string })?.type === 'objective_assessed') as unknown as [string, string, { payload: { basis: { stage_id: string }; unmet_elsewhere: unknown } }];
+    expect(event.payload.basis.stage_id).toBe('output');
+    expect(event.payload.unmet_elsewhere).toEqual(unmet.map((item) => ({ item, stage_id: 'memo' })));
+  });
+
+  it('adds no stage to trim the memo, and puts the fix to the memo itself', async () => {
+    const out = await performStep(memoCase());
+    expect(appendWorkflowEvent.mock.calls.some((c) => ((c as unknown[])[2] as { type?: string })?.type === 'stage_added')).toBe(false);
+    expect(out.needs).toMatchObject({ kind: 'objective_check', finding: 'unmet', stageId: 'memo' });
+    expect(out.output).toContain('"Trim board memo to one page" is a change to One-page board decision memo, not new work');
+  });
+});

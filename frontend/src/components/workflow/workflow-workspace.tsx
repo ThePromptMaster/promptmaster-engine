@@ -3041,7 +3041,7 @@ export function WorkflowWorkspace({
                     !appendStageVersion || objectiveNeed?.finding === 'repair_limit'
                       ? undefined
                       : objectiveNeed?.finding === 'unmet'
-                        ? () => void go.fixObjective(objectiveNeed.items)
+                        ? () => void go.fixObjective(objectiveNeed.items, objectiveNeed.stageId)
                         : () => void go.go()
                   }
                   resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, (id) => stageNameShown(id, 'short'), {}, locale).action ?? undefined) : undefined}
