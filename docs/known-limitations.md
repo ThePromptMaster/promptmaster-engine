@@ -4521,10 +4521,10 @@ three times slower than ChatGPT.
 - **Not done:** Go reshaping the workflow itself (shortening, combining or skipping stages beyond an
   optional skip under Handle) is an estimate in the reply, not built. Streaming the first draft is not built.
 
-### L-251 — The 17–18 Nov hand pass: what it found and fixed (#719–#724) (2026-11-18)
+### L-251 — The 17–18 Nov hand pass: what it found and fixed (#719–#726) (2026-11-18)
 
 The work of L-246 to L-250 was run by hand on production, on test projects on the developer's account.
-Six faults turned up that the unit tests had not caught. Each is fixed and live.
+Seven faults turned up that the unit tests had not caught. Each is fixed and live.
 
 - **The earlier check went missing on reload** (#719). The page loaded only the newest version's
   evaluation, so after a reload "This version has not been checked yet. The last check was of v1 …" was
@@ -4554,12 +4554,21 @@ Six faults turned up that the unit tests had not caught. Each is fixed and live.
   used up repair tries. Rows the user accepted are still carried, each once. Go's own accepted rows are
   carried for the first two rounds of a run, then left for the final check and its card. A row that says
   no change is needed is never carried, and is not checked for.
+- **A replaced document left its old words standing as facts** (#726). Replacing pilot-findings.txt
+  swapped its words in the context, and the change check reopened the five stages that used the incidents
+  figure, each with its reason. But the fact "Customer-reported incidents: unchanged (median 0 change).",
+  copied from the file by the start conversation, stayed as the user's own, so every prompt carried both
+  figures. Each changed line is now paired with its new line (by the label before its colon, or in order
+  when the rest changed one for one). A current fact that is exactly an old line is superseded by the new
+  one, citing the document, and the fact change reopens what used it. A fact that says the same thing in
+  other words is not matched.
 - **Seen by hand after the fixes:** the memo's page limit stayed on the memo (Go repaired it, then asked
   "shorten it again?", and the answer closed the earlier copy of that question too). An unread source
   ("could not be read in full") was not listed as holding up the approval. A "Resolved in …" row was
   offered as one press on the approval card. Salesforce showed Connected, and the start conversation
   read an opportunity, a contact and an account by name. With #724, a run carried Go's own rows twice,
-  rechecked the review, and went on to the memo's approval (5 steps, $1.50).
+  rechecked the review, and went on to the memo's approval (5 steps, $1.50). With #726, replacing the file
+  retired the old incidents fact and recorded the corrected one, citing the file.
 - **Also seen, not changed:** rows added through the side chat get generated ids ("imwldwbdd3"), and the
   stop card names a row by its id beside its text. Salesforce is searched by record name, so a request
   for "all open opportunities" finds nothing.
