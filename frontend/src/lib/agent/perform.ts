@@ -765,11 +765,12 @@ function carryingApprovedCopies(ctx: PerformContext): PerformContext {
         const done = source ? withApprovedCopy(content, source, asked) : null;
         if (!source || !done) continue;
         content = done.content;
-        copied.push(`${source.label} v${source.version} (${done.words} words, counted) copied word for word for ${row.id}`);
+        copied.push(`${source.label} v${source.version} as approved, word for word, ${done.words} words counted in code (${row.id})`);
       }
       if (!copied.length) return append(stageId, name, version, evaluation, options);
       const note = `${copied.join('; ')}.`;
-      return append(stageId, name, { ...version, content, change_summary: version.change_summary ? `${version.change_summary} ${note}` : note }, evaluation, options);
+      // First, so a long summary cut at its limit keeps it.
+      return append(stageId, name, { ...version, content, change_summary: version.change_summary ? `${note} ${version.change_summary}` : note }, evaluation, options);
     },
   };
 }

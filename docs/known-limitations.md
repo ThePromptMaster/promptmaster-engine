@@ -4844,3 +4844,9 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   - the claim check counts the user's own approvals as supplied ("The announcement is approved (v1)").
 - **Left as it is:** a section is found by its heading or number; with neither, the copy is left to the
   repair as before. A Go-decided row whose text a repair changed is decided again, as any new finding is.
+- **Found on the production pass** (#749). On a test package the model had already copied the approved
+  Recommendation word for word, as a quotation, with "Length: 698 words", counted by hand; code counts 676.
+  The copy step now also corrects a stated count beside a copy that is already there, or adds one. The
+  pinned Go button said "Approve and resume" while the card, rightly, said "Approve" (something else still
+  waited); it now says what the card says.
+

@@ -71,6 +71,9 @@ export function sourceAskedFor(finding: string, sources: readonly ApprovedSource
   return named.length === 1 ? named[0] : null;
 }
 
+/** A stated length: "Length: 698 words", "Word count: 104", "(110 words)". */
+const STATED_COUNT = /(?:word count\s*[:=-]?\s*|length\s*[:=-]?\s*)?(\d[\d,]*)\s+words\b(?:,?\s*counted by hand)?/i;
+
 /** The section number a finding names: "Section 6", "section 6 of the package". */
 const sectionNumber = (finding: string) => /\bsection\s+(\d{1,2})\b/i.exec(finding)?.[1] ?? null;
 
@@ -95,7 +98,19 @@ export function withApprovedCopy(content: string, source: ApprovedSource, findin
   const end = next ? next.at : lines.length;
   const body = lines.slice(hit.at + 1, end).join('\n');
   const words = countWords(source.text);
-  if (norm(body).includes(norm(source.text))) return null;
+  if (norm(body).includes(norm(source.text))) {
+    // Already copied (19 Nov production pass: as a quotation, "Length: 698 words", counted by
+    // hand; code counts 676). The count beside it is the code's.
+    const at = lines.findIndex((l, i) => i > hit.at && i < end && STATED_COUNT.test(l) && !norm(source.text).includes(norm(l)));
+    if (at < 0) {
+      const counted = `*${words} words, counted — ${source.label} v${source.version} as approved.*`;
+      return { content: [...lines.slice(0, hit.at + 1), '', counted, ...lines.slice(hit.at + 1)].join('\n'), words };
+    }
+    const stated = Number((STATED_COUNT.exec(lines[at])?.[1] ?? '').replace(/,/g, ''));
+    if (stated === words) return null;
+    const fixed = lines[at].replace(STATED_COUNT, (m: string, n: string) => m.replace(n, String(words)).replace(/\s*(?:,\s*)?counted by hand/i, '') + (/counted/i.test(m) ? '' : ' (counted)'));
+    return { content: [...lines.slice(0, at), fixed, ...lines.slice(at + 1)].join('\n'), words };
+  }
   const copied = ['', source.text, '', `*${words} words, counted — ${source.label} v${source.version} as approved, copied word for word.*`, ''];
   return { content: [...lines.slice(0, hit.at + 1), ...copied, ...lines.slice(end)].join('\n'), words };
 }
