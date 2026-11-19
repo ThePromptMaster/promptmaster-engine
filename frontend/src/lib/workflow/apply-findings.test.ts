@@ -115,3 +115,14 @@ describe('applying findings to a long text (2 Nov, production: 13,504 words came
     expect(rev.parts).toBeUndefined();
   });
 });
+
+describe('a repair keeps Go\'s own decision on a finding it left as it was (19 Nov, Inventory Selection i8)', () => {
+  const schema = { fields: [{ key: 'severity', options: ['minor', 'major'] }, { key: 'finding' }, { key: 'suggested_change' }], statuses: [] } as never;
+  it('kept when the finding and its change are the same; dropped when the repair changed them', () => {
+    const before = [{ id: 'i8', finding: 'Part 2 still calls Vendor A open.', suggested_change: 'Say A is within budget.', status: 'accepted', status_source: 'model', reason: 'Routine.' }];
+    const same = carryUserFields(before, [{ id: 'i8', finding: 'Part 2 still calls Vendor A open.', suggested_change: 'Say A is within budget.' }], schema);
+    expect(same[0]).toMatchObject({ status: 'accepted', status_source: 'model', reason: 'Routine.' });
+    const changed = carryUserFields(before, [{ id: 'i8', finding: 'Part 2 uses the old $35,000 subscription.', suggested_change: 'Use $41,000.' }], schema);
+    expect(changed[0].status).toBeUndefined();
+  });
+});

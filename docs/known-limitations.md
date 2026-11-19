@@ -4815,3 +4815,32 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
 - **And** (#747): "This is mine to decide" showed only on the stage Go was working on, so a hand-over on a
   later stage could be taken back only once Go had reached it. Who decides is the project's: the press is
   offered on every stage of a project not yet finished.
+
+### L-259 — Review statuses read the same everywhere; an approved text is copied by code (2026-11-19)
+- **Statuses** (Sean, 19 Nov, Inventory Selection 171db25d). A review repair after a price change came
+  back with i8 undecided though Go had accepted it, and nothing re-decided it: it quoted the retired
+  $35,000 subscription, and only decided rows were marked superseded. The package's status column, a
+  model-written copy, then said "**Undecided.**" one second before Go recorded i8 accepted on the review,
+  and the approval was asked on that version. Now:
+  - a repair keeps Go's own decision on a row it left as it was (`carryUserFields`);
+  - on a table of findings an undecided row stating a retired value is marked superseded (`markSuperseded`);
+  - before an approval question, the version's status words for review findings are rewritten in code from
+    the review tables and saved (`refreshStatusWords`, `refreshDeliverableStatuses`).
+- **One meaning per answer.** The same prompt said approving would drop i8, then that it would leave it
+  open, and the press accepted it. "Approve" no longer reads as accepting a finding
+  (`decisionsFromAnswer`); a finding the question names is not also listed as left open; and the question
+  says what each offered answer does to each named finding, computed with the reading the answer will get
+  (`choiceEffects`).
+- **An excluded option's plan** (Sean, 19 Nov). The package kept Vendor A's seven-week plan "for reuse".
+  Repairs are told such work stays that option's, under its condition, never offered for another.
+- **Asked twice** (Sean, 19 Nov, Scanner Readiness ddad7267). Check asked for the approved announcement
+  word for word; Go called it routine but left it to him as major ("used up its edits", on a check stage it
+  never edits), two repairs paraphrased it anyway, and Go asked again on the package. Now:
+  - a finding that asks for an approved text word for word is routine whatever its severity (`copiesApproved`);
+  - every version Go saves carries such a copy by code: the section whose heading names the approved stage (or
+    the section number the finding gives) gets the approved version's text, without its title or count line,
+    and a word count counted in code (`approved-copy.ts`);
+  - "used up its edits" is said only when the edit limit took revising away, and the last stage never "moves on";
+  - the claim check counts the user's own approvals as supplied ("The announcement is approved (v1)").
+- **Left as it is:** a section is found by its heading or number; with neither, the copy is left to the
+  repair as before. A Go-decided row whose text a repair changed is decided again, as any new finding is.

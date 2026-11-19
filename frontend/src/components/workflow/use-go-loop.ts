@@ -75,7 +75,7 @@ import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurab
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, isSetupStage, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, POLISH_WHEN_READY, isSetupStage, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -777,8 +777,11 @@ export function useGoLoop(opts: Options) {
       if (signal.aborted) throw new Stopped();
       if (!screen) return { kind: 'ask' };
       const made = steps.filter((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded').length;
+      const polished = polishSinceDirection(steps, stage.id);
       const plan = planFromScreen(screen, {
         question, template: o.template, stage, allowed, returnsLeft: MAX_RETURNS - made,
+        editsCapped: polished >= POLISH_WHEN_READY && !allowed.includes('revise_stage') && effectiveRenderer(stage) !== 'review',
+        lastStage: o.template.stages.at(-1)?.id === stage.id,
         approvalStands: approvalStandsThroughRepairs(o.project, stage, o.bundles[stage.id]?.versions ?? []),
         correctionsBeyondLimit: stepsRef.current.filter((st) => st.stage_id === stage.id && st.params?.correction_beyond_limit).length,
       });

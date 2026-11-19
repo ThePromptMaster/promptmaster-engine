@@ -30,7 +30,9 @@ export function namedRows(texts: readonly string[], open: readonly OpenRow[]): N
 
 export type RowDecision = { id: string; status: 'accepted' | 'rejected' };
 
-const ACCEPT = /\b(?:accept|approve|apply|adopt|agree|keep\s+(?:both|them|the\s+fix))\w*/i;
+// Not "approve": approving a version or a package decides no finding (19 Nov, Sean, Inventory
+// Selection: "Approve version 13 as final" was recorded as accepting i8, the one finding named).
+const ACCEPT = /\b(?:accept|apply|adopt|agree|keep\s+(?:both|them|the\s+fix))\w*/i;
 const REJECT = /\b(?:reject|dismiss|decline|drop|discard|leave\s+(?:it|them|both)\s+out)\w*|\b(?:don'?t|do\s+not|neither)\b/i;
 const ALL = /\b(?:both|all|them|these|those|each|every)\b/i;
 
@@ -52,4 +54,26 @@ export function decisionsFromAnswer(answer: string, rows: readonly NamedRow[]): 
     for (const r of targets) if (!out.has(r.id)) out.set(r.id, status);
   }
   return out.size ? [...out].map(([id, status]) => ({ id, status })) : null;
+}
+
+/**
+ * What each offered answer would do to the findings the question names, in the
+ * words the question then carries: "If you choose "…": i8 accepted." (19 Nov, Sean:
+ * one prompt said approving would drop i8, then that it would leave it open, and the
+ * press accepted it). Computed with `decisionsFromAnswer`, the reading the answer is
+ * given, so what the question says is what happens.
+ */
+export function choiceEffects(choices: readonly string[], rows: readonly NamedRow[]): string {
+  if (!rows.length || !choices.length) return '';
+  const lines = choices.map((choice) => {
+    const decided = decisionsFromAnswer(choice, rows) ?? [];
+    const effect = rows
+      .map((r) => {
+        const d = decided.find((x) => x.id === r.id);
+        return `${r.id} ${d ? d.status : 'stays undecided'}`;
+      })
+      .join(', ');
+    return `- "${choice.slice(0, 160)}": ${effect}.`;
+  });
+  return `\n\nWhat each answer does to the findings it names:\n${lines.join('\n')}`;
 }

@@ -23,10 +23,21 @@ export interface UnsupportedClaim {
   why: string;
 }
 
-/** What the user supplied, as the check reads it: their request, then the accepted facts. */
-export function suppliedMaterial(project: Pick<Project, 'context' | 'facts'>): string {
+/**
+ * What the user supplied, as the check reads it: their request, the accepted facts, and
+ * the approvals they gave themselves (19 Nov, Sean, Scanner Readiness: "The staff
+ * announcement is approved (v1)." was flagged as saying more than the supplied facts).
+ */
+export function suppliedMaterial(project: Pick<Project, 'context' | 'facts' | 'approvals'>): string {
   const facts = factsForRequest(project.facts).map((f) => `- ${f.statement}`);
-  return [(project.context ?? '').trim(), facts.length ? `ACCEPTED FACTS:\n${facts.join('\n')}` : '']
+  const approvals = (project.approvals ?? [])
+    .filter((a) => !a.by_policy)
+    .map((a) => `- ${a.stage}${a.version ? ` v${a.version}` : ''}: approved by the user ("${a.approval}")${a.choice ? `, choosing: ${a.choice}` : ''}`);
+  return [
+    (project.context ?? '').trim(),
+    facts.length ? `ACCEPTED FACTS:\n${facts.join('\n')}` : '',
+    approvals.length ? `APPROVED BY THE USER:\n${approvals.join('\n')}` : '',
+  ]
     .filter(Boolean)
     .join('\n\n')
     .slice(0, 60_000);
@@ -34,7 +45,7 @@ export function suppliedMaterial(project: Pick<Project, 'context' | 'facts'>): s
 
 /** The claims in `text` that say more than was supplied; none when nothing was supplied, or the check fails. */
 export async function claimSupportFor(
-  project: Pick<Project, 'context' | 'facts' | 'model'>,
+  project: Pick<Project, 'context' | 'facts' | 'model' | 'approvals'>,
   stageLabel: string,
   text: string,
   signal?: AbortSignal

@@ -124,11 +124,23 @@ export function decidedWords(project: {
 export function findingRisk(item: StageItem, schema: StageItemSchema, facts?: readonly FactWords[]): TriageRisk {
   if (quotedFact(item.changes, facts)) return 'material';
   if (quotedFact(item.implements, facts)) return 'routine';
+  if (copiesApproved(item)) return 'routine';
   const field = schema.fields.find((f) => f.key === 'severity' && f.options);
   if (!field) return 'material';
   const value = (item.severity ?? '').trim().toLowerCase();
   if (!field.options!.includes(value)) return 'material';
   return ROUTINE_SEVERITIES.has(value) ? 'routine' : 'material';
+}
+
+/**
+ * A finding whose fix is to make the work carry what the user approved, word for word
+ * (19 Nov, Sean, Scanner Readiness: "copy the approved staff announcement verbatim").
+ * Go called it "a routine consistency fix", left it to him as major, and asked twice.
+ * The decision was made when the user gave the approval: routine whatever its severity.
+ */
+export function copiesApproved(item: StageItem): boolean {
+  const text = [item.finding, item.issue, item.suggested_change, item.reason].filter(Boolean).join(' ');
+  return /\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)? (?:as approved|text|wording))\b/i.test(text) && /\bapproved\b/i.test(text);
 }
 
 export function splitUntriaged(

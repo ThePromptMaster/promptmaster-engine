@@ -199,3 +199,18 @@ describe('the approval question on the deliverable (4 Nov)', () => {
     expect(out.changes).toEqual({});
   });
 });
+
+describe('the version asked about says what the review says (19 Nov, Inventory Selection i8)', () => {
+  it('a status word the recorded decision contradicts is rewritten in code, and saved before the question', async () => {
+    const c = ctx('autonomous', [{ id: 'i10', quote: 'Session total | 90' }]);
+    const final = (c.bundles as Record<string, { versions: { content: string }[] }>).final_proposal.versions[0];
+    final.content = `${final.content}\n\n| i10. Session 1 runs long. | **Undecided.** Session total | 90. |`;
+    appendStageVersion.mockResolvedValueOnce({ id: 'check-v4', args: 0 }).mockResolvedValueOnce({ id: 'final-v8', args: 0 });
+    const out = await performStep(c);
+    expect(appendStageVersion).toHaveBeenCalledTimes(2);
+    const [stageId, , saved] = appendStageVersion.mock.calls[1] as [string, string, { content: string; source_operation: string }];
+    expect(stageId).toBe('final_proposal');
+    expect(saved.content).toContain('| i10. Session 1 runs long. | **Accepted.** Session total | 90. |');
+    expect(out.changes).toEqual({ version_ids: ['check-v4', 'final-v8'], items_triaged: ['i10'] });
+  });
+});
