@@ -167,10 +167,10 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
-import { approvalsToRead, leftToGoSignature, withApprovalsLeftToGo, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
+import { approvalsToRead, leavesChoiceToGo, leftToGoSignature, withApprovalsLeftToGo, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
 import { approvalsOnEarlierVersion, chosenFor, earlierDecision, withApprovals } from '@/lib/workflow/approvals';
 import { asksForDecision, decisionForAnswer, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
-import { decisionAsFact, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
+import { decisionAsFact, delegatedWhy, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
 import { useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
@@ -1873,6 +1873,24 @@ export function WorkflowWorkspace({
       const text = decisionText(choice);
       if (!target || !criterion || !text) throw new Error(tr('wserr.noChange'));
       const head = stageBundles[onStageId]?.versions.at(-1);
+      // "You choose" said where the decision is asked for (19 Nov, Sean, Equipment
+      // Replacement: the card's "Or say what you decide instead"). Ticked as his
+      // decision, nothing would have been chosen: the choice is left to Go, which
+      // decides it in the text and gives the approval itself.
+      if (leavesChoiceToGo(text, project.routine_decisions, template, target, criterion)) {
+        await appendEvent({
+          type: LEFT_TO_GO, stage_id: onStageId, actor: 'user', reason: `You left "${criterion.label}" to Go.`,
+          payload: { criterion_id: criterionId, quote: text.slice(0, 400), source: 'answer' },
+        });
+        if (target.renderer === 'prose' && head) {
+          await appendEvent({
+            type: 'brief_changed', stage_id: onStageId, actor: 'user', reason: 'Left to Go to decide',
+            payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: onStageId, reason: delegatedWhy(criterion.label) }] },
+          });
+        }
+        await onReload?.();
+        return;
+      }
       const fact = decisionAsFact(criterion.label, target.short_label || target.label, text, {
         criterion_id: criterionId, stage_id: onStageId, version_id: head?.id ?? null, run_id: goRunId,
       });

@@ -4803,8 +4803,12 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
 - **Left as it is:** a hand-over read from the brief is a model's reading of the user's words, kept only
   with their sentence; the checklist shows it so it can be taken back. Sean's paused packaging run (d574d104)
   is left for him.
-- **Found on the production pass** (#746). On a saved workflow with "I choose the vendor to recommend"
+- **Found on the production pass** (#745). On a saved workflow with "I choose the vendor to recommend"
   reserved, the brief check recorded the hand-over quoting the objective ("Decide which pallet-wrapping
   machine vendor to recommend…"), which says what the work is, not who may decide. A hand-over now has to
   quote one of the brief's sentences that grant or keep authority (`delegationSentences`); with none,
   nothing is handed over.
+- **Also found on the pass** (#746). The approval card's "Or say what you decide instead" took "You
+  choose" as the user's decision and ticked the approval with nothing chosen. Under "handle them for me"
+  it now leaves that choice to Go (`leavesChoiceToGo`): recorded as the user's word, the stage reopened
+  for Go to decide it in the text, and the approval given by Go after its check.

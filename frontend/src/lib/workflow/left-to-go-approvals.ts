@@ -18,6 +18,7 @@
  * a stage's commitments sign-off.
  */
 
+import { isDelegatedAnswer } from './answers';
 import type { ExitCriterion, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 
 export const LEFT_TO_GO = 'approval_left_to_go' as const;
@@ -125,4 +126,19 @@ export function approvalTheQuestionIsAbout(
     return shared >= 2;
   });
   return found.length === 1 ? found[0] : null;
+}
+
+/**
+ * A decision typed where an approval asks for one ("Or say what you decide instead")
+ * that leaves it to Go: "You choose". Only under "handle them for me", and only for an
+ * approval that may be left to Go; otherwise it is recorded as the user's decision.
+ */
+export function leavesChoiceToGo(
+  text: string,
+  routine: string | null | undefined,
+  template: Pick<WorkflowTemplate, 'stages'>,
+  stage: Pick<StageDefinition, 'id'>,
+  criterion: ExitCriterion
+): boolean {
+  return routine === 'handle' && isDelegatedAnswer(text) && mayBeLeftToGo(template, stage, criterion);
 }

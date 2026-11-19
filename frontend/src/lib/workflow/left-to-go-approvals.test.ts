@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { isDelegatedAnswer } from './answers';
-import { approvalsLeftToGo, approvalsToRead, approvalTheQuestionIsAbout, mayBeLeftToGo, withApprovalsLeftToGo } from './left-to-go-approvals';
+import { approvalsLeftToGo, approvalsToRead, approvalTheQuestionIsAbout, leavesChoiceToGo, mayBeLeftToGo, withApprovalsLeftToGo } from './left-to-go-approvals';
 import { evaluateStage } from './engine';
 import type { WorkflowTemplate } from './types';
 
@@ -67,5 +67,16 @@ describe('reserved approvals the user left to Go', () => {
     expect(approvalTheQuestionIsAbout(TEMPLATE, rec, 'Which vendor should the recommendation name, Vendor A or Vendor B?', {})?.id).toBe('recommendation.approved');
     expect(approvalTheQuestionIsAbout(TEMPLATE, rec, 'Should the table show monthly totals?', {})).toBeNull();
     expect(approvalTheQuestionIsAbout(TEMPLATE, rec, 'Which vendor should the recommendation name?', { 'recommendation.approved': true })).toBeNull();
+  });
+});
+
+describe('"You choose" typed where the decision is asked for (19 Nov)', () => {
+  it('leaves it to Go under Handle, for an approval that may be left to Go', () => {
+    const [costs, rec, pkg] = TEMPLATE.stages;
+    expect(leavesChoiceToGo('You choose, and state the deciding factor clearly.', 'handle', TEMPLATE, rec, rec.exit_criteria[0])).toBe(true);
+    expect(leavesChoiceToGo('You choose', 'ask', TEMPLATE, rec, rec.exit_criteria[0])).toBe(false);
+    expect(leavesChoiceToGo('Vendor A', 'handle', TEMPLATE, rec, rec.exit_criteria[0])).toBe(false);
+    expect(leavesChoiceToGo('You choose', 'handle', TEMPLATE, pkg, pkg.exit_criteria[0])).toBe(false);
+    expect(leavesChoiceToGo('You choose', 'handle', TEMPLATE, costs, costs.exit_criteria[0])).toBe(false);
   });
 });
