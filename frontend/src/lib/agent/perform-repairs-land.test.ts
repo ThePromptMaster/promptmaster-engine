@@ -49,6 +49,16 @@ describe('a chapter repair has to show it landed (8 Nov, production)', () => {
     expect(out.output).toContain('Still cites Section 4.');
   });
 
+  it('a long reason is clipped to what the check accepts, so the check runs (19 Nov)', async () => {
+    getArtifact.mockResolvedValue(artifact('Article XIII, Section 4 provides that.'));
+    agentCheckDeliverable.mockResolvedValue({ findings: [{ id: 'correction', verdict: 'not_carried', quote: 'Article XIII, Section 4', note: 'Still cites Section 4.' }], contradictions: [] });
+    const out = await performStep(ctx(`Correct the pension clause to Article XIII, Section 5. ${'The review accepted it. '.repeat(80)}`));
+    const sent = agentCheckDeliverable.mock.calls[0][0].accepted[0];
+    expect(sent.finding.length).toBeLessThanOrEqual(1_000);
+    expect(sent.suggested_change.length).toBeLessThanOrEqual(1_000);
+    expect(out.status).toBe('failed');
+  });
+
   it('a correction that landed passes', async () => {
     getArtifact.mockResolvedValue(artifact('Article XIII, Section 5 provides that.'));
     agentCheckDeliverable.mockResolvedValue({ findings: [{ id: 'correction', verdict: 'carried', quote: 'Article XIII, Section 5', note: '' }], contradictions: [] });

@@ -4741,3 +4741,27 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   - Go's own accepted rows are carried two rounds a run (L-251). On the test paper that took most of
     this pass's $8.72.
   - The "couldn't decide" fallback is tested in code only: a model returning nothing can't be forced.
+
+### L-257 — A full request opens its workflow; one press resumes; a long repair reason is still checked (2026-11-19)
+- **What happened** (Sean, 17–19 Nov: three projects, the last made on 19 Nov). He asked for "the full
+  project workflow" with five deliverables, one of them "a staff announcement under 150 words". Sizing
+  took the largest length stated anywhere in the request as the length of the whole work, so 150 words
+  made it concise by rule. "Make it a project" opened the one-stage view, which then sized the objective
+  alone, found it larger, and offered "Continue with …" at once.
+- **Now:** a request that names the full project, workflow or process is never concise (a reading that
+  says concise is raised to standard), and a request that lists two or more deliverables is read, not
+  sized by its stated length (`size_by_rule`, `at_least_standard`). The start page also keeps a brief of
+  several deliverables off the one-stage workflow (`oneStageFor`). A single short piece is still concise.
+- **The extra Resume** (Sean, 19 Nov). An answer on Go's card kept the run paused while anything else was
+  on the waiting list (17 Nov: answer several, then Resume once). The only other item was a question Go
+  had set aside on a stage already finished: it held nothing up, so the card's "Approve and resume" left
+  a second Resume to press. Now only an item Go would stop for keeps the run paused (`stillWaiting`): not
+  a set-aside question, nor an item that holds nothing up and does not block the finish. When the card
+  will pause, its buttons say "Approve" and "Record my decision", without "and resume".
+- **A repair that could not be checked counted as landed.** After a manuscript repair, the check that
+  the correction is in the text sent the repair's whole reason as a finding. A reason over 1,000
+  characters was refused before the model, the check concluded nothing, and the repair counted as
+  landed: 11 refusals since 17 Nov, two on Sean's Hidden Innovation. The reason is now clipped
+  (`clipFinding`).
+- **Left as it is:** the one-stage view still sizes the objective alone when it decides whether to offer
+  the full process; with the start sized correctly, the two no longer disagree on these requests.

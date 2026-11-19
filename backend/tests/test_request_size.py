@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from deps import get_client
 from main import app
-from promptmaster.request_size import SIZE_MODEL, SizeRequest, build_size_prompt, parse_size, size_by_rule, stated_words
+from promptmaster.request_size import SIZE_MODEL, SizeRequest, at_least_standard, build_size_prompt, parse_size, several_deliverables, size_by_rule, stated_words
 from promptmaster.workflow_designer import build_workflow_prompt
 
 
@@ -80,3 +80,46 @@ def test_the_designer_scales_its_stages_to_the_depth():
     assert "Design 3 to 5 stages" in standard and "fewest stages that do the work" in standard
     full = build_workflow_prompt("a book", "Write it", depth="full")[1]
     assert "Design 5 to 8 stages" in full
+
+
+# 19 Nov, a client: "I explicitly requested the full project workflow" and got the
+# one-stage view. Each request named one short piece ("a staff announcement under
+# 150 words"), and the largest stated length decided the whole request.
+LAUNCH = (
+    "Build a full project for a fictional depot launch. Prepare a coordinated launch plan.\n\n"
+    "Facts\n\nThe depot has 30 staff across two shifts.\n\n"
+    "Deliverables\n\n"
+    "1. An executive recommendation describing readiness and costs.\n"
+    "2. A training schedule covering every shift.\n"
+    "3. A budget table.\n"
+    "4. A supervisor checklist.\n"
+    "5. A staff announcement under 150 words."
+)
+
+
+def test_a_full_process_request_is_never_concise_by_one_short_piece():
+    assert size_by_rule(LAUNCH) is None
+    assert size_by_rule("Use the full PromptMaster project workflow. Prepare two short notices. Keep each document under 100 words.") is None
+    assert size_by_rule("Build a full project for a scanner rollout: a schedule, a budget, and a staff announcement under 120 words.") is None
+    # A request that is one short piece is still one sitting.
+    assert size_by_rule("Write a 120-word reminder to staff to pick up their badges").depth == "concise"
+
+
+def test_several_deliverables_are_read_not_ruled():
+    assert several_deliverables(LAUNCH)
+    assert several_deliverables("Objective\n\nDeliverables: a recommendation; a 100-word notice")
+    assert several_deliverables("Prepare three short internal documents for the team")
+    assert not several_deliverables("A 300 word email to the team about Friday")
+    assert not several_deliverables("1. Open with thanks\n2. Mention Friday")  # an outline of one piece, not deliverables
+    assert size_by_rule("Deliverables: a recommendation; a 100-word notice") is None
+
+
+def test_a_reading_that_says_concise_is_raised_for_a_full_process_request(client_for_app):
+    out = at_least_standard(parse_size({"depth": "concise", "reason": "Short."}), LAUNCH)
+    assert out.depth == "standard" and out.reason == "The request asks for the full project workflow."
+    assert at_least_standard(parse_size({"depth": "concise", "reason": "Short."}), "A thank-you note").depth == "concise"
+    client, mock = client_for_app
+    mock.generate_json = AsyncMock(return_value=({"depth": "concise", "reason": "One sitting."}, {}))
+    res = client.post("/api/size-request", json={"description": LAUNCH})
+    assert res.json()["depth"] == "standard"
+    mock.generate_json.assert_called_once()

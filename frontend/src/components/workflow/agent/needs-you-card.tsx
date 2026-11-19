@@ -23,8 +23,14 @@ export function NeedsYouCard({
   nothingElse,
   offer = null,
   onChoose,
+  pausesAfter = false,
 }: {
   need: NeedsUser;
+  /**
+   * The answer is recorded but the run stays paused, because something else on
+   * the list still waits: the buttons say "Approve", not "Approve and resume" (19 Nov).
+   */
+  pausesAfter?: boolean;
   /**
    * The options the stage puts to the user for this approval (12 Nov: "Where am
    * I supposed to select A?"). Choosing one gives the approval and records which.
@@ -50,7 +56,13 @@ export function NeedsYouCard({
   const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { message, action, options, footer, detail } = describeNeed(need, stageLabel, context, locale);
+  const described = describeNeed(need, stageLabel, context, locale);
+  const { message, footer, detail } = described;
+  // A card that will not resume does not promise to (19 Nov).
+  const resumes = t('need.approveResume');
+  const pausing = pausesAfter && need.kind === 'tick_criterion';
+  const action = pausing && described.action === resumes ? t('qq.approve') : described.action;
+  const options = pausing ? described.options?.map((o) => (o.label === resumes ? { ...o, label: t('qq.approve') } : o)) : described.options;
   // A failed repair can be told what to fix (8 Nov: "I could not find a way to
   // give a targeted correction for the failed validation").
   const [note, setNote] = useState('');
@@ -159,7 +171,7 @@ export function NeedsYouCard({
       ) : action ? (
         <>
         {deciding && (readingOptions || hasOptions) && (
-          <DecisionChoices offer={deciding} busy={busy} onChoose={choose} recordLabel={t('nyc.decideResume')} />
+          <DecisionChoices offer={deciding} busy={busy} onChoose={choose} recordLabel={pausing ? t('cl.recordDecision') : t('nyc.decideResume')} />
         )}
         {canSay && (
           <label className="mt-3 block">

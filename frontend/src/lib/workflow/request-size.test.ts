@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { designDepth, isConcise, outgrowsOneStage, sizeKey } from './request-size';
+import { designDepth, isConcise, outgrowsOneStage, sizeKey, listsSeveralDeliverables, oneStageFor } from './request-size';
 
 describe('what each way in does with the request’s size (11 Nov)', () => {
   it('a concise request is served by one stage, whichever button', () => {
@@ -27,5 +27,19 @@ describe('what each way in does with the request’s size (11 Nov)', () => {
     expect(sizeKey('p1', 'A short email')).toBe(sizeKey('p1', 'A short email'));
     expect(sizeKey('p1', 'A short email')).not.toBe(sizeKey('p1', 'A book about lions'));
     expect(sizeKey('p1', 'A short email')).not.toBe(sizeKey('p2', 'A short email'));
+  });
+});
+
+describe('a brief of several deliverables is not one stage (19 Nov)', () => {
+  const material = 'Audience: operations director\nDeliverables: An executive recommendation; A training schedule; A staff announcement under 150 words\n\nThe conversation:\n…';
+  it('reads the brief line the conversation adds', () => {
+    expect(listsSeveralDeliverables(material)).toBe(true);
+    expect(listsSeveralDeliverables('Deliverables: A 120-word reminder')).toBe(false);
+    expect(listsSeveralDeliverables('The conversation:\nno brief')).toBe(false);
+  });
+  it('a concise size serves one stage only for one piece', () => {
+    expect(oneStageFor({ depth: 'concise' }, material)).toBe(false);
+    expect(oneStageFor({ depth: 'concise' }, 'Deliverables: A 120-word reminder')).toBe(true);
+    expect(oneStageFor({ depth: 'standard' }, '')).toBe(false);
   });
 });

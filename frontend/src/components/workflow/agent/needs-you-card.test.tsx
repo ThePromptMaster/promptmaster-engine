@@ -114,3 +114,20 @@ describe('NeedsYouCard: a finding carried forward as unmet can be settled from t
     expect(screen.getByRole('button', { name: 'Carry on with the open work' })).toBeTruthy();
   });
 });
+
+describe('NeedsYouCard: a card that will not resume does not say it will (19 Nov)', () => {
+  const need = { kind: 'tick_criterion', stageId: 'package', criterionId: 'package.approved', label: 'I approve the package', authority: 'reserved' } as const;
+  it('says Approve while something else still waits, and Approve and resume otherwise', () => {
+    const { unmount } = render(<NeedsYouCard need={need} stageLabel={(id) => id} onAction={async () => undefined} pausesAfter />);
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Approve and resume' })).toBeNull();
+    unmount();
+    render(<NeedsYouCard need={need} stageLabel={(id) => id} onAction={async () => undefined} />);
+    expect(screen.getByRole('button', { name: 'Approve and resume' })).toBeTruthy();
+  });
+  it('the decision button drops "and resume" too', () => {
+    const offer = { loading: false, question: 'A or B?', options: [{ label: 'Vendor A', quote: 'Vendor A' }, { label: 'Vendor B', quote: 'Vendor B' }] };
+    render(<NeedsYouCard need={need} stageLabel={(id) => id} onAction={async () => undefined} offer={offer} onChoose={async () => undefined} pausesAfter />);
+    expect(screen.getByRole('button', { name: 'Record my decision' })).toBeTruthy();
+  });
+});

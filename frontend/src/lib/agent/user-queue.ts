@@ -326,7 +326,18 @@ export function stillWaiting(
 ): QueueEntry[] {
   const criteria = new Set(answered.criterionIds ?? []);
   const rows = new Set(answered.rowIds ?? []);
-  return entries.filter((e) => e.items.some((i) => !(i.criterionId && criteria.has(i.criterionId)) && !(i.rowId && rows.has(i.rowId))));
+  return entries.filter((e) => e.items.some((i) => wouldStopGo(i) && !(i.criterionId && criteria.has(i.criterionId)) && !(i.rowId && rows.has(i.rowId))));
+}
+
+/**
+ * An item that keeps the run paused after an answer on the card: one Go would
+ * stop for. 19 Nov, Sean: "you click the approve and resume button but then
+ * another resume button pops up right after". The only other item was a
+ * question Go had set aside on a stage already finished: it held nothing up,
+ * and Go asks a set-aside question itself when it reaches it.
+ */
+function wouldStopGo(i: QueueItem): boolean {
+  return i.kind !== 'kept_question' && (i.holdsUp.length > 0 || i.blocksFinish);
 }
 
 /**

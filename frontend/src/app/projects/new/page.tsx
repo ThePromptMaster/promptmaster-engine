@@ -3,7 +3,7 @@
 import { isQuickAnswer } from '@/lib/workflow/quick';
 import { hasConnectedAccount } from '@/lib/connections/account-found';
 import { loadGoAutostart } from '@/lib/supabase/preferences';
-import { designDepth, isConcise } from '@/lib/workflow/request-size';
+import { designDepth, oneStageFor } from '@/lib/workflow/request-size';
 import { formOf } from '@/lib/workflow/work-form';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatNumber } from '@/lib/i18n/format';
@@ -376,10 +376,10 @@ export default function NewProjectPage() {
         // A new project has Web access on: its setup may not say there is no web (22 Oct).
         web_access: 'on',
       }),
-      sizing.then((size) => (isConcise(size) && templateFor('quick') ? null : designFor(ask, brought, given, designDepth(size)))),
+      sizing.then((size) => (oneStageFor(size, brought) && templateFor('quick') ? null : designFor(ask, brought, given, designDepth(size) ?? (size?.depth === 'concise' ? 'standard' : undefined)))),
     ]);
     const standard = templateFor(suggestion.workflow) ?? templateFor('single_output');
-    const concise = isConcise(await sizing) ? templateFor('quick') : undefined;
+    const concise = oneStageFor(await sizing, brought) ? templateFor('quick') : undefined;
     const recommended = concise ?? design ?? standard;
     const split = withDocuments(ask);
     const suggested: SetupDraft = {

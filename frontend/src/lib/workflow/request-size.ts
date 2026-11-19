@@ -24,6 +24,21 @@ export function isConcise(size: Pick<RequestSize, 'depth'> | null | undefined): 
 }
 
 /**
+ * The conversation's brief lists two or more deliverables (its "Deliverables: a; b"
+ * line). 19 Nov, a client: a five-deliverable launch plan, "full project workflow"
+ * asked for, opened the one-stage view because one piece was "under 150 words".
+ */
+export function listsSeveralDeliverables(material: string): boolean {
+  const line = /^\s*Deliverables:\s*(.+)$/im.exec(material);
+  return Boolean(line && line[1].split(';').filter((part) => part.trim()).length >= 2);
+}
+
+/** The one-stage workflow serves this start: concise, and not a brief of several deliverables. */
+export function oneStageFor(size: Pick<RequestSize, 'depth'> | null | undefined, material: string): boolean {
+  return isConcise(size) && !listsSeveralDeliverables(material);
+}
+
+/**
  * A first draft whose request is more than one sitting is taken toward the
  * full process. A size that could not be read ("default") moves nothing: only
  * a rule or a reading does.

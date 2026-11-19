@@ -3032,6 +3032,16 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
 }
 
 /** Whether the reason a manuscript was reopened names corrections, rather than only that something upstream moved. */
+/**
+ * A repair's reason, within what the check accepts for a finding (19 Nov). A reason
+ * over 1,000 characters was refused before the model, the check concluded nothing,
+ * and the repair counted as landed: 11 refusals on manuscript projects since 17 Nov.
+ */
+export const FINDING_MAX = 1_000;
+export function clipFinding(text: string): string {
+  return text.length <= FINDING_MAX ? text : `${text.slice(0, FINDING_MAX - 1).trimEnd()}…`;
+}
+
 const NAMES_A_CORRECTION = /\b(?:correct(?:ed|ion|ions)?|replace|cite|fix|fixes|left this to me|the review accepted)\b/i;
 
 /**
@@ -3056,7 +3066,7 @@ async function chaptersNotLanded(
   if (!NAMES_A_CORRECTION.test(why) || !looked.trim()) return null;
   try {
     const res = await api.agentCheckDeliverable(
-      { inputs: inputsFrom(ctx.project), deliverable_label: label, content: looked, accepted: [{ id: 'correction', stage_label: 'Repair', finding: why, suggested_change: why }], tables: [], model: ctx.project.model || undefined },
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content: looked, accepted: [{ id: 'correction', stage_label: 'Repair', finding: clipFinding(why), suggested_change: clipFinding(why) }], tables: [], model: ctx.project.model || undefined },
       ctx.signal
     );
     const miss = res.findings.find((f) => f.verdict === 'not_carried');
