@@ -107,3 +107,21 @@ describe('the work Go went back to the manuscript for is carried into it', () =>
     expect(returnWorkToCarry(template, [{ type: 'stage_returned', to_stage_id: 'final', created_at: 't2', payload: { work: 'x' } }] as never, new Set())).toBeNull();
   });
 });
+
+describe('one press resumes when nothing that stops Go waits (19 Nov)', () => {
+  // Sean, Scanner Readiness: approving the package left a question Go had set
+  // aside on the finished check stage, and a second Resume appeared.
+  const approval = one(item({ id: 'a1', kind: 'approval', criterionId: 'package.approved', text: 'I approve the package', holdsUp: ['Package'] }));
+  const kept = one(item({ id: 'k1', kind: 'kept_question', stageId: 'check', text: 'Should section 6 be replaced?', holdsUp: [], blocksFinish: false }));
+  it('a set-aside question does not keep the run paused', () => {
+    expect(stillWaiting([approval, kept], { criterionIds: ['package.approved'] })).toEqual([]);
+  });
+  it('an item that holds nothing up and does not block the finish does not either', () => {
+    const optional = one(item({ id: 'f9', rowId: 'i9', holdsUp: [], blocksFinish: false }));
+    expect(stillWaiting([approval, optional], { criterionIds: ['package.approved'] })).toEqual([]);
+  });
+  it('a real blocker still waits for one Resume', () => {
+    const other = one(item({ id: 'a2', kind: 'approval', criterionId: 'plan.decision', holdsUp: ['Plan', 'Package'] }));
+    expect(stillWaiting([approval, kept, other], { criterionIds: ['package.approved'] }).map((e) => e.key)).toEqual(['a2']);
+  });
+});

@@ -467,6 +467,7 @@ export function GoPanel({
               onCarryOn={need.kind === 'tick_criterion' && canResume && otherWork?.(need.stageId) ? () => void go.go() : undefined}
               nothingElse={need.kind === 'tick_criterion' && canResume && !otherWork?.(need.stageId)}
               offer={need.kind === 'tick_criterion' ? decisionOffers?.[need.criterionId] ?? null : null}
+              pausesAfter={need.kind === 'tick_criterion' && Boolean(queue) && stillWaiting(queue!.entries, { criterionIds: [need.criterionId] }).length > 0}
               onChoose={
                 need.kind === 'tick_criterion' && needsActions?.decide
                   ? async (choice) => {
