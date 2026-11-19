@@ -38,11 +38,20 @@ export function replacedValues(facts: readonly ProjectFact[] | undefined): Super
   return out.filter((v) => !live.some((l, i) => l[v.kind].includes(v.value) && !REPLACING.test(current[i].statement)));
 }
 
-/** The decided rows of `rows` that state a replaced value as current, marked; every other row as it is. */
-export function markSuperseded(rows: readonly StageItem[], replaced: readonly SupersededValue[]): StageItem[] {
+/**
+ * The decided rows of `rows` that state a replaced value as current, marked; every other row as it is.
+ * On a table of findings an undecided row is marked too (19 Nov, Sean, Inventory Selection): i8 quoted the
+ * retired $35,000 subscription, lost its status in a repair, and was carried as open.
+ */
+export function markSuperseded(
+  rows: readonly StageItem[],
+  replaced: readonly SupersededValue[],
+  /** A table of findings: its undecided rows are findings too. A list's items are not. */
+  findings = false
+): StageItem[] {
   if (!replaced.length) return [...rows];
   return rows.map((row) => {
-    if (!row.status || row.superseded_by) return row;
+    if (row.superseded_by || (!row.status && !findings)) return row;
     const text = Object.entries(row)
       .filter(([k, v]) => !['id', 'status', 'status_source', 'superseded_by'].includes(k) && typeof v === 'string')
       .map(([, v]) => v)

@@ -72,6 +72,12 @@ export function carryUserFields(before: readonly StageItem[], after: StageItem[]
     field ? before.filter((r) => words(r[field] ?? '')).map((r) => [words(r[field] ?? ''), r] as const) : []
   );
   const userOnly = schema.fields.filter((f) => f.userOnly).map((f) => f.key);
+  // 19 Nov (Sean, Inventory Selection): a review repair after a price change came back
+  // with i8 undecided, though Go had accepted it, and the package then said "Undecided"
+  // while Go said accepted. Go's own decision on a row the repair left as it was is kept.
+  const first = schema.fields.find((f) => f.key !== 'severity' && !f.userOnly)?.key ?? 'finding';
+  const unchanged = (a: StageItem, b: StageItem) =>
+    words(a[first] ?? '') === words(b[first] ?? '') && words(a.suggested_change ?? '') === words(b.suggested_change ?? '');
   return after.map((row) => {
     const was = old.get(row.id) ?? (field ? byWork.get(words(row[field] ?? '')) : undefined);
     if (!was) return row;
@@ -87,7 +93,8 @@ export function carryUserFields(before: readonly StageItem[], after: StageItem[]
     if (denied) {
       kept.reason = [`Status not kept: the revised row says it was not reproduced (it was "${was.status}").`, row.reason ?? ''].join(' ').trim();
     }
-    if (!denied && (was.status_source === 'user' || was.status_source === 'sandbox' || was.status_source === 'tool' || (was.status && !was.status_source))) {
+    const goKept = (was.status_source === 'model' || was.status_source === 'policy') && Boolean(was.status) && !row.status && unchanged(was, row);
+    if (!denied && (was.status_source === 'user' || was.status_source === 'sandbox' || was.status_source === 'tool' || (was.status && !was.status_source) || goKept)) {
       kept.status = was.status;
       kept.reason = was.reason;
       kept.status_source = was.status_source;

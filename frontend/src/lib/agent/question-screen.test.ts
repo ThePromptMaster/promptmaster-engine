@@ -128,3 +128,18 @@ describe('a supplied requirement stands (19 Nov, Sean, packaging vendors)', () =
     expect(planFromScreen({ ...screen, requirement_quote: '' }, input(['declare_objective_complete'])).kind).toBe('ask');
   });
 });
+
+describe('the screen says why it does not revise (19 Nov, Scanner Readiness)', () => {
+  const screen = { verdict: 'routine_repair' as const, reason: 'A consistency fix.', instruction: 'Copy the approved announcement.', target_stage: '', action: '', requirement_quote: '' };
+  const base = { question: 'Should section 6 be replaced?', template: { stages: [] }, stage: { transitions: {} }, returnsLeft: 0 };
+  it('"used up its edits" only when the edit limit took revising away', () => {
+    const notCapped = planFromScreen(screen, { ...base, allowed: ['declare_objective_complete'] } as never);
+    expect(notCapped.kind === 'repair' && notCapped.move.rationale).toContain('This stage is not revised directly');
+    const capped = planFromScreen(screen, { ...base, allowed: ['declare_objective_complete'], editsCapped: true } as never);
+    expect(capped.kind === 'repair' && capped.move.rationale).toContain('used up its edits');
+  });
+  it('never "moves on" from the last stage', () => {
+    const plan = planFromScreen(screen, { ...base, allowed: ['advance_stage', 'declare_objective_complete'], lastStage: true } as never);
+    expect(plan.kind === 'repair' && plan.move.action_key).toBe('declare_objective_complete');
+  });
+});

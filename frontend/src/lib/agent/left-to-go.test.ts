@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decisionsFromAnswer, namedRows } from './left-to-go';
+import { choiceEffects, decisionsFromAnswer, namedRows } from './left-to-go';
 import type { OpenRow } from './needs';
 
 const open: OpenRow[] = [
@@ -45,5 +45,19 @@ describe('what a chosen answer decides', () => {
     expect(decisionsFromAnswer('Ask the author first', rows)).toBeNull();
     // A verb with no row and no "both/all": not a decision about these rows.
     expect(decisionsFromAnswer('Accept the memo as it is', rows)).toBeNull();
+  });
+});
+
+describe('approving a version decides no finding; each answer says what it does (19 Nov, Inventory Selection)', () => {
+  const one = [{ id: 'i8', stageId: 'review' }];
+  it('"Approve version 13 as final" leaves i8 as it is', () => {
+    expect(decisionsFromAnswer('Approve version 13 as final, with Vendor A excluded.', one)).toBeNull();
+    expect(decisionsFromAnswer('Accept i8 and approve version 13', one)).toEqual([{ id: 'i8', status: 'accepted' }]);
+  });
+  it('the question carries each answer\'s effect, as the answer will be read', () => {
+    const said = choiceEffects(['Approve version 13 as final', 'Drop i8 and approve version 13'], one);
+    expect(said).toContain('- "Approve version 13 as final": i8 stays undecided.');
+    expect(said).toContain('- "Drop i8 and approve version 13": i8 rejected.');
+    expect(choiceEffects(['Yes', 'No'], [])).toBe('');
   });
 });

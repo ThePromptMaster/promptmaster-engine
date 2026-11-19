@@ -62,6 +62,10 @@ export function planFromScreen(
     approvalStands?: boolean;
     /** Corrections this run already made on this stage beyond its edit limit (17 Nov). */
     correctionsBeyondLimit?: number;
+    /** The edit limit is what took revising away (19 Nov): said only then. */
+    editsCapped?: boolean;
+    /** The workflow's last stage: there is nothing to move on to (19 Nov). */
+    lastStage?: boolean;
   }
 ): ScreenPlan {
   if (screen.verdict === 'real_world_action') return { kind: 'record', action: screen.action, reason: screen.reason };
@@ -157,16 +161,19 @@ export function planFromScreen(
     };
   }
   if (!input.allowed.includes('revise_stage')) {
+    // 19 Nov (Sean, Scanner Readiness): "used up its edits" was said on a check stage,
+    // which is never revised directly, and "move on" on the last stage.
+    const why = input.editsCapped ? 'This run has used up its edits on this stage' : 'This stage is not revised directly';
     // 15 Nov (Sean, workshop): with later stages still to write, this became
     // "declare the objective complete", which stopped the run before the email.
     // The work moves on and the question is kept for the user.
-    if (input.allowed.includes('advance_stage')) {
+    if (input.allowed.includes('advance_stage') && !input.lastStage) {
       return {
         kind: 'repair',
         move: {
           action_key: 'advance_stage',
           params: { set_aside_question: input.question.slice(0, 1000) },
-          rationale: `${instead} This run has used up its edits on this stage, so I move on to the next one and keep this for you.`,
+          rationale: `${instead} ${why}, so I move on to the next one and keep this for you.`,
           expected_outcome: 'The next stage worked on, with this question kept for you.',
         },
       };
@@ -180,7 +187,7 @@ export function planFromScreen(
       move: {
         action_key: 'declare_objective_complete',
         params: { set_aside_question: input.question.slice(0, 1000) },
-        rationale: `${instead} This run has used up its edits on this stage, so the work is judged as it stands.`,
+        rationale: `${instead} ${why}, so the work is judged as it stands.`,
         expected_outcome: 'The objective judged on the current version, with this noted for you.',
       },
     };

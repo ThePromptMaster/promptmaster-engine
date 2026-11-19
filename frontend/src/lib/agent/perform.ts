@@ -44,7 +44,7 @@ import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/c
 import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { keepWithoutAsking, routinePrecedenceNote, type KeptConflicts } from '@/lib/workflow/routine-conflicts';
 import { defaultOutlineForm, deriveOutlineItems, sectionRecords } from '@/lib/workflow/derived-outline';
-import { confirmableProposals, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { confirmableProposals, effectiveRenderer, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -85,6 +85,8 @@ import { approverFindings, approverSources } from '@/lib/workflow/approver-suppo
 import { claimsInstruction, claimsStillIn, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
 import { writtenClaimFindings } from '@/lib/workflow/claim-support';
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
+import { refreshStatusWords } from '@/lib/workflow/status-words';
+import { approvedSources, sourceAskedFor, withApprovedCopy } from '@/lib/workflow/approved-copy';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import { headingOutline, joinParts, needsParts, partInstruction, partThatReads, splitIntoParts } from '@/lib/workflow/long-prose';
@@ -106,7 +108,7 @@ import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP, LEFT_TO_GO_STEP } from 
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
 import { carriedRowsOf, listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
-import { namedRows, type NamedRow, type RowDecision } from './left-to-go';
+import { choiceEffects, namedRows, type NamedRow, type RowDecision } from './left-to-go';
 import { addressedRows, carriedOutReason, describeAddressed, type AddressedRow } from './addressed-rows';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
@@ -387,6 +389,39 @@ async function keptUnderRoutine(
  * the stage's figures. Neither is essential — a failure here leaves the run
  * recorded and says nothing more.
  */
+/**
+ * The stage's status words for review findings brought into line with the review
+ * tables, in code, and saved as a version when any disagreed (19 Nov). Returns the
+ * version's id, or null when nothing changed or nothing could be saved.
+ */
+async function refreshDeliverableStatuses(ctx: PerformContext, justAccepted: readonly AddressedRow[]): Promise<string | null> {
+  const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+  if (!head?.content || !ctx.appendStageVersion || effectiveRenderer(ctx.stage) === 'review') return null;
+  const rows = ctx.template.stages.flatMap((stage) => {
+    if (stage.id === ctx.stage.id || !isTriageTable(itemSchemaFor(stage))) return [];
+    return (parseItems(ctx.bundles[stage.id]?.versions.at(-1)?.content) ?? []).map((row) =>
+      justAccepted.some((r) => r.stageId === stage.id && r.id === row.id) ? { ...row, status: 'accepted' } : row
+    );
+  });
+  const { content, changed } = refreshStatusWords(head.content, rows);
+  if (!changed.length) return null;
+  try {
+    const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+      content,
+      source_operation: 'agent_apply',
+      base_content: head.content,
+      instruction: `Review statuses brought up to date from the review tables: ${changed.join(', ')}.`,
+      model: ctx.project.model,
+      mode: modeForStage(ctx.project, ctx.stage),
+      change_summary: `Go wrote the review status of ${changed.join(', ')} as the review tables record it.`,
+    });
+    const id = (created as { id?: unknown } | null)?.id;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Record review rows the deliverable already carries out as accepted, on their
  * own tables, as Go's decisions with the evidence as the reason (4 Nov). The
@@ -705,8 +740,42 @@ function refusingWorkingText(ctx: PerformContext): PerformContext {
   };
 }
 
+/**
+ * An approved stage's text goes into the work word for word, by code, wherever an
+ * accepted finding asks for it so (19 Nov, Sean, Scanner Readiness: two repairs told
+ * "word for word" each paraphrased the approved announcement). Applied to every
+ * version Go saves on a written stage; the count beside it is counted, not written.
+ */
+function carryingApprovedCopies(ctx: PerformContext): PerformContext {
+  const append = ctx.appendStageVersion;
+  if (!append) return ctx;
+  return {
+    ...ctx,
+    appendStageVersion: (stageId, name, version, evaluation, options) => {
+      const stage = ctx.template.stages.find((st) => st.id === stageId);
+      if (!stage || !version.source_operation?.startsWith('agent_') || effectiveRenderer(stage) === 'review' || /^\s*[{[]/.test(version.content)) {
+        return append(stageId, name, version, evaluation, options);
+      }
+      const sources = approvedSources(ctx.template, ctx.bundles, ctx.project.manual_checks, ctx.project.manual_check_versions);
+      let content = version.content;
+      const copied: string[] = [];
+      for (const row of acceptedRowsBefore(ctx.template, ctx.bundles, stageId, ctx.state)) {
+        const asked = `${row.finding} ${row.suggested_change}`;
+        const source = sourceAskedFor(asked, sources, stageId);
+        const done = source ? withApprovedCopy(content, source, asked) : null;
+        if (!source || !done) continue;
+        content = done.content;
+        copied.push(`${source.label} v${source.version} (${done.words} words, counted) copied word for word for ${row.id}`);
+      }
+      if (!copied.length) return append(stageId, name, version, evaluation, options);
+      const note = `${copied.join('; ')}.`;
+      return append(stageId, name, { ...version, content, change_summary: version.change_summary ? `${version.change_summary} ${note}` : note }, evaluation, options);
+    },
+  };
+}
+
 export async function performStep(raw: PerformContext): Promise<StepOutcome> {
-  const ctx = refusingWorkingText(raw);
+  const ctx = refusingWorkingText(carryingApprovedCopies(raw));
   const key = ctx.step.action_key;
   const params = ctx.step.params ?? {};
   // The stage's own mode (13 Oct): Critique is worked as Cold Critic unless the user keeps theirs.
@@ -1428,7 +1497,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
         // A decided finding on a value a later fact replaced is kept, marked superseded (17 Oct, 20→12).
         const content = before && after
-          ? serializeItems(markSuperseded(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target))), replacedValues(ctx.project.facts)))
+          ? serializeItems(markSuperseded(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target))), replacedValues(ctx.project.facts), isTriageTable(itemSchemaFor(target))))
           : parts.length ? onlyParts(head, generated, parts) : generated;
         return { res, content };
       };
@@ -2283,9 +2352,19 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const addressed = addressedRows(allOpen, params.rows_addressed, head?.content ?? '', ctx.context.measured?.[ctx.stage.id] ?? []);
       const routineHandled = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
       const saved = addressed.length && routineHandled ? await recordCarriedOut(ctx, addressed, head?.version_number) : { rows: [], versionIds: [] };
+      // The version the approval is asked on says what the review tables say (19 Nov, Sean,
+      // Inventory Selection: the package read "Undecided" for i8 one second after Go recorded it accepted).
+      const refreshed = await refreshDeliverableStatuses(ctx, saved.rows);
+      if (refreshed) saved.versionIds.push(refreshed);
       const same = (a: OpenRow, b: OpenRow) => a.stageId === b.stageId && a.id === b.id;
       const notRecorded = addressed.filter((r) => !saved.rows.some((x) => same(x, r)));
-      const openRows = allOpen.filter((r) => !addressed.some((x) => same(x, r)));
+      const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
+      // The findings the question names, on whatever stage they are: the answer decides them
+      // there (18 Nov, Hidden Innovation: h16/h17 asked about on the memo stayed undecided).
+      const rows = namedRows([ctx.step.decision_question ?? '', ...choices], openRowsElsewhere(ctx.template, ctx.state, ctx.context, ''))
+        .filter((r) => !saved.rows.some((x) => x.id === r.id && x.stageId === r.stageId));
+      // A named finding is said once, with what each answer does to it, not also "left open" (19 Nov).
+      const openRows = allOpen.filter((r) => !addressed.some((x) => same(x, r)) && !rows.some((x) => x.stageId === r.stageId && x.id === r.id));
       const them = (n: number, one: string, many: string) => (n === 1 ? one : many);
       const stagesOf = (rows: readonly OpenRow[]) => [...new Set(rows.map((r) => r.stageLabel))].join(', ');
       const undecided = openRows.length
@@ -2297,16 +2376,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const recorded = saved.rows.length
         ? `\n\nAlready carried out in this version, so recorded as accepted on ${stagesOf(saved.rows)} under your routine-decision policy (yours to change there): ${describeAddressed(saved.rows)}.`
         : '';
-      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}${undecided}${carriedOut}${recorded}`;
+      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}${choiceEffects(choices.length >= 2 ? choices : [], rows)}${undecided}${carriedOut}${recorded}`;
       // What Go checked before interrupting (Q1b): on the record, under the question.
       const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
       // Q3a: a question for an expert carries the package for them, on the record.
       const expertPackage = typeof params.expert_package === 'string' && params.expert_package.trim() ? params.expert_package : '';
-      const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
-      // The findings the question names, on whatever stage they are: the answer decides them
-      // there (18 Nov, Hidden Innovation: h16/h17 asked about on the memo stayed undecided).
-      const rows = namedRows([ctx.step.decision_question ?? '', ...choices], openRowsElsewhere(ctx.template, ctx.state, ctx.context, ''))
-        .filter((r) => !saved.rows.some((x) => x.id === r.id && x.stageId === r.stageId));
       return done(key, {
         status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [],
         changes: saved.versionIds.length ? { version_ids: saved.versionIds, items_triaged: saved.rows.map((r) => r.id) } : {},
@@ -3205,6 +3279,9 @@ export function recheckInstruction(
     'Never undo what an instruction the user applied changed, removed or resolved, and keep every item\'s ID and meaning. ' +
     'Keep every figure, calculation and finding that still holds, exactly as written. ' +
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
+    // 19 Nov (Sean, Inventory Selection): "The final package retained A's seven-week
+    // implementation plan for possible reuse with another vendor, whose schedule could differ."
+    'Work that was for an option now excluded (its plan, schedule or terms) is kept only as that option\'s, under its condition, or removed; never offer it for reuse with another option, whose own figures would differ. ' +
     // A table has no place for a note: on a production replay (9 Oct) the line
     // became the Experiment table's first "run", marked worked by hand.
     (form === 'table'

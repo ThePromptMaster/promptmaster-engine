@@ -52,3 +52,14 @@ describe('terms checked against what the user supplied', () => {
     expect(api.dependentClaims).not.toHaveBeenCalled();
   });
 });
+
+describe('the user\'s own approvals are supplied (19 Nov, Scanner Readiness)', () => {
+  it('"The staff announcement is approved (v1)" has something to stand on', () => {
+    const text = suppliedMaterial({ context: 'Prepare readiness.', facts: [], approvals: [
+      { stage: 'Announcement', approval: 'I approve this announcement', version: 1, current: 1 },
+      { stage: 'Brief', approval: 'I approve this brief', version: 2, current: 2, by_policy: true },
+    ] } as never);
+    expect(text).toContain('APPROVED BY THE USER:\n- Announcement v1: approved by the user ("I approve this announcement")');
+    expect(text).not.toContain('Brief v2');
+  });
+});

@@ -36,3 +36,15 @@ describe('a decided finding on a replaced value is kept and marked superseded', 
     expect(markSuperseded(rows, replacedValues([fact({ statement: 'Delivery within 12 business days.' })]))).toEqual(rows);
   });
 });
+
+describe('an undecided finding on a retired figure is superseded (19 Nov, Inventory Selection i8)', () => {
+  it('on a table of findings, not on a list', () => {
+    const old = fact({ id: 'a', statement: 'Vendor A annual subscription is $35,000.' });
+    const now = fact({ id: 'b', statement: 'Vendor A annual subscription is $41,000.', supersedes: 'a' });
+    const retired = { ...old, retired_at: '2026-11-19T02:30:00Z' };
+    const undecided = [{ id: 'i8', finding: 'The cost comparison uses the $35,000 subscription.' }];
+    const replaced = replacedValues([retired, now]);
+    expect(markSuperseded(undecided, replaced, true)[0].superseded_by).toBe(now.statement);
+    expect(markSuperseded(undecided, replaced)[0].superseded_by).toBeUndefined();
+  });
+});
