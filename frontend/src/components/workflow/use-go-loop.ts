@@ -68,6 +68,7 @@ import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
 import { findingAsQuestion, MAX_FINDINGS_SCREENED, planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
+import { approvalTheQuestionIsAbout, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
 import { createTask } from '@/lib/supabase/tasks';
 import { approvalStandsThroughRepairs } from '@/lib/workflow/approvals';
 import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
@@ -2100,6 +2101,16 @@ export function useGoLoop(opts: Options) {
             ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
           });
           if (fact) await recordFacts(o.project, [fact]);
+          // A question about a reserved choice on this stage, left to Go ("You choose, and
+          // state the deciding factor clearly"): that approval is Go's to give now, on
+          // the record as the user's word (19 Nov, Sean, Equipment Replacement).
+          const leftChoice = delegated && !decidesRows ? approvalTheQuestionIsAbout(o.template, stage, asked, o.project.manual_checks ?? {}) : null;
+          if (leftChoice) {
+            await appendWorkflowEvent(o.project.id, o.project.user_id, {
+              type: LEFT_TO_GO, stage_id: stage.id, actor: 'user', reason: `You left "${leftChoice.label}" to Go.`,
+              payload: { criterion_id: leftChoice.id, quote: text.trim().slice(0, 400), source: 'answer', question: asked.slice(0, 600) },
+            });
+          }
           // A stage stuck on that decision is no longer stuck.
           const st = o.state.stages[stage.id];
           if (st?.status === 'blocked' && st.blocked?.kind === 'needs_decision') {
@@ -2128,7 +2139,7 @@ export function useGoLoop(opts: Options) {
           const unmet = onObjective
             ? await reopenJudged(leftToGo ? FIX_OBJECTIVE_REASON : ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
             : objectiveUnmet(o.events);
-          if (fact || opts?.decided || st?.status === 'blocked' || unmet || reopensForChoice) {
+          if (fact || opts?.decided || st?.status === 'blocked' || unmet || reopensForChoice || leftChoice) {
             await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
           }
           await go();

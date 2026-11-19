@@ -4765,3 +4765,41 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   (`clipFinding`).
 - **Left as it is:** the one-stage view still sizes the objective alone when it decides whether to offer
   the full process; with the start sized correctly, the two no longer disagree on these requests.
+
+### L-258 — What the user handed over is Go's; what they supplied stands; only their own words remove (2026-11-19)
+- **A choice the brief hands over** (Sean, 18 Nov, Equipment Replacement). His brief kept back only
+  "warranty verification and actual purchase authorization", yet the designer made "I choose the vendor
+  to recommend" an approval only he could give, with a stop condition "the user must choose". Go asked;
+  he chose its own offer "You choose, and state the deciding factor clearly", which was stored as his
+  decision, and the approval then stopped the run as "yours alone".
+- **Now:**
+  - The designer gives a choice or recommendation the brief hands over (or does not keep back, when it
+    says what it keeps) a routine sign-off and no stop condition. Only what the brief keeps back,
+    authorising a spend, send or purchase, and the last stage's sign-off are the user's.
+  - "You choose", "Your call", "Decide yourself" are answers that leave it to Go (`isDelegatedAnswer`).
+    Such an answer to a question about a reserved choice on that stage records `approval_left_to_go`
+    (actor user, with the answer), and Go gives that approval with its deciding factor.
+  - On a workflow already saved, under "handle them for me", a small check (`/api/agent/approval-delegated`,
+    Haiku) reads the brief for each reserved approval once. A hand-over is recorded (actor system) only with
+    the user's sentence that makes it, found word for word. The checklist says "Left to Go by your brief:
+    '…'", and "This is mine to decide" takes it back.
+  - Never handed over, in code and in the database guard: the last stage's sign-off, a stage's commitments
+    sign-off (`.decision`), or an approval whose words authorise a purchase, spend, payment, signature or
+    something going out.
+  - Go now reads the brief's "Keep … pending" and "Make the recommendation yourself" sentences
+    (`delegationSentences`).
+- **A supplied requirement is never re-asked** (Sean, 18 Nov, packaging vendors). No vendor met his
+  eight-week deadline and Go asked whether to allow nine or ten weeks. The designer had written a stop
+  condition "only external confirmation could settle it", the planner was told it may ask about "an
+  accepted requirement", and the screen counted a deadline as a business decision. Now the planner, the
+  supplied-facts rule and the objective check say a supplied requirement stands and "none currently
+  qualifies" is a finished answer; the screen has a `changes_supplied` verdict (with the requirement
+  quoted from the user's words), on which Go judges the objective with the requirement as it is.
+- **Removed by the user means their own words** (Sean, 19 Nov, Inventory Selection). He relayed a
+  vendor's message asking to "remove historical transactions…" and said he changed nothing; all ~50
+  sentences the rewrite dropped were filed as removed by him, and Go later stopped over "a sentence you
+  removed". Quoted text is no longer read as the user asking, and a rewrite's removals count only for
+  what the instruction asks to go. A removal now names its version in prompts ("Decision package v12").
+- **Left as it is:** a hand-over read from the brief is a model's reading of the user's words, kept only
+  with their sentence; the checklist shows it so it can be taken back. Sean's paused packaging run (d574d104)
+  is left for him.

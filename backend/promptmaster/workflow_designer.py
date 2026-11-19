@@ -195,7 +195,16 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "- approval_kind: \"decision\" ONLY for a sign-off that is the user's to give whatever the "
         "checks say: one the user asked to give (\"Approvals wanted: …\"), a choice between options, "
         "accepting a recommendation, approving something to be sent, spent, used with other people "
-        "or carried out, and the sign-off on the last stage. Every other sign-off is \"routine\": it "
+        "or carried out, and the sign-off on the last stage. "
+        # 19 Nov (a client): "Keep warranty verification and actual purchase authorization
+        # pending" was the whole of what his brief kept back, yet "I choose the vendor to
+        # recommend" became his to give, and the run stopped for it.
+        "But a choice or recommendation the user's words hand over (\"make the recommendation "
+        "yourself\", \"you choose\", \"handle routine decisions\") is \"routine\", and so is one the brief "
+        "does not keep back when it says what it keeps (\"keep X and Y pending\", \"I will authorise Z\"): "
+        "the document makes the choice and states the deciding factor. Only what the brief keeps back, "
+        "authorising a spend, a send or a purchase, and the last stage's sign-off stay \"decision\". "
+        "Every other sign-off is \"routine\": it "
         "certifies that the stage's work is sound, complete, consistent or follows what the user "
         "supplied (an extraction matches its source, every requirement is covered, a structure or a "
         "plan fits the brief, the format is followed), which can be checked against the material. "
@@ -229,7 +238,12 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "one, copy it in the user's own words; never weaken or paraphrase it into a "
         "finite task. Reaching the last stage is NOT the criterion.\n"
         "- stop_conditions: when to stop short of it (a concrete blocker, exhausted "
-        "branches, missing information or capability, a decision only the user can make).\n"
+        "branches, missing information or capability, a decision only the user can make). "
+        # 19 Nov (a client): "only external confirmation could settle it" became a question
+        # asking him whether to relax his own eight-week deadline.
+        "Never a choice the brief hands over, and for document work never \"the facts are "
+        "insufficient\" or \"only external confirmation could settle it\": the document states what is "
+        "unconfirmed and what must be confirmed, and is finished.\n"
         "- For ongoing work, put a stage just before the last one that closes a round "
         "(e.g. \"Next round\", kind write: what was learned and what to pursue next) and "
         "set its loop_back_to to the label of the earlier stage a new round starts from. "

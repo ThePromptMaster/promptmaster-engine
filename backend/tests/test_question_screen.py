@@ -99,3 +99,21 @@ def test_who_approved_something_already_called_approved_is_not_asked():
     assert "Who approved, authorised or signed off something the user's own words already call approved" in choice
     assert 'records "approver not specified"' in choice
 
+
+
+# 19 Nov (a client, packaging vendors): no vendor met his eight-week deadline, and Go
+# asked whether to allow nine or ten weeks. The requirement is his and stands.
+def test_a_question_that_would_change_a_supplied_requirement_keeps_it():
+    req = ScreenQuestionRequest(
+        inputs=PMInput(**_inputs(constraints="All three machines must be operational within eight weeks of the order.")),
+        question="B and C miss the limit. Do you keep the eight-week requirement as it stands?",
+        stage_label="Recommendation", earlier_stages=["Brief"], reserved_approvals=[],
+    )
+    system, _user = build_screen_prompt(req)
+    assert "changes_supplied" in system and "one of the eight names" in system
+    assert "a budget, scope or deadline the user has not set" in system
+    kept = parse_screen({"verdict": "changes_supplied", "reason": "It would relax his deadline.", "requirement_quote": "operational within eight weeks"}, req)
+    assert kept.verdict == "changes_supplied" and kept.requirement_quote == "operational within eight weeks"
+    # A requirement his words do not hold is not kept: the question is asked.
+    unheld = parse_screen({"verdict": "changes_supplied", "reason": "x", "requirement_quote": "within six weeks"}, req)
+    assert unheld.verdict == "business_decision"

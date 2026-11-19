@@ -109,6 +109,7 @@ import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
+import { delegationSentences } from '@/lib/agent/delegation';
 import type { EvaluationResult } from '@/types';
 import { revisionBrief } from '@/lib/workflow/revision';
 import { defaultOutlineForm, deriveOutlineItems, draftingStageId, formOfItems, outlineForms } from '@/lib/workflow/derived-outline';
@@ -166,6 +167,7 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
+import { approvalsToRead, leftToGoSignature, withApprovalsLeftToGo, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
 import { approvalsOnEarlierVersion, chosenFor, earlierDecision, withApprovals } from '@/lib/workflow/approvals';
 import { asksForDecision, decisionForAnswer, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
 import { decisionAsFact, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
@@ -279,8 +281,10 @@ export function WorkflowWorkspace({
   // every reader is given; the pinned version itself never changes.
   const storeEvents = useProjectStore((s) => s.events);
   const addedSig = addedSignature(storeEvents);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the added stages, not every event
-  const template = useMemo(() => effectiveTemplate(pinnedTemplate, storeEvents), [pinnedTemplate, addedSig]);
+  // …and the approvals the user left to Go, by their brief or their answer (19 Nov).
+  const leftSig = leftToGoSignature(storeEvents);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the added stages and approvals left to Go, not every event
+  const template = useMemo(() => withApprovalsLeftToGo(effectiveTemplate(pinnedTemplate, storeEvents), storeEvents), [pinnedTemplate, addedSig, leftSig]);
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
   // …and the approvals they gave (25 Oct), so no stage or check calls them unresolved.
@@ -1355,6 +1359,33 @@ export function WorkflowWorkspace({
         .catch(() => commitmentsAsked.current.delete(key));
     }
   }, [events, stageBundles, template, project, appendEvent]);
+  // A reserved approval the brief's own words hand to Go, under "handle them for me"
+  // (19 Nov, Sean, Equipment Replacement). Read once per brief; a hand-over is
+  // recorded with the user's sentence that makes it, and they can take it back.
+  const briefRead = useRef(new Set<string>());
+  useEffect(() => {
+    if (!events || project.status === 'finalized' || project.example_key || project.routine_decisions !== 'handle') return;
+    const approvals = approvalsToRead(template, events, project.manual_checks ?? {});
+    if (!approvals.length) return;
+    const key = `${template.key}@${template.version}|${project.objective ?? ''}|${project.constraints ?? ''}|${(project.context ?? '').length}|${approvals.map((a) => a.id).join(',')}`;
+    if (briefRead.current.has(key)) return;
+    briefRead.current.add(key);
+    const stageOf = new Map(template.stages.flatMap((st) => st.exit_criteria.map((c) => [c.id, st.id] as const)));
+    void api
+      .agentApprovalDelegated({ inputs: inputsFrom(project), approvals, delegation: delegationSentences(project) })
+      .then(async (r) => {
+        for (const a of r.approvals) {
+          const at = stageOf.get(a.id);
+          if (!at) continue;
+          await appendEvent({
+            type: LEFT_TO_GO, stage_id: at, actor: 'system',
+            reason: 'Your brief leaves this to Go.',
+            payload: { criterion_id: a.id, quote: a.quote, source: 'brief' },
+          });
+        }
+      })
+      .catch(() => briefRead.current.delete(key));
+  }, [events, template, project, appendEvent]);
   // What was attached in the side chat, until the next message carries it (5 Nov).
   const forNextMessage = useRef<MessageAttachment[]>([]);
   // Where a dropped or pasted file lands (15 Nov): the side chat, or the stage column's data panel.
@@ -3393,6 +3424,13 @@ export function WorkflowWorkspace({
               openMajors={openMajorFindings(outstanding)}
               headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
               openElsewhere={finishHere ? blockingElsewhere.length : 0}
+              onTakeBack={(id) =>
+                void appendEvent({
+                  type: LEFT_TO_GO, stage_id: stageId, actor: 'user',
+                  reason: 'You said this approval is yours to decide.',
+                  payload: { criterion_id: id, quote: '', source: 'answer', undone: true },
+                }).catch(() => undefined)
+              }
               onDoesApply={(id) =>
                 void appendEvent({
                   type: 'criterion_not_applicable', stage_id: stageId, actor: 'user',

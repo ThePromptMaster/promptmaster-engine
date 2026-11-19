@@ -45,6 +45,7 @@ from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, c
 from promptmaster.question_screen import ScreenQuestionRequest, ScreenQuestionResponse, screen_question
 from promptmaster.decision_options import DecisionOptionsRequest, DecisionOptionsResponse, decision_options
 from promptmaster.commitments import CommitmentsRequest, CommitmentsResponse, check_commitments
+from promptmaster.delegated_approvals import ApprovalDelegatedRequest, ApprovalDelegatedResponse, approvals_delegated
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
 from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
@@ -512,6 +513,18 @@ async def api_check_commitments(req: CommitmentsRequest, client: OpenRouterClien
     except Exception:  # noqa: BLE001 - "proposes" is the safe answer to any failure here
         logger.warning("Commitments check failed; the sign-off stays the user's", exc_info=True)
         return CommitmentsResponse()
+
+
+@router.post("/approval-delegated", response_model=ApprovalDelegatedResponse)
+async def api_approval_delegated(req: ApprovalDelegatedRequest, client: OpenRouterClient = Depends(get_client)) -> ApprovalDelegatedResponse:
+    """Which reserved approvals the user's own words hand to Go (19 Nov). 1 small LLM
+    call; writes nothing. A hand-over comes back only with the user's sentence that
+    makes it; any failure hands nothing over, so the approvals stay the user's."""
+    try:
+        return await approvals_delegated(client, req)
+    except Exception:  # noqa: BLE001 - nothing handed over is the safe answer to any failure here
+        logger.warning("Delegated-approvals check failed; the approvals stay the user's", exc_info=True)
+        return ApprovalDelegatedResponse()
 
 
 @router.post("/group-questions", response_model=GroupQuestionsResponse)

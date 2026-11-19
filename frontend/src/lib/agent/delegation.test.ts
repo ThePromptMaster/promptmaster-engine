@@ -36,3 +36,17 @@ describe('the user\'s delegation, in their words', () => {
     expect(delegationSentences({})).toEqual([]);
   });
 });
+
+describe('what the brief keeps back, and what it hands over (19 Nov)', () => {
+  it('keeps "Keep … pending" and "Make the recommendation yourself"', () => {
+    const constraints = 'Handle routine drafting, arithmetic, checking, and revisions autonomously. Keep warranty verification and actual purchase authorization pending.';
+    const context = 'Compare the three vendors. Make the recommendation yourself and explain the deciding factor.';
+    const got = delegationSentences({ context, constraints });
+    expect(got).toContain('Keep warranty verification and actual purchase authorization pending.');
+    expect(got).toContain('Make the recommendation yourself and explain the deciding factor.');
+    expect(got).toContain('Handle routine drafting, arithmetic, checking, and revisions autonomously.');
+  });
+  it('a booking is not a reservation of authority', () => {
+    expect(delegationSentences({ context: 'Make a reservation for twelve people at noon.' })).toEqual([]);
+  });
+});

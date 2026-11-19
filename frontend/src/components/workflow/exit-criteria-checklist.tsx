@@ -35,6 +35,8 @@ interface Props {
   headVersion?: number;
   /** A sign-off recorded as not applying to this version, which the user says does apply after all (18 Nov). */
   onDoesApply?: (id: string) => void;
+  /** An approval left to Go by the brief or an answer, which the user takes back as theirs (19 Nov). */
+  onTakeBack?: (id: string) => void;
   /** On the last stage: what still holds up the finish on other stages, counted beside this stage's own (18 Nov). */
   openElsewhere?: number;
   /** Viewing a stage that cannot be worked on from here: boxes shown, not clickable. */
@@ -154,6 +156,7 @@ export function ExitCriteriaChecklist({
   headVersion,
   openElsewhere = 0,
   onDoesApply,
+  onTakeBack,
   offers = {},
   onDecide,
   decided = {},
@@ -238,6 +241,23 @@ export function ExitCriteriaChecklist({
             )}
             {manual && c.authority === 'delegable' && !c.satisfied && (
               <span className="ms-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('cl.routine')}</span>
+            )}
+            {c.leftToGo && (
+              <span data-left-to-go className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
+                {c.leftToGo.source === 'brief' ? t('cl.leftByBrief', { quote: c.leftToGo.quote }) : t('cl.leftByAnswer', { quote: c.leftToGo.quote })}
+                {!readOnly && onTakeBack && !c.satisfied && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTakeBack(c.id);
+                    }}
+                    className="ms-2 underline underline-offset-2 hover:text-[var(--on-surface)]"
+                  >
+                    {t('cl.mineToDecide')}
+                  </button>
+                )}
+              </span>
             )}
             {c.satisfied && olderApprovals[c.id] && (
               <span data-approved-version className="ms-2 text-label text-[var(--pm-tertiary)]">

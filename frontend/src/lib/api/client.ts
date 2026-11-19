@@ -990,6 +990,14 @@ export const api = {
     return apiFetch('/api/agent/check-commitments', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Which reserved approvals the user's own words hand to Go (19 Nov); each with the sentence that does. */
+  async agentApprovalDelegated(
+    req: { inputs: PMInput; approvals: { id: string; label: string; stage_label: string }[]; delegation: string[] },
+    signal?: AbortSignal
+  ): Promise<{ approvals: { id: string; quote: string }[] }> {
+    return apiFetch('/api/agent/approval-delegated', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentDecisionOptions(
     req: { inputs: PMInput; approval: string; stage_label: string; content: string; model?: string },
     signal?: AbortSignal

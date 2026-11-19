@@ -70,7 +70,10 @@ function evaluateCriterion(
   const na = ctx.manualChecks[criterion.id] ? undefined : ctx.notApplicable?.[criterion.id];
   const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) || Boolean(na), ...(na ? { notApplicable: na.quote } : {}) };
 
-  if (criterion.check === 'manual') return criterion.authority === 'delegable' ? { ...manual, authority: 'delegable' } : manual;
+  if (criterion.check === 'manual') {
+    const left = criterion.leftToGo ? { leftToGo: criterion.leftToGo } : {};
+    return criterion.authority === 'delegable' ? { ...manual, ...left, authority: 'delegable' } : manual;
+  }
 
   const rule = criterion.rule;
   if (!rule) {

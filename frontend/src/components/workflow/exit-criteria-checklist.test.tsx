@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { approvedVersions, ExitCriteriaChecklist } from './exit-criteria-checklist';
@@ -157,5 +157,21 @@ describe('the last stage while work is open elsewhere (18 Nov, Hidden Innovation
     expect(screen.getByText(/Not applicable to this version: “No timeline, no fee/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'It does propose one' }));
     expect(onDoesApply).toHaveBeenCalledWith('brief.decision');
+  });
+});
+
+describe('an approval the brief left to Go says so, and can be taken back (19 Nov)', () => {
+  it('shows the words that left it, and "This is mine to decide" takes it back', () => {
+    const onTakeBack = vi.fn();
+    render(
+      <ExitCriteriaChecklist
+        criteria={[{ id: 'rec.approved', label: 'I choose the vendor to recommend', satisfied: false, blocking: true, manual: true, authority: 'delegable', leftToGo: { quote: 'Keep warranty verification and actual purchase authorization pending.', source: 'brief' } }]}
+        onToggleManual={() => undefined}
+        onTakeBack={onTakeBack}
+      />
+    );
+    expect(screen.getByText(/Left to Go by your brief: “Keep warranty verification/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'This is mine to decide' }));
+    expect(onTakeBack).toHaveBeenCalledWith('rec.approved');
   });
 });

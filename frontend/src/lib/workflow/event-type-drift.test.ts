@@ -49,6 +49,7 @@ const UNION: WorkflowEventType[] = [
   'web_access_changed',
   'workflow_switched',
   'criterion_not_applicable',
+  'approval_left_to_go',
 ];
 
 function checkConstraintValues(): string[] {

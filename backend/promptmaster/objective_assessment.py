@@ -79,6 +79,11 @@ _ASSESS_INSTRUCTION = (
     "evidence would change it MEETS it. Collecting that evidence, and carrying out or authorising the "
     "decision, is future work the document recommends: list it under proposed_next, never as unmet or a "
     "blocker. "
+    # 19 Nov (a client): "keep the existing requirement and finish the package with 'no vendor
+    # currently confirmed to qualify'".
+    "Where no option meets the user's supplied requirements, a document that says so, with what each "
+    "option misses by and what would have to be confirmed, MEETS an objective to recommend, decide or "
+    "select. Changing a supplied requirement so that an option qualifies is never proposed_next or unmet. "
     # 8 Nov (a client, an acquisition screen): this check asked for a margin failure to be
     # called "conditional on the undocumented one-time classification" of an item the user
     # had supplied as one-time, and the memo then said so.

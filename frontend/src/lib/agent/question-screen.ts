@@ -12,7 +12,7 @@ import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 import { DELEGATED_RULE } from '@/lib/workflow/answers';
 
-export type ScreenVerdict = 'routine_repair' | 'routine_choice' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input' | 'optional_suggestion';
+export type ScreenVerdict = 'routine_repair' | 'routine_choice' | 'real_world_action' | 'business_decision' | 'reserved_approval' | 'missing_input' | 'optional_suggestion' | 'changes_supplied';
 
 export interface QuestionScreen {
   verdict: ScreenVerdict;
@@ -66,6 +66,38 @@ export function planFromScreen(
 ): ScreenPlan {
   if (screen.verdict === 'real_world_action') return { kind: 'record', action: screen.action, reason: screen.reason };
   if (screen.verdict === 'optional_suggestion') return { kind: 'leave_out', suggestion: screen.suggestion || input.question, reason: screen.reason };
+  // 19 Nov (Sean, packaging vendors): no vendor met his eight-week deadline, and Go
+  // asked whether to allow nine or ten weeks. "I expected it to keep the existing
+  // requirement and finish the package with 'no vendor currently confirmed to qualify.'"
+  if (screen.verdict === 'changes_supplied') {
+    const kept = screen.requirement_quote.trim();
+    if (!kept) return { kind: 'ask' };
+    const rationale = `Not asking whether to change your requirement "${kept.slice(0, 200)}": it stands as you supplied it. Where no option meets it, the work says so, with what each misses by and what would have to be confirmed.`;
+    if (input.allowed.includes('declare_objective_complete')) {
+      return {
+        kind: 'repair',
+        move: {
+          action_key: 'declare_objective_complete', params: { kept_requirement: kept.slice(0, 500) }, rationale,
+          expected_outcome: 'The objective judged with your requirement as it stands.',
+        },
+      };
+    }
+    if (input.allowed.includes('revise_stage')) {
+      return {
+        kind: 'repair',
+        move: {
+          action_key: 'revise_stage',
+          params: {
+            instruction: `Keep the user's requirement exactly as supplied ("${kept.slice(0, 400)}"). Where no option meets it, say that none is currently confirmed to qualify, what each option misses by and what would have to be confirmed. Do not propose changing the requirement.`,
+            kept_requirement: kept.slice(0, 500),
+          },
+          rationale,
+          expected_outcome: 'The work finished with your requirement as it stands.',
+        },
+      };
+    }
+    return { kind: 'ask' };
+  }
   if (screen.verdict === 'reserved_approval' && input.approvalStands && input.allowed.includes('declare_objective_complete')) {
     return {
       kind: 'repair',

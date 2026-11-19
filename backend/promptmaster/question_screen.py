@@ -26,11 +26,11 @@ SCREEN_MODEL = "anthropic/claude-sonnet-5.5"
 
 Verdict = Literal[
     "routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input",
-    "optional_suggestion",
+    "optional_suggestion", "changes_supplied",
 ]
 _VERDICTS = (
     "routine_repair", "routine_choice", "real_world_action", "business_decision", "reserved_approval", "missing_input",
-    "optional_suggestion",
+    "optional_suggestion", "changes_supplied",
 )
 
 SCREEN_INSTRUCTION = (
@@ -65,11 +65,19 @@ SCREEN_INSTRUCTION = (
     "for or needs: an addition, a backup, a nice-to-have (a backup volunteer, refreshments, a second "
     "reminder, an extra section). The work is complete without it. It is left out of the work and mentioned "
     "as an optional suggestion; it is never a question and never a promise.\n\n"
+    # 19 Nov (a client): no vendor met his eight-week deadline, and the assistant asked whether
+    # to allow nine or ten weeks. "I expected it to keep the existing requirement and finish."
+    "changes_supplied: it asks whether to change, relax, extend or waive a requirement, limit, budget or "
+    "deadline stated in THE USER'S OWN WORDS, usually because no option meets it (whether to allow nine weeks "
+    "when the user required eight). The requirement stands as the user stated it: the work says that no option "
+    "currently qualifies, what each misses by and what would have to be confirmed. Copy the requirement's exact "
+    "words into requirement_quote.\n\n"
     "reserved_approval: it asks the user to approve or sign off something listed under RESERVED APPROVALS.\n\n"
     "missing_input: the document cannot be written without a fact only the user has, and the brief does not "
     "allow it to be left as a stated gap.\n\n"
     "business_decision: a choice that changes what the work commits to and that nothing supplied settles: "
-    "budget, scope, deadline, which option to recommend, or a conflict between two requirements. Not a gap the "
+    "a budget, scope or deadline the user has not set, which option to recommend when THE USER HANDED OVER "
+    "nothing about it, or a conflict between two of the user's requirements. Not a gap the "
     "work can state and carry on with when the user's own words ask to be told what is needed or allow gaps "
     "to be stated, and not a question one of whose own choices leaves the point open and flagged.\n\n"
     "A condition counts as a requirement only if the user's own words state it. A practice the assistant "
@@ -77,7 +85,7 @@ SCREEN_INSTRUCTION = (
     "real requirement, copy the user's words exactly into requirement_quote.\n"
     "If you are unsure between routine_repair or routine_choice and business_decision, choose "
     "business_decision.\n\n"
-    "Return JSON only: {\"verdict\": one of the seven names, \"reason\": one short sentence, "
+    "Return JSON only: {\"verdict\": one of the eight names, \"reason\": one short sentence, "
     "\"instruction\": for routine_repair, the work to do, in one or two sentences, stating any target "
     "the question names; for routine_choice, empty, "
     "\"target_stage\": for routine_repair, the name of the EARLIER STAGE where the correction belongs, "
@@ -150,6 +158,9 @@ def parse_screen(result: dict, req: ScreenQuestionRequest) -> ScreenQuestionResp
     if verdict == "real_world_action" and not action:
         action = req.question.strip()[:500]
     suggestion = str(result.get("suggestion") or "").strip()[:500]
+    if verdict == "changes_supplied" and not quote:
+        # A requirement the user's words do not hold is not theirs to keep: asked.
+        return ScreenQuestionResponse(reason=reason or "The requirement is not in the user's own words.")
     if verdict == "optional_suggestion":
         # Something the user's own words require is not optional, whatever the screen thought.
         if quote:

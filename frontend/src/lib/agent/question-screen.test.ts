@@ -110,3 +110,21 @@ describe('a choice with no wrong answer is Go’s under Handle (8 Nov, a client:
     expect(planFromScreen({ ...choice, verdict: 'business_decision' }, input)).toEqual({ kind: 'ask' });
   });
 });
+
+describe('a supplied requirement stands (19 Nov, Sean, packaging vendors)', () => {
+  const screen = { verdict: 'changes_supplied' as const, reason: 'It would relax his deadline.', instruction: '', target_stage: '', action: '', requirement_quote: 'operational within eight weeks' };
+  const input = (allowed: string[]) => ({ question: 'Do you keep the eight-week requirement as it stands?', template: { stages: [] }, stage: { transitions: {} }, allowed, returnsLeft: 1 }) as never;
+  it('is never asked: the objective is judged with it as it stands', () => {
+    const plan = planFromScreen(screen, input(['declare_objective_complete', 'revise_stage', 'request_user_decision']));
+    expect(plan.kind).toBe('repair');
+    if (plan.kind !== 'repair') return;
+    expect(plan.move.action_key).toBe('declare_objective_complete');
+    expect(plan.move.rationale).toContain('Not asking whether to change your requirement "operational within eight weeks"');
+  });
+  it('or the work is finished with it, and without a quote it is asked', () => {
+    const plan = planFromScreen(screen, input(['revise_stage']));
+    expect(plan.kind === 'repair' && plan.move.action_key).toBe('revise_stage');
+    expect(plan.kind === 'repair' && String(plan.move.params.instruction)).toContain('none is currently confirmed to qualify');
+    expect(planFromScreen({ ...screen, requirement_quote: '' }, input(['declare_objective_complete'])).kind).toBe('ask');
+  });
+});
