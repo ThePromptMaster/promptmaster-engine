@@ -350,11 +350,15 @@ export function GoPanel({
   // resume" and ticked it bare, which on an iPad is the only button in view.
   const offer = need?.kind === 'tick_criterion' && !(need.openRows ?? []).length && needsActions?.decide ? decisionOffers?.[need.criterionId] : undefined;
   const choosesOnCard = givenByChoosing(offer);
+  // The pinned copy says what the card says (19 Nov production pass): "Approve", not
+  // "Approve and resume", when something else still waits and the run stays paused.
+  const cardPauses = need?.kind === 'tick_criterion' && Boolean(queue) && stillWaiting(queue!.entries, { criterionIds: [need.criterionId] }).length > 0;
+  const dockLabel = (label: string) => (cardPauses && label === t('need.approveResume') ? t('qq.approve') : label);
   const dockAction: { label: string; option?: StuckOption; acts: boolean } | null =
     choosesOnCard
       ? { label: t('nyc.chooseOnCard'), acts: false }
       : needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
-      ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
+      ? { label: dockLabel(needed.options?.[0]?.label ?? needed.action!), option: needed.options?.[0]?.id, acts: true }
       : askingUser
         ? { label: t('controls.answerGo'), acts: false }
         : null;
@@ -467,7 +471,7 @@ export function GoPanel({
               onCarryOn={need.kind === 'tick_criterion' && canResume && otherWork?.(need.stageId) ? () => void go.go() : undefined}
               nothingElse={need.kind === 'tick_criterion' && canResume && !otherWork?.(need.stageId)}
               offer={need.kind === 'tick_criterion' ? decisionOffers?.[need.criterionId] ?? null : null}
-              pausesAfter={need.kind === 'tick_criterion' && Boolean(queue) && stillWaiting(queue!.entries, { criterionIds: [need.criterionId] }).length > 0}
+              pausesAfter={cardPauses}
               onChoose={
                 need.kind === 'tick_criterion' && needsActions?.decide
                   ? async (choice) => {

@@ -70,3 +70,19 @@ describe('an approved text is copied word for word, by code', () => {
     expect(copiesApproved({ id: 'i2', suggested_change: 'Rewrite the announcement more warmly.' })).toBe(false);
   });
 });
+
+describe('a copy already there keeps a count counted in code (19 Nov production pass)', () => {
+  const [source] = approvedSources(template, bundles, { 'announcement.approved': true });
+  const words = countWords(source.text);
+  it('a hand count beside it is corrected', () => {
+    const quoted = `# Package\n## 6. Staff announcement\n*Reproduced as approved. Length: 698 words.*\n\n> ${source.text.split('\n').join('\n> ')}\n## 7. Approvals\nDone.`;
+    const out = withApprovedCopy(quoted, source, FINDING)!;
+    expect(out.content).toContain(`Length: ${words} words (counted).`);
+    expect(out.content).toContain('## 7. Approvals');
+    expect(withApprovedCopy(out.content, source, FINDING)).toBeNull();
+  });
+  it('with no count, one is added under the heading', () => {
+    const plain = `## 6. Staff announcement\n\n${source.text}\n## 7. Approvals`;
+    expect(withApprovedCopy(plain, source, FINDING)!.content).toContain(`## 6. Staff announcement\n\n*${words} words, counted`);
+  });
+});
