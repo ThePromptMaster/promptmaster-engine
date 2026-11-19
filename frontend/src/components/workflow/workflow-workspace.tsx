@@ -3442,7 +3442,7 @@ export function WorkflowWorkspace({
               openMajors={openMajorFindings(outstanding)}
               headVersion={stageBundles[stageId]?.versions.at(-1)?.version_number}
               openElsewhere={finishHere ? blockingElsewhere.length : 0}
-              onTakeBack={(id) =>
+              onTakeBack={project.status === 'finalized' ? undefined : (id) =>
                 void appendEvent({
                   type: LEFT_TO_GO, stage_id: stageId, actor: 'user',
                   reason: 'You said this approval is yours to decide.',

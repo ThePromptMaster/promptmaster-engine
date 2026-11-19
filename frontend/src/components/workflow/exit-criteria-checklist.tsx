@@ -245,7 +245,8 @@ export function ExitCriteriaChecklist({
             {c.leftToGo && (
               <span data-left-to-go className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
                 {c.leftToGo.source === 'brief' ? t('cl.leftByBrief', { quote: c.leftToGo.quote }) : t('cl.leftByAnswer', { quote: c.leftToGo.quote })}
-                {!readOnly && onTakeBack && !c.satisfied && (
+                {/* Who decides is the project's, not this stage's: offered on a stage not reached yet too. */}
+                {onTakeBack && !c.satisfied && (
                   <button
                     type="button"
                     onClick={(e) => {

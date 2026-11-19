@@ -4812,3 +4812,6 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   choose" as the user's decision and ticked the approval with nothing chosen. Under "handle them for me"
   it now leaves that choice to Go (`leavesChoiceToGo`): recorded as the user's word, the stage reopened
   for Go to decide it in the text, and the approval given by Go after its check.
+- **And** (#747): "This is mine to decide" showed only on the stage Go was working on, so a hand-over on a
+  later stage could be taken back only once Go had reached it. Who decides is the project's: the press is
+  offered on every stage of a project not yet finished.

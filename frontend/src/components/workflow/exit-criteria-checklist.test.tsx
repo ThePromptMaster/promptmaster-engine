@@ -175,3 +175,17 @@ describe('an approval the brief left to Go says so, and can be taken back (19 No
     expect(onTakeBack).toHaveBeenCalledWith('rec.approved');
   });
 });
+
+it('offers "This is mine to decide" on a stage not reached yet (19 Nov production pass)', () => {
+  const onTakeBack = vi.fn();
+  render(
+    <ExitCriteriaChecklist
+      readOnly
+      criteria={[{ id: 'rec.approved', label: 'I choose the vendor to recommend', satisfied: false, blocking: true, manual: true, authority: 'delegable', leftToGo: { quote: 'Keep purchase authorization pending.', source: 'brief' } }]}
+      onToggleManual={() => undefined}
+      onTakeBack={onTakeBack}
+    />
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'This is mine to decide' }));
+  expect(onTakeBack).toHaveBeenCalledWith('rec.approved');
+});
