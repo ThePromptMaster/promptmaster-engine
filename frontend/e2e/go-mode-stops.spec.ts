@@ -160,8 +160,9 @@ test('on Research, "nothing more for me here" on a stage waiting for approval be
   const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status,needs&order=created_at.desc&limit=1`);
   expect(run).toMatchObject({ status: 'awaiting_decision', needs: { kind: 'tick_criterion', onStage: 'hypothesis' } });
 
-  // The card's button gives the approval, as the user, and the run carries on.
-  await card.getByRole('button', { name: 'Approve and resume' }).click();
+  // The card's button gives the approval, as the user. It says "Approve" when something
+  // else still waits and the run stays paused for one Resume (19 Nov), "Approve and resume" otherwise.
+  await card.getByRole('button', { name: /^Approve(?: and resume)?$/ }).click();
   await expect(criterion(page, 'I accept these hypotheses as the working set').getByRole('checkbox')).toBeChecked({ timeout: 30_000 });
   await expect(card).toHaveCount(0);
 });
