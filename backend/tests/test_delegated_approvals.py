@@ -20,16 +20,16 @@ BRIEF = (
 
 
 def _req(**over) -> ApprovalDelegatedRequest:
-    return ApprovalDelegatedRequest(
-        inputs=PMInput(objective="Recommend a replacement vendor.", constraints=BRIEF, mode="architect",
-                       facts=[{"statement": "Assumed: Vendor A is preferred.", "kind": "fact", "origin": "model_assumed"}]),
-        approvals=[
+    fields = {
+        "inputs": PMInput(objective="Recommend a replacement vendor.", constraints=BRIEF, mode="architect",
+                          facts=[{"statement": "Assumed: Vendor A is preferred.", "kind": "fact", "origin": "model_assumed"}]),
+        "approvals": [
             {"id": "recommendation.approved", "label": "I choose the vendor to recommend", "stage_label": "Recommendation"},
             {"id": "costs.approved", "label": "I authorize the purchase from the chosen vendor", "stage_label": "Costs"},
         ],
-        delegation=[BRIEF],
-        **over,
-    )
+        "delegation": [BRIEF],
+    }
+    return ApprovalDelegatedRequest(**{**fields, **over})
 
 
 @pytest.fixture
@@ -73,3 +73,14 @@ def test_the_route_sends_only_what_may_be_handed_over_and_never_fails_open(clien
     assert "I authorize the purchase" not in kwargs["prompt"]
     mock.generate_json.side_effect = RuntimeError("upstream down")
     assert http.post("/api/agent/approval-delegated", json=body).json() == {"approvals": []}
+
+
+def test_a_hand_over_rests_on_a_sentence_about_authority_not_the_objective():
+    # 19 Nov production pass: "Decide which pallet-wrapping machine vendor to recommend" was quoted.
+    req = _req()
+    objective = parse_delegated({"approvals": [{"id": "recommendation.approved", "hands_over": True, "quote": "Recommend a replacement vendor."}]}, req)
+    assert objective.approvals == []
+    assert "is not a hand-over" in DELEGATED_INSTRUCTION
+    # With no sentence about authority at all, nothing is handed over.
+    bare = _req(delegation=[])
+    assert parse_delegated({"approvals": [{"id": "recommendation.approved", "hands_over": True, "quote": BRIEF}]}, bare).approvals == []

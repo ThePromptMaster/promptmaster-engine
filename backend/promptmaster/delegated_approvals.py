@@ -45,7 +45,9 @@ DELEGATED_INSTRUCTION = (
     "yourself\", \"you choose\", \"decide which option\"), or when they say what they keep for themselves "
     "(\"keep X and Y pending\", \"I will authorise Z\", \"leave the final sign-off to me\") and this approval "
     "is not among what they keep. It is not handed over when their words keep it, when they ask to make "
-    "or approve it themselves, or when nothing they say covers it either way.\n\n"
+    "or approve it themselves, or when nothing they say covers it either way. The objective saying what the "
+    "work is (\"decide which vendor to recommend\") is not a hand-over: quote one of THEIR SENTENCES ABOUT "
+    "WHAT THE ASSISTANT MAY DO.\n\n"
     "Return JSON only: {\"approvals\": [{\"id\": the approval's id, \"hands_over\": true or false, "
     "\"quote\": the sentence of THE USER'S OWN WORDS that decides it, copied exactly}]}.\n"
     "When you cannot tell, hands_over is false."
@@ -106,6 +108,10 @@ def parse_delegated(result: object, req: ApprovalDelegatedRequest) -> ApprovalDe
         approval = sent.get(str(item.get("id") or ""))
         quote = " ".join(str(item.get("quote") or "").split()).strip("\"“”")[:400]
         if approval is None or _AUTHORISES.search(approval.label) or not _found(quote, words):
+            continue
+        # 19 Nov production pass: the objective's "Decide which vendor to recommend" was quoted as
+        # the hand-over. A hand-over rests on a sentence that grants or keeps authority.
+        if not any(_found(quote, d) or _found(d, quote) for d in req.delegation):
             continue
         if any(o.id == approval.id for o in out):
             continue
