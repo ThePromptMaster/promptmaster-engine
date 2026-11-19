@@ -99,6 +99,11 @@ export interface ExitCriterion {
    * Absent means reserved: the safe default is the user's.
    */
   authority?: 'delegable' | 'reserved';
+  /**
+   * A reserved approval the user left to Go (19 Nov): by the words of their brief,
+   * or by their answer. Set by `withApprovalsLeftToGo` from the events, never authored.
+   */
+  leftToGo?: { quote: string; source: 'brief' | 'answer' };
 }
 
 export interface ArtifactSpec {
@@ -391,6 +396,14 @@ export type WorkflowEventType =
    */
   | 'criterion_not_applicable'
   /**
+   * A reserved approval left to Go under "handle them for me" (19 Nov, Sean,
+   * Equipment Replacement). payload: criterion_id, quote, source ('brief' |
+   * 'answer'), undone. By the brief's own words (actor system, with the sentence
+   * checked word for word) or the user's answer (actor user); the user takes it
+   * back with a later event marked undone (`lib/workflow/left-to-go-approvals.ts`).
+   */
+  | 'approval_left_to_go'
+  /**
    * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
    * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only
    * the affected done stages for recheck.
@@ -550,6 +563,8 @@ export interface CriterionResult {
   hint?: string;
   /** Met because it does not apply to this version: the words of the version that show it (18 Nov). */
   notApplicable?: string;
+  /** A reserved approval the user left to Go, and the words that did (19 Nov). */
+  leftToGo?: { quote: string; source: 'brief' | 'answer' };
 }
 
 export interface StageEvaluation {

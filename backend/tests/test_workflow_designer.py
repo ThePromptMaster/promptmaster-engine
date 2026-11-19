@@ -178,3 +178,13 @@ def test_a_choice_is_worded_as_the_decision_and_never_tells_the_user_to_state_it
     assert "word it as the decision itself" in prompt
     assert "set the options out side by side" in prompt
     assert "Never add an instruction to the user inside an approval" in prompt
+
+
+def test_a_choice_the_brief_hands_over_is_routine_and_no_stop_is_written_for_it():
+    # 19 Nov (a client): his brief kept back only warranty checks and purchase authorization,
+    # and "I choose the vendor to recommend" still stopped the run as his alone.
+    from promptmaster.workflow_designer import build_workflow_prompt
+    system = "\n".join(build_workflow_prompt("a vendor recommendation", "Recommend a vendor"))
+    assert "a choice or recommendation the user's words hand over" in system
+    assert "one the brief does not keep back when it says what it keeps" in system
+    assert "only external confirmation could settle it" in system

@@ -41,6 +41,8 @@ export interface RemovedText {
   stageId: string;
   sentence: string;
   at: string;
+  /** The version it went in: what a prompt saying the user removed it cites (19 Nov). */
+  version?: number;
 }
 
 /** A sentence reduced to its words, for comparing. */
@@ -74,9 +76,46 @@ export function sentencesRemoved(before: string, after: string): string[] {
   });
 }
 
-function removesOnPurpose(v: { source_operation: string; instruction?: string | null }): boolean {
-  if (v.source_operation === 'stage_edit') return true;
-  return USER_MADE.has(v.source_operation) && ASKS_TO_REMOVE.test(v.instruction ?? '');
+/**
+ * The user's own words in an instruction: what they quote from someone else is
+ * taken out (19 Nov, Sean, Inventory Selection). He passed on a vendor's message
+ * asking to "remove historical transactions from the export requirement", and said
+ * he had changed nothing; the rewrite dropped about fifty sentences, and every one
+ * was filed as removed by him, so Go later stopped over "a sentence you removed".
+ */
+export function ownWords(instruction: string): string {
+  return instruction.replace(/“[^”]*”?|"[^"\n]*"|‘[^’]*’|«[^»]*»/g, ' ');
+}
+
+/** The asking words themselves, stemmed: never what is asked to go. */
+const REMOVE_VERBS = /^(?:remov|delet|drop|dropp|cut|omit|strik|take|rid|leave|lose|longer|mention|include|say)/;
+
+const TARGET_STOP = new Set(['this', 'that', 'these', 'those', 'from', 'with', 'into', 'about', 'every', 'there', 'their', 'please', 'sentence', 'sentences', 'line', 'lines', 'paragraph', 'section', 'text', 'part', 'mention', 'mentions']);
+
+/** The words an instruction asks to have go: those in and after each "remove", "cut", "leave out", to the end of its clause. */
+function removalTargets(own: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of own.matchAll(new RegExp(ASKS_TO_REMOVE.source, 'gi'))) {
+    // What follows the asking words, to the end of its clause: "remove the export claim", not "and say …".
+    const after = own.slice((m.index ?? 0) + m[0].length).split(/[.;:,\n]|\b(?:and|then|but|so)\b/i)[0].split(/\s+/).slice(0, 12).join(' ');
+    for (const x of stemmed(`${m[0]} ${after}`)) if (!TARGET_STOP.has(x) && !REMOVE_VERBS.test(x)) out.add(x);
+  }
+  return out;
+}
+
+/**
+ * Whether a version's dropped sentence was removed by the user. Their own edit
+ * removes on purpose. A version made from their instruction removes only what the
+ * instruction, in their own words, asks to go: a rewrite's other dropped lines are
+ * not theirs (19 Nov).
+ */
+function removedOnPurpose(v: { source_operation: string; instruction?: string | null }): ((sentence: string) => boolean) | null {
+  if (v.source_operation === 'stage_edit') return () => true;
+  if (!USER_MADE.has(v.source_operation)) return null;
+  const own = ownWords(v.instruction ?? '');
+  if (!ASKS_TO_REMOVE.test(own)) return null;
+  const targets = removalTargets(own);
+  return (sentence) => stemmed(sentence).some((w) => targets.has(w));
 }
 
 /** Every sentence the user removed and has not brought back, oldest first, the latest `MAX`. */
@@ -96,10 +135,12 @@ export function removedByUser(
         const k = key(s);
         if (out.get(k)?.stageId === stage.id) out.delete(k);
       }
-      if (!removesOnPurpose(v)) continue;
+      const onPurpose = removedOnPurpose(v);
+      if (!onPurpose) continue;
       for (const s of sentencesRemoved(versions[i - 1].content, v.content)) {
+        if (!onPurpose(s)) continue;
         const sentence = s.length > EACH_MAX ? `${s.slice(0, EACH_MAX - 1).trimEnd()}…` : s;
-        out.set(key(s), { stage: stage.label, stageId: stage.id, sentence, at: v.created_at });
+        out.set(key(s), { stage: stage.label, stageId: stage.id, sentence, at: v.created_at, ...(v.version_number ? { version: v.version_number } : {}) });
       }
     }
   }

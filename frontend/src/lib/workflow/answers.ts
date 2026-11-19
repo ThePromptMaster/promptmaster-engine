@@ -28,8 +28,17 @@ export const DELEGATED_ANSWER =
   // into the document itself: "The proposal now ends with section 7 …" (Lakeside v12).
   'Do whatever is best: use your judgement within the objective, the accepted facts and my latest version, and tell me what you chose in your note to me, not in the document.';
 
+/**
+ * 19 Nov (Sean, Equipment Replacement): he chose the planner's own offer "You choose,
+ * and state the deciding factor clearly." It was stored as his own decision, and the
+ * vendor choice then stopped again as "yours alone". Leaving it to Go in other words
+ * is leaving it to Go.
+ */
+const LEAVES_IT_TO_GO =
+  /^(?:do (?:whatever|what) (?:is|you think is) best|you (?:choose|decide|pick)|your (?:call|choice)|(?:choose|decide|pick)(?: (?:it|one))? yourself|(?:i(?:'|’)ll |i will )?leave (?:it|that|the (?:choice|decision)) (?:to|with) (?:you|go)|go(?:'|’)s (?:call|choice)|let go (?:choose|decide))\b/i;
+
 export function isDelegatedAnswer(answer: string): boolean {
-  return answer.trim() === DELEGATED_ANSWER || /^do (?:whatever|what) (?:is|you think is) best\b/i.test(answer.trim());
+  return answer.trim() === DELEGATED_ANSWER || LEAVES_IT_TO_GO.test(answer.trim());
 }
 
 /**

@@ -11,7 +11,7 @@
 
 /** A sentence that grants, reserves or limits authority. */
 const AUTHORITY =
-  /\b(?:without asking|(?:do not|don['’]t|no need to|never) ask(?: me)?|ask me\b|you may\b|you can (?:decide|handle|fix|correct|make)|handle (?:the |all |any )?(?:routine|drafting|corrections?|checking|arithmetic|it|them|this)|decide (?:it |them |each one )?yourself|i(?:['’]ll| will) approve|my approval|approve the|(?:is|are|not) authori[sz]ed|authori[sz]es|delegat)/i;
+  /\b(?:without asking|(?:do not|don['’]t|no need to|never) ask(?: me)?|ask me\b|you may\b|you can (?:decide|handle|fix|correct|make)|handle (?:the |all |any )?(?:routine|drafting|corrections?|checking|arithmetic|it|them|this)|decide (?:it |them |each one )?yourself|i(?:['’]ll| will) approve|my approval|approve the|(?:is|are|not) authori[sz]ed|authori[sz]es|delegat|\bkeep\b[^.]{0,120}\bpending\b|\b(?:i|we) reserve\b|\breserved (?:for|to) (?:me|us)\b|authori[sz]ation|recommend\w* yourself|make the recommendation|you (?:choose|decide|pick)\b|your call\b|\b(?:leave|keep)\b[^.]{0,80}\b(?:to|for) me\b)/i;
 
 const MAX = 6;
 const MAX_CHARS = 500;

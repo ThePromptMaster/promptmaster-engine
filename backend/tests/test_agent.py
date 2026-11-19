@@ -985,3 +985,16 @@ def test_the_planner_is_told_what_already_waits_on_the_user_across_the_project()
     assert "ask the ONE question whose answer unblocks the most" in user
     bare = AgentState(stage_id="brief", stage_label="Leadership brief")
     assert "ALREADY WAITING ON THE USER" not in build_next_action_prompt(PMInput(objective="x", mode="analyst"), bare, ["draft_stage"], "autonomous")[1]
+
+
+def test_under_handle_go_never_asks_to_change_what_the_user_supplied():
+    # 19 Nov (a client): no vendor met his eight-week deadline, and Go asked whether to
+    # allow nine or ten weeks instead of finishing with "none currently qualifies".
+    from promptmaster.objective_assessment import _ASSESS_INSTRUCTION
+    from promptmaster.project_context import SUPPLIED_RULE, SUPPLIED_STANDS
+    _, handled = build_next_action_prompt(INPUTS, STATE.model_copy(update={"routine_decisions": "handle"}), RESEARCH, "autonomous")
+    assert "a conflict between two accepted requirements" in handled
+    assert "Ask only about the objective, an accepted requirement" not in handled
+    assert SUPPLIED_STANDS in handled and SUPPLIED_STANDS in SUPPLIED_RULE
+    assert "none is currently confirmed to qualify" in SUPPLIED_STANDS
+    assert "Where no option meets the user's supplied requirements" in _ASSESS_INSTRUCTION

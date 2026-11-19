@@ -32,7 +32,7 @@ from .conversation import _shared_system
 from .llm_client import NotJSONError, OpenRouterClient
 from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
-from .project_context import context_block
+from .project_context import SUPPLIED_STANDS, context_block
 
 #: Go's planner runs every step, so it reads the context bounded; 4,000 until
 #: 12 Oct cut a long brief's requirements in half (Northstar).
@@ -470,8 +470,12 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "ROUTINE DECISIONS ARE YOURS (the user chose 'handle them for me'). A choice with a sensible, "
             "conventional default — parameter values, units, which cases and how many, a step size, a "
             "tolerance — is routine: do not ask it. Make the choice, say it is an assumption the user can "
-            "change, and carry on with the move that uses it. Ask only about the objective, an accepted "
-            "requirement, an approval reserved to the user, or a choice with no defensible default."
+            "change, and carry on with the move that uses it. Ask only about the objective, a conflict "
+            "between two accepted requirements, an approval reserved to the user, or a choice with no "
+            "defensible default. "
+            # 19 Nov (a client): no vendor met his eight-week deadline, and Go asked whether
+            # to allow nine or ten weeks instead of finishing the package.
+            + SUPPLIED_STANDS
         )
     if state.length_note:
         facts.append(
@@ -583,7 +587,8 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         workflow_line.append(
             f"EXECUTION: {'ongoing — rounds continue until the criterion is met or a stop condition holds' if ex.kind == 'ongoing' else 'finite'}."
             + (f" Done means: {ex.success_criterion.strip()}." if ex.success_criterion.strip() else "")
-            + (f" Stop short of it when: {'; '.join(ex.stop_conditions)}." if ex.stop_conditions else "")
+            + (f" Stop short of it when: {'; '.join(ex.stop_conditions)} (a stop condition ends the work by "
+               "finishing the document with the gap stated, never by asking the user)." if ex.stop_conditions else "")
             + " Reaching the last stage does not by itself meet the objective."
         )
     return "\n".join([

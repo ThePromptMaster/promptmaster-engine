@@ -29,6 +29,14 @@ _HEADER = (
 #: could reverse a recommendation that a supplied 24% against a supplied 20% limit had
 #: already fixed. The writer was not alone: the final check had asked for the condition.
 #: One rule, for every writer and every check, carried by `context_block`.
+#: 19 Nov (a client): no vendor met his eight-week deadline, and Go asked whether to
+#: allow nine or ten weeks. What the user supplied stands until the user changes it.
+SUPPLIED_STANDS = (
+    "Never ask whether to change, relax, extend or waive a requirement, limit or deadline the user "
+    "supplied. When no option meets it, that is the result: say that none is currently confirmed to "
+    "qualify, what each option misses by and what would have to be confirmed, and finish the work."
+)
+
 SUPPLIED_RULE = (
     "WHAT THE USER SUPPLIED IS GIVEN. A fact, figure or rule the user stated, in the objective, the "
     "brief, its constraints, the project context or an accepted fact, is taken as stated. Never question "
@@ -43,7 +51,8 @@ SUPPLIED_RULE = (
     # "Approver: to confirm" in the draft, and the run stopped to ask about it.
     "Something the user's material calls approved, authorised or agreed is approved, whoever approved it. "
     "Where the material names nobody as approving it, the record is \"approver not specified\": never "
-    "something to confirm, a question for the user, or a finding."
+    "something to confirm, a question for the user, or a finding. "
+    + SUPPLIED_STANDS
 )
 
 

@@ -72,7 +72,7 @@ export function inputsFrom(project: Project, citing = '', focus: { user?: string
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
       : {}),
     ...(project.removed_text?.length
-      ? { removed_text: project.removed_text.map(({ stage, sentence }) => ({ stage, sentence })) }
+      ? { removed_text: project.removed_text.map(({ stage, sentence, version }) => ({ stage: version ? `${stage} v${version}` : stage, sentence })) }
       : {}),
     ...(project.approvals?.length ? { approvals: project.approvals } : {}),
     // The user's other projects this one draws on (client, 21 Oct, email 5).
