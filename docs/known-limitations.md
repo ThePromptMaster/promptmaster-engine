@@ -4849,4 +4849,9 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   The copy step now also corrects a stated count beside a copy that is already there, or adds one. The
   pinned Go button said "Approve and resume" while the card, rightly, said "Approve" (something else still
   waited); it now says what the card says.
+- **And** (#750). The first copy by code on the pass worked (a model repair had paraphrased the approved
+  Recommendation; the next save put it back word for word, 676 words counted), but it kept the approved
+  text's own "##" headings at the package's section level, so a later save would have found the section
+  empty and copied it again. The copied headings now sit under the section heading, and a copy left at the
+  section's level is nested rather than copied twice.
 

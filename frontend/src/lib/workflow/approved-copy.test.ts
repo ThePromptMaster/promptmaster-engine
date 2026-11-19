@@ -86,3 +86,24 @@ describe('a copy already there keeps a count counted in code (19 Nov production 
     expect(withApprovedCopy(plain, source, FINDING)!.content).toContain(`## 6. Staff announcement\n\n*${words} words, counted`);
   });
 });
+
+describe('the copied text sits inside its section (19 Nov production pass)', () => {
+  const rec = { stageId: 'recommendation', label: 'Recommendation', shortLabel: '', version: 4, text: '## Recommended vendor: Vendor A\n\nInstallation time decides it.\n\n## Why installation time decides it\n\nA installs in 3 weeks.' };
+  const finding = 'The package Recommendation section must be the approved Recommendation text copied word for word.';
+  it('its headings are nested under the section heading, and a second save changes nothing', () => {
+    const pkg = '# Package\n## 3. Recommendation\nParaphrase.\n## 4. Still to do\nWarranty.';
+    const once = withApprovedCopy(pkg, rec, finding)!;
+    expect(once.content).toContain('## 3. Recommendation\n\n### Recommended vendor: Vendor A');
+    expect(once.content).toContain('### Why installation time decides it');
+    expect(once.content).toContain('## 4. Still to do');
+    expect(withApprovedCopy(once.content, rec, finding)).toBeNull();
+  });
+  it('a copy left at the section\'s own level is nested, not copied again', () => {
+    const flat = `## 3. Recommendation\n\n${rec.text}\n\n*${countWords(rec.text)} words, counted.*\n## 4. Still to do\nWarranty.`;
+    const out = withApprovedCopy(flat, rec, finding)!;
+    expect(out.content.match(/Recommended vendor: Vendor A/g)).toHaveLength(1);
+    expect(out.content).toContain('### Recommended vendor: Vendor A');
+    expect(out.content).toContain('## 4. Still to do\nWarranty.');
+    expect(withApprovedCopy(out.content, rec, finding)).toBeNull();
+  });
+});

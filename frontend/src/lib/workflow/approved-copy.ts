@@ -71,6 +71,15 @@ export function sourceAskedFor(finding: string, sources: readonly ApprovedSource
   return named.length === 1 ? named[0] : null;
 }
 
+/** The text's headings moved below `level`, so they sit inside the section that holds it. */
+export function nested(text: string, level: number): string {
+  const levels = text.split('\n').map((l) => /^(#{1,6})\s/.exec(l)?.[1].length ?? 0).filter(Boolean);
+  if (!levels.length) return text;
+  const shift = Math.max(0, level + 1 - Math.min(...levels));
+  if (!shift) return text;
+  return text.split('\n').map((l) => l.replace(/^(#{1,6})(?=\s)/, (h) => '#'.repeat(Math.min(6, h.length + shift)))).join('\n');
+}
+
 /** A stated length: "Length: 698 words", "Word count: 104", "(110 words)". */
 const STATED_COUNT = /(?:word count\s*[:=-]?\s*|length\s*[:=-]?\s*)?(\d[\d,]*)\s+words\b(?:,?\s*counted by hand)?/i;
 
@@ -94,11 +103,20 @@ export function withApprovedCopy(content: string, source: ApprovedSource, findin
   const hit = byNumber.length === 1 ? byNumber[0] : byLabel.length === 1 ? byLabel[0] : null;
   if (!hit) return null;
   const level = hit.m[1].length;
-  const next = headings.find((h) => h.at > hit.at && h.m[1].length <= level);
+  // The approved text's own headings are part of the section, at whatever level an
+  // earlier copy left them (19 Nov production pass: copied at the section's own level,
+  // its "## Recommended vendor" would have ended the section, and the next save copied it again).
+  const own = new Set(source.text.split('\n').map((l) => /^#{1,6}\s+(.*)$/.exec(l)?.[1]).filter((t): t is string => Boolean(t)).map(norm));
+  const next = headings.find((h) => h.at > hit.at && h.m[1].length <= level && !own.has(norm(h.m[2])));
   const end = next ? next.at : lines.length;
   const body = lines.slice(hit.at + 1, end).join('\n');
   const words = countWords(source.text);
-  if (norm(body).includes(norm(source.text))) {
+  const nestedText = nested(source.text, level);
+  const flat = lines.slice(hit.at + 1, end).some((l) => {
+    const h = /^(#{1,6})\s+(.*)$/.exec(l);
+    return Boolean(h && h[1].length <= level && own.has(norm(h[2])));
+  });
+  if (norm(body).includes(norm(source.text)) && !flat) {
     // Already copied (19 Nov production pass: as a quotation, "Length: 698 words", counted by
     // hand; code counts 676). The count beside it is the code's.
     const at = lines.findIndex((l, i) => i > hit.at && i < end && STATED_COUNT.test(l) && !norm(source.text).includes(norm(l)));
@@ -111,6 +129,6 @@ export function withApprovedCopy(content: string, source: ApprovedSource, findin
     const fixed = lines[at].replace(STATED_COUNT, (m: string, n: string) => m.replace(n, String(words)).replace(/\s*(?:,\s*)?counted by hand/i, '') + (/counted/i.test(m) ? '' : ' (counted)'));
     return { content: [...lines.slice(0, at), fixed, ...lines.slice(at + 1)].join('\n'), words };
   }
-  const copied = ['', source.text, '', `*${words} words, counted — ${source.label} v${source.version} as approved, copied word for word.*`, ''];
+  const copied = ['', nestedText, '', `*${words} words, counted — ${source.label} v${source.version} as approved, copied word for word.*`, ''];
   return { content: [...lines.slice(0, hit.at + 1), ...copied, ...lines.slice(end)].join('\n'), words };
 }
