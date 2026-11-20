@@ -122,6 +122,8 @@ def test_the_planner_on_a_later_stage_is_given_the_open_row_itself():
     assert "UNDECIDED FINDINGS ON OTHER STAGES" in user
     assert "- Check i11 (major): i2 rests on two premises that no longer hold. — suggested change: Keep tester payments at $0." in user
     assert "never say you cannot see another stage's table" in user
+    # 20 Nov: the row is tied to the question by its id, not by a number in the package.
+    assert "list the ids of the findings you ask about in params.finding_ids" in user
 
 
 def test_no_block_when_nothing_is_open_elsewhere():
