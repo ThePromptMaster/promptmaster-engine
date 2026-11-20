@@ -252,7 +252,11 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         # asking him whether to relax his own eight-week deadline.
         "Never a choice the brief hands over, and for document work never \"the facts are "
         "insufficient\" or \"only external confirmation could settle it\": the document states what is "
-        "unconfirmed and what must be confirmed, and is finished.\n"
+        "unconfirmed and what must be confirmed, and is finished. "
+        # 20 Nov (Sean, warehouse rerun): "accept a plan with no margin" was put to
+        # him as a decision; it was a risk to explain.
+        "A risk the work should explain (no margin, no spare capacity, one point of failure) is never "
+        "an approval, a decision or a stop condition.\n"
         "- For ongoing work, put a stage just before the last one that closes a round "
         "(e.g. \"Next round\", kind write: what was learned and what to pursue next) and "
         "set its loop_back_to to the label of the earlier stage a new round starts from. "

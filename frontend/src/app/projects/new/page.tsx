@@ -18,6 +18,7 @@ import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { ColourMenu } from '@/components/shared/colour-preferences';
 import { FrontDoor, itemsRead, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { conversationMaterial } from '@/lib/projects/conversation-material';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
@@ -464,23 +465,12 @@ export default function NewProjectPage() {
     ];
   }
 
-  /** The brief and the conversation, as material for the setup recommendation. */
-  function conversationMaterial(brief: DraftBrief, transcript: string): { objective: string; audience: string; material: string } {
-    const lines = [
-      brief.audience && `Audience: ${brief.audience}`,
-      brief.deliverables.length && `Deliverables: ${brief.deliverables.join('; ')}`,
-      brief.stages.length && `Stages discussed: ${brief.stages.join(' › ')}`,
-      brief.approvals.length && `Approvals wanted: ${brief.approvals.join('; ')}`,
-    ].filter(Boolean);
-    return { objective: brief.objective, audience: brief.audience, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') };
-  }
-
   /** "Review the setup first": the brief becomes the setup screen, and its facts the initial record. */
   function fromConversation(brief: DraftBrief, transcript: string, said: string, turns: Turn[]) {
     setObjective(brief.objective);
     setInitialFacts(factsFromBrief(brief, said));
     setOpeningChat(turns);
-    void recommend(undefined, conversationMaterial(brief, transcript));
+    void recommend(undefined, conversationMaterial(brief, said));
   }
 
   /**
@@ -495,7 +485,7 @@ export default function NewProjectPage() {
     setWorking('setup');
     setError(null);
     try {
-      const { recommended, draft: suggested } = await suggestSetup(undefined, conversationMaterial(brief, transcript));
+      const { recommended, draft: suggested } = await suggestSetup(undefined, conversationMaterial(brief, said));
       if (!recommended) throw new Error('No workflow is available');
       setWorking(null);
       await create({ template: recommended, draft: suggested, facts: factsFromBrief(brief, said), chat: turns });

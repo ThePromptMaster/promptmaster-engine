@@ -4985,3 +4985,34 @@ Now:
 
 Not changed: under "Ask me", or a second time on the same stage in a run, Go still asks. A request to
 remove content (a section, a note about the warranty) is not this pass.
+
+### L-266 — A table counts what it is about; a risk is explained, not made a decision; the brief holds only the user's words (2026-11-20)
+Sean's warehouse rerun (20 Nov), after one of three sessions was cancelled:
+- The schedule put the 8 employees with no session in a row under "Total planned", so the column added up
+  to 24 with 16 scheduled.
+- The package asked him to "decide whether to accept a plan with no margin". That was a risk to explain;
+  his decision was how to cover the 8. The option "change the launch date" also left out that it still
+  needs confirmed trainer time.
+- The second came from the brief. His words were "If the facts make the plan impossible, explain the
+  shortfall and identify the decision needed." The start conversation's reply added "The package will flag
+  that as a decision for you". `conversationMaterial` sent the whole transcript, PromptMaster's turns
+  included, to `/generate-setup` as "material the user attached", and the constraints rule allowed limits
+  "that follow directly from what they said". So the project's constraints ended "must flag the zero-slack
+  risk as a decision for the user", and every stage treated that as his requirement (`BRIEF_SOURCES`).
+
+Now:
+- **Writers:** `TABLE_ROWS_RULE` and `DECISIONS_RULE` (`reader_text.py`, joined as `WRITING_RULES`) reach
+  every writer: the stage writer, the side chat's Change it and save-as-new, Go's and the review panel's
+  apply (`apply-recommendations`), continue writing, and chapters. A table's total counts only its rows,
+  and what it doesn't cover goes below it. A risk is explained, never listed as a decision to accept unless
+  the user asked. Each option says what it still needs that nobody has confirmed.
+- **Checks:** `VERIFY_RULE` (evaluator and review stages) flags the same three things, and the deliverable
+  check counts a total that includes rows the table isn't about as a contradiction.
+- **Setup and designer:** the start conversation hands both the user's own turns, the outline, and the
+  brief's requirements, never PromptMaster's replies (`lib/projects/conversation-material.ts`). The setup
+  never makes a constraint of a risk, a feasibility or readiness conclusion, or something "to flag as a
+  decision". The designer never makes a risk an approval, decision or stop condition. The start
+  conversation says a risk as a risk.
+
+Not changed: a project made before this keeps its constraints. Sean's rerun still says "must flag the
+zero-slack risk as a decision for the user" until he deletes that sentence from the brief.

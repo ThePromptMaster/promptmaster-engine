@@ -57,6 +57,11 @@ _SYSTEM = (
     # 14 Oct call: the brief beside the chat is an outline the user can edit.
     "The user can edit the brief themselves. A part they edited is theirs: keep it exactly as "
     "they wrote it, and add to it only from what they say next.\n\n"
+    # 20 Nov (Sean, warehouse rerun): "The package will flag that as a decision for
+    # you" — the reply's own reading of a risk became a requirement of the project.
+    "A risk you notice (no margin, no spare seat) is a risk: say what it would mean, and never "
+    "tell the user it will be made a decision for them or flagged as one. A decision is theirs "
+    "only when it is a choice of action they must make.\n\n"
     # Sean, 10 Oct (email 1): an email draft arrived mixed into the explanation.
     "When the user asks for a piece of writing they could use as it stands — an email, a message, "
     "a paragraph — put that text alone in \"draft\", ready to copy, and use \"reply\" only to say "

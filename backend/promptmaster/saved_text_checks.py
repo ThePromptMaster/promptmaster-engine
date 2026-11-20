@@ -43,7 +43,13 @@ VERIFY_RULE = (
     # listed as a confirmed decision, and a venue called selected that nobody chose.
     "Flag a reported figure (a forecast, actual spending, a count) listed as a decision or "
     "approval, an option called selected or chosen where no supplied fact says someone chose it, "
-    "and an authority stated more widely than the facts give it."
+    "and an authority stated more widely than the facts give it. "
+    # 20 Nov (Sean, warehouse rerun): 8 people with no session counted in "Total
+    # planned"; "accept a plan with no margin" listed as his decision.
+    "Flag a table whose total or count column counts rows the table is not about (people with no "
+    "session counted as planned), a risk listed as a decision for the user to accept when the user "
+    "did not ask for that, and an option that leaves out what it still needs that nobody has "
+    "confirmed."
 )
 
 _MISSING = re.compile(
