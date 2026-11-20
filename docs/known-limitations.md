@@ -4506,7 +4506,8 @@ three times slower than ChatGPT.
   under Autonomous (`?go=start`, taken off the address at once so a reload never starts a second run). Not
   the one-stage quick route (it drafts and checks itself), not an example, and not when the person turned
   it off: "Start Go when I make a project" in Settings (`user_preferences.go_autostart`, on by default).
-  Routine decisions stay as the project has them; reserved approvals still stop it.
+  Routine decisions stay as the project has them (a new project has "Handle them for me" since 20 Nov,
+  L-264); reserved approvals still stop it.
 - **A replaced document.** Attaching a document with the name of one already attached replaces it: the old
   file is removed, and the new words replace the old under "### From <name>" in the context. The context
   change goes through the existing change check (`assess-change`), so only the stages that relied on it
@@ -4933,3 +4934,27 @@ Not changed: under "Handle them for me", a pasted message written in its author'
 mark…") is not recognised as someone else's request, so the card is still asked rather than the record kept
 silently (L-93). If the user discards the revision after confirming, the approval fact stays recorded while
 that stage's text still says pending; the stage is not marked for a recheck by it.
+
+### L-264 — New projects start on "Handle them for me" (2026-11-20)
+A client asked for routine decisions to default to "Handle them for me" instead of "Ask me". On production,
+nearly every project set to Handle since 10 Nov got there through a `routine_policy_changed` event: people were
+switching it by hand on each project. `projects.routine_decisions` now defaults to `'handle'`
+(`20261207000000_routine_decisions_handle_by_default.sql`).
+
+New projects only. A project that already exists keeps what it shows, including one on "Ask me" only because
+that was the old default: moving it would let Go accept routine work and commit delegable approvals on a
+project where the user expected to be asked. Samples were already on Handle; a copied project keeps its
+source's setting.
+
+What follows for a new project, all existing behaviour of "Handle them for me":
+- The Go panel opens at Autonomous (`policy.levelFor`), and a project made from the start screen runs Go
+  under Handle from its first step (`?go=start`, L-250).
+- A side-chat change that changes no accepted fact and adds no claim is saved without the Apply press
+  (`autoApply`).
+- The database guards that check `routine_decisions = 'handle'` (`workflow_events_agent_authorized()`,
+  `project_facts_on_insert()`) apply to it.
+- "Ask me" is one press away, recorded as the user's `routine_policy_changed`. Only the user changes it.
+
+The E2E specs were written for projects that start on "Ask me": `createProject` in `e2e/helpers.ts` gives
+the project insert `routine_decisions: 'ask'` unless a spec asks for the default, and
+`routine-decisions.spec.ts` checks the default itself.

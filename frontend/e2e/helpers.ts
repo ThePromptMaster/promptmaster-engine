@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Route } from '@playwright/test';
 
 import { supabaseEnv } from './env';
 
@@ -25,8 +25,34 @@ export function e2eUser(): { id: string; email: string; password: string } {
  */
 export async function createProject(
   page: Page,
-  { workflow, name, objective }: { workflow: 'Book' | 'Research' | 'Single output' | 'Exploration' | 'Assessment'; name: string; objective: string }
+  {
+    workflow,
+    name,
+    objective,
+    routine = 'ask',
+  }: {
+    workflow: 'Book' | 'Research' | 'Single output' | 'Exploration' | 'Assessment';
+    name: string;
+    objective: string;
+    /**
+     * Routine decisions the project starts with. New projects start on "Handle
+     * them for me" since 20 Nov (L-264); the specs that use this helper were
+     * written for projects that start on "Ask me", and keep it unless a spec
+     * asks for the default. The insert is given the value, so the page loads
+     * the project as it is stored.
+     */
+    routine?: 'ask' | 'default';
+  }
 ): Promise<string> {
+  const isProjectInsert = (url: URL) => url.pathname.endsWith('/rest/v1/projects');
+  const startOnAsk = async (route: Route) => {
+    const req = route.request();
+    if (req.method() !== 'POST') return route.continue();
+    const body = req.postDataJSON() as Record<string, unknown> | Record<string, unknown>[];
+    const withAsk = (row: Record<string, unknown>) => ({ routine_decisions: 'ask', ...row });
+    await route.continue({ postData: JSON.stringify(Array.isArray(body) ? body.map(withAsk) : withAsk(body)) });
+  };
+  if (routine === 'ask') await page.route(isProjectInsert, startOnAsk);
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill(objective);
@@ -36,6 +62,7 @@ export async function createProject(
   await page.getByLabel('Project name').fill(name);
   await page.getByRole('button', { name: /^Start / }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  if (routine === 'ask') await page.unroute(isProjectInsert, startOnAsk);
   return page.url().split('/').at(-1)!;
 }
 

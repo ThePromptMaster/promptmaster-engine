@@ -107,3 +107,21 @@ test('the database refuses a policy commit when routine decisions are set to ask
     })
   ).rejects.toThrow();
 });
+
+test('a new project starts on "Handle them for me"; "Ask me" is one press, recorded as the user\'s (20 Nov, L-264)', async ({ page }) => {
+  const id = await createProject(page, { workflow: 'Book', name: 'E2E routine default', objective: 'A book about giraffes', routine: 'default' });
+  const [project] = await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`);
+  expect(project.routine_decisions).toBe('handle');
+  // Nobody chose it: it is the default, not a recorded change.
+  expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=id`)).toEqual([]);
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await expect(panel.getByRole('radio', { name: /^Handle them for me/ })).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: test.info().outputPath('04-handle-by-default.png') });
+
+  await panel.getByRole('radio', { name: /^Ask me/ }).click();
+  await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('ask');
+  const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=actor,payload`);
+  expect(changed).toMatchObject({ actor: 'user', payload: { routine_decisions: 'ask' } });
+});
