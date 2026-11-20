@@ -18,7 +18,8 @@ export interface NamedRow {
 }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const mentions = (text: string, id: string) => new RegExp(`(^|[^\\p{L}\\p{N}_])${escape(id)}(?![\\p{L}\\p{N}_])`, 'iu').test(text);
+/** Whether `text` names the row `id` (a whole id, not part of a longer one). */
+export const mentions = (text: string, id: string) => new RegExp(`(^|[^\\p{L}\\p{N}_])${escape(id)}(?![\\p{L}\\p{N}_])`, 'iu').test(text);
 
 /**
  * The ids Go gave beside its question for the findings it asks about

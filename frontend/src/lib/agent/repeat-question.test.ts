@@ -177,3 +177,28 @@ describe('the pause in the interface language', () => {
     expect(shownStopReason('es', words)).toMatch(/^Ya te pregunté esto/);
   });
 });
+
+describe('a question about another finding is not a repeat (20 Nov, an inventory-selection pass)', () => {
+  // As asked on production: two findings the user keeps, asked in the same words one after the other.
+  const FIRST =
+    'Finding 17 (Consistency review of findings) says no vendor meets every requirement and asks whether the package goes to the Finance committee now as a no-qualifying-vendor result, or is held until a vendor confirms a nightly Ledgerline export. Accepting either option records it as your decision in the findings table and next steps. Rejecting the finding drops it from the table, with the reason kept. Which do you want?';
+  const SECOND =
+    'Finding imwobyea82 (Consistency review, major) says: "While no vendor qualifies, the recommendation package is held until a vendor confirms a nightly Ledgerline ERP export (finding 17). It has to be decided whether the held package is shared with StockPilot to prompt a quote for nightly Ledgerline export, or kept internal for now." Choosing either option records it as your decision in the findings table and next steps. Rejecting the finding drops it from the table, with the reason kept. While the package is held, should it be shared with StockPilot or kept internal?';
+  const t = (m: number) => `2026-11-20T01:${String(m).padStart(2, '0')}:00Z`;
+  const steps: AskedStep[] = [
+    { action_key: 'request_user_decision', stage_id: 'recommendation_package', decision_question: FIRST, params: { finding_id: 'imwob0tqc2' }, started_at: t(35), finished_at: t(35) },
+    { action_key: 'user_answer', stage_id: 'recommendation_package', output: 'Hold the package until a vendor confirms nightly Ledgerline export', started_at: t(38), finished_at: t(38) },
+    { action_key: 'recheck_stage', stage_id: 'recommendation_package', started_at: t(39), finished_at: t(39) },
+  ];
+  it('the words alone read it as a repeat; the finding it is about does not', () => {
+    expect(questionOverlap(FIRST, SECOND)).toBeGreaterThanOrEqual(SAME_QUESTION);
+    expect(repeatedQuestion({ question: SECOND, stageId: 'recommendation_package', steps })).not.toBeNull();
+    expect(repeatedQuestion({ question: SECOND, stageId: 'recommendation_package', steps, findings: ['imwobyea82'] })).toBeNull();
+  });
+  it('the same finding asked again is still a repeat', () => {
+    expect(repeatedQuestion({ question: FIRST, stageId: 'recommendation_package', steps, findings: ['imwob0tqc2'] })).not.toBeNull();
+    // Named in the earlier question's own words, with no id beside it.
+    const byText = steps.map((s, i) => (i === 0 ? { ...s, params: {}, decision_question: `${FIRST} (imwob0tqc2)` } : s));
+    expect(repeatedQuestion({ question: FIRST, stageId: 'recommendation_package', steps: byText, findings: ['imwob0tqc2'] })).not.toBeNull();
+  });
+});
