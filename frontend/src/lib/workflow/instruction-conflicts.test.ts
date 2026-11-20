@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { choiceLabels, directionsOf, gist, mergeConflicts, precedenceNote, ruleConflicts, type InstructionConflict } from './instruction-conflicts';
+import { approvalConfirmedNote, choiceLabels, directionsOf, isUnconfirmedApproval, gist, mergeConflicts, precedenceNote, ruleConflicts, type InstructionConflict } from './instruction-conflicts';
 import { recommendedControl } from './precedence';
 
 const base = { objective: 'An explainer for 10-year-olds', constraints: 'Under 300 words', decisions: [], others: [] };
@@ -104,14 +104,21 @@ describe('one plain question that protects a recorded approval (14 Oct, Sean: LA
   });
 
   it('labels the choices in a few words, with no quoted instruction', () => {
-    expect(choiceLabels(approval)).toEqual({ keep: 'Keep December 18 approved', override: 'Treat January 15 as approved' });
-    expect(choiceLabels({ ...approval, keep_label: '', override_label: '' })).toEqual({ keep: 'Keep the approved value', override: 'Override the recorded approval' });
+    // L-263: an approval nobody recorded is never the request's own words.
+    expect(choiceLabels(approval)).toEqual({ keep: 'Keep December 18 approved', override: 'I have the approval this needs' });
+    expect(choiceLabels({ ...approval, approver: 'Elena' }).override).toBe("I have Elena's approval");
+    expect(choiceLabels({ ...approval, keep_label: '', override_label: '' })).toEqual({ keep: 'Keep the approved value', override: 'I have the approval this needs' });
+    // One the instruction itself records keeps the model's label.
+    expect(choiceLabels({ ...approval, instruction_authorised: true }).override).toBe('Treat January 15 as approved');
+    expect(choiceLabels({ ...approval, instruction_authorised: true, override_label: '' }).override).toBe('Override the recorded approval');
     expect(choiceLabels(asOf)).toEqual({ keep: 'Keep the constraints', override: 'Follow the new instruction' });
   });
 
   it('tells the model to keep the approved value and record the request as unapproved', () => {
     const note = precedenceNote(approval, 'Change it to January 15', 'existing');
-    expect(note).toContain('Keep what the record says is approved');
+    expect(note).toContain('Keep what the record says about the approval');
+    // Without the user's confirmation there is no "override" of an approval any more.
+    expect(precedenceNote(approval, 'Change it to January 15', 'new')).toMatch(/^Keep what the record says about the approval/);
     expect(note).toContain('record Omar’s request as unapproved');
   });
 
@@ -119,5 +126,39 @@ describe('one plain question that protects a recorded approval (14 Oct, Sean: LA
     const update = '"Update LANTERN as of November 12. Luis confirms the final vacancy is filled. Actual spending is now $24,000. Everything else is unchanged."';
     expect(gist(update)).toBe('Update LANTERN as of November 12. Luis confirms the final vacancy is filled. Actual spending is now $24,000.');
     expect(gist('word '.repeat(60), 40).endsWith('word…')).toBe(true);
+  });
+});
+
+
+describe('an approval the user reports holding, with its source (L-263, Sean, 19 Nov)', () => {
+  const pending: InstructionConflict = {
+    kind: 'fact', with_id: 'F1', source: 'model',
+    with_text: 'The operations director’s launch authorization is pending.',
+    explanation: 'The trainer cannot give the operations director’s authorization.',
+    keep_label: 'Keep director authorization pending', override_label: 'Mark director authorization approved',
+    protects_approval: true, approver: 'the operations director',
+  };
+
+  it('is unconfirmed until the instruction itself records it', () => {
+    expect(isUnconfirmedApproval(pending)).toBe(true);
+    expect(isUnconfirmedApproval({ ...pending, instruction_authorised: true })).toBe(false);
+    expect(isUnconfirmedApproval({ ...pending, protects_approval: false })).toBe(false);
+  });
+
+  it('offers the user’s own approval, never the request: "Mark director authorization approved" is not a button', () => {
+    expect(choiceLabels(pending)).toEqual({ keep: 'Keep director authorization pending', override: "I have the operations director's approval" });
+  });
+
+  it('tells the model who approved, on whose word, where it is recorded, and that the request is not the approval', () => {
+    const note = approvalConfirmedNote(pending, { approver: 'the operations director', source: 'Director’s email of 19 Nov' });
+    expect(note).toContain('The user confirms that the operations director has given this approval');
+    expect(note).toContain('Director’s email of 19 Nov');
+    expect(note).toContain('cite that source');
+    expect(note).toContain('is not itself the approval');
+    expect(note).toContain('The operations director’s launch authorization is pending.');
+    expect(note).not.toMatch(/overridden/);
+    // A quoted request is named as the request.
+    expect(approvalConfirmedNote({ ...pending, request_quote: 'Please mark it approved' }, { approver: '', source: 'Board minutes, 18 Nov' }))
+      .toContain('The request in the instruction ("Please mark it approved") is not itself the approval');
   });
 });

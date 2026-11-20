@@ -75,6 +75,12 @@ class Conflict(BaseModel):
     from_request: bool = False
     #: Those words of the instruction, verbatim.
     request_quote: str = ""
+    #: L-263 (Sean, 19 Nov, warehouse rollout): who the record says must give
+    #: the approval ("the operations director"), as the record names them —
+    #: checked in code against the record. The browser's second choice reads
+    #: "I have the operations director's approval" and asks for its source,
+    #: never "Mark director authorization approved".
+    approver: str = ""
 
 
 _CONFLICT_INSTRUCTION = (
@@ -110,7 +116,10 @@ _CONFLICT_INSTRUCTION = (
     "instruction would treat a change that person has not approved as approved — writing the "
     "unapproved value as the approved one, or removing the record of the request — that is the "
     "conflict to report, with kind \"fact\" (citing the fact's id) or \"decision\" or \"constraint\", "
-    "and \"protects_approval\": true. Report it once, not once per place it is written.\n\n"
+    "and \"protects_approval\": true, and set \"approver\" to who the record says must approve, as the record "
+    "names them (\"the operations director\", \"Elena\"). A record that says an approval or authorization is still "
+    "pending, and an instruction or message asking to mark it approved, is this conflict too. Report it once, not "
+    "once per place it is written.\n\n"
     # 17 Oct (Sean, HARBOR: Elena's November 6 approval was answered with
     # "Keep November 5 update"; NORTHSTAR-2: a confirmed amendment withdrawing
     # an exception was answered with "Keep Cedar exception").
@@ -140,6 +149,7 @@ _CONFLICT_INSTRUCTION = (
     '"with_text": "what it conflicts with", "explanation": "one sentence", '
     '"resolution": "one sentence", "keep_label": "at most six words", '
     '"override_label": "at most six words", "protects_approval": true|false, '
+    '"approver": "who the record says must approve, or empty", '
     '"authority_quote": "the instruction\'s own words recording the approval or confirmed amendment, or empty", '
     '"request_quote": "the instruction\'s own words reporting someone else\'s request, or empty"}]}'
 )
@@ -256,6 +266,16 @@ _RELAYED = re.compile(
     r"unapproved|not (?:yet )?(?:been )?approved|pending|awaiting|draft|tentative\w*|would|if)\b",
     re.IGNORECASE,
 )
+#: Words that ask for something to be marked approved: an order, never the
+#: approval itself (L-263, Sean, 19 Nov: a trainer's "mark the operations
+#: director's launch authorization approved").
+_MARKS_APPROVED = re.compile(
+    r"^\s*please\b"
+    r"|\b(?:mark|treat|record|set|list|show|log|consider|count|make)\w*\b[^.;]{0,80}?\b(?:as\s+)?"
+    r"(?:approved|authori[sz]ed|signed[- ]off|cleared|confirmed)\b"
+    r"|\bas\s+(?:approved|authori[sz]ed|signed[- ]off)\b",
+    re.IGNORECASE,
+)
 _NOT_NAMES = {
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
     "December", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Confirmed", "Approved",
@@ -272,7 +292,7 @@ def _authorised(quote: str, instruction: str, known_text: str) -> bool:
     q = " ".join(quote.split()).strip(" .\"'“”")
     if len(q) < 8 or q.lower() not in " ".join(instruction.split()).lower():
         return False
-    if not _AUTHORISED.search(q) or _RELAYED.search(q):
+    if not _AUTHORISED.search(q) or _RELAYED.search(q) or _MARKS_APPROVED.search(q):
         return False
     names = [w for w in re.findall(r"\b[A-Z][a-z]{2,}\b", q) if w not in _NOT_NAMES]
     return all(n.lower() in known_text.lower() for n in names)
@@ -357,20 +377,45 @@ def parse_conflicts(
                 continue
             if user_text is not None and not _from_user(with_text, user_text):
                 continue
-        protects = item.get("protects_approval") is True
+        protects = item.get("protects_approval") is True or _marks_unapproved(
+            with_text, str(item.get("override_label") or ""), explanation
+        )
         if not frozen and _only_as_of(kind, with_text, explanation, protects):
             continue
         out.append(Conflict(
             kind=kind, with_id=with_id, with_text=with_text[:2_000], explanation=explanation[:500],
             keep_label=_label(item.get("keep_label")), override_label=_label(item.get("override_label")),
             resolution=" ".join(str(item.get("resolution") or "").split())[:300],
-            protects_approval=item.get("protects_approval") is True,
+            protects_approval=protects,
+            approver=_approver(item.get("approver"), known_text) if protects else "",
             **_authority(item.get("authority_quote"), instruction, known_text),
         ))
         if not out[-1].instruction_authorised:
             out[-1] = out[-1].model_copy(update=_request(item.get("request_quote"), instruction, known_text))
     # The approval the record protects is the question; it is asked first.
     return sorted(out, key=lambda c: not c.protects_approval)
+
+
+def _marks_unapproved(with_text: str, override_label: str, explanation: str) -> bool:
+    """L-263 (Sean, 19 Nov): the record names an approval, and the other side
+    of the choice would mark it approved ("Mark director authorization
+    approved"). That is an approval conflict whether or not the model said so:
+    left unflagged, the button acted in one click with no confirmation."""
+    return bool(_APPROVAL.search(with_text)) and bool(
+        _MARKS_APPROVED.search(override_label)
+        or re.search(r"\b(?:mark|treat|record)\w*\b[^.;]{0,80}?\b(?:approved|authori[sz]ed)\b", explanation, re.IGNORECASE)
+    )
+
+
+def _approver(raw: object, known_text: str) -> str:
+    """Who must approve, as the record names them; "" unless the record does."""
+    text = " ".join(str(raw or "").split()).strip(" .,;:")
+    if not text or any(q in text for q in "\"“”«»") or len(text.split()) > 8:
+        return ""
+    bare = re.sub(r"^(?:the|a|an)\s+", "", text, flags=re.IGNORECASE)
+    if len(bare) < 2 or bare.lower() not in " ".join(known_text.split()).lower():
+        return ""
+    return text[:80]
 
 
 def _authority(raw: object, instruction: str, known_text: str) -> dict:

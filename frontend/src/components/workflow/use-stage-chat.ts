@@ -63,7 +63,7 @@ import {
 } from './chat-scope';
 import { listVersions, type NewVersion } from '@/lib/supabase/versions';
 import { resolveInstruction, withoutStamps, type ResolvedInstruction } from '@/lib/workflow/version-stamp';
-import type { ArtifactVersion, Project } from '@/types/project';
+import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import { factChangesFromRevision, isNewFact, newFactSource, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
@@ -460,9 +460,22 @@ export function useStageChat({
     async (
       instruction: string,
       kind: ScopeKind,
-      options: { selection?: string; sectionId?: string; precedence?: string[] } = {}
+      options: {
+        selection?: string;
+        sectionId?: string;
+        precedence?: string[];
+        /**
+         * The project's facts as they now stand, when the caller has just
+         * changed them (L-263: an approval the user confirmed, saved before the
+         * revision). The project prop still holds the earlier list until the
+         * store reloads, and the revision's fact check would offer the old
+         * fact's change again.
+         */
+        facts?: readonly ProjectFact[];
+      } = {}
     ) => {
       const typed = instruction.trim();
+      const current = options.facts ? { ...project, facts: [...options.facts] } : project;
       if (!typed || busy || loading) return;
       // An export's version stamps never reach the document or the model as words.
       const text = withoutStamps(typed) || typed;
@@ -518,7 +531,7 @@ export function useStageChat({
         };
 
         const response = await api.applyToAnswer({
-          inputs: inputsFrom(project),
+          inputs: inputsFrom(current),
           active_iteration: asIteration(target.text, versionNumber, project.mode),
           chat_history: [...priorHistory, scoped],
           iteration_number: headNumber + 1,
@@ -554,8 +567,8 @@ export function useStageChat({
           ask: { instruction: text, kind, options },
           messageId: saved.id,
           factChanges: await withMeaningChanges(
-            factChangesFromRevision({ facts: project.facts, instruction: ask, before: content, after: checked.nextContent }),
-            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model, setup: { objective: project.objective ?? '', constraints: project.constraints ?? '', output_format: project.output_format ?? '' } },
+            factChangesFromRevision({ facts: current.facts, instruction: ask, before: content, after: checked.nextContent }),
+            { facts: current.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model, setup: { objective: project.objective ?? '', constraints: project.constraints ?? '', output_format: project.output_format ?? '' } },
             (req) => api.revisionFacts(req)
           ),
           changeSummary: withWebLine(

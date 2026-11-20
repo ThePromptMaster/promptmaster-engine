@@ -3751,7 +3751,13 @@ export function WorkflowWorkspace({
               stageId={stage.id}
               stageLabel={stage.label}
               stageTitle={stageText(locale, template.key, stage, 'label')}
-              onFactsChanged={() => onReload?.()}
+              onFactsChanged={(opts) => {
+                // A confirmed approval this stage's revision is about to carry
+                // does not reopen it (L-263); the stages that relied on the old
+                // status still do.
+                if (opts?.revising) revisedWith.current = { stageId: stage.id, at: Date.now() };
+                return onReload?.();
+              }}
               // Written before the facts reload the project, or the reload brings
               // back the old objective over the one just set (2 Nov, prod pass).
               onPatchSetup={async (patch) => {

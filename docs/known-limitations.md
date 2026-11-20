@@ -4906,3 +4906,30 @@ internal") was added after the first was answered. Go's question about it shared
 as "I asked this before", quoting the first question, whose finding was already decided. The guard now reads
 which open findings a question is about (Go's `finding_ids`, or the ids it names): a question about none of
 the findings the earlier one asked about is not its repeat, however alike the words.
+
+### L-263 — A request to mark an approval approved is not the approval; one the user holds is confirmed and sourced (2026-11-20)
+Sean's warehouse rollout test (19 Nov) pasted a trainer's message asking for the operations director's launch
+authorization to be marked approved. The side chat warned correctly, then offered "Mark director authorization
+approved", the model's own label for the request. Pressing it only told the writer the user had "explicitly
+overridden the recorded approval rule": nothing asked whether the director had approved, and nothing recorded
+who approved or where. When the model left `protects_approval` off, it was one click with no confirmation.
+
+Now, for an approval the record waits on that the instruction does not itself record (`isUnconfirmedApproval`):
+- The second button is written in code: "I have {approver}'s approval", with the approver as the record names
+  them (`approver`, checked against the record in `conflicts.py`), or "I have the approval this needs".
+- Pressing it asks for a ticked confirmation that the approver gave it and a required "Where is it recorded?".
+  The approval is saved first as a fact in code words, replacing the fact the check cited when it cited one
+  (`recordReportedApproval`, `source_ref.approval_source`, `confirmed_by_user`), and the decision trail
+  carries the approver and source. If the fact cannot be saved, nothing is applied.
+- The writer is told who approved, on the user's confirmation, to cite the source, and that the request is not
+  the approval (`approvalConfirmedNote`). "Override the recorded approval" without a source no longer exists.
+- In code: a conflict whose record names an approval and whose other side would mark it approved is an
+  approval conflict even if the model did not say so, and an order to mark something approved ("Please mark…
+  approved") is never an authority quote.
+- Go's own question about such an approval offers only Keep; an approval the user holds is typed, with who
+  gave it and where, and travels as their answer. No fact is written from a Go answer.
+
+Not changed: under "Handle them for me", a pasted message written in its author's first person ("Please
+mark…") is not recognised as someone else's request, so the card is still asked rather than the record kept
+silently (L-93). If the user discards the revision after confirming, the approval fact stays recorded while
+that stage's text still says pending; the stage is not marked for a recheck by it.

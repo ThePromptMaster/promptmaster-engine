@@ -42,15 +42,20 @@ import {
   findInstructionConflicts,
   holdPendingChange,
   recordConflictChoice,
+  recordReportedApproval,
   settlePendingChange,
   type PendingChange,
 } from '@/lib/workflow/conflict-trail';
 import { useProjectStore } from '@/stores/project-store';
 import {
+  approvalConfirmedNote,
+  isUnconfirmedApproval,
   precedenceNote,
+  type ApprovalReport,
   type Controls,
   type InstructionConflict,
 } from '@/lib/workflow/instruction-conflicts';
+import { listProjectFacts } from '@/lib/supabase/facts';
 import { keepWithoutAsking, routinePrecedenceNote } from '@/lib/workflow/routine-conflicts';
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
@@ -157,8 +162,12 @@ interface Props {
   starters?: string[];
   /** A control beside the composer that attaches a file to the project. */
   attach?: ReactNode;
-  /** After a revision updated accepted facts, so the project reloads them. */
-  onFactsChanged?: () => Promise<unknown> | void;
+  /**
+   * After a revision updated accepted facts, so the project reloads them.
+   * `revising`: this stage is about to carry the change itself (an approval
+   * the user confirmed, L-263), so it is not reopened for it.
+   */
+  onFactsChanged?: (opts?: { revising?: boolean }) => Promise<unknown> | void;
   /** Replace the stored objective or constraints, as a ticked instruction asks (1 Nov). */
   onPatchSetup?: (patch: { objective?: string; constraints?: string; output_format?: string }) => Promise<unknown> | void;
   /** After the chat saved web sources, so the project reloads them (22 Oct). */
@@ -572,27 +581,47 @@ export function ChatPanel({
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
   }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority, keepUnderRoutine, changeAsRows, t]);
 
+  const [approvalError, setApprovalError] = useState(false);
   const resolveConflicts = useCallback(
-    async (choices: Controls[]) => {
+    async (choices: Controls[], approval?: ApprovalReport) => {
       if (!conflicting) return;
       const { text, conflicts, action, pendingId } = conflicting;
+      // L-263: an approval the user confirmed holding is saved first, as a
+      // fact with its source. If it cannot be saved, nothing is applied and
+      // the question stays, so the text never states an approval the record
+      // does not hold.
+      const report = approval && choices[0] === 'new' && conflicts[0] && isUnconfirmedApproval(conflicts[0]) ? approval : undefined;
+      let facts: Awaited<ReturnType<typeof listProjectFacts>> | undefined;
+      setApprovalError(false);
+      if (report) {
+        try {
+          await recordReportedApproval({ project, conflict: conflicts[0], report, instruction: text });
+          facts = await listProjectFacts(project.id).catch(() => undefined);
+          void onFactsChanged?.({ revising: true });
+        } catch {
+          setApprovalError(true);
+          return;
+        }
+      }
       setConflicting(null);
       settle(pendingId, text, 'applied');
       await Promise.all(
         conflicts.map((conflict, i) =>
-          recordConflictChoice({ projectId: project.id, userId: project.user_id, stageId, instruction: text, conflict, controls: choices[i] })
-            .catch(() => undefined)
+          recordConflictChoice({
+            projectId: project.id, userId: project.user_id, stageId, instruction: text, conflict, controls: choices[i],
+            ...(report && i === 0 ? { approval: report } : {}),
+          }).catch(() => undefined)
         )
       );
-      const precedence = conflicts.map((c, i) => precedenceNote(c, text, choices[i]));
+      const precedence = conflicts.map((c, i) => (report && i === 0 ? approvalConfirmedNote(c, report) : precedenceNote(c, text, choices[i])));
       if (action) {
         // An action button's revision carries the user's answer with it.
         await onRunAction?.({ ...action, instruction: [text, ...precedence].join('\n') });
         return;
       }
-      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId, precedence });
+      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId, precedence, ...(facts ? { facts } : {}) });
     },
-    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId, onRunAction, settle]
+    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId, onRunAction, settle, onFactsChanged]
   );
 
   return (
@@ -750,8 +779,9 @@ export function ChatPanel({
               instruction={conflicting.text}
               conflicts={conflicting.conflicts}
               busy={chat.busy}
-              onContinue={(choices) => void resolveConflicts(choices)}
+              onContinue={(choices, approval) => void resolveConflicts(choices, approval)}
               onCancel={() => {
+                setApprovalError(false);
                 if (!conflicting.action) setDraft(conflicting.text);
                 settle(conflicting.pendingId, conflicting.text, 'withdrawn');
                 setConflicting(null);
@@ -823,6 +853,11 @@ export function ChatPanel({
       {chat.error && (
         <p role="alert" className="px-5 pb-2 text-label text-[var(--pm-error)]">
           {chat.error}
+        </p>
+      )}
+      {approvalError && conflicting && (
+        <p role="alert" className="px-5 pb-2 text-label text-[var(--pm-error)]">
+          {t('cp.reportFailed')}
         </p>
       )}
       {chat.redo && !readOnly && (
