@@ -57,6 +57,37 @@ const SIGNALS = [
 /** A note is a few lines, never most of the text. */
 const NOTE_MAX = 3_000;
 
+/**
+ * What a note about the work's own making says (20 Nov, Sean, warehouse rerun: a
+ * fix opened the final package with "One line on a conflict: the stage asks both
+ * to apply the accepted findings and to copy the earlier announcement character
+ * for character … I applied i8: I removed both sentences…"). Two different ones
+ * before the document's first heading make that opening a note to the user.
+ */
+const PROCESS = [
+  /\bthe[ \t]+stage(?:'s)?[ \t]+(?:asks|says|instructions?|requires)\b/i,
+  /\bfindings?[ \t]+[a-z]?\d+\b|\baccepted[ \t]+(?:findings?|changes?)\b/i,
+  /\bI[ \t]+(?:applied|removed|kept|copied|set[ \t]+aside|changed|added|left[ \t]+out|did[ \t]+not[ \t]+(?:apply|copy|change))\b/,
+  /\bcharacter[- ]for[- ]character\b|\bverbatim[ \t]+copy\b/i,
+  /^[ \t*_]*one[ \t]+line[ \t]+on\b|\bpull[ \t]+against[ \t]+each[ \t]+other\b|\bthese[ \t]+(?:two[ \t]+)?conflict\b/im,
+  /\byour[ \t]+instruction\b|\bthe[ \t]+(?:previous|earlier)[ \t]+(?:version|draft)\b/i,
+];
+
+/**
+ * Where the work starts, when an opening before its first heading is a note to
+ * the user. Only text before the first heading, only when a heading follows it,
+ * never a table, and only when it says two different things a note about the
+ * work's making says.
+ */
+function leadingBlock(lines: string[]): number | null {
+  const first = lines.findIndex((l) => HEADING.test(l));
+  if (first <= 0) return null;
+  const opening = lines.slice(0, first);
+  const text = opening.join('\n').trim();
+  if (!text || text.length > NOTE_MAX || opening.some((l) => l.trimStart().startsWith('|'))) return null;
+  return PROCESS.filter((p) => p.test(text)).length >= 2 ? first : null;
+}
+
 /** The words a line opens with, without Markdown, up to a colon. */
 function labelOf(line: string): string {
   const bare = line.replace(/^[ \t]*(?:#{1,6}[ \t]+|>[ \t]*)?[*_]*/, '').trim();
@@ -100,7 +131,7 @@ function trailingBlock(lines: string[]): number | null {
   return signals(body) >= 2 ? start + 1 : null;
 }
 
-/** The work, and the note to the user taken off its end ('' when there is none). */
+/** The work, and the note to the user taken off its end, or off its opening before the first heading (20 Nov) ('' when there is none). */
 export function splitUserNote(text: string): { body: string; note: string } {
   if (!text || !text.trim()) return { body: text, note: '' };
   const notes: string[] = [];
@@ -111,6 +142,11 @@ export function splitUserNote(text: string): { body: string; note: string } {
     work = work.slice(0, m.index);
   }
   let lines = work.replace(/\s+$/, '').split('\n');
+  const lead = leadingBlock(lines);
+  if (lead !== null) {
+    notes.push(lines.slice(0, lead).join('\n').trim());
+    lines = lines.slice(lead);
+  }
   const start = trailingBlock(lines);
   if (start !== null) {
     let block = lines.slice(start);

@@ -126,3 +126,19 @@ describe('a repair keeps Go\'s own decision on a finding it left as it was (19 N
     expect(changed[0].status).toBeUndefined();
   });
 });
+
+describe('a note to the user is never part of the applied text (20 Nov, Sean, warehouse rerun)', () => {
+  it('the note the backend took off, and one the writer put at the opening, come back beside the text', async () => {
+    vi.mocked(api.applyRecommendations).mockReset();
+    vi.mocked(api.applyRecommendations).mockResolvedValueOnce({
+      content:
+        'One line on a conflict: the stage asks both to apply the accepted findings and to copy the earlier announcement character for character. I applied i8.\n\n# Package\n\n## Schedule\n\nTwo sessions run.',
+      note_to_user: 'I counted the announcement at 114 words.',
+      instruction: 'x', finish_reason: 'stop',
+    } as never);
+    const rev = await reviseWithFindings({ project: { id: 'p', model: 'm' } as never, content: '# Package\n\nOld.', findings, source: 'the stage check' });
+    expect(rev.after).toBe('# Package\n\n## Schedule\n\nTwo sessions run.');
+    expect(rev.note).toContain('I counted the announcement at 114 words.');
+    expect(rev.note).toContain('One line on a conflict');
+  });
+});

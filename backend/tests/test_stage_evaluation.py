@@ -584,6 +584,15 @@ def test_the_evaluator_is_told_to_call_the_work_the_draft():
     assert 'never "the artifact"' in _STAGE_EVAL_INSTRUCTION
 
 
+def test_a_conflict_in_the_instructions_is_not_a_finding_for_the_draft():
+    """20 Nov (Sean, warehouse rerun): "the draft does not name the conflict to the user"
+    became a paragraph addressed to him at the top of the final package."""
+    from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
+
+    assert "A conflict between the stage's own instructions is not a defect of the draft" in _STAGE_EVAL_INSTRUCTION
+    assert "Never ask the draft to tell the user something" in _STAGE_EVAL_INSTRUCTION
+
+
 def test_completeness_is_judged_against_the_stage_not_the_deliverable(book_inputs, positioning_stage, book_digest):
     """9 Oct (production): Method was "incomplete" for holding no computed examples."""
     _system, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "Some text", book_digest, [])

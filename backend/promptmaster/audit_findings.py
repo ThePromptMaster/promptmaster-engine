@@ -16,6 +16,7 @@ from .llm_client import OpenRouterClient
 from .schemas import AuditFinding, Iteration, PMInput
 from .session_context import format_session_history
 from .project_context import context_block
+from .reader_text import READER_TEXT_RULE, USER_NOTE_MARKER, USER_NOTE_RULE
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,18 @@ _APPLY_AUDIT_INSTRUCTION = (
 )
 
 
+#: 20 Nov (Sean, warehouse rerun): a review finding said the draft "does not name
+#: the conflict to the user", and this prompt — Go's way of applying findings to a
+#: stage — had nowhere to put a note, so the writer opened the final package with
+#: "One line on a conflict: the stage asks both…". Go then asked him whether to take
+#: it out. A stage's findings are applied with the stage writer's note rules.
+_STAGE_NOTE_INSTRUCTION = (
+    "A finding that asks you to tell the user something — name a conflict, explain a choice, "
+    "say what you did — is answered in your note to the user, never in the work.\n\n"
+    + USER_NOTE_RULE + "\n\n" + READER_TEXT_RULE
+)
+
+
 def _format_findings_block(findings: list[AuditFinding]) -> str:
     if not findings:
         return "(no findings selected)"
@@ -126,9 +139,15 @@ def build_apply_audit_prompt(
     findings: list[AuditFinding],
     iterations: list[Iteration],
     whole_text: str = "",
+    stage_notes: bool = False,
 ) -> tuple[str, str]:
-    """Build (system, user) prompts for the apply-audit LLM call."""
-    system = _shared_system(inputs, iterations, _APPLY_AUDIT_INSTRUCTION)
+    """Build (system, user) prompts for the apply-audit LLM call.
+
+    `stage_notes`: a stage's findings, applied by Go or the review panel
+    (`/apply-recommendations`): the writer gets a place for a note to the user,
+    which the router takes off the work (20 Nov)."""
+    instruction = f"{_APPLY_AUDIT_INSTRUCTION}\n\n{_STAGE_NOTE_INSTRUCTION}" if stage_notes else _APPLY_AUDIT_INSTRUCTION
+    system = _shared_system(inputs, iterations, instruction)
     findings_block = _format_findings_block(findings)
     user = (
         f"Original objective: {inputs.objective}\n"
@@ -141,7 +160,10 @@ def build_apply_audit_prompt(
         f"{source_iteration.output}\n\n"
         f"FINDINGS TO ADDRESS:\n{findings_block}\n\n"
         "Produce a revised version of the answer that addresses each finding "
-        "while preserving alignment with the original objective. Output only "
-        "the revised answer text."
+        "while preserving alignment with the original objective. "
+        + (
+            f"Output the revised text, then, only if you have something to tell the user, the line {USER_NOTE_MARKER} and your note."
+            if stage_notes else "Output only the revised answer text."
+        )
     )
     return system, user

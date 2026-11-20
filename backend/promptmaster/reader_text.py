@@ -94,6 +94,36 @@ _SIGNALS = (
 #: A note is a few lines, never most of the text.
 _NOTE_MAX = 3_000
 
+#: What a note about the work's own making says (20 Nov, Sean, warehouse rerun: a fix
+#: opened the final package with "One line on a conflict: the stage asks both to apply
+#: the accepted findings and to copy the earlier announcement character for character
+#: … I applied i8: I removed both sentences…"). Two different ones before the
+#: document's first heading make that opening a note to the user.
+_PROCESS = (
+    re.compile(r"\bthe[ \t]+stage(?:'s)?[ \t]+(?:asks|says|instructions?|requires)\b", re.IGNORECASE),
+    re.compile(r"\bfindings?[ \t]+[a-z]?\d+\b|\baccepted[ \t]+(?:findings?|changes?)\b", re.IGNORECASE),
+    re.compile(r"\bI[ \t]+(?:applied|removed|kept|copied|set[ \t]+aside|changed|added|left[ \t]+out|did[ \t]+not[ \t]+(?:apply|copy|change))\b"),
+    re.compile(r"\bcharacter[- ]for[- ]character\b|\bverbatim[ \t]+copy\b", re.IGNORECASE),
+    re.compile(r"^[ \t*_]*one[ \t]+line[ \t]+on\b|\bpull[ \t]+against[ \t]+each[ \t]+other\b|\bthese[ \t]+(?:two[ \t]+)?conflict\b", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"\byour[ \t]+instruction\b|\bthe[ \t]+(?:previous|earlier)[ \t]+(?:version|draft)\b", re.IGNORECASE),
+)
+
+
+def _leading_block(lines: list[str]) -> int | None:
+    """Where the work starts, when an opening before its first heading is a note to the user.
+
+    Only text before the first heading, only when a heading follows it, never a table, and
+    only when it says two different things a note about the work's making says.
+    """
+    first = next((i for i, l in enumerate(lines) if _HEADING.match(l)), None)
+    if not first:
+        return None
+    opening = lines[:first]
+    text = "\n".join(opening).strip()
+    if not text or len(text) > _NOTE_MAX or any(l.lstrip().startswith("|") for l in opening):
+        return None
+    return first if sum(1 for p in _PROCESS if p.search(text)) >= 2 else None
+
 
 def _label_of(line: str) -> str:
     """The words a line opens with, without Markdown, up to a colon."""
@@ -150,7 +180,8 @@ def _trailing_block(lines: list[str]) -> int | None:
 
 
 def split_user_note(text: str) -> tuple[str, str]:
-    """The work, and the note to the user taken off its end ("" when there is none)."""
+    """The work, and the note to the user taken off its end, or off its opening before the
+    first heading (20 Nov) ("" when there is none)."""
     if not text or not text.strip():
         return text, ""
     notes: list[str] = []
@@ -160,6 +191,10 @@ def split_user_note(text: str) -> tuple[str, str]:
         notes.append(work[m.end() :].strip())
         work = work[: m.start()]
     lines = work.rstrip().split("\n")
+    lead = _leading_block(lines)
+    if lead is not None:
+        notes.append(_note_text(lines[:lead]))
+        lines = lines[lead:]
     start = _trailing_block(lines)
     if start is not None:
         block = lines[start:]

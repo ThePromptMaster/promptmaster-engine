@@ -138,6 +138,24 @@
    "text": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.\n\n## Notes on this version\n\n- Trimmed to 640 words.",
    "document": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.",
    "note": true
+  },
+  {
+   "name": "20 Nov warehouse rerun v6: a note about the stage's own instructions opening the package",
+   "text": "One line on a conflict: the stage asks both to apply the accepted findings and to copy the earlier announcement character for character. Those two pull against each other over two sentences that finding i8 identified as unsupported. I applied i8: I removed both sentences and copied the corrected announcement verbatim into the package. I set aside the character-for-character copy of the earlier text.\n\n# Warehouse Scanner Rollout: Final Readiness Package\n\n## Requirements matrix\n\n| # | Requirement | Current status |\n|---|---|---|\n| 1 | Training for all employees | Not met by the plan. 16 of 24 employees have planned attendance. |\n\n## Staff announcement\n\n> Two sessions are scheduled. A decision is pending on the employees who do not have a session.",
+   "document": "# Warehouse Scanner Rollout: Final Readiness Package\n\n## Requirements matrix\n\n| # | Requirement | Current status |\n|---|---|---|\n| 1 | Training for all employees | Not met by the plan. 16 of 24 employees have planned attendance. |\n\n## Staff announcement\n\n> Two sessions are scheduled. A decision is pending on the employees who do not have a session.",
+   "note": true
+  },
+  {
+   "name": "20 Nov: an ordinary opening line before the title stays",
+   "text": "Prepared for the North and Central warehouse leads. This package covers the training plan, the budget and what remains open before launch.\n\n# Warehouse Scanner Rollout: Final Readiness Package\n\n## Requirements matrix\n\n| # | Requirement | Current status |\n|---|---|---|\n| 1 | Training for all employees | Not met by the plan. 16 of 24 employees have planned attendance. |\n\n## Staff announcement\n\n> Two sessions are scheduled. A decision is pending on the employees who do not have a session.",
+   "document": "Prepared for the North and Central warehouse leads. This package covers the training plan, the budget and what remains open before launch.\n\n# Warehouse Scanner Rollout: Final Readiness Package\n\n## Requirements matrix\n\n| # | Requirement | Current status |\n|---|---|---|\n| 1 | Training for all employees | Not met by the plan. 16 of 24 employees have planned attendance. |\n\n## Staff announcement\n\n> Two sessions are scheduled. A decision is pending on the employees who do not have a session.",
+   "note": false
+  },
+  {
+   "name": "20 Nov: a document that opens in the first person, with one process word, stays",
+   "text": "I applied the new session rates from Day 1 and kept the earlier rates for the planning figures.\n\n## Rates\n\n| Item | Amount |\n|---|---|\n| Session | $700 |",
+   "document": "I applied the new session rates from Day 1 and kept the earlier rates for the planning figures.\n\n## Rates\n\n| Item | Amount |\n|---|---|\n| Session | $700 |",
+   "note": false
   }
  ]
 }

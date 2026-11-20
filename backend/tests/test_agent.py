@@ -931,6 +931,8 @@ def test_a_paused_revise_is_said_not_silently_withheld():
     assert "REVISING IS PAUSED ON THIS STAGE FOR THE REST OF THIS RUN: 2 checks, applied findings or revisions" in user
     assert "never tell the user you cannot edit the work" in user
     assert "ask whether you should try again" in user
+    # 20 Nov (Sean, warehouse rerun): a note to him in the work is taken out, not asked about.
+    assert "A note to the user that ended up in the work is not such a change" in user
 
 
 def test_the_users_delegation_reaches_the_planner_in_their_words():

@@ -36,6 +36,12 @@ export interface PendingRevision {
   web?: WebFound | null;
   /** A long text revised a part at a time: how many parts, and which (1-based) came back unusable and were kept as they were. */
   parts?: { count: number; kept: number[] };
+  /**
+   * What the writer said to the user rather than the reader, kept out of the
+   * work (20 Nov, Sean, warehouse rerun: "One line on a conflict: …" opened the
+   * final package). Shown with the step, never saved into the text.
+   */
+  note?: string;
 }
 
 /** Parts revised at once; the rest wait their turn, so one long text is not a burst of calls. */
@@ -159,11 +165,16 @@ export async function reviseWithFindings(args: {
   );
   const web = await keepFound(project, res, where);
   if (!res.content.trim()) throw new Error('The model returned nothing usable.');
+  // A note to the user is not part of the document, at its end (4 Nov, Lakeside)
+  // or its opening (20 Nov); the backend took off what it found, and this catches
+  // the rest.
+  const split = splitUserNote(res.content);
+  const note = [res.note_to_user ?? '', split.note].map((n) => n.trim()).filter(Boolean).join('\n\n');
   return {
     findings,
     before: content,
-    // A note to the user is not the end of the document (4 Nov, Lakeside).
-    after: splitUserNote(res.content).body,
+    ...(note ? { note } : {}),
+    after: split.body,
     instruction: res.instruction,
     finishReason: res.finish_reason || null,
     source,
@@ -191,7 +202,7 @@ async function reviseInParts(args: {
   const { project, content, findings, source, signal, where } = args;
   const chunks = splitIntoParts(content);
   const outline = headingOutline(content);
-  const results: { text: string; kept: boolean; instruction: string; web: WebFound | null }[] = new Array(chunks.length);
+  const results: { text: string; kept: boolean; instruction: string; web: WebFound | null; note: string }[] = new Array(chunks.length);
   // The part that reports on the rest goes last, against what the others became (5 Nov).
   const reads = partThatReads(chunks);
   const first = reads === 0 ? 1 : 0;
@@ -203,7 +214,9 @@ async function reviseInParts(args: {
     );
     const web = i === first ? await keepFound(project, res, where) : null;
     const kept = !res.content.trim() || res.finish_reason === 'length';
-    results[i] = { text: kept ? chunks[i] : splitUserNote(res.content).body, kept, instruction: res.instruction, web };
+    const split = splitUserNote(res.content);
+    const note = [res.note_to_user ?? '', split.note].map((n) => n.trim()).filter(Boolean).join('\n\n');
+    results[i] = { text: kept ? chunks[i] : split.body, kept, instruction: res.instruction, web, note: kept ? '' : note };
   };
   await revisePart(first);
   const others = chunks.map((_, i) => i).filter((i) => i !== first && i !== reads);
@@ -213,9 +226,11 @@ async function reviseInParts(args: {
   await revisePart(reads, joinParts(chunks.map((c, i) => results[i]?.text ?? c)));
   const kept = results.flatMap((r, i) => (r.kept ? [i + 1] : []));
   if (kept.length === chunks.length) throw new Error('No part of the revision came back usable.');
+  const note = results.map((r) => r.note).filter(Boolean).join('\n\n');
   return {
     findings,
     before: content,
+    ...(note ? { note } : {}),
     after: joinParts(results.map((r) => r.text)),
     instruction: results[0].instruction,
     finishReason: 'stop',

@@ -515,7 +515,12 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "evaluate_stage are not offered now. That is this run's limit, not something you are unable to do: "
             "never tell the user you cannot edit the work, and never ask them to press a button to make an edit "
             "for you. If a change the requirements need has still not held, say once what is left and why, and "
-            "ask whether you should try again — their answer lets you revise again."
+            "ask whether you should try again — their answer lets you revise again. "
+            # 20 Nov (Sean, warehouse rerun): Go asked whether to take out a note
+            # to him that a fix had written into the final package.
+            "A note to the user that ended up in the work is not such a change: ask to remove it plainly "
+            "(\"remove the note to you at the top\"), and under routine decisions handled by you it is taken "
+            "out without waiting for them."
         )
     if state.latest_change is not None:
         # 19 Oct (Research › Method): asked what an applied finding changed, Go

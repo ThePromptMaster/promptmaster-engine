@@ -189,3 +189,46 @@ def test_llm_failure_surfaces_as_502(basic_inputs):
         app.dependency_overrides.pop(get_client, None)
 
     assert response.status_code == 502
+
+
+def test_a_note_to_the_user_is_taken_off_the_work_and_returned_beside_it(basic_inputs):
+    """20 Nov (Sean, warehouse rerun): Go applied a finding that said the draft "does
+    not name the conflict to the user", and the final package opened with a paragraph
+    addressed to him. The writer now has a place for that note, and a note written
+    into the opening anyway comes off in code."""
+    from promptmaster.reader_text import USER_NOTE_MARKER, USER_NOTE_RULE
+
+    opening = (
+        "One line on a conflict: the stage asks both to apply the accepted findings and to copy the earlier "
+        "announcement character for character. I applied i8: I removed both sentences.\n\n"
+        "# Readiness package\n\n## Schedule\n\nTwo sessions run."
+    )
+    for written, note in [
+        (f"# Readiness package\n\n## Schedule\n\nTwo sessions run.\n\n{USER_NOTE_MARKER}\nI applied i8.", "I applied i8."),
+        (opening, "One line on a conflict"),
+    ]:
+        client = AsyncMock()
+        client.generate_with_meta = AsyncMock(return_value=(written, {}, "stop"))
+        app.dependency_overrides[get_client] = lambda: client
+        try:
+            body = TestClient(app).post(
+                "/api/apply-recommendations",
+                json={"inputs": basic_inputs.model_dump(), "content": "A draft.", "findings": [f.model_dump() for f in CAST_RECOMMENDATIONS]},
+            ).json()
+        finally:
+            app.dependency_overrides.pop(get_client, None)
+        assert body["content"] == "# Readiness package\n\n## Schedule\n\nTwo sessions run."
+        assert body["note_to_user"].startswith(note)
+        system = client.generate_with_meta.await_args.kwargs["system"]
+        assert USER_NOTE_RULE in system
+        assert "is answered in your note to the user, never in the work" in system
+
+
+def test_the_legacy_apply_audit_keeps_its_prompt(basic_inputs):
+    from promptmaster.audit_findings import build_apply_audit_prompt
+    from promptmaster.reader_text import USER_NOTE_RULE
+    from promptmaster.schemas import Iteration
+
+    source = Iteration(iteration_number=1, prompt_sent="", output="x", mode=basic_inputs.mode, trigger_source="applied_audit")
+    system, user = build_apply_audit_prompt(basic_inputs, source, CAST_RECOMMENDATIONS, [])
+    assert USER_NOTE_RULE not in system and user.endswith("Output only the revised answer text.")

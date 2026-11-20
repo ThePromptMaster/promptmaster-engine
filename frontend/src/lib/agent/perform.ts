@@ -115,6 +115,7 @@ import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
 import { describeVersionChange, versionChange } from '@/lib/workflow/version-change';
 import { splitUserNote, userNoteLine } from '@/lib/workflow/user-note';
+import { onlyRemoves } from '@/lib/workflow/only-removes';
 
 export interface PerformContext {
   project: Project;
@@ -1015,6 +1016,32 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
       const revising = actionFor(key)!.performer === 'revise';
       const instruction = typeof params.instruction === 'string' ? params.instruction : '';
+      // 20 Nov (Sean, warehouse rerun): one pass past the edit limit that only takes
+      // out a note to the user. A note the splitter finds comes out in code, with no
+      // model call; a version the model writes is saved only if it lost lines and
+      // gained or changed none (`onlyRemoves`).
+      const removalOnly = revising && params.removal_beyond_limit === true && !rendererHoldsItems(ctx.stage.renderer);
+      if (removalOnly) {
+        const cut = splitUserNote(head);
+        if (cut.note && cut.body.trim() && onlyRemoves(head, cut.body)) {
+          const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+            content: cut.body,
+            source_operation: 'agent_revise',
+            base_content: head,
+            instruction: instruction || ctx.step.rationale || '',
+            model: ctx.project.model,
+            mode: modeForStage(ctx.project, ctx.stage),
+            change_summary: `Go mode took out a note to you that was not part of the work, and changed nothing else. ${userNoteLine(cut.note)}`.slice(0, 1000),
+          });
+          const versionId = (created as { id?: unknown } | null)?.id;
+          const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, cut.body) : [];
+          return done(key, {
+            status: 'succeeded', toolsUsed: [],
+            changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+            output: [`Took out a note to you from ${ctx.stage.label}, in code; nothing else in the work changed.`, ...reconfirmed, userNoteLine(cut.note)].join(' '),
+          });
+        }
+      }
       let routineKept: Awaited<ReturnType<typeof keptUnderRoutine>> = null;
       if (revising && instruction && !ctx.conflictAnswer) {
         const conflicts = await findInstructionConflicts({
@@ -1090,6 +1117,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
             needs: { kind: 'answer_question', question },
           });
         }
+      }
+      if (removalOnly && !onlyRemoves(head, content)) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'], changes: {},
+          output: `Not saved: this pass was only allowed to take text out of ${ctx.stage.label}, and the revision also added or reworded text. The current version stays as it is.`,
+        });
       }
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
@@ -1290,6 +1323,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           ...(rev.parts?.kept.length ? [`Part${rev.parts.kept.length === 1 ? '' : 's'} ${rev.parts.kept.join(', ')} came back cut off or empty and ${rev.parts.kept.length === 1 ? 'was' : 'were'} kept as before.`] : []),
           ...findings.slice(0, 4).map((f) => `Finding: ${f.summary.slice(0, 200)}`),
           `What changed:\n${describeVersionChange(versionChange(rev.before, rev.after, 6))}`,
+          // What the writer said to the user is the step's, never the document's (20 Nov).
+          ...(rev.note ? [userNoteLine(rev.note)] : []),
           ...(routineKept ? [routineKept.note] : []),
           ...reconfirmed,
         ].join('\n'),
