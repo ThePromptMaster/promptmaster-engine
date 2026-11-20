@@ -4958,3 +4958,30 @@ What follows for a new project, all existing behaviour of "Handle them for me":
 The E2E specs were written for projects that start on "Ask me": `createProject` in `e2e/helpers.ts` gives
 the project insert `routine_decisions: 'ask'` unless a spec asks for the default, and
 `routine-decisions.spec.ts` checks the default itself.
+
+### L-265 — A note to the user stays out of the work, and Go takes one out without asking (2026-11-20)
+Sean's warehouse rerun (20 Nov): Go applied a review finding that said the draft "does not name the
+conflict to the user". Go applies a prose stage's findings through `/api/apply-recommendations`, whose
+prompt had no place for a note. So the final package opened with "One line on a conflict: the stage asks
+both to apply the accepted findings and to copy the earlier announcement character for character … I
+applied i8…". Go had then used its edits on the stage (`POLISH_*` in `policy.ts`), so it asked him
+"Should I make one more pass to remove the opening note…?" He asked why routine cleanup needed his input.
+
+Now:
+- `/api/apply-recommendations` gives the writer the stage writer's note rules (`USER_NOTE_RULE`,
+  `READER_TEXT_RULE`, and "a finding that asks you to tell the user something is answered in your note")
+  and returns `note_to_user` beside the work. Go's step shows it ("Kept out of the document, for you").
+- `split_user_note` / `splitUserNote` also take a note off the **opening**: text before the first
+  heading, when a heading follows it, no table, and two different signs of a note about the work's own
+  making ("the stage asks", "finding i8", "accepted findings", "I applied/removed…", "character for
+  character", "one line on…"). The shared fixtures carry Sean's paragraph and two openings that stay.
+- The stage evaluator no longer raises "tell the user X" or a conflict between the stage's own
+  instructions as a finding for the draft.
+- Under Autonomous + "Handle them for me", a question that only asks to take out a note to the user
+  (`asksToRemoveNote`) becomes one `revise_stage` past the edit limit (`removal_beyond_limit`), as a
+  citation correction already was. The pass takes a note the splitter finds out in code, with no model
+  call. Otherwise the model's version is saved only if `onlyRemoves` holds: every line it keeps was there,
+  in order and word for word, and at least one went.
+
+Not changed: under "Ask me", or a second time on the same stage in a run, Go still asks. A request to
+remove content (a section, a note about the warranty) is not this pass.

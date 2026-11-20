@@ -784,6 +784,7 @@ export function useGoLoop(opts: Options) {
         lastStage: o.template.stages.at(-1)?.id === stage.id,
         approvalStands: approvalStandsThroughRepairs(o.project, stage, o.bundles[stage.id]?.versions ?? []),
         correctionsBeyondLimit: stepsRef.current.filter((st) => st.stage_id === stage.id && st.params?.correction_beyond_limit).length,
+        removalsBeyondLimit: stepsRef.current.filter((st) => st.stage_id === stage.id && st.params?.removal_beyond_limit).length,
       });
       if (plan.kind === 'leave_out') {
         // 15 Nov (Sean, guest invitation): Go's own extra is not a question for the

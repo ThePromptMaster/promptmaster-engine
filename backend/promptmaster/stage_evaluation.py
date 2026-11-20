@@ -103,6 +103,13 @@ _STAGE_EVAL_INSTRUCTION = (
     "high the bar is, is set by the CRITIQUE INTENSITY below. An artifact with "
     "nothing wrong with it gets an empty list; do not manufacture findings to "
     "look rigorous.\n\n"
+    # 20 Nov (Sean, warehouse rerun): "the draft does not name the conflict to
+    # the user" was raised as a finding, and applying it put a paragraph
+    # addressed to him at the top of the final package.
+    "A finding is a defect of the work for its reader. A conflict between the stage's own instructions "
+    "is not a defect of the draft; say it in your explanation instead. Never ask the draft to tell "
+    "the user something — what was done, which instruction was followed, that two instructions "
+    "conflict: the work is written for its reader, and notes to the user are not part of it.\n\n"
     "RECOMMENDATION: when a threshold is crossed — alignment Low, drift High, "
     "or a finding serious enough to be worth a revision — return ONE corrective "
     "recommendation. It is offered to the user, never applied: they may accept, "

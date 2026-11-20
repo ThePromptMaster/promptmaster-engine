@@ -47,6 +47,20 @@ export type ScreenPlan =
       move: { action_key: string; params: Record<string, unknown>; rationale: string; expected_outcome: string };
     };
 
+/**
+ * A request to take out a note to the user that ended up in the work (20 Nov, Sean,
+ * warehouse rerun: "Should I make one more pass to remove the opening note about
+ * the announcement conflict…?"). Both halves must be there: taking something out,
+ * and it being a note to the user rather than part of the work.
+ */
+const REMOVE = /\b(?:remove|removing|delete|take\s+out|taking\s+out|strip|drop|cut)\b/i;
+const NOTE_TO_USER =
+  /\b(?:note|comment|message|remark|aside)s?\b[^.?\n]{0,60}?\b(?:to|for)\s+(?:you|the\s+user)\b|\b(?:internal|editing|editorial|working|process|drafting)\s+(?:note|comment|text|remark)s?\b|\bopening\s+(?:note|paragraph\s+about\s+how)\b|\bnote\s+(?:to\s+you\s+)?at\s+the\s+(?:top|start|end)\b/i;
+
+export function asksToRemoveNote(question: string): boolean {
+  return REMOVE.test(question) && NOTE_TO_USER.test(question);
+}
+
 /** A request that fixes an error of fact in the text, not one that polishes it. */
 const CORRECTION = /\b(?:citation|cite[sd]?|reference|attribut(?:ion|ed|e)|author(?:ship|s)?|misattribut\w*|wrong (?:year|date|name|figure|number|title)|incorrect(?:ly)?|correct (?:the|its|a)\b|typo|misspell\w*)\b/i;
 
@@ -62,6 +76,8 @@ export function planFromScreen(
     approvalStands?: boolean;
     /** Corrections this run already made on this stage beyond its edit limit (17 Nov). */
     correctionsBeyondLimit?: number;
+    /** Passes this run already made on this stage beyond its edit limit to take out a note to the user (20 Nov). */
+    removalsBeyondLimit?: number;
     /** The edit limit is what took revising away (19 Nov): said only then. */
     editsCapped?: boolean;
     /** The workflow's last stage: there is nothing to move on to (19 Nov). */
@@ -109,6 +125,30 @@ export function planFromScreen(
         action_key: 'declare_objective_complete', params: {},
         rationale: 'Not asking for your approval again: it stands for the version you approved, and every version since is one of my routine repairs.',
         expected_outcome: 'The objective judged on the current version, with your approval shown against the version it was given on.',
+      },
+    };
+  }
+  // 20 Nov (Sean, warehouse rerun): "Go stopped to ask whether it should remove an
+  // internal editing note from the final package … routine cleanup Go should handle
+  // when it has permission to make routine edits." Taking out a note to the user is
+  // not polishing: one such pass is made beyond the limit, and what it saves may
+  // only lose lines (`onlyRemoves`, checked when the version is saved).
+  if (
+    !input.allowed.includes('revise_stage') &&
+    (screen.verdict === 'routine_choice' || screen.verdict === 'routine_repair' || screen.verdict === 'business_decision') &&
+    asksToRemoveNote(input.question) &&
+    (input.removalsBeyondLimit ?? 0) < 1
+  ) {
+    return {
+      kind: 'repair',
+      move: {
+        action_key: 'revise_stage',
+        params: {
+          instruction: 'Take out the note to the user that is in the work (text addressed to the user about how the work was made, not part of it). Change nothing else: keep every other line exactly as it is.',
+          removal_beyond_limit: true,
+        },
+        rationale: `Instead of asking "${input.question.slice(0, 200)}": it only takes out a note to you that is not part of the work, so I make this one pass although the run has used its edits on this stage, and keep every other line as it is.`,
+        expected_outcome: 'The note taken out; nothing else in the work changed.',
       },
     };
   }

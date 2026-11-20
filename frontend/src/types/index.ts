@@ -486,6 +486,8 @@ export interface ApplyRecommendationsRequest {
 
 export interface ApplyRecommendationsResponse extends WebUse {
   content: string;
+  /** What the writer said to the user, taken off the work by the backend (20 Nov); '' or absent when nothing. */
+  note_to_user?: string;
   /** The findings block that was sent. Stored as the new version's FR-10 instruction. */
   instruction: string;
   finish_reason: string;

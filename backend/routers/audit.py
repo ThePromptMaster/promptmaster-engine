@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from promptmaster.limits import MAX_WHOLE_TEXT_CHARS
+from promptmaster.reader_text import split_user_note
 from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client
 from promptmaster.audit_findings import (
@@ -86,6 +87,9 @@ class ApplyRecommendationsRequest(BaseModel):
 
 class ApplyRecommendationsResponse(WebUse):
     content: str
+    #: What the writer said to the user rather than the reader, taken off the work
+    #: in code (20 Nov, Sean, warehouse rerun); "" when it said nothing.
+    note_to_user: str = ""
     #: What was sent, so the caller can store it as the version's `instruction`
     #: (FR-10 provenance) without rebuilding the string and risking a mismatch.
     instruction: str
@@ -182,10 +186,11 @@ async def api_apply_recommendations(
     against the wrong thing — and the pipeline's three extra results would be
     discarded here anyway.
 
-    The prompt is `build_apply_audit_prompt`, unchanged and unwrapped. A
-    recommendation casts cleanly to `AuditFinding`, so this milestone adds no
-    prompt text at all, and the block the user approved in the preview dialog is
-    byte-for-byte the block that reaches the model.
+    The prompt is `build_apply_audit_prompt`. A recommendation casts cleanly to
+    `AuditFinding`, and the block the user approved in the preview dialog is
+    byte-for-byte the block that reaches the model. Since 20 Nov it carries the
+    stage writer's note rules (`stage_notes`), and a note to the user is taken
+    off the work here and returned beside it.
     """
     try:
         model = req.model or None
@@ -215,6 +220,7 @@ async def api_apply_recommendations(
             findings=req.findings,
             iterations=[],
             whole_text=req.whole_text,
+            stage_notes=True,
         )
 
         revised, _usage, finish_reason = await client.generate_with_meta(
@@ -223,8 +229,10 @@ async def api_apply_recommendations(
             model=model,
         )
 
+        work, note = split_user_note(revised)
         return ApplyRecommendationsResponse(
-            content=cite_only_known(revised, inputs, web),
+            content=cite_only_known(work, inputs, web),
+            note_to_user=note,
             # Returned rather than recomputed by the caller: the version row
             # stores it as FR-10 provenance, and two places building the same
             # string is two places for it to drift.
