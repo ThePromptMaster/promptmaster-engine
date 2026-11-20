@@ -4855,3 +4855,27 @@ Seven faults turned up that the unit tests had not caught. Each is fixed and liv
   empty and copied it again. The copied headings now sit under the section heading, and a copy left at the
   section's level is nested rather than copied twice.
 
+
+### L-260 — Three gaps from the 20 Nov hand pass of the 19 Nov round (2026-11-20)
+A hand pass on a test copy of an inventory selection (a price change, a side-chat rewrite quoting a
+vendor's "remove", then a vendor correction ruling the recommended vendor out) confirmed L-258/L-259 by
+hand and found three gaps.
+- **Numbered findings tables.** The package's "Review findings and status" table numbered the findings
+  1 to 16, and `refreshStatusWords` looked only for "i8". A findings table (its header or the heading above
+  it names findings) whose first-cell numbers are exactly the review's ids is now read as naming them; a
+  table that renumbered or left one out is not, so "3" is never taken for i4.
+- **A correction recorded beside the old claim.** A repair failed as still saying "Confirmed by the vendor",
+  which stood only in "first reported as nightly export confirmed by the vendor, corrected by the vendor to
+  weekly export only" and in a quotation. `claimsStillIn` now reads what the text states the way the leftover
+  check does (`statedSentences`: quotations, history sections and attributed sentences report, they do not
+  state), and "corrected", "correction" and "first reported/stated/quoted/given" attribute.
+- **A sign-off that authorises a purchase.** The designer made the last stage's sign-off "I give Finance
+  review sign-off and authorize the purchase of the recommended system.", and Go asked it of a package that
+  recommended no system. A purchase, a spend or another team's sign-off happens outside the work: the prompt
+  says the deliverable leaves it pending as the user's next step, and `signoff_for_the_work` turns a sign-off
+  that authorises or buys into the user's approval of the stage's work ("I approve the recommendation
+  package as final.").
+- **Left as it is:** workflows already saved keep their sign-off wording (published templates do not
+  change). Two items of L-257/L-259 were still not reached by hand: an approval question that names an
+  open finding (Go decided every finding itself) and the one-press resume past a set-aside question (Go
+  set none aside).

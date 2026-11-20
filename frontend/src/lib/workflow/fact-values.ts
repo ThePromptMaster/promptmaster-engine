@@ -209,7 +209,10 @@ export function answered(statement: string): string {
  * "Not adopted" reports a proposal the record replaced (19 Oct, Ridgeway copy:
  * "tied to the 100 hours, which were not adopted" failed two repairs).
  */
-const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|not (?:adopted|approved|authori[sz]ed|taken up)|propos(?:al|als|ed|es)|v\d+)\b/i;
+// "Corrected", "first reported as": a vendor correction recorded beside what it replaced (20 Nov,
+// inventory-selection pass: "first reported as nightly export confirmed by the vendor, corrected by
+// the vendor to weekly export only" failed a repair as still saying "Confirmed by the vendor").
+const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|not (?:adopted|approved|authori[sz]ed|taken up)|propos(?:al|als|ed|es)|correct(?:ed|ion|ions)|first (?:reported|stated|quoted|given)|v\d+)\b/i;
 
 /**
  * A section that records history: a change log, a decision log, superseded
@@ -499,6 +502,62 @@ function carriesOnReporting(lines: readonly string[]): Set<string> {
   return out;
 }
 
+/**
+ * The lines of `text` that state things, not report them: quotations, a history
+ * section or table, and a list under a line that sets values aside are left out.
+ */
+function statedLines(text: string): string[] {
+  // A list under a line that sets values aside ("The following alternatives
+  // are excluded:") is that line's: each item reports a value, it does not
+  // state it (8 Oct, production: "- $18 per user per month price").
+  const lines = withoutQuotations(text.replace(/\\n/g, '\n')).split('\n');
+  let underAttribution = false;
+  // Under a markdown heading that records history, until the next heading.
+  let inHistory = false;
+  // A table whose header names history ("| Type | Item | Detail | Date / status |"
+  // under "Decision and change log"): handled by the heading; a table header
+  // row that itself says "superseded" or "history" marks the table.
+  let historyTable = false;
+  return lines.filter((line, i) => {
+    const t = line.trim();
+    const heading = /^#{1,6}\s+(.*)$/.exec(t) ?? /^\*\*([^*]+)\*\*:?$/.exec(t);
+    if (heading) {
+      inHistory = HISTORY_HEADING.test(heading[1]);
+      historyTable = false;
+      return !inHistory;
+    }
+    if (inHistory) return false;
+    if (t.startsWith('|')) {
+      if (HISTORY_HEADING.test(t) && /\|\s*:?-{2,}/.test(lines[i + 1] ?? '')) historyTable = true;
+      if (historyTable) return false;
+    } else if (t) {
+      historyTable = false;
+    }
+    if (/:\s*$/.test(t)) {
+      underAttribution = ATTRIBUTED.test(t);
+      return !underAttribution;
+    }
+    if (underAttribution && (/^([-*+]|\d+[.)])\s/.test(t) || (t && t.length < 80 && !/[.!?]$/.test(t)))) return false;
+    if (t) underAttribution = false;
+    return true;
+  });
+}
+
+/**
+ * The sentences of `text` that state something as current: what `statedLines`
+ * keeps, less a repair's "What changed:" line and a sentence that attributes or
+ * sets aside what it names (20 Nov: the conclusion check reads text the way the
+ * leftover check does, so a correction recorded beside the old claim is not the claim).
+ */
+export function statedSentences(text: string): string[] {
+  const kept = statedLines(text);
+  const reported = carriesOnReporting(kept);
+  return sentencesOf(kept.join('\n')).filter((raw) => {
+    const p = withoutEmphasis(raw);
+    return !(/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw));
+  });
+}
+
 /** One superseded value a text still states as current, and a sentence that states it. */
 export interface LeftoverMention {
   value: SupersededValue;
@@ -524,40 +583,7 @@ export function leftoverMentions(
 ): LeftoverMention[] {
   if (!superseded.length) return [];
   const derived = derivedValues(options.derivedIn ?? text);
-  // A list under a line that sets values aside ("The following alternatives
-  // are excluded:") is that line's: each item reports a value, it does not
-  // state it (8 Oct, production: "- $18 per user per month price").
-  const lines = withoutQuotations(text.replace(/\\n/g, '\n')).split('\n');
-  let underAttribution = false;
-  // Under a markdown heading that records history, until the next heading.
-  let inHistory = false;
-  // A table whose header names history ("| Type | Item | Detail | Date / status |"
-  // under "Decision and change log"): handled by the heading; a table header
-  // row that itself says "superseded" or "history" marks the table.
-  let historyTable = false;
-  const kept = lines.filter((line, i) => {
-    const t = line.trim();
-    const heading = /^#{1,6}\s+(.*)$/.exec(t) ?? /^\*\*([^*]+)\*\*:?$/.exec(t);
-    if (heading) {
-      inHistory = HISTORY_HEADING.test(heading[1]);
-      historyTable = false;
-      return !inHistory;
-    }
-    if (inHistory) return false;
-    if (t.startsWith('|')) {
-      if (HISTORY_HEADING.test(t) && /\|\s*:?-{2,}/.test(lines[i + 1] ?? '')) historyTable = true;
-      if (historyTable) return false;
-    } else if (t) {
-      historyTable = false;
-    }
-    if (/:\s*$/.test(t)) {
-      underAttribution = ATTRIBUTED.test(t);
-      return !underAttribution;
-    }
-    if (underAttribution && (/^([-*+]|\d+[.)])\s/.test(t) || (t && t.length < 80 && !/[.!?]$/.test(t)))) return false;
-    if (t) underAttribution = false;
-    return true;
-  });
+  const kept = statedLines(text);
   const pieces = sentencesOf(kept.join('\n'));
   const reported = carriesOnReporting(kept);
   // Rows of a table are serialised as JSON: a key before a colon is not a label.

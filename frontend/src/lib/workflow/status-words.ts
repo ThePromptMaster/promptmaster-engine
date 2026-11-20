@@ -41,6 +41,47 @@ function cased(word: string, like: string): string {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const SEPARATOR = /^\|?\s*:?-{2,}/;
+const HEADING = /^(?:#{1,6}\s+.*|\*\*[^*]+\*\*:?)$/;
+const cellsOf = (row: string) => row.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.replace(/[*_`]/g, '').trim());
+
+/**
+ * The rows of a findings table that number the review's findings without their
+ * "i" (20 Nov, an inventory-selection pass: the package's "Review findings and
+ * status" table numbered them 1 to 16, so "| 8 | … | Accepted |" was out of reach
+ * of a check that looked for "i8"). A table is one when its header or the heading
+ * above it names findings, and its numbers are exactly the review's: a table that
+ * renumbered or left a finding out is not read, so "3" is never taken for i4.
+ * Line index → the review id the row stands for.
+ */
+function numberedFindingRows(lines: readonly string[], rows: readonly StageItem[]): Map<number, string> {
+  const out = new Map<number, string>();
+  const ids = new Map<string, string>();
+  for (const r of rows) {
+    const n = /^i(\d+)$/i.exec(r.id ?? '')?.[1];
+    if (n) ids.set(String(Number(n)), r.id!);
+  }
+  if (!ids.size) return out;
+  let heading = '';
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (HEADING.test(t)) heading = t;
+    if (!t.startsWith('|') || !SEPARATOR.test(lines[i + 1]?.trim() ?? '')) continue;
+    const named = /\bfindings?\b/i.test(t) || /\bfindings?\b/i.test(heading);
+    const table = new Map<number, string>();
+    let j = i + 2;
+    for (; j < lines.length && lines[j].trim().startsWith('|'); j++) {
+      const n = /^(?:#\s*|i\s*)?(\d+)\.?$/i.exec(cellsOf(lines[j])[0] ?? '')?.[1];
+      if (n) table.set(j, String(Number(n)));
+    }
+    const numbers = [...table.values()];
+    const same = numbers.length === ids.size && new Set(numbers).size === numbers.length && numbers.every((n) => ids.has(n));
+    if (named && same) for (const [line, n] of table) out.set(line, ids.get(n)!);
+    i = j - 1;
+  }
+  return out;
+}
+
 /**
  * `content` with every status word that disagrees with its row's status on the
  * review table rewritten, and the ids it changed.
@@ -48,20 +89,29 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function refreshStatusWords(content: string, rows: readonly StageItem[]): { content: string; changed: string[] } {
   const changed = new Set<string>();
   const lines = content.split('\n');
+  const numbered = numberedFindingRows(lines, rows);
   for (const row of rows) {
     const want = wordFor(row);
     if (!row.id || !want) continue;
     const id = new RegExp(`\\b${escape(row.id)}\\b`);
     for (let n = 0; n < lines.length; n++) {
       const line = lines[n];
-      const at = line.search(id);
+      let at = line.search(id);
+      let idLength = row.id.length;
+      if (at < 0 && numbered.get(n) === row.id) {
+        // The row's number, as its first cell: read from the cell after it.
+        at = line.indexOf('|', line.indexOf('|') + 1);
+        idLength = 0;
+      }
       if (at < 0) continue;
       // The row's status: the first status word after the id that is set out as one
       // (its own table cell, in bold, or after "remains/is/marked"), not a word of the
-      // finding's own text ("still described Vendor A's standing as open").
+      // finding's own text ("still described Vendor A's standing as open"). In a table
+      // row the finding's own cell may be long, so the whole row is read.
+      const reach = line.trim().startsWith('|') ? Infinity : 400;
       const words = new RegExp(`\\b${WORDS}\\b`, 'gi');
-      words.lastIndex = at + row.id.length;
-      for (let m = words.exec(line); m && m.index - at < 400; m = words.exec(line)) {
+      words.lastIndex = at + idLength;
+      for (let m = words.exec(line); m && m.index - at < reach; m = words.exec(line)) {
         const before = line.slice(0, m.index);
         const isStatus = /\*\*\s*$/.test(before) || /\|\s*$/.test(before) || /\b(?:remains|is|was|marked|status:?|now)\s+$/i.test(before);
         if (!isStatus) continue;

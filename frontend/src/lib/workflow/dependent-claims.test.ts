@@ -53,6 +53,22 @@ describe('a conclusion drawn from a corrected figure', () => {
     expect(claimsStillIn('EBITDA fell while revenue also declined, to $22.5 million.', [claim])).toEqual([]);
   });
 
+  // 20 Nov, inventory-selection pass: the repaired package recorded the vendor's
+  // correction beside what it replaced, and quoted the finding that names it.
+  it('is not still made by a correction recorded beside it, a quotation of it, or a history section', () => {
+    const claim = { quote: 'Confirmed by the vendor', fact: 'StockPilot exports weekly only', why: 'the export is not nightly' };
+    const repaired = [
+      '| R3. Nightly inventory export to Ledgerline ERP | Weekly only (vendor correction: first reported as nightly export confirmed by the vendor, corrected by the vendor to weekly export only) | **Fail** | — |',
+      '| 7 | Vendor-confirmation sources are marked correctly: "confirmed by the vendor" for StockPilot and "confirmed" for the other two. | Accepted | Resolved. |',
+      '',
+      '## Change log',
+      '',
+      '- R3 for StockPilot: Confirmed by the vendor, now weekly only.',
+    ].join('\n');
+    expect(claimsStillIn(repaired, [claim])).toEqual([]);
+    expect(claimsStillIn('| R3. Nightly export | Confirmed by the vendor | Pass |', [claim])).toEqual([claim]);
+  });
+
   it('is named to the repair as must-fix, and to the stage check as a finding', () => {
     const claim = { quote: QUOTE, fact: NEW.statement, why: 'revenue fell' };
     expect(claimsInstruction([claim])).toContain(`never keep it as it is: "${QUOTE}" (current fact: ${NEW.statement}; revenue fell)`);
