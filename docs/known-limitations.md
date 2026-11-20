@@ -4898,3 +4898,11 @@ Now:
   choices); the question says so per answer (`choiceEffects`);
 - "Still undecided before you approve" is said only while the stage's own approval is still to be given.
 - **Left as it is:** a question that names two or more findings is still decided only by accept/reject words.
+
+### L-262 — A question about another finding is not a repeat (2026-11-20)
+On the L-261 pass a second finding the user keeps ("share the held package with the vendor, or keep it
+internal") was added after the first was answered. Go's question about it shared the first one's wording
+("…records it as your decision in the findings table and next steps…"), so the repeat guard stopped the run
+as "I asked this before", quoting the first question, whose finding was already decided. The guard now reads
+which open findings a question is about (Go's `finding_ids`, or the ids it names): a question about none of
+the findings the earlier one asked about is not its repeat, however alike the words.

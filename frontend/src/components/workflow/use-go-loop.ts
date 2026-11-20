@@ -43,7 +43,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objective-fixes';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, LEFT_TO_GO_STEP, ROUTINE_DEFAULT_STEP, SETTLED_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
-import { decisionsFromAnswer, type NamedRow, type RowDecision } from '@/lib/agent/left-to-go';
+import { askedIds, decisionsFromAnswer, namedRows, type NamedRow, type RowDecision } from '@/lib/agent/left-to-go';
 import { KEEP_BLANK, placeholderShare } from '@/lib/workflow/placeholders';
 import { describeSettled, nothingSaid, settleItems, settleKey, settleMarks, userStatements, withMarks } from '@/lib/agent/settle';
 import { answeredKept, queueLines, userQueue } from '@/lib/agent/user-queue';
@@ -1476,10 +1476,13 @@ export function useGoLoop(opts: Options) {
           // changed since, is not asked again: the run pauses once and says
           // so (4 Nov, Sean, Lakeside: three questions about the same notes,
           // $1.81 → $2.61).
+          const offeredNow = 'decision_choices' in choice && Array.isArray(choice.decision_choices) ? choice.decision_choices : [];
           const repeat = repeatedQuestion({
             question, control: typeof choice.params?.control === 'string' ? choice.params.control : null, stageId: o.stage.id,
             steps: [...priorStepsRef.current, ...stepsRef.current],
             versions: o.bundles[o.stage.id]?.versions ?? [], facts: o.project.facts ?? [],
+            // The findings it is about: a question about another finding is not a repeat (20 Nov).
+            findings: namedRows([question, ...offeredNow], openRowsElsewhere(o.template, o.state, context, ''), askedIds(choice.params)).map((r) => r.id),
           });
           if (repeat) {
             // With somewhere to answer: "tell me what to do differently" over a

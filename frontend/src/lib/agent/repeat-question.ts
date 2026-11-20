@@ -16,6 +16,7 @@ import { isDelegatedAnswer } from '@/lib/workflow/answers';
 import { USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 
 import { USER_ANSWER_STEP } from './actions';
+import { askedIds, mentions } from './left-to-go';
 
 /** What the guard reads of a step. */
 export interface AskedStep {
@@ -125,6 +126,8 @@ export function repeatedQuestion(input: {
   steps: readonly AskedStep[];
   versions?: readonly { source_operation: string; created_at: string }[];
   facts?: readonly { created_at: string; accepted_by?: string | null; source_ref?: Record<string, unknown> | null; retired_at?: string | null }[];
+  /** The open findings this question is about, by id (Go's `finding_ids`, or ids it names). */
+  findings?: readonly string[];
 }): Repeat | null {
   const { question, stageId, steps } = input;
   if (!question.trim()) return null;
@@ -160,6 +163,14 @@ export function repeatedQuestion(input: {
     // to go on, so the question may be asked once more (5 Nov).
     if (steps.slice(answerAt + 1).some((s) => s.action_key === USER_ANSWER_STEP && (s.output ?? '').trim() && !isDelegatedAnswer(s.output ?? ''))) return;
     const asked = questionOf(step);
+    // About another finding, however alike the wording (20 Nov, an inventory-selection pass:
+    // a question about a second finding the user keeps shared "records it as your decision in
+    // the findings table…" with the one answered before, and was stopped as its repeat).
+    const about = input.findings ?? [];
+    if (about.length) {
+      const before = new Set([...askedIds(step.params), ...about.filter((id) => mentions(asked, id))]);
+      if (!about.some((id) => before.has(id))) return;
+    }
     const sameButton = Boolean(control) && controlOf(step) === control;
     const overlap = questionOverlap(asked, question);
     const sameWords = overlap >= SAME_QUESTION;
