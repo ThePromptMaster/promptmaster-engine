@@ -12,6 +12,7 @@ from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .schemas import ContinuitySnapshot, Iteration, PMInput
 from .project_context import context_line
+from .reader_text import WRITING_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,8 @@ _CONTINUATION_INSTRUCTION = (
     "- Do NOT repeat any content already in the previous output.\n"
     "- Continue from where the previous output trails off — same tone, same structure.\n"
     "- If the structure has numbered sections, continue the numbering.\n"
-    "- Stop when you've covered the remaining sections/topics naturally."
+    "- Stop when you've covered the remaining sections/topics naturally.\n\n"
+    + WRITING_RULES.replace("{", "{{").replace("}", "}}")
 )
 
 

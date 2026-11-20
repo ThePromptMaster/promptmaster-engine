@@ -28,6 +28,32 @@ NO_WORKING_RULE = (
     "mark after a figure, no \"correction to the line above\", no wrong table followed by a right one."
 )
 
+#: 20 Nov (Sean, warehouse rerun): the schedule listed the 8 employees with no session
+#: as a row under "Total planned", so the column added up to 24 with 16 scheduled.
+TABLE_ROWS_RULE = (
+    "WHAT A TABLE COUNTS. A table's rows are the things its heading names — the sessions that run, "
+    "the items bought — and a total or count column adds up only those rows. What the table does not "
+    "cover (people with no session, an item not funded) goes in a line below the table, never as a row "
+    "whose number is counted in the column. A cancelled row may stay to say it was cancelled, with "
+    "nothing counted in it."
+)
+
+#: 20 Nov (Sean, warehouse rerun): "The package asks me to separately accept the lack
+#: of spare seats. That's a risk to explain. The decision I actually need to make is
+#: how to cover the 8 employees without a session. Moving the launch date still
+#: requires confirmed trainer time."
+DECISIONS_RULE = (
+    "A DECISION IS A CHOICE OF ACTION, A RISK IS EXPLAINED. A decision for the user is a choice between "
+    "actions only they can take — how to cover a shortfall, whether to change a requirement, the budget, "
+    "a date or an approval. A risk (no margin, no spare seat, one point of failure) is explained: what it "
+    "is and what it would mean. Never list a risk as a decision to accept, unless the user asked for that "
+    "in their own words. Each option you give says what it still depends on that nobody has confirmed — "
+    "a later date still needs the people, time or approval the current plan is short of."
+)
+
+#: Both, for every writer (stage, side chat, apply, continue, chapters).
+WRITING_RULES = TABLE_ROWS_RULE + "\n\n" + DECISIONS_RULE
+
 READER_TEXT_RULE = (
     "WRITTEN FOR ITS READER. The work is the finished document, not a record of how it was made. "
     "Do not mention PromptMaster, stages, versions or drafts (\"v3\", \"version 2\", \"the previous draft\"), "

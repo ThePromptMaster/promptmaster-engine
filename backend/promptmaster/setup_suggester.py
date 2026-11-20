@@ -49,9 +49,14 @@ SETUP_SUGGESTER_SYSTEM = (
     "about it, pick the closest of: General, Technical, Executive, Academic, "
     "Student.\n\n"
     "Constraints: a short paragraph of the scope limits, focus areas or deadlines "
-    "the user stated, or that follow directly from what they said. Do not add "
-    "limits of your own (Sean, 10 Oct: \"avoid specialized training materials\" "
-    "appeared in a setup nobody asked for it in). If none apply, return an empty "
+    "the user stated. Do not add limits of your own (Sean, 10 Oct: \"avoid "
+    "specialized training materials\" appeared in a setup nobody asked for it in). "
+    # 20 Nov (Sean, warehouse rerun): the start conversation's own reading — "the
+    # package will flag that as a decision for you" — came back as "must flag the
+    # zero-slack risk as a decision for the user", and every stage obeyed it.
+    "Never make a constraint out of a risk you notice, a conclusion about whether "
+    "the plan is feasible or ready, or something to \"flag as a decision\": those "
+    "are for the work to explain, not requirements. If none apply, return an empty "
     "string. "
     # 4 Nov (Sean, support-software memo): "Handle routine drafting, arithmetic,
     # checking and corrections without asking me to decide each one" became

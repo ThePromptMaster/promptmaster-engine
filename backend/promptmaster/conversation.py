@@ -7,7 +7,7 @@ instruction and what they put in the user message.
 
 from __future__ import annotations
 
-from .reader_text import NO_WORKING_RULE
+from .reader_text import NO_WORKING_RULE, WRITING_RULES
 from .page_context import ChatAttachment, ChatContext, format_chat_context
 from .prompt_builder import build_prompt, resolve_mode_config
 from .schemas import ChatMessage, Iteration, PMInput
@@ -190,7 +190,7 @@ _APPLY_INSTRUCTION = (
     "the structure and length appropriate to the objective. Change only what the "
     "chat asked for: every line, list item, greeting, sign-off and fact the "
     "instruction does not concern is kept, word for word (14 Oct: a time change "
-    "dropped a checklist line and an email's greeting). " + NO_WORKING_RULE
+    "dropped a checklist line and an email's greeting). " + NO_WORKING_RULE + "\n\n" + WRITING_RULES
     + _INSTRUCTION_IS_LATER
 )
 
@@ -235,6 +235,7 @@ _SAVE_AS_NEW_INSTRUCTION = (
     "what the chat asked for, and keep the rest. Output only the full text of "
     "the new version, ready to read."
     + _INSTRUCTION_IS_LATER
+    + "\n\n" + WRITING_RULES
 )
 
 

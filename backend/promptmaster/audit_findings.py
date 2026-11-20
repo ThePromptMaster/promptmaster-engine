@@ -16,7 +16,7 @@ from .llm_client import OpenRouterClient
 from .schemas import AuditFinding, Iteration, PMInput
 from .session_context import format_session_history
 from .project_context import context_block
-from .reader_text import READER_TEXT_RULE, USER_NOTE_MARKER, USER_NOTE_RULE
+from .reader_text import READER_TEXT_RULE, USER_NOTE_MARKER, USER_NOTE_RULE, WRITING_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ _APPLY_AUDIT_INSTRUCTION = (
     "findings to address. Produce a revised version of the answer that addresses "
     "each finding listed below, while preserving alignment with the original "
     "objective and constraints. Keep the structure and length appropriate to the "
-    "objective. Output only the revised answer text."
+    "objective. Output only the revised answer text.\n\n" + WRITING_RULES
 )
 
 
