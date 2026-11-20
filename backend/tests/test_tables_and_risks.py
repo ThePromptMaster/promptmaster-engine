@@ -29,6 +29,8 @@ def test_the_rules_say_what_he_asked():
     assert "goes in a line below the table, never as a row whose number is counted in the column" in TABLE_ROWS_RULE
     assert "Never list a risk as a decision to accept, unless the user asked for that" in DECISIONS_RULE
     assert "a later date still needs the people, time or approval the current plan is short of" in DECISIONS_RULE
+    # 20 Nov, production pass: "Move the launch later" came back "Excluded" after "keep Day 3".
+    assert "never as excluded or not applicable" in DECISIONS_RULE
 
 
 def test_every_writer_carries_them():
