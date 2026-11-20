@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { choiceEffects, decisionsFromAnswer, namedRows } from './left-to-go';
+import { askedIds, choiceEffects, decisionsFromAnswer, namedRows } from './left-to-go';
 import type { OpenRow } from './needs';
 
 const open: OpenRow[] = [
@@ -61,3 +61,32 @@ describe('approving a version decides no finding; each answer says what it does 
     expect(choiceEffects(['Yes', 'No'], [])).toBe('');
   });
 });
+
+describe('a finding Go names beside its question, and an option chosen for it (20 Nov, inventory-selection pass)', () => {
+  const choices = ['Send the package to Finance now as a no-qualifying-vendor result', 'Hold the package until a vendor confirms nightly Ledgerline export', 'Reject finding 17; the package stands as it is'];
+  const timing: OpenRow = { stageId: 'consistency_review', stageLabel: 'Consistency review', id: 'imwob0tqc2', text: 'Send the package now or hold it' };
+  it('reads the ids Go gave beside the question, though the question calls it "Finding 17"', () => {
+    expect(askedIds({ finding_id: 'imwob0tqc2' })).toEqual(['imwob0tqc2']);
+    expect(askedIds({ finding_ids: ['a1', ' a2 '], rows: [{ id: 'a1' }, 'a3'] })).toEqual(['a1', 'a2', 'a3']);
+    expect(askedIds(undefined)).toEqual([]);
+    expect(namedRows(['Finding 17 (Consistency review) asks …'], [timing], ['imwob0tqc2'])).toEqual([{ id: 'imwob0tqc2', stageId: 'consistency_review', asked: true }]);
+    expect(namedRows(['Finding 17 (Consistency review) asks …'], [timing])).toEqual([]);
+  });
+  it('an offered option decides the one finding asked about, as accepted with the choice kept', () => {
+    const rows = [{ id: 'imwob0tqc2', stageId: 'consistency_review', asked: true as const }];
+    expect(decisionsFromAnswer(choices[1], rows, choices)).toEqual([
+      { id: 'imwob0tqc2', status: 'accepted', reason: 'You chose: Hold the package until a vendor confirms nightly Ledgerline export' },
+    ]);
+    expect(decisionsFromAnswer(choices[2], rows, choices)).toEqual([{ id: 'imwob0tqc2', status: 'rejected' }]);
+    expect(choiceEffects(choices, rows)).toContain('- "Hold the package until a vendor confirms nightly Ledgerline export": imwob0tqc2 accepted, with this as your decision.');
+  });
+  it('never from words of the user\'s own, an approval, or a finding only mentioned in the text', () => {
+    const asked = [{ id: 'i8', stageId: 'review', asked: true as const }];
+    expect(decisionsFromAnswer('Hold it for a week', asked, choices)).toBeNull();
+    expect(decisionsFromAnswer('Approve version 13 as final', asked, ['Approve version 13 as final', 'Hold it'])).toBeNull();
+    expect(decisionsFromAnswer('Keep it open for now', asked, ['Keep it open for now', 'Hold it'])).toBeNull();
+    expect(decisionsFromAnswer('Hold it', [{ id: 'i8', stageId: 'review' }], ['Approve', 'Hold it'])).toBeNull();
+    expect(decisionsFromAnswer('Hold it', [...asked, { id: 'i9', stageId: 'review', asked: true as const }], ['Approve', 'Hold it'])).toBeNull();
+  });
+});
+

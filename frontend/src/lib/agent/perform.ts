@@ -108,7 +108,7 @@ import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP, LEFT_TO_GO_STEP } from 
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
 import { carriedRowsOf, listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
-import { choiceEffects, namedRows, type NamedRow, type RowDecision } from './left-to-go';
+import { askedIds, choiceEffects, namedRows, type NamedRow, type RowDecision } from './left-to-go';
 import { addressedRows, carriedOutReason, describeAddressed, type AddressedRow } from './addressed-rows';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
@@ -506,7 +506,7 @@ async function decideNamedFindings(ctx: PerformContext, key: string, inputs: Ret
     if (!targets.length) continue;
     const statuses = proposableStatuses(schema);
     const decisions = given
-      ? given.filter((d) => targets.some((t) => t.id === d.id)).map((d) => ({ id: d.id, status: statuses.some((s) => s.value === d.status) ? d.status : '', reason: 'Your answer.' }))
+      ? given.filter((d) => targets.some((t) => t.id === d.id)).map((d) => ({ id: d.id, status: statuses.some((s) => s.value === d.status) ? d.status : '', reason: d.reason ?? 'Your answer.' }))
       : (await api.agentTriage(
           {
             inputs, state: ctx.digest,
@@ -2362,13 +2362,16 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
       // The findings the question names, on whatever stage they are: the answer decides them
       // there (18 Nov, Hidden Innovation: h16/h17 asked about on the memo stayed undecided).
-      const rows = namedRows([ctx.step.decision_question ?? '', ...choices], openRowsElsewhere(ctx.template, ctx.state, ctx.context, ''))
+      const rows = namedRows([ctx.step.decision_question ?? '', ...choices], openRowsElsewhere(ctx.template, ctx.state, ctx.context, ''), askedIds(params))
         .filter((r) => !saved.rows.some((x) => x.id === r.id && x.stageId === r.stageId));
       // A named finding is said once, with what each answer does to it, not also "left open" (19 Nov).
       const openRows = allOpen.filter((r) => !addressed.some((x) => same(x, r)) && !rows.some((x) => x.stageId === r.stageId && x.id === r.id));
       const them = (n: number, one: string, many: string) => (n === 1 ? one : many);
       const stagesOf = (rows: readonly OpenRow[]) => [...new Set(rows.map((r) => r.stageLabel))].join(', ');
-      const undecided = openRows.length
+      // Only while this stage's own approval is still to be given: after it, or on a
+      // question that is not about approving, "before you approve" is not true (20 Nov).
+      const approvalWaits = (ctx.stage.exit_criteria ?? []).some((c) => c.check === 'manual' && !ctx.context.manualChecks?.[c.id]);
+      const undecided = openRows.length && approvalWaits
         ? `\n\nStill undecided before you approve: ${listOpenRows(openRows)}. Approving now leaves ${them(openRows.length, 'it', 'them')} open; ${them(openRows.length, 'it is', 'they are')} decided on ${stagesOf(openRows)}.`
         : '';
       const carriedOut = notRecorded.length

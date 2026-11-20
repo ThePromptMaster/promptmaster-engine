@@ -4879,3 +4879,22 @@ hand and found three gaps.
   change). Two items of L-257/L-259 were still not reached by hand: an approval question that names an
   open finding (Go decided every finding itself) and the one-press resume past a set-aside question (Go
   set none aside).
+
+### L-261 — A question about one finding, named beside it; an option chosen for it is the user's decision (2026-11-20)
+A hand pass on the inventory-selection test copy added a major finding the user keeps ("send the package
+now or hold it is my decision"; a side-chat row, so its id was `imwob0tqc2`). The approval asked with it
+open said one thing, "approving leaves it open", and the press recorded exactly that. Go then asked about
+the finding as "Finding 17", its number in the package, with the id only in `params.finding_id`:
+- nothing tied the question to the row (`namedRows` read ids from the text), so it carried no effect per
+  answer and a "Still undecided before you approve … leaves it open" line, after the approval was given;
+- "Hold the package until a vendor confirms nightly export" has no accept or reject verb, so it was kept as a
+  fact only; Go went back, rewrote the review, and its own triage marked the row accepted as Go's.
+Now:
+- the ids Go gives beside a question (`finding_id`, `finding_ids`, `rows`) name those rows (`askedIds`), and the
+  planner is told to list them in `params.finding_ids`;
+- one of the options a question offered about the one finding Go said it asks about decides that finding:
+  accepted, as the user's, with "You chose: …" as its reason, and kept as a fact too; never an answer about
+  approving, carrying on or keeping it open, nor words the user typed (`decisionsFromAnswer` with the offered
+  choices); the question says so per answer (`choiceEffects`);
+- "Still undecided before you approve" is said only while the stage's own approval is still to be given.
+- **Left as it is:** a question that names two or more findings is still decided only by accept/reject words.

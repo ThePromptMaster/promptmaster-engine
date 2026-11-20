@@ -99,7 +99,8 @@ const TEMPLATE = {
     },
     {
       id: 'final_proposal', label: 'Final proposal', short_label: 'Final', renderer: 'prose', required: true,
-      expected_artifacts: [{ kind: 'document', cardinality: 'one', primary: true }], exit_criteria: [], transitions: {},
+      expected_artifacts: [{ kind: 'document', cardinality: 'one', primary: true }],
+      exit_criteria: [{ id: 'final_proposal.approved', label: 'I approve this proposal', check: 'manual', authority: 'reserved' }], transitions: {},
     },
   ],
 } as unknown as WorkflowTemplate;
@@ -212,5 +213,53 @@ describe('the version asked about says what the review says (19 Nov, Inventory S
     expect(stageId).toBe('final_proposal');
     expect(saved.content).toContain('| i10. Session 1 runs long. | **Accepted.** Session total | 90. |');
     expect(out.changes).toEqual({ version_ids: ['check-v4', 'final-v8'], items_triaged: ['i10'] });
+  });
+});
+
+describe('a question about one finding, named beside it (20 Nov, an inventory-selection pass)', () => {
+  // The question called the row "Finding 17", its number in the package, and gave its id as params.finding_id.
+  function asked(approved: boolean) {
+    const c = ctx('autonomous', undefined);
+    const step = c.step as unknown as { params: Record<string, unknown>; decision_question: string };
+    step.params = { finding_id: 'i11', choices: ['Send the proposal now', 'Hold the proposal until the client confirms', 'Reject finding 17; the proposal stands'] };
+    step.decision_question = 'Finding 17 (Check) asks whether the proposal is sent now or held until the client confirms. Which do you want?';
+    (c.context as { manualChecks: Record<string, boolean> }).manualChecks = approved ? { 'final_proposal.approved': true } : {};
+    return c;
+  }
+  it('names the finding, says what each answer does to it, and says nothing of approving once the approval is given', async () => {
+    const out = await performStep(asked(true));
+    const q = out.stop?.reason ?? '';
+    expect(q).toContain('- "Send the proposal now": i11 accepted, with this as your decision.');
+    expect(q).toContain('- "Hold the proposal until the client confirms": i11 accepted, with this as your decision.');
+    expect(q).toContain('- "Reject finding 17; the proposal stands": i11 rejected.');
+    expect(q).not.toContain('before you approve');
+    expect(out.needs).toMatchObject({ kind: 'answer_question', rows: [{ id: 'i11', stageId: 'proposal_check', asked: true }] });
+  });
+  it('while the approval still waits, the other open findings are still listed before it', async () => {
+    const q = (await performStep(asked(false))).stop?.reason ?? '';
+    expect(q).toMatch(/Still undecided before you approve: i10 \(Check\)[^\n]*i12 \(Check\)/);
+    expect(q).not.toMatch(/Still undecided before you approve:[^\n]*i11/);
+  });
+});
+
+describe('the option chosen is recorded on the finding as the user\'s (20 Nov, an inventory-selection pass)', () => {
+  it('accepted, as the user\'s, with the choice kept as its reason', async () => {
+    // The pass: "Hold the package until …" was kept only as a fact; a later repair marked the row accepted by Go.
+    const c = ctx('autonomous', undefined);
+    (c as unknown as { step: unknown }).step = {
+      action_key: 'decide_named_findings',
+      params: {
+        rows: [{ id: 'i11', stageId: 'proposal_check', asked: true }],
+        decisions: [{ id: 'i11', status: 'accepted', reason: 'You chose: Hold the proposal until the client confirms' }],
+        answer: 'Hold the proposal until the client confirms',
+      },
+      decision_question: null, rationale: '',
+    };
+    const out = await performStep(c);
+    expect(out.status).toBe('succeeded');
+    const [stageId, , saved] = appendStageVersion.mock.calls[0] as [string, string, { content: string }];
+    expect(stageId).toBe('proposal_check');
+    const i11 = parseItems(saved.content)!.find((i) => i.id === 'i11')!;
+    expect(i11).toMatchObject({ status: 'accepted', status_source: 'user', reason: 'Your answer — You chose: Hold the proposal until the client confirms' });
   });
 });

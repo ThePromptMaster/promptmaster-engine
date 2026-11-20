@@ -534,7 +534,10 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "UNDECIDED FINDINGS ON OTHER STAGES (the rows themselves, by id — when the user asks which "
             "finding is open, quote it from here; never say you cannot see another stage's table). When "
             "you ask about one, name its stage and id, quote its wording, and say what accepting it "
-            "(its suggested change is applied) and rejecting it (it is dropped, with the reason kept) will do. "
+            "(its suggested change is applied) and rejecting it (it is dropped, with the reason kept) will do; "
+            # 20 Nov: a question called a row "Finding 17", its number in the package, so
+            # nothing tied the answer to the row.
+            'list the ids of the findings you ask about in params.finding_ids (["<row id>", ...]). '
             # 4 Nov, production (Lakeside copy): i10 "Session 1 timings sum to
             # 105" was listed as undecided under the approval of a version where
             # they summed to 90, which the planner itself said it had fixed.

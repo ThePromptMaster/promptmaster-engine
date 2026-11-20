@@ -2092,13 +2092,17 @@ export function useGoLoop(opts: Options) {
           // The findings the question named (18 Nov): the answer decides them where they are,
           // as the user's — chosen ("Accept both h16 and h17") or left to Go.
           const rows = current.needs?.kind === 'answer_question' ? current.needs.rows ?? [] : [];
+          const offered = current.needs?.kind === 'answer_question' ? current.needs.choices ?? [] : [];
           const delegated = isDelegatedAnswer(text);
-          const chosen = rows.length && !delegated ? decisionsFromAnswer(text, rows) : null;
+          const chosen = rows.length && !delegated ? decisionsFromAnswer(text, rows, offered) : null;
+          // An option chosen for the finding ("Hold the package until …") says more than
+          // accept: it stays on the record as a fact too, so the work follows it (20 Nov).
+          const byOption = Boolean(chosen?.some((d) => d.reason));
           const decidesRows = rows.length > 0 && (delegated || chosen !== null);
           if (decidesRows) namedRef.current = { rows, decisions: chosen, answer: text.trim() };
           // An answer that made a waiting decision is on record as that decision already
           // (`decideApproval`): a second fact saying the same would outlive a change of mind.
-          const fact = opts?.decided || chosen ? null : answerAsFact(asked, text, {
+          const fact = opts?.decided || (chosen && !byOption) ? null : answerAsFact(asked, text, {
             run_id: current.id, step_id: step.id, stage_id: stage.id,
             // Recorded knowing the record says otherwise: kept with the fact.
             ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
