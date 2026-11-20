@@ -122,6 +122,8 @@ test('a new project starts on "Handle them for me"; "Ask me" is one press, recor
 
   await panel.getByRole('radio', { name: /^Ask me/ }).click();
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('ask');
-  const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=actor,payload`);
-  expect(changed).toMatchObject({ actor: 'user', payload: { routine_decisions: 'ask' } });
+  // The event is written after the project row (CI, 5fa9e219): wait for it, too.
+  await expect
+    .poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=actor,payload`))[0] ?? null, { timeout: 15_000 })
+    .toMatchObject({ actor: 'user', payload: { routine_decisions: 'ask' } });
 });
