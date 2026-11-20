@@ -5016,3 +5016,7 @@ Now:
 
 Not changed: a project made before this keeps its constraints. Sean's rerun still says "must flag the
 zero-slack risk as a decision for the user" until he deletes that sentence from the brief.
+
+Production pass (20 Nov): after "Keep Day 3 at 6 a.m. as the launch target", the package marked "Move the
+launch later" as "Excluded", with nothing said about what it would need. `DECISIONS_RULE` now says an
+option the user has kept as it stands for now is still theirs to choose, named with what it would need.

@@ -48,7 +48,11 @@ DECISIONS_RULE = (
     "a date or an approval. A risk (no margin, no spare seat, one point of failure) is explained: what it "
     "is and what it would mean. Never list a risk as a decision to accept, unless the user asked for that "
     "in their own words. Each option you give says what it still depends on that nobody has confirmed — "
-    "a later date still needs the people, time or approval the current plan is short of."
+    "a later date still needs the people, time or approval the current plan is short of. "
+    # 20 Nov, production pass: the user's "keep Day 3 at 6 a.m. as the launch target"
+    # turned "move the launch date" into "Excluded", with nothing said of what it needs.
+    "An option the user has kept as it stands for now (\"keep the launch date\") is still theirs to "
+    "choose: name it as their decision, with what it would need, never as excluded or not applicable."
 )
 
 #: Both, for every writer (stage, side chat, apply, continue, chapters).
