@@ -14,6 +14,7 @@ import type { AuditFinding } from '@/types';
 import type { Project } from '@/types/project';
 import { api } from '@/lib/api/client';
 import { factsForRequest } from './facts';
+import { statedSentences } from './fact-values';
 
 export interface DependentClaim {
   quote: string;
@@ -53,10 +54,21 @@ function norm(text: string): string {
   return text.replace(/\\n/g, ' ').replace(/[*_`#>“”"’'|]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** The claims whose sentence `text` still contains, verbatim. */
+/**
+ * The claims `text` still makes, verbatim. Only what it states counts, read as the
+ * leftover check reads it (`statedSentences`): a quotation, a history section, or a
+ * sentence that records a correction beside what it replaced reports the old claim
+ * (20 Nov, an inventory-selection pass: "first reported as nightly export confirmed by
+ * the vendor, corrected by the vendor to weekly export only" failed a repair as still
+ * saying "Confirmed by the vendor").
+ */
 export function claimsStillIn(text: string, claims: readonly DependentClaim[]): DependentClaim[] {
-  const t = norm(text);
-  return claims.filter((c) => t.includes(norm(c.quote)));
+  if (!claims.length) return [];
+  const t = norm(statedSentences(text).join(' '));
+  return claims.filter((c) => {
+    const q = norm(c.quote);
+    return Boolean(q) && t.includes(q);
+  });
 }
 
 /** How a repair is told what to fix. */

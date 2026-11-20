@@ -202,8 +202,8 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "But a choice or recommendation the user's words hand over (\"make the recommendation "
         "yourself\", \"you choose\", \"handle routine decisions\") is \"routine\", and so is one the brief "
         "does not keep back when it says what it keeps (\"keep X and Y pending\", \"I will authorise Z\"): "
-        "the document makes the choice and states the deciding factor. Only what the brief keeps back, "
-        "authorising a spend, a send or a purchase, and the last stage's sign-off stay \"decision\". "
+        "the document makes the choice and states the deciding factor. Only what the brief keeps back "
+        "and the last stage's sign-off stay \"decision\". "
         "Every other sign-off is \"routine\": it "
         "certifies that the stage's work is sound, complete, consistent or follows what the user "
         "supplied (an extraction matches its source, every requirement is covered, a structure or a "
@@ -227,7 +227,16 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         # preparation only" got a stage whose approval was "I choose how the gap will be resolved".
         "When the work is a document, never make an approval or a stop condition out of something the "
         "document is only asked to propose, or something that has to happen outside it (covering a shift, "
-        "booking, confirming). The document proposes it and says what is still to do.\n\n"
+        "booking, confirming). The document proposes it and says what is still to do. "
+        # 20 Nov, an inventory-selection pass: "I give Finance review sign-off and authorize the
+        # purchase of the recommended system." was the last sign-off, and the package it signed
+        # recommended no system.
+        "Authorising a purchase, a spend or a payment, and a sign-off another team gives (Finance "
+        "review, Legal), happen outside the work too, even when the brief keeps them for the user: "
+        "never make one an approval or fold it into one, the last stage's included. The deliverable "
+        "leaves it pending as the user's next step. The last stage's sign-off approves the finished "
+        "deliverable as it stands, and never presumes an outcome the work may not reach (\"the "
+        "recommended system\", when none may qualify).\n\n"
         "Set inquiry true only when the work investigates or tests ideas (science, "
         "analysis, a thought experiment) rather than writes something.\n\n"
         "EXECUTION — whether the work ends, and when it is done:\n"
@@ -261,6 +270,24 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
 
 def _clip(value: object, n: int) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()[:n]
+
+
+#: An act that happens outside the work: authorising, or buying. PromptMaster performs
+#: neither, so a sign-off that names one would record it without anything happening.
+_OUTSIDE_ACT = re.compile(r"\bauthori[sz](?:e|es|ed|ing|ation)\b|\bpurchas(?:e|es|ed|ing)\b|\bbuy(?:s|ing)?\b", re.I)
+
+
+def signoff_for_the_work(approval: str, label: str, *, last: bool) -> str:
+    """A sign-off that authorises a purchase or a spend becomes the user's approval of the
+    stage's own work (20 Nov, an inventory-selection pass: the last stage's "I give Finance
+    review sign-off and authorize the purchase of the recommended system." was asked of a
+    package that recommended no system). What the brief keeps for the user stays pending
+    in the deliverable, as its next step; the prompt says so, and this holds when a design
+    does it anyway."""
+    if not approval or not _OUTSIDE_ACT.search(approval):
+        return approval
+    name = label[:1].lower() + label[1:] if label[1:2].islower() else label
+    return f"I approve the {name} as final." if last else f"I approve the {name}."
 
 
 def parse_workflow(result: object) -> DesignedWorkflow:
@@ -301,6 +328,8 @@ def parse_workflow(result: object) -> DesignedWorkflow:
     while stages and stages[0].kind == "check":
         stages.pop(0)
     stages = fix_chapters(with_closing_stage(stages))
+    for i, stage in enumerate(stages):
+        stage.approval = signoff_for_the_work(stage.approval, stage.label, last=i == len(stages) - 1)
     # The sign-off on the finished work is the user's, whatever the design said (8 Nov):
     # routine sign-offs are the ones before it.
     if stages and stages[-1].approval:

@@ -188,3 +188,26 @@ def test_a_choice_the_brief_hands_over_is_routine_and_no_stop_is_written_for_it(
     assert "a choice or recommendation the user's words hand over" in system
     assert "one the brief does not keep back when it says what it keeps" in system
     assert "only external confirmation could settle it" in system
+
+
+def test_a_purchase_authorisation_is_never_a_sign_off_the_last_one_approves_the_work():
+    # 20 Nov, an inventory-selection pass: the last stage's sign-off was "I give Finance review
+    # sign-off and authorize the purchase of the recommended system.", asked of a package that
+    # recommended no system.
+    system = "\n".join(build_workflow_prompt("a vendor recommendation", "Recommend a vendor"))
+    assert "Authorising a purchase, a spend or a payment, and a sign-off another team gives" in system
+    assert "never presumes an outcome the work may not reach" in system
+    assert "authorising a spend, a send or a purchase, and the last stage's sign-off" not in system
+
+    wf = parse_workflow({"name": "X", "stages": [
+        _stage("Requirements summary", approval="I confirm these requirements match what I supplied.", approval_kind="routine"),
+        _stage("Vendor comparison", approval="I authorise buying from the cheapest qualifying vendor."),
+        _stage("Recommendation package", approval="I give Finance review sign-off and authorize the purchase of the recommended system."),
+    ]})
+    assert wf.stages[0].approval == "I confirm these requirements match what I supplied."
+    assert wf.stages[1].approval == "I approve the vendor comparison."
+    assert wf.stages[-1].approval == "I approve the recommendation package as final."
+    assert wf.stages[-1].approval_kind == "decision"
+    # A label that starts with a name keeps its capital.
+    wf = parse_workflow({"name": "X", "stages": [_stage("Brief"), _stage("Draft"), _stage("PINE pack", approval="I authorize the purchase.")]})
+    assert wf.stages[-1].approval == "I approve the PINE pack as final."
