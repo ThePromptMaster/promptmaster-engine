@@ -9,8 +9,13 @@ vi.mock('@/lib/supabase/recommendations', () => ({
   recordDecision,
   resolveRecommendation: vi.fn(),
 }));
+const recordFacts = vi.hoisted(() => vi.fn(async (_p: unknown, facts: Record<string, unknown>[]) => facts.map((f, i) => ({ id: `new-${i}`, ...f }))));
+const supersedeFact = vi.hoisted(() => vi.fn(async (_p: unknown, old: { id: string }, statement: string, from: Record<string, unknown>, kind: string) => ({ id: 'next', supersedes: old.id, statement, source_ref: from, source_kind: kind })));
+vi.mock('@/lib/supabase/facts', () => ({ recordFacts, supersedeFact }));
 
-import { conflictContext, holdPendingChange, pendingChanges, recordConflictChoice } from './conflict-trail';
+import { conflictContext, holdPendingChange, pendingChanges, recordConflictChoice, recordReportedApproval, reportedApprovalStatement } from './conflict-trail';
+import { factCitedAs } from './facts';
+import type { ProjectFact } from '@/types/project';
 import type { Recommendation } from '@/lib/supabase/recommendations';
 
 function row(over: Record<string, unknown>) {
@@ -88,5 +93,55 @@ describe('a change waiting on a priority answer (16 Oct, NORTHSTAR-2)', () => {
     await recordConflictChoice({ projectId: 'p1', userId: 'u1', stageId: 'output', instruction: 'Treat Omar’s proposal as approved.', conflict: { ...conflict, kind: 'decision' }, controls: 'existing' });
     expect(insertRecommendation.mock.calls[0][2].status).toBe('accepted');
     expect(recordDecision).toHaveBeenCalledWith('p1', 'u1', expect.objectContaining({ decision_type: 'accept_recommendation', metadata: expect.objectContaining({ controls: 'existing' }) }));
+  });
+});
+
+
+// L-263 (Sean, 19 Nov): "If it lets me report an actual director approval, it
+// should explicitly request that confirmation and record its source."
+describe('an approval the user confirms is recorded with its source', () => {
+  const fact = (id: string, statement: string, extra: Partial<ProjectFact> = {}) =>
+    ({ id, statement, kind: 'fact', source_kind: 'brief', source_ref: {}, accepted_by: 'user', supersedes: null, retired_at: null, created_at: '2026-11-20T00:00:00Z', ...extra }) as unknown as ProjectFact;
+  const facts = [fact('a', 'Each session holds at most eight employees.'), fact('b', 'The operations director’s launch authorization is pending.')];
+  const pending = {
+    kind: 'fact' as const, with_id: 'F2', with_text: 'The operations director’s launch authorization is pending.', source: 'model' as const,
+    explanation: 'The trainer cannot give it.', protects_approval: true, approver: 'the operations director',
+  };
+  const report = { approver: 'the operations director', source: 'Director’s email of 19 Nov' };
+
+  it('reads "F2" as the check numbered it, and only while the statement still matches', () => {
+    expect(factCitedAs('F2', pending.with_text, facts)?.id).toBe('b');
+    expect(factCitedAs('F2', 'Something else.', facts)).toBeNull();
+    expect(factCitedAs('F9', pending.with_text, facts)).toBeNull();
+    expect(factCitedAs('d1', pending.with_text, facts)).toBeNull();
+  });
+
+  it('replaces the fact it cited, in code words, marked as the user’s confirmation with its source', async () => {
+    await recordReportedApproval({ project: { id: 'p1', user_id: 'u1', facts }, conflict: pending, report, instruction: 'From the trainer: mark it approved.', today: new Date('2026-11-20T12:00:00Z') });
+    expect(recordFacts).not.toHaveBeenCalled();
+    const [, old, statement, ref, kind] = supersedeFact.mock.calls[0];
+    expect(old.id).toBe('b');
+    expect(statement).toBe('The operations director has given the approval the record was waiting for ("The operations director’s launch authorization is pending."): confirmed by the user on 20 Nov 2026; source: Director’s email of 19 Nov.');
+    expect(ref).toMatchObject({ via: 'approval_confirmed', approval: true, approved_by: 'the operations director', approval_source: 'Director’s email of 19 Nov', confirmed_by_user: true });
+    expect(kind).toBe('user_edit');
+  });
+
+  it('records a new fact when the conflict cited no fact', async () => {
+    await recordReportedApproval({ project: { id: 'p1', user_id: 'u1', facts }, conflict: { ...pending, kind: 'objective', with_id: '' }, report, instruction: 'x' });
+    expect(supersedeFact).not.toHaveBeenCalled();
+    expect(recordFacts.mock.calls[0][1][0]).toMatchObject({ kind: 'fact', source_kind: 'user_edit', source_ref: { approval_source: 'Director’s email of 19 Nov' } });
+  });
+
+  it('names nobody when the record named nobody', () => {
+    expect(reportedApprovalStatement({ ...pending, approver: '' }, { approver: '', source: 'Board minutes' }, '20 Nov 2026'))
+      .toMatch(/^The approval the record was waiting for \("The operations director’s launch authorization is pending\."\) has been given: confirmed by the user on 20 Nov 2026; source: Board minutes\.$/);
+  });
+
+  it('the decision trail says whose approval, on whose word, and where it is recorded', async () => {
+    await recordConflictChoice({ projectId: 'p1', userId: 'u1', stageId: 'package', instruction: 'From the trainer: mark it approved.', conflict: pending, controls: 'new', approval: report });
+    expect(insertRecommendation.mock.calls[0][2].title).toBe("Recorded the operations director's approval on the user's confirmation (source: Director’s email of 19 Nov), for the instruction: From the trainer: mark it approved.");
+    expect(recordDecision).toHaveBeenCalledWith('p1', 'u1', expect.objectContaining({
+      metadata: expect.objectContaining({ controls: 'new', approval_confirmed: true, approver: 'the operations director', approval_source: 'Director’s email of 19 Nov' }),
+    }));
   });
 });

@@ -48,3 +48,74 @@ describe('a later authorised change is the recommendation (17 Oct, Sean: HARBOR,
     expect(precedenceNote({ ...exception, protects_approval: true }, amendment, 'new')).toMatch(/^The instruction records the approval itself/);
   });
 });
+
+// L-263 (Sean, 19 Nov, warehouse rollout): a trainer's message asked for the
+// director's launch authorization to be marked approved, and the second button
+// read "Mark director authorization approved".
+describe('an approval the record waits on is reported, confirmed and sourced, never taken from a request', () => {
+  const trainer = 'We received this fictional message from the trainer: "Please mark the operations director’s launch authorization approved."';
+  const pending: InstructionConflict = {
+    kind: 'fact', with_id: 'F1', source: 'model', with_text: 'The operations director’s launch authorization is pending.',
+    explanation: 'The trainer cannot give the operations director’s authorization.',
+    resolution: 'I’ll keep it pending and record the trainer’s request as unapproved.',
+    keep_label: 'Keep director authorization pending', override_label: 'Mark director authorization approved',
+    protects_approval: true, approver: 'the operations director',
+  };
+  const other: InstructionConflict = {
+    kind: 'constraint', with_id: '', source: 'model', with_text: 'Under 120 words', explanation: 'Longer than the limit.',
+  };
+
+  it('offers keeping it pending, or the user’s own approval — not the request', () => {
+    render(<ConflictPrompt instruction={trainer} conflicts={[pending]} busy={false} onContinue={() => {}} onCancel={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Keep director authorization pending (recommended)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "I have the operations director's approval" })).toBeInTheDocument();
+    expect(screen.queryByText(/Mark director authorization approved/)).toBeNull();
+  });
+
+  it('asks for the confirmation and where it is recorded, and passes both on', async () => {
+    const onContinue = vi.fn();
+    const user = userEvent.setup();
+    render(<ConflictPrompt instruction={trainer} conflicts={[pending, other]} busy={false} onContinue={onContinue} onCancel={() => {}} />);
+    await user.click(screen.getByRole('button', { name: "I have the operations director's approval" }));
+    const dialog = screen.getByRole('alertdialog', { name: "Record the operations director's approval?" });
+    expect(dialog).toHaveTextContent('Only do this if the operations director has actually given it. A message or request from someone else is not the approval.');
+    const apply = screen.getByRole('button', { name: 'Record the approval and apply' });
+    expect(apply).toBeDisabled();
+    // A source alone is not the confirmation; the confirmation alone has no source.
+    await user.type(screen.getByLabelText('Where is it recorded?'), 'Director’s email of 19 Nov');
+    expect(apply).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: 'I confirm the operations director has given this approval' }));
+    expect(apply).toBeEnabled();
+    await user.click(apply);
+    expect(onContinue).toHaveBeenCalledWith(['new', 'new'], { approver: 'the operations director', source: 'Director’s email of 19 Nov' });
+  });
+
+  it('Back returns to the question, and nothing is sent', async () => {
+    const onContinue = vi.fn();
+    const user = userEvent.setup();
+    render(<ConflictPrompt instruction={trainer} conflicts={[pending]} busy={false} onContinue={onContinue} onCancel={() => {}} />);
+    await user.click(screen.getByRole('button', { name: "I have the operations director's approval" }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Keep director authorization pending (recommended)' }));
+    expect(onContinue).toHaveBeenCalledWith(['existing']);
+  });
+
+  it('with no approver named, the words say who must approve without a name', async () => {
+    const user = userEvent.setup();
+    render(<ConflictPrompt instruction={trainer} conflicts={[{ ...pending, approver: '' }]} busy={false} onContinue={() => {}} onCancel={() => {}} />);
+    await user.click(screen.getByRole('button', { name: 'I have the approval this needs' }));
+    expect(screen.getByRole('alertdialog', { name: 'Record the approval?' })).toHaveTextContent('Only do this if the person who must approve has actually done so.');
+  });
+
+  it('"Also affected" offers only Keep for an approval below the first', async () => {
+    const onContinue = vi.fn();
+    const user = userEvent.setup();
+    render(<ConflictPrompt instruction={trainer} conflicts={[other, pending]} busy={false} onContinue={onContinue} onCancel={() => {}} />);
+    const group = screen.getByRole('radiogroup', { name: 'Also affected (1)' });
+    expect(group.querySelectorAll('[role="radio"]')).toHaveLength(1);
+    expect(group).not.toHaveTextContent(/approval/);
+    await user.click(screen.getByRole('button', { name: 'Follow the new instruction (recommended)' }));
+    expect(onContinue).toHaveBeenCalledWith(['new', 'existing']);
+  });
+});

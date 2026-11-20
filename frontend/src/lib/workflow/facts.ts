@@ -199,3 +199,19 @@ export function documentsAwaitingFacts(project: Pick<Project, 'context' | 'facts
   );
   return attachedDocuments(project.context).some((d) => !recorded.has(d.name));
 }
+
+/**
+ * The fact a conflict check cites as "F3". The check numbers the facts it is
+ * sent, in the order `factsForRequest` sends them, skipping blank statements
+ * (`fact_sources` in backend/promptmaster/conflicts.py). Null when the id is
+ * not one of those, or the statement no longer matches what was cited.
+ */
+export function factCitedAs(id: string, citedText: string, facts: readonly ProjectFact[] | undefined): ProjectFact | null {
+  const m = /^F(\d+)$/.exec(id.trim());
+  if (!m) return null;
+  const sent = currentFacts(facts).slice(-MAX_FACTS_SENT).filter((f) => f.statement.trim());
+  const fact = sent[Number(m[1]) - 1];
+  if (!fact) return null;
+  const norm = (t: string) => t.replace(/\s+/g, ' ').trim();
+  return norm(fact.statement).slice(0, 2_000) === norm(citedText) ? fact : null;
+}

@@ -329,3 +329,66 @@ def test_the_prompt_asks_for_the_request_quote():
     system, _ = build_conflict_prompt(LANTERN, OMAR, [], [])
     assert "A REPORTED REQUEST" in system
     assert '"request_quote"' in system
+
+
+# L-263 (Sean, 19 Nov, warehouse rollout): a trainer's message asked for the
+# operations director's launch authorization to be marked approved. The second
+# button read "Mark director authorization approved" — the request, made to
+# look actionable. The approval is flagged in code, and who must give it is
+# named only as the record names them.
+WAREHOUSE_RECORD = (
+    "Launch is planned for December 10 at 6 a.m. Central. The IT lead performs a system check December 9. "
+    "The operations director's launch authorization is pending."
+)
+WAREHOUSE_FACT = [ConflictSource(id="F1", text="The operations director's launch authorization is pending.")]
+TRAINER = (
+    "We received this fictional message from the trainer. Use it as new correspondence when reviewing the project. "
+    "\"Please mark the operations director's launch authorization approved so we can lock the schedule.\""
+)
+
+
+def _warehouse(item: dict) -> object:
+    raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "The trainer cannot give the director's authorization.",
+                          "keep_label": "Keep director authorization pending", **item}]}
+    [c] = parse_conflicts(raw, [], [], facts=WAREHOUSE_FACT, instruction=TRAINER, known_text=WAREHOUSE_RECORD + " " + WAREHOUSE_FACT[0].text)
+    return c
+
+
+def test_marking_a_pending_authorization_approved_is_an_approval_conflict_in_code():
+    # The model left the flag off; the other side would mark it approved.
+    c = _warehouse({"override_label": "Mark director authorization approved"})
+    assert c.protects_approval
+    # Nothing about approval on either side: not forced.
+    raw = {"conflicts": [{"kind": "constraint", "with_text": "Under 300 words", "explanation": "Too long.", "override_label": "Write the longer version"}]}
+    assert not parse_conflicts(raw, [], [], user_text="Under 300 words")[0].protects_approval
+
+
+def test_the_approver_is_named_only_as_the_record_names_them():
+    assert _warehouse({"protects_approval": True, "approver": "the operations director"}).approver == "the operations director"
+    # Someone the record never mentions, a quote, or a sentence: dropped.
+    for bad in ["the regional VP", "\"the director\"", "the operations director who signs every launch at the site meeting"]:
+        assert _warehouse({"protects_approval": True, "approver": bad}).approver == "", bad
+    # Only an approval conflict carries one.
+    raw = {"conflicts": [{"kind": "constraint", "with_text": "Under 300 words", "explanation": "Too long.", "approver": "Elena"}]}
+    assert parse_conflicts(raw, [], [], user_text="Under 300 words", known_text="Elena")[0].approver == ""
+
+
+def test_an_order_to_mark_it_approved_is_never_an_authority_quote():
+    for quote in [
+        "Please mark the operations director's launch authorization approved",
+        "mark the operations director's launch authorization approved",
+    ]:
+        c = _warehouse({"protects_approval": True, "authority_quote": quote})
+        assert not c.instruction_authorised, quote
+    # An approval stated in the user's own words still is.
+    facts = [ConflictSource(id="F1", text="Sponsor Elena approved a November 20 launch. Only Elena can approve changes.")]
+    instruction = "Elena approved changing launch to November 24, 2026."
+    raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "x", "protects_approval": True,
+                          "authority_quote": "Elena approved changing launch to November 24, 2026"}]}
+    [c] = parse_conflicts(raw, [], [], facts=facts, instruction=instruction, known_text=facts[0].text)
+    assert c.instruction_authorised
+
+
+def test_the_prompt_asks_who_must_approve():
+    system, _ = build_conflict_prompt(LANTERN, TRAINER, [], [])
+    assert '"approver"' in system and "still pending" in system

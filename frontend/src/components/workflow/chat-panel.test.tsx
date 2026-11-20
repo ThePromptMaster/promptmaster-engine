@@ -27,6 +27,7 @@ const applyToAnswer = vi.fn();
 const saveAsNewVersion = vi.fn();
 const checkConflicts = vi.fn<(...args: unknown[]) => Promise<{ conflicts: unknown[] }>>(async () => ({ conflicts: [] }));
 const recordConflictChoice = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {});
+const recordReportedApproval = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({ id: 'fact-approved' }));
 const HELD = { id: 'held-1', status: 'pending', category: 'pending-change:1' };
 const holdPendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => HELD);
 const settlePendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async (id) => ({ ...HELD, id, status: 'accepted' }));
@@ -37,8 +38,10 @@ vi.mock('@/lib/supabase/sources', () => ({
   saveSources: (...args: unknown[]) => saveSources(...args),
 }));
 
+const listProjectFacts = vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []);
 vi.mock('@/lib/supabase/facts', () => ({
   supersedeFact: (...args: unknown[]) => supersedeFact(...args),
+  listProjectFacts: (...args: unknown[]) => listProjectFacts(...args),
 }));
 
 // PM-24's decision trail is Supabase; here it is the empty trail plus a spy.
@@ -52,6 +55,7 @@ vi.mock('@/lib/supabase/recommendations', () => ({
 vi.mock('@/lib/workflow/conflict-trail', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/workflow/conflict-trail')>()),
   recordConflictChoice: (...args: unknown[]) => recordConflictChoice(...args),
+  recordReportedApproval: (...args: unknown[]) => recordReportedApproval(...args),
   holdPendingChange: (...args: unknown[]) => holdPendingChange(...args),
   settlePendingChange: (...args: unknown[]) => settlePendingChange(...args),
 }));
@@ -392,7 +396,7 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
         {
           kind: 'fact', with_id: 'F2', with_text: 'Only Elena can approve a change.', explanation: 'Elena hasn’t approved this date change.',
           resolution: 'I’ll keep December 18 as the approved target and record Omar’s renewed request as unapproved.',
-          keep_label: 'Keep December 18 approved', override_label: 'Treat January 15 as approved', protects_approval: true,
+          keep_label: 'Keep December 18 approved', override_label: 'Treat January 15 as approved', protects_approval: true, approver: 'Elena',
         },
       ],
     });
@@ -404,9 +408,12 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     expect(prompt).toHaveTextContent('Also affected (1)');
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Treat January 15 as approved' }));
-    // Not yet: overriding a recorded approval asks once more.
-    expect(screen.getByRole('alertdialog', { name: 'Override the recorded approval?' })).toHaveTextContent('Elena hasn’t approved this date change. Overriding the recorded approval treats the change as approved.');
+    // L-263: the request's own words ("Treat January 15 as approved") are not a button.
+    expect(screen.queryByRole('button', { name: /Treat January 15 as approved/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: "I have Elena's approval" }));
+    // Not yet: reporting the approval asks for the confirmation and its source.
+    expect(screen.getByRole('alertdialog', { name: "Record Elena's approval?" })).toHaveTextContent('Only do this if Elena has actually given it.');
+    expect(screen.getByRole('button', { name: 'Record the approval and apply' })).toBeDisabled();
     expect(applyToAnswer).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Keep December 18 approved (recommended)' }));
@@ -417,6 +424,62 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'new' }));
     const history = (applyToAnswer.mock.calls[0][0] as { chat_history: { content: string }[] }).chat_history;
     expect(history.at(-1)!.content).toContain('record Omar’s renewed request as unapproved');
+  });
+
+  it('L-263 (Sean, 19 Nov): an approval the user confirms is saved with its source before the change, and the model is told so', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{
+        kind: 'fact', with_id: 'F1', with_text: 'The operations director’s launch authorization is pending.',
+        explanation: 'The trainer cannot give the operations director’s authorization.',
+        resolution: 'I’ll keep it pending and record the trainer’s request as unapproved.',
+        keep_label: 'Keep director authorization pending', override_label: 'Mark director authorization approved',
+        protects_approval: true, approver: 'the operations director', request_quote: 'Please mark the launch authorization approved',
+      }],
+    });
+    const onFactsChanged = vi.fn();
+    panel({ onFactsChanged });
+    await instruct('Message from the trainer: "Please mark the launch authorization approved."', /whole document/i);
+    await screen.findByRole('region', { name: 'Which takes priority?' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: "I have the operations director's approval" }));
+    await user.click(screen.getByRole('checkbox', { name: 'I confirm the operations director has given this approval' }));
+    await user.type(screen.getByLabelText('Where is it recorded?'), 'Director’s email of 19 Nov');
+    await user.click(screen.getByRole('button', { name: 'Record the approval and apply' }));
+
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
+    const report = { approver: 'the operations director', source: 'Director’s email of 19 Nov' };
+    expect(recordReportedApproval).toHaveBeenCalledWith(expect.objectContaining({ report }));
+    expect(onFactsChanged).toHaveBeenCalledWith({ revising: true });
+    // Saved before the revision is drafted.
+    expect(recordReportedApproval.mock.invocationCallOrder[0]).toBeLessThan(applyToAnswer.mock.invocationCallOrder[0]);
+    expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'new', approval: report }));
+    const sent = (applyToAnswer.mock.calls[0][0] as { chat_history: { content: string }[] }).chat_history.at(-1)!.content;
+    expect(sent).toContain('The user confirms that the operations director has given this approval');
+    expect(sent).toContain('Director’s email of 19 Nov');
+    expect(sent).toContain('The request in the instruction ("Please mark the launch authorization approved") is not itself the approval');
+    expect(sent).not.toMatch(/explicitly overridden/);
+  });
+
+  it('L-263: when the approval cannot be saved, nothing is applied and the question stays', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{
+        kind: 'fact', with_id: 'F1', with_text: 'The operations director’s launch authorization is pending.', explanation: 'Not approved.',
+        protects_approval: true, approver: 'the operations director',
+      }],
+    });
+    recordReportedApproval.mockRejectedValueOnce(new Error('offline'));
+    panel();
+    await instruct('Mark the launch authorization approved.', /whole document/i);
+    await screen.findByRole('region', { name: 'Which takes priority?' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: "I have the operations director's approval" }));
+    await user.click(screen.getByRole('checkbox', { name: 'I confirm the operations director has given this approval' }));
+    await user.type(screen.getByLabelText('Where is it recorded?'), 'Board minutes');
+    await user.click(screen.getByRole('button', { name: 'Record the approval and apply' }));
+    expect(await screen.findByText('The approval could not be saved, so nothing was changed. Try again.')).toBeInTheDocument();
+    expect(applyToAnswer).not.toHaveBeenCalled();
+    expect(recordConflictChoice).not.toHaveBeenCalled();
+    expect(screen.getByRole('region', { name: 'Which takes priority?' })).toBeInTheDocument();
   });
 
   it('Cancel sends nothing and gives the instruction back', async () => {

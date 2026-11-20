@@ -18,8 +18,20 @@ import {
 } from '@/lib/supabase/recommendations';
 import type { RecommendationScope } from './recommend';
 import { api } from '@/lib/api/client';
-import type { Project } from '@/types/project';
-import { choiceLabels, gist, mergeConflicts, nameOf, ruleConflicts, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
+import type { Project, ProjectFact } from '@/types/project';
+import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import {
+  choiceLabels,
+  gist,
+  mergeConflicts,
+  nameOf,
+  ruleConflicts,
+  type ApprovalReport,
+  type ConflictSource,
+  type Controls,
+  type InstructionConflict,
+} from './instruction-conflicts';
+import { factCitedAs } from './facts';
 import { inputsFrom } from './stage-requests';
 
 export const CONFLICT_CATEGORY = 'conflict:';
@@ -199,16 +211,21 @@ export async function recordConflictChoice(args: {
    * Recorded the same way, saying so, with `policy: 'routine_decisions'`.
    */
   routine?: boolean;
+  /** L-263: the approval the user confirmed holding, and where it is recorded. */
+  approval?: ApprovalReport;
 }): Promise<void> {
-  const { conflict, controls, instruction, routine = false } = args;
+  const { conflict, controls, instruction, routine = false, approval } = args;
   // Plain words, never a quote inside a quote: this title is read back as an
   // earlier decision by the next check (14 Oct, Sean, LANTERN).
   const { keep, override } = choiceLabels(conflict);
+  const reported = controls === 'new' && approval ? approval : null;
   const title = routine
     ? `Kept "${keep}" under the routine-decision policy, over the request: ${gist(instruction)}`
-    : controls === 'new'
-      ? `Chose "${override}" over ${nameOf(conflict)}, for the instruction: ${gist(instruction)}`
-      : `Chose "${keep}" over the instruction: ${gist(instruction)}`;
+    : reported
+      ? `Recorded ${reported.approver ? `${reported.approver}'s` : 'the required'} approval on the user's confirmation (source: ${gist(reported.source, 120)}), for the instruction: ${gist(instruction)}`
+      : controls === 'new'
+        ? `Chose "${override}" over ${nameOf(conflict)}, for the instruction: ${gist(instruction)}`
+        : `Chose "${keep}" over the instruction: ${gist(instruction)}`;
   const rec = await insertRecommendation(args.projectId, args.userId, {
     category: `${CONFLICT_CATEGORY}${Date.now()}`,
     kind: 'workflow',
@@ -234,6 +251,51 @@ export async function recordConflictChoice(args: {
     decision_type: 'accept_recommendation',
     recommendation_id: rec.id,
     rationale: title,
-    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source, controls, ...(routine ? { policy: 'routine_decisions' } : {}) },
+    metadata: {
+      conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source, controls,
+      ...(routine ? { policy: 'routine_decisions' } : {}),
+      ...(reported ? { approval_confirmed: true, approver: reported.approver, approval_source: reported.source.slice(0, 300) } : {}),
+    },
   });
+}
+
+/**
+ * The approval the user confirmed holding, saved as a fact with its source
+ * (L-263, Sean, 19 Nov: "it should explicitly request that confirmation and
+ * record its source"). It replaces the fact the conflict cited, when it cited
+ * one; otherwise it is a new fact naming the record it answers. Written in
+ * code, never by a model, and marked as the user's confirmation.
+ */
+export async function recordReportedApproval(args: {
+  project: Pick<Project, 'id' | 'user_id' | 'facts'>;
+  conflict: InstructionConflict;
+  report: ApprovalReport;
+  instruction: string;
+  today?: Date;
+}): Promise<ProjectFact> {
+  const { project, conflict, report, instruction } = args;
+  const when = (args.today ?? new Date()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const statement = reportedApprovalStatement(conflict, report, when);
+  const ref = {
+    via: 'approval_confirmed',
+    approval: true,
+    approved_by: report.approver,
+    approval_source: report.source.slice(0, 300),
+    confirmed_by_user: true,
+    instruction: gist(instruction, 300),
+  };
+  const cited = conflict.kind === 'fact' ? factCitedAs(conflict.with_id, conflict.with_text, project.facts) : null;
+  if (cited) return supersedeFact(project, cited, statement, ref, 'user_edit');
+  const [fact] = await recordFacts(project, [{ statement, kind: 'fact', source_kind: 'user_edit', source_ref: ref }]);
+  return fact;
+}
+
+/** "The operations director has given the approval the record was waiting for ("…"): confirmed by the user on 20 Nov 2026; source: …." */
+export function reportedApprovalStatement(conflict: InstructionConflict, report: ApprovalReport, when: string): string {
+  const was = gist(conflict.with_text, 160);
+  const who = report.approver.trim();
+  const lead = who
+    ? `${who.charAt(0).toUpperCase()}${who.slice(1)} has given the approval the record was waiting for ("${was}")`
+    : `The approval the record was waiting for ("${was}") has been given`;
+  return `${lead}: confirmed by the user on ${when}; source: ${gist(report.source, 300)}.`;
 }

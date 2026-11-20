@@ -41,7 +41,7 @@ import { approvalsOnEarlierVersion } from '@/lib/workflow/approvals';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
-import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
+import { approverOf, choiceLabels, gist, isUnconfirmedApproval, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { keepWithoutAsking, routinePrecedenceNote, type KeptConflicts } from '@/lib/workflow/routine-conflicts';
 import { defaultOutlineForm, deriveOutlineItems, sectionRecords } from '@/lib/workflow/derived-outline';
 import { confirmableProposals, effectiveRenderer, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
@@ -337,15 +337,25 @@ function askWhichTakesPriority(key: string, params: Record<string, unknown>, ins
   // approval a record protects first, and what keeping it means.
   const c = conflicts[0];
   const { keep, override } = choiceLabels(c);
+  // L-263 (Sean, 19 Nov): an approval nobody has recorded is never one click
+  // away. Keeping the record is the only button; an approval the user really
+  // holds is typed, with who gave it and where it is recorded, and the answer
+  // carries those words to the revision.
+  const unconfirmed = isUnconfirmedApproval(c);
+  const who = approverOf(c);
   const question =
     `Before I change ${gist(instruction, 120)}: ${c.explanation.trim()}` +
     (c.resolution?.trim() ? ` ${c.resolution.trim()}` : '') +
-    (c.protects_approval ? ' Overriding the recorded approval treats the change as approved; choose it only if that approval has been given.' : ' Which should take priority?');
+    (unconfirmed
+      ? ` If ${who || 'the person who must approve'} has actually given this approval, type who gave it and where it is recorded (for example "${who ? `${who.charAt(0).toUpperCase()}${who.slice(1)}` : 'The approver'} approved it by email on 19 Nov"), and I'll record it with that source. A request from anyone else is not the approval.`
+      : c.protects_approval
+        ? ' Overriding the recorded approval treats the change as approved; choose it only if that approval has been given.'
+        : ' Which should take priority?');
   return done(key, {
     status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
     output: question, params: { ...params, conflict_question: true },
     stop: { status: 'awaiting_decision', reason: question },
-    needs: { kind: 'answer_question', question, choices: [keep, override] },
+    needs: { kind: 'answer_question', question, choices: unconfirmed ? [keep] : [keep, override] },
   });
 }
 

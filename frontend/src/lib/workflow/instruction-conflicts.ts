@@ -44,6 +44,8 @@ export interface InstructionConflict {
   /** The conflicting words only report someone else's request, from nobody the record lets approve (checked in code, L-93). */
   from_request?: boolean;
   request_quote?: string;
+  /** Who the record says must give the approval, as the record names them (checked in code, L-263). */
+  approver?: string;
 }
 
 export interface ConflictSource {
@@ -182,6 +184,7 @@ export function mergeConflicts(rule: InstructionConflict[], model: InstructionCo
     kept.protects_approval ||= c.protects_approval;
     kept.instruction_authorised ||= c.instruction_authorised;
     kept.authority_quote ||= c.authority_quote;
+    kept.approver ||= c.approver;
   }
   // The approval a record protects is the question, so it comes first (14 Oct).
   return [...out.filter((c) => c.protects_approval), ...out.filter((c) => !c.protects_approval)].slice(0, 5);
@@ -210,13 +213,47 @@ export function nameOf(c: InstructionConflict): string {
   }
 }
 
-/** The two buttons: the model's short labels, or plain ones of our own. */
+/**
+ * The record waits on, or protects, someone's approval, and the instruction
+ * does not itself record that approval in the user's words. Applying it is
+ * then never "do what the request says": only the user reporting an approval
+ * they actually hold, with where it is recorded (L-263, Sean, 19 Nov: a
+ * trainer's message drew "Mark director authorization approved").
+ */
+export function isUnconfirmedApproval(c: InstructionConflict): boolean {
+  return Boolean(c.protects_approval && !c.instruction_authorised);
+}
+
+/** Who must approve, for a sentence: the record's own name, or "" when it gave none. */
+export function approverOf(c: InstructionConflict): string {
+  return (c.approver ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The two buttons: the model's short labels, or plain ones of our own. For an
+ * approval nobody has recorded, the second is always ours: the user saying
+ * they have the approval, never the request's own words ("Mark … approved").
+ */
 export function choiceLabels(c: InstructionConflict): { keep: string; override: string } {
+  const approver = approverOf(c);
   return {
     keep: c.keep_label?.trim() || (c.protects_approval ? tr('cp.keepApproved') : tr('cp.keepNamed', { name: nameOf(c) })),
-    override: c.override_label?.trim() || (c.protects_approval ? tr('cp.overrideApproval') : tr('cp.followNew')),
+    override: isUnconfirmedApproval(c)
+      ? approver ? tr('cp.haveApproval', { approver }) : tr('cp.haveApprovalAny')
+      : c.override_label?.trim() || (c.protects_approval ? tr('cp.overrideApproval') : tr('cp.followNew')),
   };
 }
+
+/** An approval the user reports holding, and where it is recorded (L-263). */
+export interface ApprovalReport {
+  /** Who gave it, as the record names them; "" when the record named nobody. */
+  approver: string;
+  /** Where it is recorded, in the user's words: "Director's email of 19 Nov". */
+  source: string;
+}
+
+/** The shortest source the confirmation accepts: a few characters, never blank. */
+export const MIN_SOURCE_CHARS = 4;
 
 /** An instruction shortened at a word, for a sentence about it: never cut mid-word, never quoted twice. */
 export function gist(text: string, max = 120): string {
@@ -244,11 +281,34 @@ export function precedenceNote(c: InstructionConflict, instruction: string, cont
     return `The instruction records the approval itself (${gist(c.authority_quote ?? '', 160)}): apply it as the current approved value, and keep the earlier value (${what}) only as superseded history.`;
   }
   if (c.protects_approval) {
-    return controls === 'new'
-      ? `The user has explicitly overridden the recorded approval rule (${what}) for this instruction; follow the instruction.`
-      : `Keep what the record says is approved (${what}). ${c.resolution?.trim() || 'Record what the instruction asks for as a request that has not been approved, and change nothing that depends on the approval.'}`;
+    // An approval is applied only through `approvalConfirmedNote`, with the
+    // user's confirmation and its source (L-263). A 'new' answer without one
+    // keeps the record: there is no "override the approval" any more.
+    return `Keep what the record says about the approval (${what}). ${c.resolution?.trim() || 'Record what the instruction asks for as a request that has not been approved, and change nothing that depends on the approval.'}`;
   }
   return controls === 'new'
     ? `The user has decided this instruction takes precedence over ${other} (${what}).`
     : `The user has decided ${other} (${what}) takes precedence: apply the instruction only as far as it is consistent with it.`;
+}
+
+/**
+ * What the model is told when the user confirms they hold the approval the
+ * record was waiting on, and says where it is recorded (L-263, Sean, 19 Nov:
+ * "If it lets me report an actual director approval, it should explicitly
+ * request that confirmation and record its source"). A request in the
+ * instruction stays a request; the approval is the user's report, with its
+ * source.
+ */
+export function approvalConfirmedNote(c: InstructionConflict, report: ApprovalReport): string {
+  const who = report.approver.trim() || 'the person the record says must approve';
+  const source = gist(report.source, 200);
+  const request = gist(c.request_quote ?? '', 160);
+  return (
+    `The user confirms that ${who} has given this approval, and says it is recorded in: ${source}. ` +
+    `Record it as approved by ${who}, on the user's confirmation, and cite that source wherever the approval is stated. ` +
+    (request
+      ? `The request in the instruction ("${request}") is not itself the approval: record it as the request it is. `
+      : 'A message or request from anyone else in the instruction is not itself the approval: record it as the request it is. ') +
+    `Keep the earlier status (${gist(c.with_text, 200)}) only as superseded history.`
+  );
 }
