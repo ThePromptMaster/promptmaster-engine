@@ -191,6 +191,14 @@ const QUOTED = /[“"]([^”"\n]{10,400})[”"]/g;
 /** A quote the change asks to be taken out, not written: "Remove "…"", the first half of "replace "…" with "…"". */
 const TAKES_OUT = /\b(?:remove|delete|drop|cut|replace|instead of|not|never)\b[^“"]*$/i;
 
+/** A row that asks for no change: "No change to these four statements…", "Keep them as they are". */
+const KEEPS = /^\s*(?:no (?:change|edit|fix)s?\b|keep (?:it|them|this|these|the [^.]{0,40}?) (?:as (?:it is|they are)|unchanged|verbatim|word[- ]for[- ]word))/i;
+
+/** Passages a row quotes, long enough to name a line: six words or more. */
+function linesQuoted(text: string): string[] {
+  return [...text.matchAll(QUOTED)].map((m) => m[1].trim()).filter((q) => norm(q).split(' ').length >= 6);
+}
+
 /** The words a change asks to be written into the text, quoted: `write: "**Target:** Friday at 9 a.m., kept by…"`. */
 export function wordsToWrite(change: string): string[] {
   const out: string[] = [];
@@ -210,8 +218,9 @@ export function wordsToWrite(change: string): string[] {
  * word for word, and what was done or not done, for the version's record (L-259,
  * L-267). A copy is not made:
  * - of an approval given on an earlier version than the stage's current one;
- * - over another accepted change: a row's quoted words to write that the text
- *   holds and the copy would take away (21 Nov: i19's Target line, three times).
+ * - while another accepted row changes that text: it quotes a line of it as it
+ *   stands, or the copy would take away the quoted words it asks to write
+ *   (21 Nov: i19's Target line, three times).
  * A count line this code once put in the work is taken out when no row asks for a
  * count (21 Nov: Go spent four steps deleting it, and it was put back each time).
  */
@@ -237,7 +246,15 @@ export function approvedCopiesFor(
     if (!done) continue;
     const before = norm(text);
     const after = norm(done.content);
-    const undone = rows.filter((other) => other.id !== row.id && wordsToWrite(other.suggested_change).some((q) => before.includes(norm(q)) && !after.includes(norm(q))));
+    // Another accepted row changes the approved text: it quotes a line of it as it stands
+    // (21 Nov hand pass: "e.g. …" fixes are paraphrased, so their own words can't be
+    // looked for), or the copy would take away the words it asks to write.
+    const approved = norm(source.text);
+    const undone = rows.filter((other) =>
+      other.id !== row.id && !KEEPS.test(other.suggested_change) && (
+        linesQuoted(`${other.finding} ${other.suggested_change}`).some((q) => approved.includes(norm(q))) ||
+        wordsToWrite(other.suggested_change).some((q) => before.includes(norm(q)) && !after.includes(norm(q)))
+      ));
     if (undone.length) {
       notes.push(`${source.label} v${source.version} not copied over the text: accepted change${undone.length === 1 ? '' : 's'} ${undone.map((r) => r.id).join(', ')} change${undone.length === 1 ? 's' : ''} it (${row.id})`);
       continue;

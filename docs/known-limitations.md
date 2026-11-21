@@ -5044,8 +5044,10 @@ Now (`lib/workflow/approved-copy.ts`, `approvedCopiesFor`):
 - An approval given on an earlier version than the stage's current one is not copied. The version's change
   summary says it waits for the approval to be re-confirmed. This also covers 20 Nov, when an announcement's
   approved v1 was put back while v2 was current.
-- A copy that would take away the quoted words another accepted row asks to write is not made, and the
-  summary names that row.
+- A copy is not made while another accepted row changes that text, and the summary names the row. A row
+  changes it when it quotes a line of the approved text as it stands (six words or more), or when the copy
+  would take away the quoted words it asks to write. The hand pass found this: the check's fixes are
+  "e.g. …" and get reworded, so their words alone can't be looked for.
 - A count line goes in the work only when the row asks for the count. One this code put in earlier is taken
   out on Go's next save.
 - "Already there" is checked line by line.
