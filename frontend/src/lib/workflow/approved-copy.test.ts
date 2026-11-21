@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { approvedBody, approvedSources, sourceAskedFor, withApprovedCopy } from './approved-copy';
+import { approvedBody, approvedCopiesFor, approvedSources, sourceAskedFor, withApprovedCopy, wordsToWrite } from './approved-copy';
 import { countWords } from './measurable';
 import { copiesApproved, findingRisk } from './triage';
 
@@ -105,5 +105,98 @@ describe('the copied text sits inside its section (19 Nov production pass)', () 
     expect(out.content).toContain('### Recommended vendor: Vendor A');
     expect(out.content).toContain('## 4. Still to do\nWarranty.');
     expect(withApprovedCopy(out.content, rec, finding)).toBeNull();
+  });
+});
+
+/**
+ * 21 Nov (Sean, launch readiness brief and internal email, L-267): every save of the
+ * final put Internal email v5 back over the Target line accepted change i19 asked
+ * for, because row i1 ("Keep them verbatim in the final brief and email") was read
+ * as a request to copy the approved email. The strings are production's.
+ */
+describe('the copy never undoes the work (21 Nov, L-267)', () => {
+  const EMAIL_V5 = [
+    '**Subject:** Inventory rollout: launch not authorized',
+    '',
+    'Hi all,',
+    '',
+    "**QA:** The required inventory reconciliation check passed on its Thursday 10 a.m. rerun, after failing Wednesday at 2 p.m. Tuesday's pass was withdrawn.",
+    '',
+    '**Launch:** Not authorized; launch cannot proceed yet. The release manager withdrew the Thursday 8 a.m. authorization at 10:15 a.m. and is reviewing.',
+    '',
+    '**Decision owner:** The release manager. The decision is open.',
+    '',
+    '**Target:** Friday at 9 a.m.',
+  ].join('\n');
+  const TARGET_I19 = '**Target:** Friday at 9 a.m., kept by the release manager while reviewing; this is not an authorization.';
+  const i1 = {
+    id: 'i1',
+    finding: 'Line-by-line comparison of the four statuses found no conflict. QA: brief "All required checks passed, as reported by the QA lead on Tuesday at 10 a.m." matches the email word for word. Launch: brief "Launch cannot proceed yet" matches email "not authorized and cannot proceed yet". Owner: both say "The release manager decides whether to authorize launch." Target: both say "Friday at 9 a.m."',
+    suggested_change: 'No change to these four statements. Keep them verbatim in the final brief and email.',
+  };
+  const i19 = {
+    id: 'i19',
+    finding: 'Email, Target line: "**Target:** Friday at 9 a.m." The brief says the target is "kept as the target while the release manager reviews" and cites the 10:15 a.m. message. The email gives no evidence for the target.',
+    suggested_change: `In the shortened email, write: "${TARGET_I19}"`,
+  };
+  const copyRow = { id: 'i30', finding: 'The final email differs from the approved one.', suggested_change: 'Use the approved Internal email word for word in the final.' };
+  const tpl = {
+    stages: [
+      { id: 'internal_email', label: 'Internal email', short_label: 'Email', exit_criteria: [{ id: 'internal_email.approved', label: 'I approve this email', check: 'manual' }] },
+      { id: 'consistency_and_fact_check', label: 'Consistency and fact check', short_label: 'Check', exit_criteria: [] },
+      { id: 'final_brief_and_email', label: 'Final brief and email', short_label: 'Final', exit_criteria: [] },
+    ],
+  } as never;
+  const final = (email: string) => `# Launch Readiness Brief\n\n**Target launch:** Friday at 9 a.m.\n\n# Internal Email\n\n${email}\n`;
+  const repaired = final(EMAIL_V5.replace('**Target:** Friday at 9 a.m.', TARGET_I19));
+  const current = { internal_email: { artifact: null, versions: [{ id: 'e5', version_number: 5, content: EMAIL_V5 }] } } as never;
+  const sourcesOnHead = approvedSources(tpl, current, { 'internal_email.approved': true }, { 'internal_email.approved': 'e5' });
+
+  it('a "keep these statements verbatim" row copies nothing: it does not ask for an approved text', () => {
+    expect(sourceAskedFor(`${i1.finding} ${i1.suggested_change}`, sourcesOnHead, 'final_brief_and_email')).toBeNull();
+    const out = approvedCopiesFor(repaired, [i1, i19], sourcesOnHead, 'final_brief_and_email');
+    expect(out.content).toBe(repaired);
+    expect(out.notes).toEqual([]);
+  });
+
+  it('an approval given on an earlier version than the stage\'s current one is not copied', () => {
+    const later = { internal_email: { artifact: null, versions: [{ id: 'e5', version_number: 5, content: EMAIL_V5 }, { id: 'e6', version_number: 6, content: EMAIL_V5 }] } } as never;
+    const [source] = approvedSources(tpl, later, { 'internal_email.approved': true }, { 'internal_email.approved': 'e5' });
+    expect(source.outdated).toEqual({ head: 6 });
+    const out = approvedCopiesFor(repaired, [copyRow, i19], [source], 'final_brief_and_email');
+    expect(out.content).toBe(repaired);
+    expect(out.notes[0]).toContain('Internal email: approved on v5, now v6, so not copied word for word until that approval is re-confirmed (i30)');
+  });
+
+  it('a copy that would take away another accepted change is not made, and says which', () => {
+    const out = approvedCopiesFor(repaired, [copyRow, i19], sourcesOnHead, 'final_brief_and_email');
+    expect(out.content).toContain(TARGET_I19);
+    expect(out.notes).toEqual(['Internal email v5 not copied over the text: accepted change i19 changes it (i30)']);
+  });
+
+  it('a paraphrase is still replaced, with no count line in the work', () => {
+    const paraphrased = final(EMAIL_V5.replace('The decision is open.', 'No decision yet.'));
+    const out = approvedCopiesFor(paraphrased, [copyRow], sourcesOnHead, 'final_brief_and_email');
+    expect(out.content).toContain('**Decision owner:** The release manager. The decision is open.');
+    expect(out.content).not.toMatch(/words, counted/);
+    expect(out.notes[0]).toMatch(/^Internal email v5 as approved, word for word, \d+ words counted in code \(i30\)$/);
+    // Done once.
+    expect(approvedCopiesFor(out.content, [copyRow], sourcesOnHead, 'final_brief_and_email').notes).toEqual([]);
+  });
+
+  it('the count line an earlier copy put in the work is taken out (production v16)', () => {
+    const v16 = final(`*67 words, counted — Internal email v5 as approved.*\n\n${EMAIL_V5.replace('**Target:** Friday at 9 a.m.', TARGET_I19)}`);
+    const out = approvedCopiesFor(v16, [i1, i19], sourcesOnHead, 'final_brief_and_email');
+    expect(out.content).toBe(repaired);
+    expect(out.notes).toEqual(['took out the count line an earlier copy put in the work']);
+    const v15 = final(`${EMAIL_V5}\n\n*67 words, counted — Internal email v5 as approved, copied word for word.*\n`);
+    expect(approvedCopiesFor(v15, [i1], sourcesOnHead, 'final_brief_and_email').content).not.toContain('words, counted');
+  });
+
+  it('the words a change asks to write are its quoted text, not what it asks to remove', () => {
+    expect(wordsToWrite(i19.suggested_change)).toEqual([TARGET_I19]);
+    expect(wordsToWrite('Replace "the old target line here" with "Friday at 9 a.m., kept while reviewing"')).toEqual(['Friday at 9 a.m., kept while reviewing']);
+    expect(wordsToWrite('Remove "the italic line at the end of the email"')).toEqual([]);
+    expect(wordsToWrite('Say "yes"')).toEqual([]);
   });
 });
