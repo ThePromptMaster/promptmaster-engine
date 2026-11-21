@@ -5054,3 +5054,26 @@ Now (`lib/workflow/approved-copy.ts`, `approvedCopiesFor`):
 
 Not changed: a row that asks for an approved text and another that changes it are both still accepted. The
 change wins, and the summary says the copy was not made. Nothing asks the user which one they meant.
+
+### L-268 — Repairs for something else are not tries at a new reopening; the stuck card says what the repairs were for (2026-11-21)
+Sean's launch readiness run, after he answered "change the Target line". Check was saved again and reopened
+Final, and Go stopped at once with "3 repairs of Final did not settle it". `repairTries` had counted the two
+earlier repairs that carried i19 (`params.carried`, no `stale_since`) as tries at the new reopening. So
+Final was never repaired for the change that reopened it. The card's "3 repairs" also counted one repair
+for an earlier reopening, and its "what is still unresolved" named the reopening ("Consistency and fact
+check was changed (now v8)") when the repairs had been about i19.
+
+Now (`lib/agent/needs.ts`):
+- A repair made for something else (carried forward, measured, a cut) is not a try at a stage's reopening.
+  A planner's unmarked repair in the run still counts, as before.
+- `repairStuckNeed` reads the repairs for what the last one was for. Its tries, what is unresolved, and the
+  last attempt describe the same repairs. For carried repairs, what is unresolved is the carried row.
+
+### L-269 — A part's word limit named in a change is not counted on the whole deliverable (2026-11-21)
+Found on the 21 Nov hand pass (john@ c89649d5). An accepted change to one line of the email ended "there is
+room under the 80-word limit". `lengthRows` read that as a length for the whole deliverable, the brief and
+email together, and counted 594 words against 80. The check called the change not carried, and the final
+went back for a repair no text could pass, until the check rounds ran out. A limit equal to one of the
+deliverable's own part limits (here "Internal email of at most 80 words", already counted on the email) is
+now left to that part. Not changed: a change naming a different number with no part is still counted on the
+whole text.
