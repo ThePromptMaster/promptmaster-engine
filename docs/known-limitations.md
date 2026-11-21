@@ -5020,3 +5020,35 @@ zero-slack risk as a decision for the user" until he deletes that sentence from 
 Production pass (20 Nov): after "Keep Day 3 at 6 a.m. as the launch target", the package marked "Move the
 launch later" as "Excluded", with nothing said about what it would need. `DECISIONS_RULE` now says an
 option the user has kept as it stands for now is still theirs to choose, named with what it would need.
+
+### L-267 — An approved text is copied only when asked for, only as currently approved, and never over an accepted change (2026-11-21)
+Sean's launch readiness brief and internal email (21 Nov). Go tried three times to carry accepted change
+i19 ("In the shortened email, write: "**Target:** Friday at 9 a.m., kept by the release manager while
+reviewing; this is not an authorization."") into the final, and three times the saved final still had the
+old Target line. The check read the newest version each time and was right. The repair was undone at save
+time by the L-259 copy:
+- Check row i1 was a "no conflict" finding ("…matches the email word for word… Keep them verbatim in the
+  final brief and email"). `sourceAskedFor` read "verbatim" plus the word "email", the short label of the
+  Internal email stage, as a request to copy that stage word for word.
+- So every Go save of the final put back Internal email v5, the version the approval was given on, although
+  v6 was current. v5 ends "**Target:** Friday at 9 a.m.".
+- The copy also put "*67 words, counted — Internal email v5 as approved…*" in the email. Go read it as a
+  note left in the work and spent four steps deleting it, going back to Internal email once, which reopened
+  Check and the final. Each save put it back. It also took the 80-word email to 82.
+- After his answer, v16 kept the new line only because it begins with the old one, and the "already there"
+  test compared substrings.
+
+Now (`lib/workflow/approved-copy.ts`, `approvedCopiesFor`):
+- A row must ask for an approved text ("approved" as well as "verbatim" or "word for word"), the rule
+  `copiesApproved` already used for triage.
+- An approval given on an earlier version than the stage's current one is not copied. The version's change
+  summary says it waits for the approval to be re-confirmed. This also covers 20 Nov, when an announcement's
+  approved v1 was put back while v2 was current.
+- A copy that would take away the quoted words another accepted row asks to write is not made, and the
+  summary names that row.
+- A count line goes in the work only when the row asks for the count. One this code put in earlier is taken
+  out on Go's next save.
+- "Already there" is checked line by line.
+
+Not changed: a row that asks for an approved text and another that changes it are both still accepted. The
+change wins, and the summary says the copy was not made. Nothing asks the user which one they meant.

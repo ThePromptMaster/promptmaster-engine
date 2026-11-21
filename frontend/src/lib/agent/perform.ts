@@ -86,7 +86,7 @@ import { claimsInstruction, claimsStillIn, dependentClaimsFor } from '@/lib/work
 import { writtenClaimFindings } from '@/lib/workflow/claim-support';
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { refreshStatusWords } from '@/lib/workflow/status-words';
-import { approvedSources, sourceAskedFor, withApprovedCopy } from '@/lib/workflow/approved-copy';
+import { approvedCopiesFor, approvedSources } from '@/lib/workflow/approved-copy';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import { headingOutline, joinParts, needsParts, partInstruction, partThatReads, splitIntoParts } from '@/lib/workflow/long-prose';
@@ -755,7 +755,8 @@ function refusingWorkingText(ctx: PerformContext): PerformContext {
  * An approved stage's text goes into the work word for word, by code, wherever an
  * accepted finding asks for it so (19 Nov, Sean, Scanner Readiness: two repairs told
  * "word for word" each paraphrased the approved announcement). Applied to every
- * version Go saves on a written stage; the count beside it is counted, not written.
+ * version Go saves on a written stage; never over another accepted change, nor from
+ * an approval older than the stage's text (21 Nov, L-267: `approvedCopiesFor`).
  */
 function carryingApprovedCopies(ctx: PerformContext): PerformContext {
   const append = ctx.appendStageVersion;
@@ -768,18 +769,9 @@ function carryingApprovedCopies(ctx: PerformContext): PerformContext {
         return append(stageId, name, version, evaluation, options);
       }
       const sources = approvedSources(ctx.template, ctx.bundles, ctx.project.manual_checks, ctx.project.manual_check_versions);
-      let content = version.content;
-      const copied: string[] = [];
-      for (const row of acceptedRowsBefore(ctx.template, ctx.bundles, stageId, ctx.state)) {
-        const asked = `${row.finding} ${row.suggested_change}`;
-        const source = sourceAskedFor(asked, sources, stageId);
-        const done = source ? withApprovedCopy(content, source, asked) : null;
-        if (!source || !done) continue;
-        content = done.content;
-        copied.push(`${source.label} v${source.version} as approved, word for word, ${done.words} words counted in code (${row.id})`);
-      }
-      if (!copied.length) return append(stageId, name, version, evaluation, options);
-      const note = `${copied.join('; ')}.`;
+      const { content, notes } = approvedCopiesFor(version.content, acceptedRowsBefore(ctx.template, ctx.bundles, stageId, ctx.state), sources, stageId);
+      if (!notes.length) return append(stageId, name, version, evaluation, options);
+      const note = `${notes.join('; ').replace(/^./, (c) => c.toUpperCase())}.`;
       // First, so a long summary cut at its limit keeps it.
       return append(stageId, name, { ...version, content, change_summary: version.change_summary ? `${note} ${version.change_summary}` : note }, evaluation, options);
     },
