@@ -200,3 +200,44 @@ describe('the copy never undoes the work (21 Nov, L-267)', () => {
     expect(wordsToWrite('Say "yes"')).toEqual([]);
   });
 });
+
+/**
+ * 21 Nov hand pass (john@ c89649d5): the check's fixes to the email are "e.g. …" and
+ * the writer words them its own way, so the words to write can't be looked for. A row
+ * that quotes a line of the approved text as it stands is about changing it.
+ */
+describe('a copy waits while an accepted row changes the approved text (21 Nov hand pass)', () => {
+  const EMAIL = [
+    '**Subject: Inventory rollout: launch status**',
+    '',
+    'Team,',
+    '',
+    '**Target:** Friday at 9 a.m. remains the target while the release manager reviews. It is not a confirmed launch.',
+    '',
+    '**Decision owner:** the release manager.',
+  ].join('\n');
+  const source = { stageId: 'internal_email', label: 'Internal email', shortLabel: 'Email', text: EMAIL, version: 1 };
+  const copyRow = { id: 'i9', finding: 'The final email is not the approved one.', suggested_change: 'Use the approved Internal email word for word in the final.' };
+  const i2 = {
+    id: 'i2',
+    finding: 'Internal email, line "**Target:** Friday at 9 a.m. remains the target while the release manager reviews." The line gives no time for the instruction it rests on.',
+    suggested_change: 'Tie the line to its evidence, e.g. "Friday at 9 a.m. remains the target, per the release manager\'s 10:15 a.m. note, while they review. It is not a confirmed launch." Keep the email at 80 words or fewer.',
+  };
+  const final = (email: string) => `# Brief\n\nText.\n\n# Internal Email\n\n${email}\n`;
+  const paraphrased = final(EMAIL.replace('remains the target while the release manager reviews.', 'stays the target under the release manager\'s 10:15 a.m. note while they review.'));
+
+  it('the paraphrased fix stays, and the record says which row holds the copy', () => {
+    const out = approvedCopiesFor(paraphrased, [copyRow, i2], [source], 'final');
+    expect(out.content).toBe(paraphrased);
+    expect(out.notes).toEqual(['Internal email v1 not copied over the text: accepted change i2 changes it (i9)']);
+  });
+
+  it('with no row about it, the copy is made', () => {
+    expect(approvedCopiesFor(paraphrased, [copyRow], [source], 'final').content).toContain('remains the target while the release manager reviews.');
+  });
+
+  it('a row that keeps the text as it is does not hold the copy', () => {
+    const keeps = { id: 'i3', finding: 'Email line "**Target:** Friday at 9 a.m. remains the target while the release manager reviews." matches the brief.', suggested_change: 'No change needed.' };
+    expect(approvedCopiesFor(paraphrased, [copyRow, keeps], [source], 'final').content).toContain('remains the target while the release manager reviews.');
+  });
+});
