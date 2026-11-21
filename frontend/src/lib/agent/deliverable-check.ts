@@ -59,7 +59,18 @@ export const LENGTH_FOR_LATER = 'not counted here: this text is the working of a
  * round. The row is still marked, so no model judges the length by eye, and
  * it says nothing was counted.
  */
-export function lengthRows(rows: readonly AcceptedRow[], content: string, working = false): Map<string, LengthDecision> {
+export function lengthRows(
+  rows: readonly AcceptedRow[],
+  content: string,
+  working = false,
+  /**
+   * The word limits of the deliverable's parts, already counted on each part
+   * (21 Nov hand pass: "there is room under the 80-word limit", in a change to one
+   * line of the email, was counted on the whole brief and email, 594 words, and
+   * sent the final back for a repair that could never meet it).
+   */
+  partLimits: readonly number[] = []
+): Map<string, LengthDecision> {
   const out = new Map<string, LengthDecision>();
   if (!content.trim()) return out;
   for (const row of rows) {
@@ -67,6 +78,8 @@ export function lengthRows(rows: readonly AcceptedRow[], content: string, workin
     if (!/\bwords?\b/i.test(change)) continue;
     // A hedged figure first ("about 500 words"), as the brief's own is read…
     const hedged = wholeLengthTarget({ constraints: change }, content);
+    const limit = hedged?.max ?? firmLength(change, content)?.firm.max;
+    if (limit !== undefined && partLimits.includes(limit)) continue;
     if ((hedged || firmLength(change, content)) && working) {
       out.set(row.id, { met: true, later: true, line: LENGTH_FOR_LATER });
       continue;

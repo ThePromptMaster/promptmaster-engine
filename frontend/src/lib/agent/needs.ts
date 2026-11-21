@@ -347,11 +347,22 @@ export function repairTries(steps: readonly AgentStep[], state: WorkflowState, t
     .filter((s) => !s.params?.accepted_fixes)
     .filter((s) => {
       const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
-      if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried) || Boolean(s.params?.cut);
-      // Unmarked (a step the planner chose): counted within this run.
-      return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
+      if (!since) return otherRepair(s) !== null;
+      // Unmarked (a step the planner chose): counted within this run. A repair made for
+      // something else — what a check carried forward, a measurement, a cut — is not a
+      // try at this reopening (21 Nov, Sean: two repairs of i19 used up Final's tries
+      // before the change that reopened it was ever repaired, and Go stopped).
+      return s.params?.stale_since === since || (!s.params?.stale_since && otherRepair(s) === null && thisRun.has(s.id));
     })
     .map((s) => String(s.params?.stage_id ?? ''));
+}
+
+/** What a repair was for, when it was not a reopening: a carried-forward finding, a measurement or a cut. */
+function otherRepair(s: Pick<AgentStep, 'params'>): 'carried' | 'measured' | 'cut' | null {
+  if (Array.isArray(s.params?.carried)) return 'carried';
+  if (s.params?.measured) return 'measured';
+  if (s.params?.cut) return 'cut';
+  return null;
 }
 
 /**
@@ -426,9 +437,20 @@ export function needHeading(need: NeedsUser): 'suggestion' | 'repair' | 'decisio
   }
 }
 
-/** The `repair_stuck` need for a stage, from the repair steps recorded for it. */
+/**
+ * The `repair_stuck` need for a stage, from the repair steps recorded for it. The
+ * tries, what is unresolved and the last attempt are of the same repairs: those for
+ * what the last one was for (21 Nov, Sean: "3 repairs" counted one for a reopening
+ * and two for i19, and "what is still unresolved" named the reopening, not i19).
+ */
 export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
-  const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);
+  const all = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);
+  const latest = all.at(-1);
+  const purpose = latest ? otherRepair(latest) : null;
+  const since = latest?.params?.stale_since;
+  const repairs = !latest ? [] : purpose
+    ? all.filter((s) => otherRepair(s) === purpose)
+    : all.filter((s) => otherRepair(s) === null && (!since || !s.params?.stale_since || s.params.stale_since === since));
   const recent = repairs.slice(-Math.max(REPAIR_TRIES, 3));
   // A repair that failed its check may still have saved its attempt, so it can be seen (9 Nov).
   const saved = recent.filter((s) => {
@@ -439,11 +461,20 @@ export function repairStuckNeed(state: WorkflowState, stageId: string, steps: re
   return {
     kind: 'repair_stuck',
     stageId,
-    why: state.stages[stageId]?.stale?.reason || fallbackWhy || 'something it relied on changed',
+    why: (purpose === 'carried' ? carriedWhy(latest?.params?.carried) : '') || state.stages[stageId]?.stale?.reason || fallbackWhy || 'something it relied on changed',
     last: last?.output ?? '',
     tries: recent.length,
     saved,
   };
+}
+
+/** What carried-forward repairs were for, said once: the first row, and how many more. */
+function carriedWhy(rows: unknown): string {
+  const list = Array.isArray(rows) ? rows.filter((r): r is string => typeof r === 'string' && r.trim().length > 0) : [];
+  if (!list.length) return '';
+  const first = list[0].replace(/\s+/g, ' ').trim();
+  const head = first.length > 300 ? `${first.slice(0, 297).trimEnd()}…` : first;
+  return list.length > 1 ? `${head} (and ${list.length - 1} more)` : head;
 }
 
 /** The renderers whose reopened stages Go repairs (`staleRepair`). */

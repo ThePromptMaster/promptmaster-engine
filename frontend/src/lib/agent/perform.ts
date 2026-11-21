@@ -3556,7 +3556,8 @@ async function checkDeliverable(
   const claim = noAccessClaim(content);
   // 12 Nov: a length is counted, never judged. The check is given the count,
   // and a change that asks for a length is decided by it before the call.
-  const lengths = lengthRows(rows, content, working);
+  const partLimits = stageRequirements(ctx.project, ctx.template, holder).flatMap(({ requirement: r }) => (r.kind === 'words' && isPart(r) && r.max !== undefined ? [r.max] : []));
+  const lengths = lengthRows(rows, content, working, partLimits);
   const sent = rows.map((r) => (lengths.has(r.id) ? { ...r, length_decided: lengths.get(r.id)!.line } : r));
   const measured = [
     { label: `${label} — length`, value: `${countWords(content).toLocaleString('en-US')} words`, met: null, info: true },
