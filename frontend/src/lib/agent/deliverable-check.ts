@@ -64,12 +64,14 @@ export function lengthRows(
   content: string,
   working = false,
   /**
-   * The word limits of the deliverable's parts, already counted on each part
-   * (21 Nov hand pass: "there is room under the 80-word limit", in a change to one
-   * line of the email, was counted on the whole brief and email, 594 words, and
-   * sent the final back for a repair that could never meet it).
+   * The word limits the brief and the recorded requirements set. Each is already
+   * counted in code where it applies, so a change that only restates one is not
+   * counted again on the whole text (21 Nov hand pass: "there is room under the
+   * 80-word limit", in a change to one line of the email, was counted on the whole
+   * brief and email, 594 words, and sent the final back for a repair that could
+   * never meet it).
    */
-  partLimits: readonly number[] = []
+  briefLimits: readonly number[] = []
 ): Map<string, LengthDecision> {
   const out = new Map<string, LengthDecision>();
   if (!content.trim()) return out;
@@ -79,7 +81,7 @@ export function lengthRows(
     // A hedged figure first ("about 500 words"), as the brief's own is read…
     const hedged = wholeLengthTarget({ constraints: change }, content);
     const limit = hedged?.max ?? firmLength(change, content)?.firm.max;
-    if (limit !== undefined && partLimits.includes(limit)) continue;
+    if (limit !== undefined && briefLimits.includes(limit)) continue;
     if ((hedged || firmLength(change, content)) && working) {
       out.set(row.id, { met: true, later: true, line: LENGTH_FOR_LATER });
       continue;

@@ -5069,11 +5069,12 @@ Now (`lib/agent/needs.ts`):
 - `repairStuckNeed` reads the repairs for what the last one was for. Its tries, what is unresolved, and the
   last attempt describe the same repairs. For carried repairs, what is unresolved is the carried row.
 
-### L-269 — A part's word limit named in a change is not counted on the whole deliverable (2026-11-21)
+### L-269 — A word limit a change only restates from the brief is not counted on the whole deliverable (2026-11-21)
 Found on the 21 Nov hand pass (john@ c89649d5). An accepted change to one line of the email ended "there is
 room under the 80-word limit". `lengthRows` read that as a length for the whole deliverable, the brief and
 email together, and counted 594 words against 80. The check called the change not carried, and the final
 went back for a repair no text could pass, until the check rounds ran out. A limit equal to one of the
-deliverable's own part limits (here "Internal email of at most 80 words", already counted on the email) is
-now left to that part. Not changed: a change naming a different number with no part is still counted on the
-whole text.
+brief's own limits is now left to where that limit applies, where code already counts it: here "The internal
+email is at most 80 words", counted on the email. The first version of this fix looked only at limits on parts.
+The production pass showed "email" is read as a document, not a part, so the 80 never reached the list.
+Not changed: a change naming a number the brief does not set is still counted on the whole text.
