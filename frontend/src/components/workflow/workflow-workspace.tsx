@@ -133,7 +133,7 @@ import { FactsNextStep, OfferedChangeNotice } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
-import { openBriefChange, proposedChange, settledChange, type ProposedChange } from '@/lib/workflow/brief-change';
+import { openBriefChange, proposedChange, settledChange, SETTLED_SHOWN_MS, type ProposedChange } from '@/lib/workflow/brief-change';
 import { replaceDocumentInContext, contextFromDocuments, documentInContext } from '@/lib/data/extract-text';
 import { changedLines, factsFromReplacedLines } from '@/lib/data/replaced-lines';
 import { ChatAttach } from './chat-attach';
@@ -185,7 +185,7 @@ import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluatio
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
 import { changeOutcomes } from '@/lib/workflow/change-outcomes';
-import { changeSummary } from '@/lib/workflow/change-summary';
+import { changeSummary, decisionStillAwaited } from '@/lib/workflow/change-summary';
 import { plainReason } from '@/lib/workflow/plain-reason';
 
 interface Props {
@@ -2129,13 +2129,20 @@ export function WorkflowWorkspace({
     const all = [...go.priorSteps, ...go.steps];
     return keptQuestions(all, answeredKept(project.facts, all));
   }, [go.priorSteps, go.steps, project.facts]);
+  // A change whose decision is still to be made again keeps its summary up (L-277 follow-up).
+  const awaitedDecision = useMemo(() => {
+    if (briefChange || settled) return null;
+    const found = decisionStillAwaited(events ?? [], project.manual_checks, Date.now(), SETTLED_SHOWN_MS);
+    return found && found.event.created_at !== settledDismissed ? found : null;
+  }, [briefChange, settled, events, project.manual_checks, settledDismissed]);
   // After a change: what still stands, what is being redone, what needs the user (L-277).
   const changeSummaryNow = useMemo(() => {
     const open = briefChange ? { since: briefChange.event.created_at, touched: [...briefChange.stageIds, ...(briefChange.alsoWaiting ?? [])] } : null;
-    const shown = open ?? (settled ? { since: settled.event.created_at, touched: settled.stageIds } : null);
+    const after = settled ?? awaitedDecision;
+    const shown = open ?? (after ? { since: after.event.created_at, touched: after.stageIds } : null);
     if (!shown) return null;
     const done = shown.touched.filter((id) => isDone(state.stages[id]?.status));
-    const outcomes = open
+    const outcomes = !settled
       ? changeOutcomes(
           done, shown.since, template.stages, (id) => stageBundles[id]?.versions ?? [], evaluations, (id) => context.openRows?.[id]?.length ?? 0,
           new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string))
@@ -2146,7 +2153,7 @@ export function WorkflowWorkspace({
       queue: project.status === 'finalized' ? [] : userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
       manualChecks: project.manual_checks,
     });
-  }, [briefChange, settled, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow]);
+  }, [briefChange, settled, awaitedDecision, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow]);
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
@@ -3275,9 +3282,9 @@ export function WorkflowWorkspace({
               onUpdate={undefined}
               updating={go.active}
               judging={judgingChange}
-              settled={settled}
+              settled={settled ?? awaitedDecision}
               outcomes={settledOutcomes}
-              onDismissSettled={() => settled && setSettledDismissed(settled.event.created_at)}
+              onDismissSettled={() => { const shown = settled ?? awaitedDecision; if (shown) setSettledDismissed(shown.event.created_at); }}
               summary={changeSummaryNow}
               onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
             />

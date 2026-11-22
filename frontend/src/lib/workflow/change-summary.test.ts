@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { changeSummary, type ChangeSummaryInput } from './change-summary';
+import { changeSummary, decisionStillAwaited, type ChangeSummaryInput } from './change-summary';
 import { plainReason } from './plain-reason';
 import { setAsideLater, setAsideReason } from './approvals';
 import { recordDecisionReason } from './decision-options';
@@ -127,3 +127,15 @@ describe('a reason in the user\'s words (L-277)', () => {
     expect(plainReason('')).toBe('');
   });
 });
+
+describe('the summary stays while the set-aside choice waits (L-277 follow-up)', () => {
+  const set = { type: 'brief_changed', stage_id: 'final', created_at: SINCE, payload: { kind: 'fact', affected: [{ stage_id: 'costs' }, { stage_id: 'approve' }, { stage_id: 'final' }], decisions_set_aside: [B] } };
+  const now = Date.parse(SINCE) + 60_000;
+  it('is the change, with its stages, until the choice is made again', () => {
+    expect(decisionStillAwaited([set] as never, { 'approve.approved': false }, now, 12 * 3600_000)).toEqual({ event: set, stageIds: ['costs', 'approve', 'final'] });
+    expect(decisionStillAwaited([set] as never, { 'approve.approved': true }, now, 12 * 3600_000)).toBeNull();
+    expect(decisionStillAwaited([set] as never, {}, now + 13 * 3600_000, 12 * 3600_000)).toBeNull();
+    expect(decisionStillAwaited([{ ...set, payload: { kind: 'fact', affected: [] } }] as never, {}, now, 12 * 3600_000)).toBeNull();
+  });
+});
+

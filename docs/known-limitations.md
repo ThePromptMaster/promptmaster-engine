@@ -5281,6 +5281,16 @@ box-office system from three quotes, against a $24,000 cap and a March 2 on-sale
 fact of its own, so the demo change (Option B's card readers from $1,975 to $3,100, which puts B above A while
 still under the cap) sets the choice aside and shows all three groups.
 
+Two follow-ups from the production pass the same day (vendor example, project 93db976d):
+- **The summary stays while the choice waits.** After Go had updated the work, nothing waited for a recheck
+  and the decision stage was reopened rather than finished, so the notice disappeared just when the choice was
+  the one thing left. While a set-aside decision is still to be made again, the change that set it aside stays
+  shown, with "Choose again" (`decisionStillAwaited`).
+- **The choice is asked before a later sign-off.** The run stopped on "I approve this memo to send to the board"
+  while the choice that memo records waited, listed second under "Also waiting on you". A reserved sign-off
+  now waits for a choice an earlier, unfinished stage still needs (`earlierChoiceWaiting` in `lib/agent/needs.ts`),
+  and Go stops on that choice instead.
+
 Not covered:
 - "Still usable" means "not reopened": a stage the change check missed is listed as usable.
 - Only the latest change is summarised; stages still waiting from an earlier one are counted with it.
