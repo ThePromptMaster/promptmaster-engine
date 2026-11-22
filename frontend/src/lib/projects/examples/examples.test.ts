@@ -84,7 +84,7 @@ describe('the examples', () => {
  * from the hand pass on production after the deploy, in the follow-up the same day,
  * which takes the key out of this list. Never filled with an invented result.
  */
-const AWAITING_FIRST_RUN = new Set<string>(['vendor_choice']);
+const AWAITING_FIRST_RUN = new Set<string>([]);
 
 describe('what a real run produced (6 Nov, production)', () => {
   it.each(EXAMPLES.filter((e) => !AWAITING_FIRST_RUN.has(e.key)).map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
@@ -111,6 +111,10 @@ describe('what a real run produced (6 Nov, production)', () => {
     expect(briefing).toMatch(/7\.45%/);
     expect(briefing).toMatch(/caps any price rise at 4%/);
     expect(briefing).toMatch(/\$210,000/);
+    // The demo change ran: B's card readers rose, and the memo records the choice made again.
+    const vendor = resultOf({ key: 'vendor_choice' })!.text;
+    expect(vendor).toMatch(/\$4,800 \+ \$12,900 \+ \$3,100 \+ \$950 = \*\*\$21,750\*\*/);
+    expect(vendor).toMatch(/Option A, Curtain Call Ticketing, is the option chosen/);
   });
 });
 

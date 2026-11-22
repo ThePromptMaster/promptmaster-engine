@@ -18,6 +18,52 @@ export interface FinishedResult {
 }
 
 export const FINISHED_RESULTS: Partial<Record<ExampleKey, FinishedResult>> = {
+  // 22 Nov, production (john@ 93db976d): Go to the choice, Option B chosen, then the demo
+  // change (B's card readers $1,975 to $3,100) set the choice aside; Go redid the costs, the
+  // draft and the check, Option A was chosen again, and the memo followed it (L-277).
+  vendor_choice: {
+    date: '2026-11-22',
+    minutes: 23,
+    costUsd: 3.47,
+    text: `**Memo: Box-office system for the spring season**
+
+**To:** The Riverside Players board
+**Re:** Box-office system for the spring season
+**For decision at:** December meeting
+
+**Decision**
+
+Option A, Curtain Call Ticketing, is the option chosen to put to the board for approval at its December meeting. It costs $21,450 all-in for the first year, with tickets on sale February 16, 2027. This is also the recommended option.
+
+**The options side by side**
+
+Each year-one total is the sum of the vendor's four quoted costs.
+
+| | Option A: Curtain Call Ticketing | Option B: Marquee Box Office | Option C: Footlights POS |
+|---|---|---|---|
+| Setup | $6,500 | $4,800 | $3,900 |
+| Year-one licence | $11,400 | $12,900 | $9,600 |
+| Card readers | $2,350 | $3,100 | $2,100 |
+| Training | $1,200 | $950 | $800 |
+| **Year-one total** | $6,500 + $11,400 + $2,350 + $1,200 = **$21,450** | $4,800 + $12,900 + $3,100 + $950 = **$21,750** | $3,900 + $9,600 + $2,100 + $800 = **$16,400** |
+| Against the $24,000 cap | $2,550 under | $2,250 under | $7,600 under |
+| Tickets on sale | February 16, 2027 | February 23, 2027 | March 15, 2027 |
+| Against March 2, 2027 | 14 days before | 7 days before | 13 days after |
+| Meets $24,000 cap | Yes | Yes | Yes |
+| Meets March 2, 2027 on-sale date | Yes | Yes | **No** |
+
+**Why Option A**
+
+The treasurer set two requirements: no more than $24,000 all-in for the first year, and tickets on sale by March 2, 2027. The rule is to choose the lowest-cost option that meets both.
+
+- **Option C does not qualify.** It is the cheapest at $16,400, but its tickets go on sale March 15, 2027. That is 13 days after the deadline.
+- **Options A and B meet both requirements.** Option A costs $300 less than Option B ($21,750 − $21,450 = $300). Option A would also put tickets on sale 7 days earlier, but the rule weighs only cost among the qualifying options.
+- **Option A is therefore the lowest-cost qualifying option.** It comes in $2,550 under the cap ($24,000 − $21,450 = $2,550). Its tickets go on sale 14 days before the deadline.
+
+**Next step**
+
+The board considers Option A at its December meeting. Once the board approves it, the purchase from Curtain Call Ticketing proceeds on its quoted terms: $21,450 for the first year and an on-sale date of February 16, 2027.`,
+  },
   meeting_briefing: {
     date: '2026-11-07',
     minutes: 13,

@@ -2141,13 +2141,19 @@ export function WorkflowWorkspace({
     const after = settled ?? awaitedDecision;
     const shown = open ?? (after ? { since: after.event.created_at, touched: after.stageIds } : null);
     if (!shown) return null;
-    const done = shown.touched.filter((id) => isDone(state.stages[id]?.status));
+    const done = template.stages.map((st) => st.id).filter((id) => isDone(state.stages[id]?.status));
     const outcomes = !settled
       ? changeOutcomes(
           done, shown.since, template.stages, (id) => stageBundles[id]?.versions ?? [], evaluations, (id) => context.openRows?.[id]?.length ?? 0,
           new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string))
         )
-      : settledOutcomes;
+      : settledOutcomes.concat(
+          changeOutcomes(
+            done.filter((id) => !settledOutcomes.some((o) => o.stageId === id)), shown.since, template.stages, (id) => stageBundles[id]?.versions ?? [], evaluations,
+            (id) => context.openRows?.[id]?.length ?? 0,
+            new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string))
+          )
+        );
     return changeSummary({
       template, state, events: events ?? [], since: shown.since, touched: shown.touched, outcomes, reapprove,
       queue: project.status === 'finalized' ? [] : userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
