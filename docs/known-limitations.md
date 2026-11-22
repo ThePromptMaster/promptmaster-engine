@@ -2338,7 +2338,8 @@ own stage then says what it lacked.
 Every prompt lists the approvals the user ticked, each with the version it was given on. An
 approval given on an older version is still an approval of that version: prompts are told the
 current version number, and the checklist shows "approved vN, now vM". Nothing unticks it
-automatically.
+automatically, except a decision made by choosing an option when a fact about that option changes
+(L-272, 2026-11-22).
 
 Since 26 Oct, when Go repairs a stage (a reopened stage, or a measured requirement) under
 "Handle them for me", each routine (`delegable`) approval on it is checked against the new
@@ -5118,3 +5119,39 @@ facts. A write that still fails is logged to `error_events` (`decision_not_recor
 
 Not covered: other writes are not retried by this; they now show the database's reason instead of a generic
 sentence. The tick itself is the project's debounced save, which already retries on its own.
+
+### L-272 — A changed fact about the chosen option reopens the decision (2026-11-22)
+Sean, 21 Nov, two tests. Scanner replacement: he approved Option B at $60,000, then Option B's training
+charge rose to $7,500. Warehouse labeling (Go): he chose Option A at $48,000, then Option A's training went
+from $7,000 to $11,000. Each time Go repaired the decision stage and **marked it complete again**. The memo's
+wording treated the approval as history, but the workflow did not: the approval stayed ticked "for that
+version", the scanner run ended "Objective met", and `approvalsOnEarlierVersion` left a chosen-option approval
+out of the re-confirm count, because every later version was Go's own.
+
+Now, when the facts change (`use-brief-change.ts`, the fact branch), any decision made by choosing an option
+(a current decision fact with `criterion_id` and `choice`, still ticked) whose option the changed or removed
+fact names (`concernsItem`, `lib/workflow/item-labels.ts`: "Option B …" against "I approve Option B at
+$60,000"; a fact about every option counts too) is set aside (`decisionsSetAside`, `lib/workflow/approvals.ts`).
+Its approval is unticked first, and then its stage reopens, with a reason that says the decision was made on
+the old fact and is awaited again. The `brief_changed` event carries `decisions_set_aside`. Go's recheck then
+leaves the stage open until the approval is given, stops on its card, and the options are read again for the
+new version. The old decision fact stays as history; deciding again supersedes it.
+
+Not covered: a change to another option (A's price when B was chosen) does not reopen the decision, even if
+it would now win. A choice that names no labelled option is not matched. Approvals that are not decisions
+still stand for their version, as L-117 says; L-273 shows them.
+
+### L-273 — The sidebar shows which stages need a fresh approval, and does not count them done (2026-11-22)
+Sean's warehouse run, 21 Nov: the rail said "5 done · 0 to go", with ticks beside Approve option and Final
+memo, while the same screen said "2 approvals to re-confirm" and "Needs your decision". The ticks and the
+count came from stage status only. The re-confirm number was a separate count of approvals.
+
+Now a done stage with an approval given on an earlier text (the same `approval_on_earlier_version` items
+the caption read, `reapprovalByStage` in `engine.ts`) is drawn with the `approval` icon and a "re-approve"
+badge. Its title names the approvals and the versions. `progressSummary` counts it apart:
+"3 done · 2 to re-approve · 0 to go", and the phone bar says the same. An approval on a stage that is not done
+is still listed as "N approvals to re-confirm".
+
+Not covered: Go's own "still to do" (`remainingStages`) and the Finish panel's stage count still count such a
+stage as done. Go cannot give the user's approval, and its stop says what is to re-confirm.
+

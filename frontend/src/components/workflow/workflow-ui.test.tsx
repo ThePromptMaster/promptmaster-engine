@@ -105,6 +105,22 @@ describe('approval pending reads the same everywhere (2 Oct, item 3)', () => {
 });
 
 describe('StageRail', () => {
+  it('draws a done stage approved on an earlier text as "re-approve", not a tick (L-273, 21 Nov, Sean, warehouse)', () => {
+    const state = projectState(SINGLE_OUTPUT_V1, []);
+    state.stages.input = { ...state.stages.input, status: 'complete' } as never;
+    state.current_stage_id = 'review';
+    render(
+      <StageRail
+        template={SINGLE_OUTPUT_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()}
+        reapprove={{ input: { approvals: ['I approve this input'], version: 1, current: 3 } }}
+      />
+    );
+    const input = screen.getByRole('button', { name: /Input/ });
+    expect(input).toHaveTextContent('re-approve');
+    expect(input.querySelector('.material-symbols-outlined')?.textContent).toBe('approval');
+    expect(input.querySelector('[data-reapprove]')?.getAttribute('title')).toContain('v1 and the stage is now v3: “I approve this input”');
+  });
+
   it('draws a finished stage with open findings as "done · N open", not a plain tick (18 Oct, Summit)', () => {
     const state = projectState(SINGLE_OUTPUT_V1, []);
     state.stages.input = { ...state.stages.input, status: 'complete' } as never;

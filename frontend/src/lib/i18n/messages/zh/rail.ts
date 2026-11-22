@@ -17,6 +17,8 @@ export const zh: Record<keyof typeof en, string> = {
   'rail.doneOpen': '已完成 · {count} 项未决',
   'rail.doneOpenWhy_one': '已完成，但仍有 {count} 个发现项未决——打开此阶段查看',
   'rail.doneOpenWhy_other': '已完成，但仍有 {count} 个发现项未决——打开此阶段查看',
+  'rail.reapprove': '需重新批准',
+  'rail.reapproveWhy': '已完成，但您的批准针对的是 v{version}，此阶段现为 v{current}：{approvals}。请在此阶段的清单中重新批准。',
   'rail.waiting': '等待你处理',
   'rail.waitingWhy': '此阶段的工作已完成，但项目的目标尚未达成——在该阶段查看它在等待什么',
   'rail.recheck': '待重新检查',
@@ -31,4 +33,5 @@ export const zh: Record<keyof typeof en, string> = {
   'rail.legend.skipped': '有意跳过，并附有理由',
   'rail.legend.blocked': '受阻——正在等待某项内容',
   'rail.legend.stale': '需重新检查——之前的某项内容已更改',
+  'rail.legend.reapprove': '在较早的文本上完成——需要您重新批准',
 };

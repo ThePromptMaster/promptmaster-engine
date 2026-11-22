@@ -15,6 +15,8 @@ export const en = {
   'rail.doneOpen': 'done · {count} open',
   'rail.doneOpenWhy_one': 'Done, with {count} finding still open — open the stage to see it',
   'rail.doneOpenWhy_other': 'Done, with {count} findings still open — open the stage to see them',
+  'rail.reapprove': 're-approve',
+  'rail.reapproveWhy': 'Done, but your approval was given on v{version} and the stage is now v{current}: {approvals}. Approve it again in the stage\'s checklist.',
   'rail.waiting': 'waiting on you',
   'rail.waitingWhy': "This stage's work is done, but the project's objective is not met yet — see what it is waiting for on the stage",
   'rail.recheck': 'awaiting recheck',
@@ -29,6 +31,7 @@ export const en = {
   'rail.legend.skipped': 'Skipped on purpose, with a reason',
   'rail.legend.blocked': 'Stuck — waiting on something',
   'rail.legend.stale': 'Recheck — something before it changed',
+  'rail.legend.reapprove': 'Done on an earlier text — your approval needs giving again',
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -49,6 +52,8 @@ export const es: Keys = {
   'rail.doneOpen': 'hecha · {count} abiertos',
   'rail.doneOpenWhy_one': 'Hecha, con {count} hallazgo aún abierto: abre la etapa para verlo',
   'rail.doneOpenWhy_other': 'Hecha, con {count} hallazgos aún abiertos: abre la etapa para verlos',
+  'rail.reapprove': 'volver a aprobar',
+  'rail.reapproveWhy': 'Hecha, pero tu aprobación se dio en la v{version} y la etapa está ahora en la v{current}: {approvals}. Apruébala de nuevo en la lista de la etapa.',
   'rail.waiting': 'te espera',
   'rail.waitingWhy': 'El trabajo de esta etapa está hecho, pero el objetivo del proyecto aún no se cumple: mira en la etapa qué espera',
   'rail.recheck': 'por revisar',
@@ -63,6 +68,7 @@ export const es: Keys = {
   'rail.legend.skipped': 'Omitida a propósito, con un motivo',
   'rail.legend.blocked': 'Atascada: esperando algo',
   'rail.legend.stale': 'Revisar: algo anterior cambió',
+  'rail.legend.reapprove': 'Hecha sobre un texto anterior: tu aprobación hay que darla de nuevo',
 };
 
 export const fr: Keys = {
@@ -81,6 +87,8 @@ export const fr: Keys = {
   'rail.doneOpen': 'terminée · {count} en suspens',
   'rail.doneOpenWhy_one': 'Terminée, avec {count} remarque encore ouverte — ouvrez l’étape pour la voir',
   'rail.doneOpenWhy_other': 'Terminée, avec {count} remarques encore ouvertes — ouvrez l’étape pour les voir',
+  'rail.reapprove': 'à réapprouver',
+  'rail.reapproveWhy': 'Terminée, mais votre approbation porte sur la v{version} et l’étape est maintenant en v{current} : {approvals}. Approuvez-la de nouveau dans la liste de l’étape.',
   'rail.waiting': 'vous attend',
   'rail.waitingWhy': 'Le travail de cette étape est fait, mais l’objectif du projet n’est pas encore atteint — voyez sur l’étape ce qu’elle attend',
   'rail.recheck': 'à revérifier',
@@ -95,6 +103,7 @@ export const fr: Keys = {
   'rail.legend.skipped': 'Ignorée volontairement, avec une raison',
   'rail.legend.blocked': 'Bloquée — en attente de quelque chose',
   'rail.legend.stale': 'À revérifier — quelque chose avant elle a changé',
+  'rail.legend.reapprove': 'Terminée sur un texte antérieur — votre approbation est à redonner',
 };
 
 export const pt: Keys = {
@@ -113,6 +122,8 @@ export const pt: Keys = {
   'rail.doneOpen': 'concluída · {count} em aberto',
   'rail.doneOpenWhy_one': 'Concluída, com {count} apontamento ainda em aberto — abra a etapa para vê-lo',
   'rail.doneOpenWhy_other': 'Concluída, com {count} apontamentos ainda em aberto — abra a etapa para vê-los',
+  'rail.reapprove': 'voltar a aprovar',
+  'rail.reapproveWhy': 'Concluída, mas a sua aprovação foi dada na v{version} e a etapa está agora na v{current}: {approvals}. Aprove-a de novo na lista da etapa.',
   'rail.waiting': 'aguardando você',
   'rail.waitingWhy': 'O trabalho desta etapa está feito, mas o objetivo do projeto ainda não foi atingido — veja na etapa o que falta',
   'rail.recheck': 'aguardando nova checagem',
@@ -127,4 +138,5 @@ export const pt: Keys = {
   'rail.legend.skipped': 'Pulada de propósito, com um motivo',
   'rail.legend.blocked': 'Travada — aguardando algo',
   'rail.legend.stale': 'Checar de novo — algo anterior mudou',
+  'rail.legend.reapprove': 'Concluída sobre um texto anterior — a sua aprovação tem de ser dada de novo',
 };

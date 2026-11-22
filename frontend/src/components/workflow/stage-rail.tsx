@@ -44,6 +44,8 @@ const STATUS_ICON: Record<StageStatus, string> = {
 
 /** Open but not where the project is: left open, or reopened to edit. */
 const OPEN_ELSEWHERE_ICON = 'pending';
+/** Done on an earlier text than it holds now: the user's approval is to give again (L-273). */
+const REAPPROVE_ICON = 'approval';
 
 function statusColor(status: StageStatus, isCurrent: boolean): string {
   if (isCurrent) return 'text-[var(--pm-primary)]';
@@ -80,9 +82,15 @@ interface Props {
    * with any is drawn "done · N open", not a plain tick (18 Oct, Sean, Summit).
    */
   openFindings?: Readonly<Record<string, number>>;
+  /**
+   * Per stage, approvals given on an earlier text (`reapprovalByStage`): a done
+   * stage with any is drawn "re-approve", not a tick (L-273, 21 Nov, Sean,
+   * warehouse: ticks beside Approve option and Final memo while Go waited on him).
+   */
+  reapprove?: Readonly<Record<string, { approvals: string[]; version: number; current: number }>>;
 }
 
-export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn, openFindings }: Props) {
+export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn, openFindings, reapprove }: Props) {
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
@@ -117,6 +125,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
               const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
               const projectOpen = projectOpenOn === stage.id;
               const openCount = isDone(status) && !projectOpen ? openFindings?.[stage.id] ?? 0 : 0;
+              const toReapprove = isDone(status) && !projectOpen ? reapprove?.[stage.id] ?? null : null;
 
               return (
                 <li key={stage.id}>
@@ -134,9 +143,9 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                   >
                     <span
                       aria-hidden
-                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen || (openCount && !isCurrent) ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
+                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen || ((openCount || toReapprove) && !isCurrent) ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
                     >
-                      {projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : STATUS_ICON[status]}
+                      {projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : toReapprove ? REAPPROVE_ICON : STATUS_ICON[status]}
                     </span>
 
                     <span
@@ -198,6 +207,16 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                       </span>
                     )}
 
+                    {toReapprove && (
+                      <span
+                        data-reapprove
+                        title={t('rail.reapproveWhy', { version: toReapprove.version, current: toReapprove.current, approvals: toReapprove.approvals.map((a) => `“${a}”`).join(', ') })}
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        {t('rail.reapprove')}
+                      </span>
+                    )}
+
                     {projectOpen && (
                       <span
                         title={t('rail.waitingWhy')}
@@ -256,4 +275,5 @@ const LEGEND: [string, MessageKey][] = [
   [STATUS_ICON.skipped, 'rail.legend.skipped'],
   [STATUS_ICON.blocked, 'rail.legend.blocked'],
   [STATUS_ICON.stale, 'rail.legend.stale'],
+  [REAPPROVE_ICON, 'rail.legend.reapprove'],
 ];

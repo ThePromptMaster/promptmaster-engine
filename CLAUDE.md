@@ -125,6 +125,8 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 
 **An approved stage's text goes into the work word for word by code, not by a model** (19 Nov, L-259): an accepted finding that asks for it is routine (`copiesApproved`), and every version Go saves carries it (`lib/workflow/approved-copy.ts`): only when the row asks for an approved text, only from an approval on the stage's current version, never over another accepted row's quoted change, and with no count line in the work unless asked (21 Nov, L-267). A deliverable's status words for review findings are written from the review tables before an approval question (`refreshStatusWords`).
 
+**A decision made by choosing an option is taken back when a fact about that option changes** (22 Nov, L-272): `decisionsSetAside` unticks it before the `brief_changed` that reopens its stage, so Go asks again with the options. Every other approval stands for its version (L-117), and the rail draws a done stage with one as "re-approve", apart from "done" (`reapprovalByStage`, L-273).
+
 **What PromptMaster can verify is a rule; what is left is the user's approval, worded in the first person** ("I approve this analysis plan for execution"). The checklist groups them as "PromptMaster verified" and "You approve".
 
 **Exit criteria are declarative predicates evaluated by pure functions** — never an LLM call. A gate that fails because a model timed out is a gate users learn to resent. Unknown rule types degrade to a manual checklist item rather than throwing.

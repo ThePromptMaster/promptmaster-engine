@@ -17,6 +17,8 @@ export const ar: Record<keyof typeof en, string> = {
   'rail.doneOpen': 'منجزة · {count} مفتوحة',
   'rail.doneOpenWhy_one': 'منجزة، مع ملاحظة واحدة ({count}) لا تزال مفتوحة — افتح المرحلة لرؤيتها',
   'rail.doneOpenWhy_other': 'منجزة، مع ملاحظات لا تزال مفتوحة (العدد: {count}) — افتح المرحلة لرؤيتها',
+  'rail.reapprove': 'إعادة الموافقة',
+  'rail.reapproveWhy': 'منجزة، لكن موافقتك أُعطيت على الإصدار {version} والمرحلة الآن على الإصدار {current}: {approvals}. وافق عليها مجددًا في قائمة المرحلة.',
   'rail.waiting': 'بانتظارك',
   'rail.waitingWhy': 'عمل هذه المرحلة منجز، لكن هدف المشروع لم يتحقق بعد — اطّلع في المرحلة على ما تنتظره',
   'rail.recheck': 'بانتظار إعادة التحقق',
@@ -31,4 +33,5 @@ export const ar: Record<keyof typeof en, string> = {
   'rail.legend.skipped': 'تُخطّيت عمدًا، مع ذكر السبب',
   'rail.legend.blocked': 'متعثرة — بانتظار أمر ما',
   'rail.legend.stale': 'إعادة تحقق — تغيّر شيء قبلها',
+  'rail.legend.reapprove': 'أُنجزت على نص أقدم — موافقتك تحتاج إلى إعطائها من جديد',
 };
