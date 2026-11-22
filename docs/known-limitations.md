@@ -5164,3 +5164,50 @@ is still listed as "N approvals to re-confirm".
 Not covered: Go's own "still to do" (`remainingStages`) and the Finish panel's stage count still count such a
 stage as done. Go cannot give the user's approval, and its stop says what is to re-confirm.
 
+
+### L-274 — An option that fails one of the user's requirements is explained, not offered (2026-11-22)
+Sean's warehouse test, 22 Nov (project 20065349). After Option A's training quote rose, Approve option v6 put
+Option A at $52,000 against a hard $50,000 cap. Its own table said "Ineligible: $2,000 over the cap", and the
+option's label said "(over the $50,000 cap)". It was still a button like Option B. He pressed it to see what
+would happen, and it was recorded as his decision. The options call (`promptmaster/decision_options.py`) was
+never asked about requirements, and every option was drawn the same way.
+
+Now the call also says, for each option, which of the user's requirements the stage's text shows it failing:
+the requirement facts and the brief's constraints. It must give both passages, the requirement as the user
+gave it and the stage text that shows the failure, and an option keeps `fails` only when both are found. Such
+an option is drawn as an explanation with no button, on Go's card, under the approval and in the "Also waiting
+on you" list. The text names the requirement and the passage, and says that to choose the option, the
+requirement is changed in Facts first. The other options stay buttons. Typed, the option is refused with the
+same reason and nothing is recorded, whether it is typed in the card's box or as an answer to Go's question
+(`failingChoice`, `ChoiceRefused`). `decideApproval` checks it too.
+
+Not covered: an option the text does not show failing anything is offered, even if it does fail a
+requirement. Only the stage's own words are read, never a model's own judgement. If every option fails, the
+card says so and offers nothing to press.
+
+### L-275 — A typed choice is the decision, a decision replaces earlier typed choices, and the page says what it recorded (2026-11-22)
+In the same test, at 13:54 UTC Sean typed "Approve Option B at $49,000 all-in" in answer to Go's own question.
+`decideByAnswer` matched only approvals in the waiting list, and this one was still ticked for Option A. So the
+answer was kept as a note (a fact with no `criterion_id`), not as the decision. Ten minutes later he pressed
+Option A on the approval. Both stood as "Decided by the user". Final memo v5 recorded B, Go's memory still
+said "the user answered: Approve Option B", and Go marked the memo done with "which option is your approval of
+record?" set aside. The page had moved on to Final memo, so he could not tell what his press had saved.
+
+Now:
+- **A typed choice is the decision.** An answer that names one option of a reserved approval decides it. The
+  approval can be waiting, hidden from the list while earlier work is redone, or already given for another
+  option (`decisionCandidates`). An approval already given changes only on an answer that says it chooses
+  ("approve", "go with", "pick"). Options not on screen are read for the approval's current text. The same
+  option chosen again writes nothing.
+- **A decision replaces earlier typed choices.** It retires the current answers to Go's questions that chose
+  an option of the same kind, with "Replaced by your decision on …" (`answersReplacedBy`). An answer that only
+  mentions an option stays.
+- **Go follows the record.** Its memory leaves out an answer that was replaced and lists each decision of
+  record. The repeat-question check counts a decision made on the approval as a change.
+- **The page says what it recorded.** Go's panel says "Recorded on Approve option: Option A … It replaces: …"
+  until it is dismissed, wherever Go goes next. The decision trail carries the same text.
+- **A set-aside stage is re-marked.** A decision stage still waiting for Go to write a choice in is re-marked
+  when that choice is set aside (L-272); before, it kept "record the decision".
+
+Not covered: an answer that names no labelled option ("the cheaper one") is still a note. A choice between
+items of different kinds in one answer is not matched.

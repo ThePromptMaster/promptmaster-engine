@@ -24,6 +24,14 @@ options: an English sign-off with no word of choosing in it is not even sent.
 (Letting a sign-off keep options when the text "left the decision open" was
 tried against the saved texts: it gave a brief's sign-off the later stage's
 decision in two runs of three.)
+
+An option that fails the user's own requirement (22 Nov, L-274). Sean's
+warehouse test: after a quote change, Option A was $52,000 against a hard
+$50,000 cap. The stage's table said "Ineligible: $2,000 over the cap", the
+label even said "(over the $50,000 cap)", and A was still a button like B. He
+pressed it, and it was recorded. Now the call also says which requirement the
+text shows an option failing, with both passages copied; the option is kept
+and marked, and the page explains it instead of offering it.
 """
 
 from __future__ import annotations
@@ -64,6 +72,12 @@ OPTIONS_INSTRUCTION = (
     "board, a letter gives its reader ways to reply. Those are the document's content and its reader's choice. "
     "They are not the user's decision, whoever THE AUDIENCE is: return no options for them. Options count only "
     "when the choice is the user's own and still open.\n\n"
+    "AN OPTION THAT FAILS A REQUIREMENT. The user's own REQUIREMENTS are listed below (a budget cap, a "
+    "deadline, a rule every option must meet). When the STAGE TEXT itself says or shows that an option fails one "
+    "of them (\"Ineligible: $2,000 over the cap\", \"misses the December 18 go-live\"), give that option "
+    "fails: {\"requirement\": the requirement copied exactly from REQUIREMENTS, \"quote\": the passage of the "
+    "STAGE TEXT, copied exactly, that shows it fails it}. Otherwise leave fails out. Never test an option against "
+    "a requirement yourself: only report what the text shows. Still list such an option.\n\n"
     "Also say how THE APPROVAL itself is worded, as approval_asks: \"choice\" when its own words have the "
     "user choose or decide something (\"I choose Option A or Option B\", \"I approve this decision on the "
     "cap\"); \"sign_off\" when it approves, accepts or releases the work as it stands (\"I approve this "
@@ -71,7 +85,8 @@ OPTIONS_INSTRUCTION = (
     "A sign-off has no options, whatever the text lays out.\n\n"
     "Return JSON only: {\"approval_asks\": \"choice\" or \"sign_off\", "
     "\"question\": the decision the user is asked to make, in one short sentence, or empty, "
-    f"\"options\": [{{\"label\": \"...\", \"quote\": \"...\"}}]}} with at most {MAX_OPTIONS} options."
+    f"\"options\": [{{\"label\": \"...\", \"quote\": \"...\", \"fails\": {{\"requirement\": \"...\", \"quote\": \"...\"}} or omitted}}]}} "
+    f"with at most {MAX_OPTIONS} options."
 )
 
 
@@ -85,10 +100,21 @@ class DecisionOptionsRequest(BaseModel):
     model: str = Field(default="", max_length=200)
 
 
+class OptionFails(BaseModel):
+    """A requirement of the user's that the stage's own text shows the option fails (L-274)."""
+
+    #: The requirement, as the user gave it.
+    requirement: str
+    #: The passage of the stage's text that shows the option fails it.
+    quote: str
+
+
 class DecisionOption(BaseModel):
     label: str
     #: The passage of the stage's text that states it.
     quote: str
+    #: Set only when both passages are found: the page then explains the option instead of offering it.
+    fails: OptionFails | None = None
 
 
 class DecisionOptionsResponse(BaseModel):
@@ -102,12 +128,22 @@ def _shown(content: str) -> str:
     return text if len(text) <= MAX_STAGE_CHARS else text[-MAX_STAGE_CHARS:]
 
 
+def requirements_of(inputs: PMInput) -> list[str]:
+    """The user's requirements an option can fail: their requirement facts and the brief's constraints."""
+    out = [f.statement.strip() for f in (inputs.facts or []) if f.kind == "requirement" and f.statement.strip()]
+    if (inputs.constraints or "").strip():
+        out.append(inputs.constraints.strip())
+    return out
+
+
 def build_options_prompt(req: DecisionOptionsRequest) -> tuple[str, str]:
     context = context_block(req.inputs)
+    requirements = requirements_of(req.inputs)
     user = (
         f"OBJECTIVE: {req.inputs.objective}\n"
         + (f"THE AUDIENCE (who the work is written for): {req.inputs.audience}\n" if req.inputs.audience else "")
         + (f"CONSTRAINTS: {req.inputs.constraints}\n" if req.inputs.constraints else "")
+        + ("REQUIREMENTS:\n" + "\n".join(f"- {r}" for r in requirements) + "\n" if requirements else "")
         + (f"\n{context}\n" if context else "")
         + f"\nTHE STAGE: {req.stage_label or '(unnamed)'}\n"
         f"THE APPROVAL: {req.approval}\n\n"
@@ -116,11 +152,25 @@ def build_options_prompt(req: DecisionOptionsRequest) -> tuple[str, str]:
     return OPTIONS_INSTRUCTION, user
 
 
-def parse_options(result: object, content: str) -> DecisionOptionsResponse:
+def _fails(raw: object, content: str, requirements: list[str]) -> OptionFails | None:
+    """Kept only with the requirement found among the user's and the passage found
+    in the stage's text: an option is never withheld on a model's say-so alone."""
+    if not isinstance(raw, dict) or not requirements:
+        return None
+    requirement = " ".join(str(raw.get("requirement") or "").split()).strip("\"“” ")[:300]
+    quote = " ".join(str(raw.get("quote") or "").split()).strip("\"“”")[:300]
+    if not _found(requirement, *requirements) or not _found(quote, content):
+        return None
+    return OptionFails(requirement=requirement, quote=quote)
+
+
+def parse_options(result: object, content: str, requirements: list[str] | None = None) -> DecisionOptionsResponse:
     """An option stays only with its passage found in the stage's text; one
     option, or none, is not a choice. An approval that only signs the work off
     has none: a reply that does not say the approval asks for a choice is read
-    as a sign-off."""
+    as a sign-off. An option the text shows failing one of the user's
+    requirements is kept and marked (L-274), so the page can say why it is not
+    offered; it still counts as one of the options."""
     if not isinstance(result, dict):
         return DecisionOptionsResponse()
     if str(result.get("approval_asks") or "").strip().lower() != "choice":
@@ -136,7 +186,7 @@ def parse_options(result: object, content: str) -> DecisionOptionsResponse:
         if not label or not key or key in seen or not _found(quote, content):
             continue
         seen.add(key)
-        kept.append(DecisionOption(label=label, quote=quote))
+        kept.append(DecisionOption(label=label, quote=quote, fails=_fails(item.get("fails"), content, requirements or [])))
         if len(kept) >= MAX_OPTIONS:
             break
     if len(kept) < 2:
@@ -161,5 +211,5 @@ async def decision_options(client: OpenRouterClient, req: DecisionOptionsRequest
     if not req.content.strip() or plainly_signs_off(req.approval):
         return DecisionOptionsResponse()
     system, user = build_options_prompt(req)
-    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=700, model=OPTIONS_MODEL)
-    return parse_options(result, req.content)
+    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1200, model=OPTIONS_MODEL)
+    return parse_options(result, req.content, requirements_of(req.inputs))

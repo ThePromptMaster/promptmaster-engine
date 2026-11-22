@@ -202,3 +202,14 @@ describe('a question about another finding is not a repeat (20 Nov, an inventory
     expect(repeatedQuestion({ question: FIRST, stageId: 'recommendation_package', steps: byText, findings: ['imwob0tqc2'] })).not.toBeNull();
   });
 });
+
+describe('a decision made on the approval is a change, not the old answer (L-275, 22 Nov, Sean)', () => {
+  it('a press on an option after the answer means the question is not a repeat', () => {
+    const facts = [{ created_at: at(19), accepted_by: 'user', retired_at: null, source_ref: { via: 'go answer', criterion_id: 'approve.approved', choice: 'Option A' } }];
+    expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, facts })).toBeNull();
+    // An answer recorded as a fact (no criterion) is still the answer itself.
+    const answerFact = [{ created_at: at(19), accepted_by: 'user', retired_at: null, source_ref: { via: 'go answer' } }];
+    expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, facts: answerFact })).not.toBeNull();
+  });
+});
+

@@ -208,7 +208,7 @@ describe('an answer to Go\'s own question that makes a waiting decision (12 Nov,
 
   it('names the option it chose, by the option\'s own name', async () => {
     const { decisionForAnswer } = await import('./decision-options');
-    expect(decisionForAnswer('Option A: I approve the $1,400 spending exception', pending)).toEqual({ criterionId: 'options.approved', stageId: 'options', choice: options[0].label });
+    expect(decisionForAnswer('Option A: I approve the $1,400 spending exception', pending)).toEqual({ criterionId: 'options.approved', stageId: 'options', choice: options[0].label, fails: null });
     expect(decisionForAnswer('I will go with option b.', pending)?.choice).toBe(options[1].label);
   });
 
