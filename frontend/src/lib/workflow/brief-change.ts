@@ -178,8 +178,13 @@ export function settledChange(
 ): { event: WorkflowEvent; stageIds: string[] } | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const e = events[i];
-    if (e.type !== 'brief_changed' || e.payload?.presentation_only) continue;
-    const affected = Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: string }[]) : [];
+    // A revision the user saved on an earlier stage reopens the finished work after it too: its
+    // outcome is shown the same way (L-277; it was shown only while waiting).
+    const revision = e.type === 'stage_version_saved' && e.actor === 'user';
+    if (!revision && (e.type !== 'brief_changed' || e.payload?.presentation_only)) continue;
+    const affected = !Array.isArray(e.payload?.affected)
+      ? []
+      : (e.payload!.affected as (string | { stage_id?: string })[]).map((a) => (typeof a === 'string' ? { stage_id: a } : a));
     const stageIds = [...new Set(affected.map((a) => a.stage_id ?? '').filter((id) => state.stages[id]))];
     if (!stageIds.length) continue;
     if (now - Date.parse(e.created_at) > SETTLED_SHOWN_MS) return null;

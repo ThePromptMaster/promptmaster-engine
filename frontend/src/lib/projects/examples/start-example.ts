@@ -3,6 +3,7 @@ import { prepareFiles, type PreparedFile } from '@/lib/data/attachments';
 import { imagePreview } from '@/lib/data/preview';
 import { createClient } from '@/lib/supabase/client';
 import { attachProjectFile } from '@/lib/supabase/project-files';
+import { recordFacts } from '@/lib/supabase/facts';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { appendVersion, createArtifact } from '@/lib/supabase/versions';
 import { appendWorkflowEvent, publishUserTemplate } from '@/lib/supabase/workflow';
@@ -90,6 +91,10 @@ export async function startExample(
         mode: example.project.mode,
         change_summary: 'Prepared for this example. No model wrote it.',
       });
+    }
+    // The sample's quotes and requirements, one fact each (L-277).
+    if (example.facts?.length) {
+      await recordFacts(project, example.facts.map((f) => ({ statement: f.statement, kind: f.kind, source_kind: 'brief' as const, source_ref: { via: 'example' } })));
     }
     for (const { name, text } of example.files ?? []) {
       const { ready, errors } = await prepareFiles([new File([text], name, { type: 'text/csv' })], []);

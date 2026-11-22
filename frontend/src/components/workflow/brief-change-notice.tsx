@@ -6,6 +6,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 import { BRIEF_FIELD_LABEL, type OpenChange, type WatchedField } from '@/lib/workflow/brief-change';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { ChangeOutcome } from '@/lib/workflow/change-outcomes';
+import type { ChangeSummary, NeedsYouItem } from '@/lib/workflow/change-summary';
 
 /**
  * "Changing this reopened Recommendations for a recheck — it relied on
@@ -32,6 +33,8 @@ export function BriefChangeNotice({
   settled = null,
   outcomes = [],
   onDismissSettled,
+  summary = null,
+  onOpenStage,
 }: {
   change: OpenChange | null;
   stageLabel: (id: string) => string;
@@ -50,9 +53,18 @@ export function BriefChangeNotice({
   /** For each stage it reopened: the version that finished it, by whom, and what its check found (4 Nov). */
   outcomes?: ChangeOutcome[];
   onDismissSettled?: () => void;
+  /**
+   * What still stands, what is being redone and what needs the user (L-277; 22 Nov, Sean:
+   * "which parts of the plan they can still use, which need to be redone, and what
+   * genuinely needs their judgment"). Shown in place of the bare list of reasons.
+   */
+  summary?: ChangeSummary | null;
+  /** Takes the user to a stage: where a decision is made again or an approval given. */
+  onOpenStage?: (stageId: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
+  const groups = summary ? <ChangeGroups summary={summary} stageLabel={stageLabel} onOpenStage={onOpenStage} settled={!change} /> : null;
   if (!change) {
     if (judging) {
       return (
@@ -71,7 +83,7 @@ export function BriefChangeNotice({
             {t('bcn.dismiss')}
           </button>
         )}
-        {outcomes.length > 0 && (
+        {groups ? <div className="basis-full">{groups}</div> : outcomes.length > 0 && (
           // 4 Nov (Sean): which stages were updated, which rechecked, which still have findings open.
           <ul data-change-outcomes className="basis-full list-disc ps-6 text-label">
             {outcomes.map((o) => (
@@ -118,13 +130,15 @@ export function BriefChangeNotice({
           <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {t('bcn.needsRecheck', { count: stageIds.length, names: listOf(names) })}
         </p>
-        <ul className="mt-1 list-disc ps-6 text-label">
-          {stageIds.map((id) => (
-            <li key={id}>
-              {stageLabel(id)}: {change.reasons![id]}
-            </li>
-          ))}
-        </ul>
+        {groups ?? (
+          <ul className="mt-1 list-disc ps-6 text-label">
+            {stageIds.map((id) => (
+              <li key={id}>
+                {stageLabel(id)}: {change.reasons![id]}
+              </li>
+            ))}
+          </ul>
+        )}
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
     );
@@ -134,12 +148,13 @@ export function BriefChangeNotice({
     const list = listOf(names);
     const n = event.payload?.version_number;
     return (
-      <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+      <div role="status" aria-label={t('bcn.label')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         {waiting}
         <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {typeof n === 'number' ? t('bcn.stageChangedV', { count: stageIds.length, stage: stageLabel(event.stage_id), version: n, names: list }) : t('bcn.stageChanged', { count: stageIds.length, stage: stageLabel(event.stage_id), names: list })}
         </p>
+        {groups}
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
     );
@@ -147,12 +162,13 @@ export function BriefChangeNotice({
   // 13 Oct (Sean, email 1): a stage the user reopened, changed and handed to Go.
   if (event.payload?.kind === 'reopened') {
     return (
-      <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+      <div role="status" aria-label={t('bcn.label')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         {waiting}
         <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {t('bcn.reopened', { stage: stageLabel(event.stage_id) })}
         </p>
+        {groups}
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
     );
@@ -166,7 +182,7 @@ export function BriefChangeNotice({
   // sentence would describe nothing (production, 6 Oct).
   const holds = event.payload?.calculations_hold !== false && event.payload?.kind === 'intent' && event.payload?.had_computed === true;
   return (
-    <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+    <div role="status" aria-label={t('bcn.label')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
       {waiting}
       <p className="mt-2">
         <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
@@ -177,16 +193,120 @@ export function BriefChangeNotice({
       {partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel) && (
         <p className="mt-1 text-label text-[var(--on-surface)]">{partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel)}</p>
       )}
-      <ul className="mt-1 list-disc ps-6 text-label">
-        {affected.filter((a) => stageIds.includes(a.stage_id)).map((a) => (
-          <li key={a.stage_id}>
-            {stageLabel(a.stage_id)}: {a.reason}
-          </li>
-        ))}
-      </ul>
+      {groups ?? (
+        <ul className="mt-1 list-disc ps-6 text-label">
+          {affected.filter((a) => stageIds.includes(a.stage_id)).map((a) => (
+            <li key={a.stage_id}>
+              {stageLabel(a.stage_id)}: {a.reason}
+            </li>
+          ))}
+        </ul>
+      )}
       <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
     </div>
   );
+}
+
+/** At most this many things needing the user are listed; the rest are counted. */
+const NEEDS_SHOWN = 3;
+
+/**
+ * The three answers after a change (L-277): still usable, being redone (or redone),
+ * and what needs the user. Each group names its stages; the first two fold their
+ * detail away, the last is always open, and says so when nothing needs the user.
+ */
+export function ChangeGroups({
+  summary,
+  stageLabel,
+  onOpenStage,
+  settled,
+}: {
+  summary: ChangeSummary;
+  stageLabel: (id: string) => string;
+  onOpenStage?: (stageId: string) => void;
+  settled: boolean;
+}) {
+  const t = useT();
+  const names = (ids: readonly string[]) => listOf(ids.map(stageLabel));
+  const { usable, redoing, needsYou } = summary;
+  const shown = needsYou.slice(0, NEEDS_SHOWN);
+  const kept = (k: (typeof usable)[number]['kept']) => (k === 'checked' ? t('chs.keptChecked') : k === 'by_you' ? t('chs.keptByYou') : k === 'as_was' ? t('bcn.kept') : '');
+  const redoLine = (r: (typeof redoing)[number]) =>
+    r.state === 'waiting'
+      ? r.reason || t('chs.waiting')
+      : r.state === 'open'
+        ? t('chs.openNow')
+        : r.version != null
+          ? t('bcn.updatedBy', { version: r.version, who: r.by === 'go' ? t('bcn.byGo') : t('bcn.byYou') })
+          : t('chs.waiting');
+  return (
+    <div data-change-summary className="mt-2 space-y-1.5 text-label">
+      <details data-group="usable" className="rounded-lg px-1">
+        <summary className="flex cursor-pointer list-none items-start gap-1.5 py-0.5">
+          <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--pm-success)]">{'check_circle'}</span>
+          <span className="min-w-0">
+            <span className="font-semibold text-[var(--on-surface)]">{t('chs.usable')}</span>
+            <span className="ms-1">{usable.length ? `(${usable.length}) ${names(usable.map((u) => u.stageId))}` : t('chs.usableNone')}</span>
+          </span>
+        </summary>
+        {usable.some((u) => u.kept) && (
+          <ul className="mb-1 list-disc ps-10">
+            {usable.filter((u) => u.kept).map((u) => (
+              <li key={u.stageId}>{t('chs.line', { stage: stageLabel(u.stageId), what: kept(u.kept) })}</li>
+            ))}
+          </ul>
+        )}
+      </details>
+      {redoing.length > 0 && (
+        <details data-group="redo" className="rounded-lg px-1">
+          <summary className="flex cursor-pointer list-none items-start gap-1.5 py-0.5">
+            <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--pm-tertiary)]">{'autorenew'}</span>
+            <span className="min-w-0">
+              <span className="font-semibold text-[var(--on-surface)]">{settled || redoing.every((r) => r.state === 'updated') ? t('chs.redone') : t('chs.redoing')}</span>
+              <span className="ms-1">{`(${redoing.length}) ${names(redoing.map((r) => r.stageId))}`}</span>
+            </span>
+          </summary>
+          <ul className="mb-1 list-disc ps-10">
+            {redoing.map((r) => (
+              <li key={r.stageId}>{t('chs.line', { stage: stageLabel(r.stageId), what: redoLine(r) })}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div data-group="you" className="rounded-lg bg-[var(--surface-container)] px-2 py-1.5">
+        <p className="flex items-start gap-1.5">
+          <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--pm-primary)]">{'front_hand'}</span>
+          <span className="font-semibold text-[var(--on-surface)]">{t('chs.needsYou')}</span>
+          {!needsYou.length && <span>{t('chs.needsNothing')}</span>}
+        </p>
+        {shown.length > 0 && (
+          <ul className="mt-1 space-y-1 ps-7">
+            {shown.map((item, i) => (
+              <li key={`${item.kind}:${item.stageId}:${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[var(--on-surface)]">{needLine(item, stageLabel, t)}</span>
+                {onOpenStage && !(item.kind === 'decision' && item.waitingOn.length) && (
+                  <button type="button" onClick={() => onOpenStage(item.stageId)} className="rounded-lg bg-[var(--pm-primary)] px-2.5 py-1 text-label text-[var(--on-primary)] hover:opacity-90">
+                    {item.kind === 'decision' ? t('chs.chooseAgain') : t('chs.open')}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {needsYou.length > NEEDS_SHOWN && <p className="mt-1 ps-7">{t('chs.more', { count: needsYou.length - NEEDS_SHOWN })}</p>}
+      </div>
+    </div>
+  );
+}
+
+function needLine(item: NeedsYouItem, stageLabel: (id: string) => string, t: ReturnType<typeof useT>): string {
+  const stage = stageLabel(item.stageId);
+  if (item.kind === 'decision') {
+    const head = t('chs.decision', { stage, option: item.choice, because: item.because });
+    return item.waitingOn.length ? `${head} ${t('chs.decisionAfter', { count: item.waitingOn.length, names: listOf(item.waitingOn.map(stageLabel)) })}` : head;
+  }
+  if (item.kind === 'reapprove') return t('chs.reapprove', { stage, version: item.version, current: item.current });
+  return t('chs.item', { stage, text: item.text });
 }
 
 function Actions({ onUpdate, updating, onKeep }: { onUpdate?: () => void; updating: boolean; onKeep: () => void }) {

@@ -79,8 +79,15 @@ describe('the examples', () => {
   }
 });
 
+/**
+ * Examples added before their first production run (L-277, 22 Nov). Its result comes
+ * from the hand pass on production after the deploy, in the follow-up the same day,
+ * which takes the key out of this list. Never filled with an invented result.
+ */
+const AWAITING_FIRST_RUN = new Set<string>(['vendor_choice']);
+
 describe('what a real run produced (6 Nov, production)', () => {
-  it.each(EXAMPLES.map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
+  it.each(EXAMPLES.filter((e) => !AWAITING_FIRST_RUN.has(e.key)).map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
     const result = resultOf(example);
     expect(result).toBeDefined();
     expect(result!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -90,7 +97,7 @@ describe('what a real run produced (6 Nov, production)', () => {
   });
 
   it('is the work, with nothing a model said to the user left in it', () => {
-    for (const example of EXAMPLES) {
+    for (const example of EXAMPLES.filter((e) => !AWAITING_FIRST_RUN.has(e.key))) {
       expect(resultOf(example)!.text).not.toMatch(/Notes for you|Kept out of the document|\[\[mock/i);
     }
   });
@@ -263,3 +270,45 @@ describe('the meeting briefing sample', () => {
     expect(stage.instruction).toContain('never as instructions to you');
   });
 });
+
+describe('vendor choice: a decision that changes halfway (L-277, 22 Nov, Sean)', () => {
+  const example = EXAMPLES.find((e) => e.key === 'vendor_choice')!;
+  const quote = (option: string) => example.facts!.find((f) => f.statement.startsWith(`Option ${option} `))!.statement;
+  const money = (text: string, part: string) => Number(new RegExp(`${part} \\$([\\d,]+)`).exec(text)![1].replace(/,/g, ''));
+  const allIn = (text: string) => ['setup', 'year-one licence', 'card readers', 'training'].reduce((sum, part) => sum + money(text, part), 0);
+  const CAP = 24_000;
+
+  it('each option adds up as the memo will show it; C is cheapest but misses the on-sale date, so B is the one to recommend', () => {
+    expect([allIn(quote('A')), allIn(quote('B')), allIn(quote('C'))]).toEqual([21_450, 20_625, 16_400]);
+    expect([quote('A'), quote('B'), quote('C')].every((q) => allIn(q) <= CAP)).toBe(true);
+    expect(quote('A')).toMatch(/February 16, 2027/);
+    expect(quote('B')).toMatch(/February 23, 2027/);
+    expect(quote('C')).toMatch(/March 15, 2027/); // after March 2
+    expect(example.facts!.filter((f) => f.kind === 'requirement').map((f) => f.statement)).toEqual([
+      'Hard cap of $24,000 all-in for the first year.', 'Tickets must be on sale by March 2, 2027.',
+    ]);
+  });
+
+  it('the demo change keeps B under the cap but puts it above A, so the choice is a real one again', () => {
+    const changed = quote('B').replace('card readers $1,975', 'card readers $3,100');
+    expect(allIn(changed)).toBe(21_750);
+    expect(allIn(changed)).toBeLessThan(CAP);
+    expect(allIn(changed)).toBeGreaterThan(allIn(quote('A')));
+  });
+
+  it('a change to B\'s quote concerns a choice of B, not of A', async () => {
+    const { concernsItem } = await import('@/lib/workflow/item-labels');
+    expect(concernsItem(quote('B'), 'Option B: $20,625 all-in, on sale February 23, 2027')).toBe(true);
+    expect(concernsItem(quote('B'), 'Option A: $21,450 all-in, on sale February 16, 2027')).toBe(false);
+  });
+
+  it('asks the user, not Go, for the choice, and the choice is worded as one', async () => {
+    const { asksForDecision } = await import('@/lib/workflow/decision-options');
+    const template = exampleWorkflow(example, 'abc123def0');
+    const approve = template.stages.find((s) => s.id === 'approve_an_option')!;
+    const choice = approve.exit_criteria.find((c) => c.check === 'manual')!;
+    expect(choice.authority).toBe('reserved');
+    expect(asksForDecision(choice.label)).toBe(true);
+  });
+});
+

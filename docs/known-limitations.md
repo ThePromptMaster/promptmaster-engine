@@ -5247,3 +5247,45 @@ schedule optimised in code) is rewritten by the model in words, not recomputed; 
 record the new records as facts and let Go update the stages (L-277 shows what that changes). A request stopped
 by the deadline is billed for what the model produced, and that spend reaches only the backend log.
 
+### L-277 — After a change: what still stands, what is being redone, what needs you (2026-11-22)
+Sean, 22 Nov: "What I want is for someone to make a change midway through a project and immediately see which
+parts of the plan they can still use, which need to be redone, and what genuinely needs their judgment. What's
+one workflow in the current build you'd demo to show that?"
+
+Before this, the change notice listed the stages a change reopened, each with its reason, and said "Everything
+else stands". What stood was never named. A decision the change set aside (L-272) was one more stage to
+recheck, and its reason was the instruction written for the model ("…keep it only as an earlier decision, say
+the decision is awaited, and change nothing else"). Once the work was done, the notice followed only brief and
+fact changes, not a revision saved from the side chat. None of the curated examples had a choice between
+options, so none could show it.
+
+Now the notice answers three questions (`changeSummary`, `lib/workflow/change-summary.ts`;
+`ChangeGroups` in `brief-change-notice.tsx`):
+- **Still usable:** finished stages the change did not touch, and touched ones finished again on the same
+  version: checked against the change and kept (`checked_unchanged`, L-246), kept as the user chose ("Keep them
+  as they are"), or finished again as they were.
+- **Being redone / Redone:** each reopened stage, waiting (with its reason), under way, or updated to vN by Go
+  or by the user (`changeOutcomes`). A stage reopened as a consequence (a repair saved before it) counts too.
+- **Needs you:** a decision the change set aside, with what it rested on, offered with "Choose again" once
+  the stages before it are updated ("You can choose once Costs is updated"). Also approvals given on an
+  earlier text (`reapprovalByStage`), and approvals and questions waiting from the change point on (`userQueue`).
+  When there are none, it says "Nothing needs your judgment."
+
+The reasons are shown in the user's words (`plainReason`: "It uses “Option B: …”, which has changed", "Your
+choice of Option B is set aside until you choose again"), in the notice, the rail's tooltip and the stage's
+note. `stale.reason` is unchanged, because Go's repair reads it as its instruction. After a "Change it"
+revision that reopened later stages, the outcome is shown as well, as it is for a facts change.
+
+The **vendor decision memo** example (`vendor_choice`) demonstrates it. A community theatre chooses a
+box-office system from three quotes, against a $24,000 cap and a March 2 on-sale date. Each quote starts as a
+fact of its own, so the demo change (Option B's card readers from $1,975 to $3,100, which puts B above A while
+still under the cap) sets the choice aside and shows all three groups.
+
+Not covered:
+- "Still usable" means "not reopened": a stage the change check missed is listed as usable.
+- Only the latest change is summarised; stages still waiting from an earlier one are counted with it.
+- "Needs you" lists only what is at or after the change point.
+- Nothing reaches the user away from the page.
+- The example's first production run is recorded the day it ships (`AWAITING_FIRST_RUN` in `examples.test.ts`
+  until then).
+
