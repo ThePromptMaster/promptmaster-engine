@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 
 import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, onlyFromTheChat, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
-import { decisionsSetAside, setAsideReason, type SetAsideDecision } from '@/lib/workflow/approvals';
+import { decisionsSetAside, setAsideLater, setAsideReason, type SetAsideDecision } from '@/lib/workflow/approvals';
 import { factsText } from '@/lib/workflow/facts';
 import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -130,9 +130,16 @@ export function useBriefChange({
               // approval is taken back first, then its stage reopens with the reason, and
               // Go asks again with the options.
               const aside = setAside ? decisionsSetAside(p, removed) : [];
+              const order = t.stages.map((st) => st.id);
               for (const d of aside) {
                 try {
                   await setAside!(d);
+                  // Its fact was retired with it: the reload that follows is not another
+                  // change (22 Nov, production pass: it reopened every stage a second time).
+                  baseline.current = {
+                    ...baseline.current!,
+                    facts: factsText((p.facts ?? []).map((f) => (f.id === d.factId ? { ...f, retired_at: f.retired_at ?? new Date().toISOString() } : f))),
+                  };
                 } catch {
                   // The approval stays; the stage still reopens below and says why.
                 }
@@ -140,6 +147,13 @@ export function useBriefChange({
                 const idx = affected.findIndex((a) => a.stage_id === d.stageId);
                 if (idx >= 0) affected[idx] = { stage_id: d.stageId, reason };
                 else affected.push({ stage_id: d.stageId, reason });
+                // The work after it is told too: a final memo repaired for the price alone
+                // went on saying "FINAL. Approved option: Option B" (22 Nov, production pass).
+                const from = order.indexOf(d.stageId);
+                for (const [i, a] of affected.entries()) {
+                  if (a.stage_id === d.stageId || order.indexOf(a.stage_id) < from) continue;
+                  affected[i] = { ...a, reason: `${a.reason} ${setAsideLater(d)}` };
+                }
               }
               await append({
                 type: 'brief_changed', stage_id: at,

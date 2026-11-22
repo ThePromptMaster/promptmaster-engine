@@ -27,7 +27,7 @@ describe('a fact change that concerns the chosen option takes the decision back 
     const onDecisionSetAside = vi.fn(async () => { order.push('untick'); });
     const props = { template: SINGLE_OUTPUT_V1, state, bundles: {}, stageId: 'review', appendEvent, enabled: true, onDecisionSetAside };
     const { rerender } = renderHook((p: { project: Project }) => useBriefChange({ ...props, project: p.project }), {
-      initialProps: { project: { ...base, facts: [bOld, decision] } },
+      initialProps: { project: { ...base, facts: [bOld, decision] } as Project },
     });
     const bNew = fact('b2', 'Option B: two vendors; $49,000 equipment and installation + $7,500 training; all three sites live by December 18', {}, { supersedes: 'b' });
     rerender({ project: { ...base, facts: [{ ...bOld, retired_at: '2026-11-22T00:50:13Z' }, decision, bNew] } });
@@ -39,5 +39,40 @@ describe('a fact change that concerns the chosen option takes the decision back 
     const payload = appendEvent.mock.calls[0][0].payload as { affected: { stage_id: string; reason: string }[]; decisions_set_aside: unknown[] };
     expect(payload.decisions_set_aside).toHaveLength(1);
     expect(payload.affected).toEqual([expect.objectContaining({ stage_id: 'review', reason: expect.stringContaining('set aside until the user decides again') })]);
+  });
+});
+
+describe('the retired decision is not read as another change; later work is told (L-272, 22 Nov, production pass)', () => {
+  it('one event, and the stage after the decision is told the decision is set aside', async () => {
+    vi.useFakeTimers();
+    const bOld = fact('b', 'Option B: two vendors; $49,000 equipment and installation + $6,000 training; all three sites live by December 18');
+    const decision = fact('d', 'Decided by the user — on "I choose the option to approve" (Review): I approve Option B at $60,000.', {
+      criterion_id: 'review.approved', stage_id: 'review', choice: 'I approve Option B at $60,000.',
+    }, { subject: 'Decision' });
+    const base = { id: 'p', user_id: 'u', status: 'active', objective: 'Memo', constraints: '', output_format: '', audience: '', manual_checks: { 'review.approved': true } } as unknown as Project;
+    const done = (id: string, seq: number) => ({ seq, type: 'stage_marked_complete', stage_id: id, payload: {}, created_at: `2026-11-22T00:0${seq}:00Z`, actor: 'system' });
+    const state = projectState(SINGLE_OUTPUT_V1, [done('input', 1), done('review', 2), done('output', 3)] as never);
+    const text = 'Option B: two vendors; $49,000 equipment and installation + $6,000 training; all three sites live by December 18.';
+    const bundle = (content: string) => ({ versions: [{ id: 'v', version_number: 1, content }] });
+    const appendEvent = vi.fn(async (e: unknown) => e);
+    const onDecisionSetAside = vi.fn(async () => undefined);
+    const props = { template: SINGLE_OUTPUT_V1, state, bundles: { review: bundle(`Decision: ${text}`), output: bundle(`Memo. ${text}`) } as never, stageId: 'output', appendEvent, enabled: true, onDecisionSetAside };
+    const { rerender } = renderHook((p: { project: Project }) => useBriefChange({ ...props, project: p.project }), {
+      initialProps: { project: { ...base, facts: [bOld, decision] } as Project },
+    });
+    const bNew = fact('b2', 'Option B: two vendors; $49,000 equipment and installation + $7,500 training; all three sites live by December 18', {}, { supersedes: 'b' });
+    rerender({ project: { ...base, facts: [{ ...bOld, retired_at: '2026-11-22T00:50:13Z' }, decision, bNew] } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    // The page reloads with the decision retired: no second event.
+    rerender({ project: { ...base, manual_checks: {}, facts: [{ ...bOld, retired_at: '2026-11-22T00:50:13Z' }, { ...decision, retired_at: '2026-11-22T00:50:14Z' }, bNew] } as unknown as Project });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(appendEvent).toHaveBeenCalledTimes(1);
+    const affected = (appendEvent.mock.calls[0][0] as { payload: { affected: { stage_id: string; reason: string }[] } }).payload.affected;
+    expect(affected.find((a) => a.stage_id === 'output')?.reason).toContain('is set aside by this change until the user decides again');
+    expect(affected.find((a) => a.stage_id === 'review')?.reason).toContain('was made when the record said');
   });
 });

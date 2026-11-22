@@ -259,3 +259,8 @@ export function decisionsSetAside(
 export function setAsideReason(d: Pick<SetAsideDecision, 'choice' | 'because'>): string {
   return `the user's decision "${d.choice}" was made when the record said "${d.because}", which has changed. That decision is set aside until the user decides again: keep it only as an earlier decision, say the decision is awaited, and change nothing else.`;
 }
+
+/** What a stage after the decision is told: the choice is no longer the decision of record. */
+export function setAsideLater(d: Pick<SetAsideDecision, 'choice'>): string {
+  return `Also: the user's decision "${d.choice}" is set aside by this change until the user decides again. Do not present it as the decision of record or as approved; say the decision is awaited.`;
+}

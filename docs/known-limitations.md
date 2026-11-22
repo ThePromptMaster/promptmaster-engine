@@ -5137,7 +5137,10 @@ the old fact and is awaited again. The `brief_changed` event carries `decisions_
 leaves the stage open until the approval is given, stops on its card, and the options are read again for the
 new version. The old decision fact is retired, so it stays in the history and no prompt reads it as current. (Kept
 current at first, it made the review raise "the record holds a user decision choosing Option A" after the user had
-chosen B, and Go stopped on that finding.) Since the production pass the
+chosen B, and Go stopped on that finding.) The project is read again right after, because Go's next repair reads the
+facts it holds and an event only refreshes the log; that retirement is not taken as another change (it had reopened
+every stage a second time). The stages after the decision are told it is set aside (a final memo repaired for the
+price alone kept "FINAL. Approved option: Option B"). Since the production pass the
 same day, such a stage is reopened as a draft in progress, not as a finished stage (`projectState`, `brief_changed`
 with `decisions_set_aside`): the version its repair saves answers the reopening. Reopened as finished, it stayed
 "awaiting recheck" through a repair that could not close it, and Go repaired it again and then stopped with
