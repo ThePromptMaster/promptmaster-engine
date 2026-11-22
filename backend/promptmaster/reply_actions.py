@@ -22,7 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .conversation import _shared_system
-from .fact_filters import about_another_item, from_user, record_kind, records_nothing, the_change
+from .fact_filters import about_another_item, from_user, is_decision_line, record_kind, records_nothing, the_change
 from .llm_client import OpenRouterClient
 from .project_context import facts_block
 from .schemas import PMInput
@@ -299,6 +299,10 @@ def parse_record_facts(item: dict, question: str, known: list[str] | None = None
         # A statement about one item does not replace another item's fact, or one about
         # every item of the kind (L-270): it is recorded beside it, as a new fact.
         if replaces and about_another_item(statement, replaces):
+            replaces = ""
+        # The user's decision changes only when they decide again (L-278): a statement
+        # that gives a new value for the chosen option is recorded beside it.
+        if replaces and is_decision_line(replaces):
             replaces = ""
         facts.append(FactToRecord(
             statement=statement, subject=" ".join(str(f.get("subject") or "").split())[:200], kind=kind, replaces=replaces,

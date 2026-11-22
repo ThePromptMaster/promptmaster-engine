@@ -5310,3 +5310,27 @@ Not covered:
 - "Needs you" lists only what is at or after the change point.
 - Nothing reaches the user away from the page.
 
+
+### L-278 — A revision never rewrites the user's decision (2026-11-22)
+Production pass of Sean's scanner case (21 Nov), on 486927bc, john@ project 90ef866a. Option B was chosen at
+$60,000 with the option button, and the final memo was approved. Then Sean's own instruction went into the final
+memo's side chat: "The Option B vendor has corrected the training charge from $6,000 to $7,500…". The fact offer
+listed Option B's fact (right; A and C were left alone, L-270). It also listed the decision itself, ticked:
+"Decided by the user — … Option B: two vendors, $60,000 all-in as approved, now $61,500 all-in after the vendor's
+corrected training charge…". The model's meaning check had read the new total as a change to that fact. Applied
+as offered, the decision fact would have been superseded inside the same change. `decisionsSetAside` reads the
+current facts, so it would not have found the decision, nothing would have been set aside (L-272), and the
+approval would have stayed ticked on an option that now breaks the cap. (On the pass that row was unticked by
+hand; the reopen then worked: one `brief_changed` with `decisions_set_aside`, the decision fact retired, Go asked
+again with the options.)
+
+Now a decision record is never offered for change by a revision or an edit: neither by the value pass
+(`factChangesFromRevision`) nor by the meaning check (`withMeaningChanges`), which is no longer shown it
+(`reconcilable`, `lib/workflow/fact-reconcile.ts`). A decision record is a fact that starts "Decided by the user",
+or one written with the criterion and the choice it decided (`isDecisionRecord`, `lib/workflow/facts.ts`). The side
+chat's "Record these facts" never replaces one either: the statement is recorded beside it
+(`is_decision_line`, `backend/promptmaster/fact_filters.py`). A decision changes only when the user decides
+again, and a change to the facts it rests on sets it aside (L-272).
+
+Not covered: a decision whose option has no fact of its own (the figures only in the brief or the stage text)
+is not set aside by a revision that changes them. It stays ticked until the user changes it.

@@ -128,6 +128,22 @@ def test_one_items_statement_never_replaces_another_items_fact():
     assert parse_record_facts(item, q + " $49,000", known)[0].replaces == b
 
 
+def test_a_statement_never_replaces_the_users_decision():
+    """L-278, 22 Nov (production pass of Sean's scanner case): the user's decision on
+    Option B was offered for rewriting as "… now $61,500"; superseded so, it was never
+    set aside and its approval stayed ticked."""
+    from promptmaster.fact_filters import is_decision_line
+    from promptmaster.reply_actions import parse_record_facts
+
+    decision = 'Decided by the user — on "I choose the option to approve" (Decision): Option B: two vendors, $60,000 all-in, all three sites live by December 18.'
+    q = "Option B's training charge alone has gone from $6,000 to $7,500, so Option B: two vendors, $61,500 all-in, all three sites live by December 18."
+    stmt = "Option B: two vendors, $61,500 all-in, all three sites live by December 18"
+    out = parse_record_facts({"facts": [{"statement": stmt, "replaces": decision}]}, q, [decision])
+    assert out and out[0].replaces == ""
+    assert is_decision_line("Decision: Decided by the user: Approve Option B at $60,000.")
+    assert not is_decision_line("Option B: two vendors; $49,000 equipment and installation + $6,000 training")
+
+
 def test_item_labels_match_the_frontend():
     from promptmaster.fact_filters import about_another_item, item_labels
 

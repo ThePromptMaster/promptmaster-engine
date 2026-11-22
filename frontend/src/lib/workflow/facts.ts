@@ -12,6 +12,19 @@ export function currentFacts(facts: readonly ProjectFact[] | undefined): Project
   return (facts ?? []).filter((f) => !f.retired_at);
 }
 
+/** A line that records the user's decision, not a fact a decision rests on. */
+export const DECISION_LINE = /^(?:Decision:\s*)?Decided by the user\b/i;
+
+/**
+ * A fact that records the user's decision: "Decided by the user — on …", or one
+ * written with the criterion and the choice it decided (L-278). It is the
+ * user's record of what they chose, never a value for a revision to update.
+ */
+export function isDecisionRecord(fact: Pick<ProjectFact, 'statement'> & { source_ref?: Record<string, unknown> | null }): boolean {
+  const ref = fact.source_ref ?? {};
+  return DECISION_LINE.test(fact.statement.trim()) || (typeof ref.criterion_id === 'string' && typeof ref.choice === 'string');
+}
+
 const SOURCE_WORDS: Record<ProjectFact['source_kind'], string> = {
   brief: 'added to the brief',
   file: 'from a file',

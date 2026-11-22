@@ -11,6 +11,7 @@
 import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
 import { choosesAnOption } from './decision-options';
+import { DECISION_LINE } from './facts';
 import { concernsItem, itemLabels } from './item-labels';
 import type { WorkflowEvent, WorkflowTemplate } from './types';
 
@@ -256,9 +257,6 @@ export interface SetAsideDecision {
   /** The fact the choice rested on, as it read before the change. */
   because: string;
 }
-
-/** A line of `factsText` that records a decision, not a fact a decision rests on. */
-const DECISION_LINE = /^(?:Decision:\s*)?Decided by the user\b/i;
 
 /**
  * The decisions a change to the facts sets aside (L-272, 21 Nov, Sean: Option B
