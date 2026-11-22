@@ -20,7 +20,7 @@ describe('a decision whose option a fact change concerns is set aside (L-272, 21
 
   it('Option B\'s changed fact sets aside the Option B decision', () => {
     const out = decisionsSetAside({ facts: [decision], manual_checks: ticked }, [bOld]);
-    expect(out).toEqual([{ criterionId: 'approver_decision_on_an_option.approved', stageId: 'approver_decision_on_an_option', choice: decision.source_ref!.choice, because: bOld }]);
+    expect(out).toEqual([{ factId: 'd', criterionId: 'approver_decision_on_an_option.approved', stageId: 'approver_decision_on_an_option', choice: decision.source_ref!.choice, because: bOld }]);
     expect(setAsideReason(out[0])).toContain('set aside until the user decides again');
   });
 

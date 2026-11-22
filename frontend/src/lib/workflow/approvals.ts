@@ -210,6 +210,8 @@ export function withApprovals<P extends Project>(
 
 /** A decision the user made by choosing an option, set aside because a fact about that option changed (L-272). */
 export interface SetAsideDecision {
+  /** The fact that recorded the decision: retired, so no prompt reads it as current (it stays in the history). */
+  factId: string;
   criterionId: string;
   stageId: string;
   /** The option chosen, as it was recorded. */
@@ -227,9 +229,11 @@ const DECISION_LINE = /^(?:Decision:\s*)?Decided by the user\b/i;
  * approval stage was repaired and closed again with the $60,000 choice still
  * standing; the warehouse run did the same for Option A). A decision made by
  * choosing an option, still ticked, whose option a changed or removed fact
- * names, no longer stands: it is unticked and its stage reopens, so Go asks
- * again with the options. The decision's fact stays, as history; deciding
- * again replaces it. A fact replaced by a new decision never counts.
+ * names, no longer stands: it is unticked, its fact is retired (kept in the
+ * history: a review that still read it as current asked about a decision the
+ * user had already replaced, 22 Nov production pass), and its stage reopens,
+ * so Go asks again with the options. A fact replaced by a new decision never
+ * counts.
  * `removed`: the statements the change took out of the facts (`statementsOf`).
  */
 export function decisionsSetAside(
@@ -246,7 +250,7 @@ export function decisionsSetAside(
     if (!project.manual_checks?.[ref.criterion_id]) continue;
     if (out.some((d) => d.criterionId === ref.criterion_id)) continue;
     const because = changed.find((r) => concernsItem(r, ref.choice as string));
-    if (because) out.push({ criterionId: ref.criterion_id, stageId: ref.stage_id, choice: ref.choice, because });
+    if (because) out.push({ factId: f.id, criterionId: ref.criterion_id, stageId: ref.stage_id, choice: ref.choice, because });
   }
   return out;
 }

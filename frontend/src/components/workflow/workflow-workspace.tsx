@@ -95,7 +95,7 @@ import { batchAwaited, leftToAssess, scaleForRequest, serializeAssessment, type 
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
-import { listProjectFacts, recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import { listProjectFacts, recordFacts, retireFact, supersedeFact } from '@/lib/supabase/facts';
 import { dbErrorTechnical } from '@/lib/supabase/errors';
 import { writeDecision } from '@/lib/workflow/record-decision';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
@@ -1338,9 +1338,12 @@ export function WorkflowWorkspace({
   // A decision whose option a fact change concerns is taken back (L-272): the
   // tick is written through before the event that reopens its stage.
   const setDecisionAside = useCallback(
-    async (d: { criterionId: string; stageId: string }) => {
+    async (d: { factId: string; criterionId: string; stageId: string; because: string }) => {
       await handleToggleManual(d.criterionId, false, undefined, d.stageId);
       await flushProject();
+      // The decision's fact goes into the history: read as current, a review asked
+      // about the old choice after the user had made a new one (22 Nov, production pass).
+      await retireFact(d.factId, `Set aside: it was made when the record said "${d.because}", which changed.`).catch(() => undefined);
     },
     [handleToggleManual, flushProject]
   );
