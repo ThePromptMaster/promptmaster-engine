@@ -251,7 +251,7 @@ async function readMemory(o: Options, steps: readonly AgentStep[]): Promise<stri
       o.loadEvents ? o.loadEvents() : Promise.resolve(o.events),
       listRecommendations(o.project.id),
     ]);
-    return projectMemory({ template: o.template, events, recommendations, steps });
+    return projectMemory({ template: o.template, events, recommendations, steps, facts: o.project.facts ?? [] });
   } catch {
     return [];
   }

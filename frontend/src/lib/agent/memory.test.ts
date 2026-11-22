@@ -67,3 +67,23 @@ describe('projectMemory: what the planner is told has been decided (1 Oct, item 
     expect(lines.at(-1)).toContain('reason 39');
   });
 });
+
+describe('memory follows the decision of record (L-275, 22 Nov, Sean)', () => {
+  it('an answer a decision replaced is not recalled as standing, and the decision is', () => {
+    const asked = step({ id: 'ask', action_key: 'request_user_decision', decision_question: 'Do you approve Option B at $49,000 all-in?' });
+    const answered = step({ id: '87d4dfb7', action_key: 'user_answer', output: 'Approve Option B at $49,000 all-in' });
+    const facts = [
+      { retired_at: '2026-11-22T14:04:31Z', retired_reason: 'Replaced by your decision on "I choose the labeling option to approve": Option A', source_ref: { via: 'go answer', step_id: '87d4dfb7' } },
+      { retired_at: null, retired_reason: null, source_ref: { via: 'go answer', criterion_id: 'approve_an_option.approved', choice: 'Option A: $52,000 all-in', question: 'I choose the labeling option to approve' } },
+    ];
+    const lines = projectMemory({ template: BOOK_V1, events: [], recommendations: [], steps: [asked, answered], facts: facts as never });
+    expect(lines.some((l) => l.includes('Approve Option B'))).toBe(false);
+    expect(lines.at(-1)).toContain('Decided on "I choose the labeling option to approve": Option A: $52,000 all-in');
+  });
+
+  it('without facts, answers are recalled as before', () => {
+    const answered = step({ id: 's1', action_key: 'user_answer', output: 'Approve Option B' });
+    expect(projectMemory({ template: BOOK_V1, events: [], recommendations: [], steps: [answered] })).toEqual(['Asked, the user answered: Approve Option B']);
+  });
+});
+

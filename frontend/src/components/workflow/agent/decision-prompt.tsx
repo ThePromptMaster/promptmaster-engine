@@ -111,6 +111,7 @@ export function QuestionPrompt({
   // recorded twice and the run ended failed). The ref covers two presses
   // before the first render; the state greys the buttons.
   const [sending, setSending] = useState(false);
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const sendingRef = useRef(false);
   function send(answer: string, contradicted?: AnswerContradiction) {
     if (sendingRef.current) return;
@@ -121,7 +122,13 @@ export function QuestionPrompt({
       setSending(false);
     };
     try {
-      void Promise.resolve(contradicted ? onAnswer(answer, contradicted) : onAnswer(answer)).catch(() => undefined).finally(done);
+      setAnswerError(null);
+      void Promise.resolve(contradicted ? onAnswer(answer, contradicted) : onAnswer(answer))
+        .catch((e: unknown) => {
+          // A refused choice says why (L-274); anything else is shown by the run itself.
+          if (e instanceof Error && e.name === 'ChoiceRefused') setAnswerError(e.message);
+        })
+        .finally(done);
     } catch (e) {
       done();
       throw e;
@@ -249,6 +256,11 @@ export function QuestionPrompt({
           {t('qp.orChange')}
         </span>
       </div>
+      {answerError && (
+        <p role="alert" data-answer-refused className="mt-2 text-label text-[var(--pm-error)]">
+          {answerError}
+        </p>
+      )}
     </section>
   );
 }

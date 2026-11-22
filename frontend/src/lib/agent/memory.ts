@@ -15,6 +15,10 @@ import type { Recommendation } from '@/lib/supabase/recommendations';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { isDelegatedAnswer } from '@/lib/workflow/answers';
+import type { ProjectFact } from '@/types/project';
+
+/** How `replacedReason` (`lib/workflow/approvals.ts`) begins. */
+const REPLACED_PREFIX = 'Replaced by your decision on';
 import { USER_ANSWER_STEP } from './actions';
 
 export const MEMORY_MAX_LINES = 20;
@@ -31,8 +35,21 @@ export function projectMemory(input: {
   recommendations: readonly Pick<Recommendation, 'status' | 'title' | 'category' | 'scope'>[];
   /** Steps of this run and the windows before it, oldest first. */
   steps: readonly AgentStep[];
+  /**
+   * The project's facts, retired ones too (L-275): an answer a later decision replaced is
+   * not recalled as standing, and each decision made on an approval is.
+   */
+  facts?: readonly Pick<ProjectFact, 'source_ref' | 'retired_at' | 'retired_reason'>[];
 }): string[] {
-  const { template, events, recommendations, steps } = input;
+  const { template, events, recommendations, steps, facts = [] } = input;
+  // Answers a decision on an approval replaced, by the step that recorded them (22 Nov, Sean:
+  // the memory still said "the user answered: Approve Option B" after he pressed Option A).
+  const replaced = new Set(
+    facts
+      .filter((f) => f.retired_at && (f.retired_reason ?? '').startsWith(REPLACED_PREFIX))
+      .map((f) => (f.source_ref as { step_id?: unknown } | null | undefined)?.step_id)
+      .filter((id): id is string => typeof id === 'string')
+  );
   const label = (id: string) => template.stages.find((s) => s.id === id)?.label ?? id;
   const lines: string[] = [];
 
@@ -58,7 +75,7 @@ export function projectMemory(input: {
 
   // What the user told Go when it asked, with the question it was answering.
   steps.forEach((s, i) => {
-    if (s.action_key !== USER_ANSWER_STEP || !s.output.trim()) return;
+    if (s.action_key !== USER_ANSWER_STEP || !s.output.trim() || replaced.has(s.id)) return;
     const asked = [...steps.slice(0, i)].reverse().find((p) => p.decision_question || p.params?.conflict_question);
     const question = asked?.decision_question || (asked?.params?.conflict_question ? asked.output : '');
     // Left to Go, this says what that asks for, within the line's limit: clipped,
@@ -67,6 +84,14 @@ export function projectMemory(input: {
       ? `Asked${question ? ` "${clip(question).slice(0, 120)}"` : ''}, the user left it to you: choose now and say so in your note; what only they can do, say.`
       : `Asked${question ? ` "${clip(question).slice(0, 120)}"` : ''}, the user answered: ${s.output}`);
   });
+
+  // The decisions of record on the approvals, last: they are what stands now.
+  for (const f of facts) {
+    if (f.retired_at) continue;
+    const ref = f.source_ref as { criterion_id?: unknown; choice?: unknown; question?: unknown } | null | undefined;
+    if (typeof ref?.criterion_id !== 'string' || typeof ref.choice !== 'string') continue;
+    lines.push(`Decided on "${clip(String(ref.question ?? ref.criterion_id)).slice(0, 120)}": ${ref.choice} (this is the decision of record; an earlier answer naming another option no longer stands)`);
+  }
 
   // The most recent are the ones most likely to bear on what comes next.
   return lines.map(clip).slice(-MEMORY_MAX_LINES);

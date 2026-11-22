@@ -1001,7 +1001,7 @@ export const api = {
   async agentDecisionOptions(
     req: { inputs: PMInput; approval: string; stage_label: string; content: string; model?: string },
     signal?: AbortSignal
-  ): Promise<{ question: string; options: { label: string; quote: string }[] }> {
+  ): Promise<{ question: string; options: { label: string; quote: string; fails?: { requirement: string; quote: string } | null }[] }> {
     return apiFetch('/api/agent/decision-options', { method: 'POST', body: JSON.stringify(req), signal });
   },
 

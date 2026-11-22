@@ -97,8 +97,16 @@ export function GoPanel({
   queue,
   decideByAnswer,
   leftForGo,
+  recordedDecision = null,
+  onDismissRecorded,
 }: {
   go: ReturnType<typeof useGoLoop>;
+  /**
+   * The decision just recorded, said here because the page moves on with Go (L-275; 22 Nov,
+   * Sean: "I landed on Final memo … I couldn't tell what happened to my tap on A").
+   */
+  recordedDecision?: { stage: string; choice: string; replaces: readonly string[] } | null;
+  onDismissRecorded?: () => void;
   /**
    * Gives a waiting decision its approval when an answer to Go's own question names one of its
    * options, and says whether it did (12 Nov: the same choice was asked as a question and then
@@ -439,6 +447,20 @@ export function GoPanel({
         )}
       </div>
 
+      {recordedDecision && (
+        <div role="status" data-decision-recorded className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+          <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--pm-success)]">check_circle</span>
+          <p className="me-auto min-w-0 text-body text-[var(--on-surface)]">
+            {t('nyc.recorded', { stage: recordedDecision.stage, choice: recordedDecision.choice })}
+            {recordedDecision.replaces.length ? ` ${t('nyc.recordedReplaces', { earlier: recordedDecision.replaces.join('; ') })}` : ''}
+          </p>
+          {onDismissRecorded && (
+            <button type="button" onClick={onDismissRecorded} aria-label={t('nyc.recordedDismiss')} className="rounded-lg p-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
+              <span aria-hidden className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          )}
+        </div>
+      )}
       {expanded && (
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
@@ -514,7 +536,14 @@ export function GoPanel({
               change={latestChange ?? undefined}
               onAnswer={async (t, contradicted) => {
                 // The answer may be the choice a waiting approval asks for: then it gives that approval.
-                const decided = decideByAnswer ? await decideByAnswer(t).catch(() => false) : false;
+                // A choice its stage shows failing a requirement is refused and said (L-274): never
+                // recorded as an answer either, where it would stand as the user's word.
+                const decided = decideByAnswer
+                  ? await decideByAnswer(t).catch((e: unknown) => {
+                      if (e instanceof Error && e.name === 'ChoiceRefused') throw e;
+                      return false;
+                    })
+                  : false;
                 return go.answer(t, contradicted, decided ? { decided: true } : undefined);
               }}
               checkAnswer={go.checkAnswer}

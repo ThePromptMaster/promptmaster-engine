@@ -137,8 +137,10 @@ export function repeatedQuestion(input: {
     if (Number.isNaN(at)) return true;
     const edited = (input.versions ?? []).some((v) => USER_CHOSEN_OPERATIONS.has(v.source_operation) && Date.parse(v.created_at) > at);
     // An answer to Go's question is recorded as a fact too; that is the answer, not a change.
+    // A decision made on an approval is a change (L-275: Sean pressed Option A after answering
+    // B, and Go quoted the B answer back as though nothing had happened).
     const added = (input.facts ?? []).some(
-      (f) => !f.retired_at && f.accepted_by === 'user' && f.source_ref?.via !== 'go answer' && Date.parse(f.created_at) > at
+      (f) => !f.retired_at && f.accepted_by === 'user' && (f.source_ref?.via !== 'go answer' || typeof f.source_ref?.criterion_id === 'string') && Date.parse(f.created_at) > at
     );
     return edited || added;
   };

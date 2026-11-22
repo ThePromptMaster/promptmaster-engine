@@ -10,7 +10,8 @@
  */
 import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
-import { concernsItem } from './item-labels';
+import { choosesAnOption } from './decision-options';
+import { concernsItem, itemLabels } from './item-labels';
 import type { WorkflowEvent, WorkflowTemplate } from './types';
 
 export interface GivenApproval {
@@ -97,6 +98,42 @@ export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'reti
     }
   }
   return found;
+}
+
+/** The answer part of an answer fact: "…, answered: Approve Option B at $49,000" is "Approve Option B at $49,000". */
+export function answeredText(statement: string): string {
+  const at = statement.lastIndexOf('answered:');
+  return at >= 0 ? statement.slice(at + 'answered:'.length).trim() : statement.replace(/^Decided by the user:\s*/, '').trim();
+}
+
+/**
+ * Answers to Go's own questions that chose an option of the kind a decision
+ * now chooses, still current (22 Nov, L-275). Sean typed "Approve Option B at
+ * $49,000 all-in" to Go's question; it was kept as a note, not as the decision.
+ * Ten minutes later he pressed Option A on the approval, and both stood as "Decided
+ * by the user": the final memo kept B and Go asked which. A decision made on
+ * the approval replaces them. Only an answer that chooses ("approve", "go
+ * with", "pick") and names an item of the same kind ("Option …"); one that only
+ * mentions an option stays.
+ */
+export function answersReplacedBy<F extends Pick<ProjectFact, 'statement' | 'source_ref' | 'retired_at'>>(
+  facts: readonly F[] | null | undefined,
+  choice: string
+): F[] {
+  const kinds = new Set(itemLabels(choice).keys());
+  if (!kinds.size) return [];
+  return (facts ?? []).filter((f) => {
+    if (f.retired_at) return false;
+    const ref = f.source_ref as { via?: unknown; criterion_id?: unknown } | null | undefined;
+    if (ref?.via !== 'go answer' || typeof ref?.criterion_id === 'string') return false;
+    const answer = answeredText(f.statement);
+    return choosesAnOption(answer) && [...itemLabels(answer).keys()].some((k) => kinds.has(k));
+  });
+}
+
+/** The reason a replaced answer is retired with. */
+export function replacedReason(approval: string, choice: string): string {
+  return `Replaced by your decision on "${approval}": ${choice}`.slice(0, 500);
 }
 
 export function approvalsGiven(

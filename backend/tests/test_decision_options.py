@@ -173,3 +173,70 @@ def test_the_mock_offers_the_options_the_stage_text_names():
     assert parse_options(_json_reply(system, user), PROPOSAL).options == []
     system, user = build_options_prompt(_req(approval="I approve this stage."))
     assert parse_options(_json_reply(system, user), STAGE).options == []
+
+
+# 22 Nov, Sean's warehouse test: Approve option v6 after Option A's training quote rose (L-274).
+WAREHOUSE = (
+    "# Approve an Option\n\n"
+    "| | Option A | Option B |\n|---|---|---|\n"
+    "| **All-in cost** (including $5,000 contingency) | $52,000 ($36,000 + $11,000 + $5,000) | $49,000 ($38,000 + $6,000 + $5,000) |\n"
+    "| **Go-live, all sites** (after two-business-day pilots) | December 17 (Thursday) | December 18 (Friday) |\n"
+    "| **Eligibility** (within $50,000 cap and live by December 18) | Ineligible: $2,000 over the cap ($52,000 − $50,000) "
+    "| Eligible: $1,000 under the cap ($50,000 − $49,000) and live on the deadline |\n"
+)
+CAP = "Hard cap of $50,000 all-in, including a mandatory $5,000 contingency."
+WAREHOUSE_REPLY = {"approval_asks": "choice", "question": "Which labeling option do you approve?", "options": [
+    {"label": "Option A: $52,000 all-in, live December 17 (over the $50,000 cap)", "quote": "$52,000 ($36,000 + $11,000 + $5,000)",
+     "fails": {"requirement": CAP, "quote": "Ineligible: $2,000 over the cap ($52,000 − $50,000)"}},
+    {"label": "Option B: $49,000 all-in, live December 18", "quote": "$49,000 ($38,000 + $6,000 + $5,000)"},
+]}
+
+
+def test_an_option_the_text_shows_over_a_requirement_is_kept_and_marked():
+    out = parse_options(WAREHOUSE_REPLY, WAREHOUSE, [CAP, "All sites must go live by December 18 after a two-business-day pilot at each site."])
+    assert [o.label.split(":")[0] for o in out.options] == ["Option A", "Option B"]
+    a, b = out.options
+    assert a.fails is not None
+    assert a.fails.requirement == CAP
+    assert a.fails.quote.startswith("Ineligible: $2,000 over the cap")
+    assert b.fails is None
+
+
+def test_a_failure_is_dropped_when_either_passage_cannot_be_traced():
+    invented = {**WAREHOUSE_REPLY, "options": [
+        {**WAREHOUSE_REPLY["options"][0], "fails": {"requirement": "Spend no more than $45,000.", "quote": "Ineligible: $2,000 over the cap ($52,000 − $50,000)"}},
+        {**WAREHOUSE_REPLY["options"][1], "fails": {"requirement": CAP, "quote": "Option B is over the cap by $3,000."}},
+    ]}
+    out = parse_options(invented, WAREHOUSE, [CAP])
+    assert len(out.options) == 2
+    assert all(o.fails is None for o in out.options)
+    # With no requirements at all, nothing can be marked.
+    assert all(o.fails is None for o in parse_options(WAREHOUSE_REPLY, WAREHOUSE).options)
+
+
+def test_the_prompt_lists_the_users_requirements_and_asks_for_failures():
+    req = DecisionOptionsRequest(
+        inputs=PMInput(**_inputs(constraints="", facts=[
+            {"statement": CAP, "kind": "requirement"},
+            {"statement": "Option B: $38,000 equipment and installation, plus $6,000 training.", "kind": "fact"},
+        ])),
+        approval="I choose the labeling option to approve", stage_label="Approve option", content=WAREHOUSE,
+    )
+    system, user = build_options_prompt(req)
+    assert f"REQUIREMENTS:\n- {CAP}" in user
+    assert "Option B: $38,000" not in user.split("REQUIREMENTS:")[1].split("\n\n")[0]
+    assert "fails" in system and "Never test an option against a requirement yourself" in system
+
+
+def test_the_route_returns_the_failure(client_for_app):
+    client, mock = client_for_app
+    mock.generate_json.return_value = (WAREHOUSE_REPLY, {})
+    body = {
+        "inputs": _inputs(constraints="", facts=[{"statement": CAP, "kind": "requirement"}]),
+        "approval": "I choose the labeling option to approve", "stage_label": "Approve option", "content": WAREHOUSE,
+    }
+    res = client.post("/api/agent/decision-options", json=body)
+    assert res.status_code == 200
+    options = res.json()["options"]
+    assert options[0]["fails"]["requirement"] == CAP
+    assert options[1]["fails"] is None

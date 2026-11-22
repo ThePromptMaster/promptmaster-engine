@@ -555,8 +555,11 @@ export function projectState(
         for (const a of affected) {
           const id = typeof a.stage_id === 'string' ? a.stage_id : '';
           const was = state.stages[id]?.status;
-          // A draft in progress that used the old value is reopened too (8 Oct).
-          if (!id || !(isDone(was) || was === 'in_progress')) continue;
+          // A draft in progress that used the old value is reopened too (8 Oct). A decision
+          // stage already waiting for Go to record a choice is re-marked when that choice is
+          // set aside (L-275): left as it was, its repair still said "record the decision"
+          // after the approval had been taken back.
+          if (!id || !(isDone(was) || was === 'in_progress' || (aside.has(id) && was === 'stale'))) continue;
           set(id, { status: 'stale', stale: { reason: typeof a.reason === 'string' ? a.reason : '', since: event.created_at, was: aside.has(id) ? 'in_progress' : was! } });
         }
         break;

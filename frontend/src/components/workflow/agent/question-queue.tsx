@@ -6,6 +6,8 @@ import { entryHoldsUp, resolvedFindings, type QueueEntry, type QueueItem } from 
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { DecisionOffer } from '@/lib/workflow/decision-options';
 
+import { FailingOption } from './decision-options';
+
 /** What the user did with one entry of the list. */
 export type QueueAnswer =
   | { kind: 'approve' }
@@ -121,11 +123,18 @@ export function QuestionQueue({
               {single && first.note && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('qq.note', { note: first.note })}</p>}
               {offer?.loading && <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('nyc.optionsLoading')}</p>}
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {single && first.kind === 'approval' && options.map((o) => (
-                  <button key={o.label} type="button" title={o.quote} disabled={waiting} onClick={() => send(entry, { kind: 'choose', choice: o.label })} className={primary}>
-                    {o.label}
-                  </button>
-                ))}
+                {single && first.kind === 'approval' && options.map((o) =>
+                  // An option its stage shows failing a requirement is explained, not offered (L-274).
+                  o.fails ? (
+                    <div key={o.label} className="basis-full">
+                      <FailingOption option={o} />
+                    </div>
+                  ) : (
+                    <button key={o.label} type="button" title={o.quote} disabled={waiting} onClick={() => send(entry, { kind: 'choose', choice: o.label })} className={primary}>
+                      {o.label}
+                    </button>
+                  )
+                )}
                 {single && first.kind === 'approval' && !offer?.loading && options.length === 0 && (
                   <button type="button" disabled={waiting} onClick={() => send(entry, { kind: 'approve' })} className={primary}>
                     {t('qq.approve')}

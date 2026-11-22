@@ -171,10 +171,14 @@ import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsToRead, leavesChoiceToGo, leftToGoSignature, withApprovalsLeftToGo, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
-import { approvalsOnEarlierVersion, chosenFor, earlierDecision, withApprovals } from '@/lib/workflow/approvals';
-import { asksForDecision, decisionForAnswer, decisionTargets, decisionText, recordDecisionReason } from '@/lib/workflow/decision-options';
+import { answeredText, answersReplacedBy, approvalsOnEarlierVersion, chosenFor, earlierDecision, replacedReason, withApprovals } from '@/lib/workflow/approvals';
+import {
+  asksForDecision, choosesAnOption, ChoiceRefused, decisionCandidates, decisionForAnswer, decisionTargets, decisionText, failingChoice, recordDecisionReason,
+  type PendingDecision,
+} from '@/lib/workflow/decision-options';
+import { itemLabels } from '@/lib/workflow/item-labels';
 import { decisionAsFact, delegatedWhy, queueAnswerAsFact, rowAnswerAsFact } from '@/lib/workflow/answers';
-import { useDecisionOptions } from './agent/use-decision-options';
+import { cachedDecisionOffer, readDecisionOffer, useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
@@ -1887,6 +1891,8 @@ export function WorkflowWorkspace({
   // reopened so the decision is written where it said "awaiting the user's
   // decision". Used by Go's card and by the stage's checklist.
   const goRunId = go.run?.id ?? null;
+  // The last decision recorded here, shown in Go's panel until dismissed (L-275).
+  const [recordedDecision, setRecordedDecision] = useState<{ stageId: string; choice: string; replaces: string[]; at: number } | null>(null);
   const decideApproval = useCallback(
     async (criterionId: string, onStageId: string, choice: string) => {
       const target = getStage(template, onStageId);
@@ -1912,11 +1918,28 @@ export function WorkflowWorkspace({
         await onReload?.();
         return;
       }
+      // An option the stage's text shows failing one of the user's requirements is
+      // not recorded, pressed or typed (L-274; 22 Nov, Sean: Option A at $52,000
+      // against a hard $50,000 cap was pressed and recorded).
+      const failing = failingChoice(text, cachedDecisionOffer(criterionId, head?.id)?.options);
+      if (failing?.fails) {
+        throw new Error(tr('nyc.typedFails', { option: failing.label, requirement: failing.fails.requirement, quote: failing.fails.quote }));
+      }
       const fact = decisionAsFact(criterion.label, target.short_label || target.label, text, {
         criterion_id: criterionId, stage_id: onStageId, version_id: head?.id ?? null, run_id: goRunId,
       });
       // Decided again: the new decision replaces the earlier one, which is retired, not kept beside it.
       const earlier = earlierDecision(project.facts, criterionId);
+      // And an answer to Go's own question that chose an option of this kind ("Approve Option
+      // B", typed) is replaced too: kept beside the decision, the final memo followed it and Go
+      // asked which one stood (L-275, 22 Nov, Sean's warehouse test).
+      const replacedAnswers = answersReplacedBy(project.facts, text);
+      const before = earlier ?? [...(project.facts ?? [])].reverse().find((f) => (f.source_ref as { criterion_id?: unknown } | null)?.criterion_id === criterionId) ?? null;
+      const beforeChoice = (before?.source_ref as { choice?: unknown } | null | undefined)?.choice;
+      const replaces = [
+        ...(typeof beforeChoice === 'string' && decisionText(beforeChoice) !== text ? [decisionText(beforeChoice)] : []),
+        ...replacedAnswers.map((f) => `“${answeredText(f.statement)}”`),
+      ];
       const eventReason = `Your decision: ${text}`.slice(0, 300);
       // Each write is tried once more when the database did not answer, after checking it did
       // not land, and a failure says why and is logged (L-271; 21 Nov, Sean: a 522 on the fact
@@ -1927,7 +1950,7 @@ export function WorkflowWorkspace({
           writeFact: () =>
             fact && earlier ? supersedeFact(project, earlier, fact.statement, fact.source_ref ?? {}, 'user_edit') : fact ? recordFacts(project, [fact]) : Promise.resolve(),
           readFacts: () => listProjectFacts(project.id),
-          afterFact: () => handleToggleManual(criterionId, true, `Decided: ${text}`, onStageId),
+          afterFact: () => handleToggleManual(criterionId, true, `Decided: ${text}${replaces.length ? ` (replaces: ${replaces.join('; ')})` : ''}`, onStageId),
           ...(target.renderer === 'prose' && head
             ? {
                 writeEvent: () =>
@@ -1945,6 +1968,13 @@ export function WorkflowWorkspace({
             }),
         }
       );
+      for (const f of replacedAnswers) {
+        // The decision is recorded; an answer that could not be retired stays, and says so on the next read.
+        await retireFact(f.id, replacedReason(criterion.label, text)).catch(() => undefined);
+      }
+      // Said where the user lands, not only on the stage the press left (L-275: "I couldn't tell
+      // what happened to my tap on A").
+      setRecordedDecision({ stageId: onStageId, choice: text, replaces, at: Date.now() });
       await onReload?.();
     },
     [template, stageBundles, project, goRunId, handleToggleManual, appendEvent, onReload]
@@ -2124,15 +2154,29 @@ export function WorkflowWorkspace({
   // approval is that decision: it gives the approval, so it is not asked for again.
   const decideByAnswer = useCallback(
     async (answer: string): Promise<boolean> => {
-      const pending = waitingQueue
+      const pending: PendingDecision[] = waitingQueue
         .filter((q) => q.kind === 'approval' && q.criterionId)
         .map((q) => ({ criterionId: q.criterionId!, stageId: q.stageId, options: queueOffers[q.criterionId!]?.options ?? [] }));
+      // Not only the approvals listed as waiting (L-275): one already given for another option,
+      // or one the list leaves out while earlier work is being redone, is decided by an answer
+      // that chooses one of its options. Its options are read only when the answer names an item.
+      if (itemLabels(answer).size) {
+        const listed = new Set(pending.map((d) => d.criterionId));
+        for (const c of decisionCandidates(template, stageBundles, project.manual_checks, project.facts)) {
+          if (listed.has(c.criterionId) || (c.given && !choosesAnOption(answer))) continue;
+          const offer = cachedDecisionOffer(c.criterionId, c.versionId) ?? (await readDecisionOffer(project, c));
+          pending.push({ criterionId: c.criterionId, stageId: c.stageId, options: offer.options, given: c.given });
+        }
+      }
       const made = decisionForAnswer(answer, pending);
       if (!made) return false;
+      if (made.fails) throw new ChoiceRefused(tr('nyc.typedFails', { option: made.choice, requirement: made.fails.requirement, quote: made.fails.quote }));
+      // The same option chosen again: already the decision of record, nothing to write.
+      if (project.manual_checks?.[made.criterionId] && chosenFor(project.facts).get(made.criterionId) === decisionText(made.choice)) return true;
       await decideApproval(made.criterionId, made.stageId, made.choice);
       return true;
     },
-    [waitingQueue, queueOffers, decideApproval]
+    [waitingQueue, queueOffers, decideApproval, template, stageBundles, project]
   );
   const answerFromQueue = useCallback(
     async (entry: QueueEntry, answer: QueueAnswer): Promise<{ open: QueueItem[] } | void> => {
@@ -3110,6 +3154,8 @@ export function WorkflowWorkspace({
               queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
               decideByAnswer={decideByAnswer}
               leftForGo={goLeftForGo}
+              recordedDecision={recordedDecision ? { ...recordedDecision, stage: stageNameShown(recordedDecision.stageId) } : null}
+              onDismissRecorded={() => setRecordedDecision(null)}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />
