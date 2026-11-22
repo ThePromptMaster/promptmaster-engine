@@ -379,16 +379,23 @@ export function measureEvidence(
  * the objective check had nothing but its own reading (6 Nov, a book test: "Roughly
  * 600–800 words per chapter" came back not checked, at 690–787).
  */
+/** The measurable requirements the brief and the recorded requirements set, wherever each applies. */
+export function projectRequirements(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>
+): MeasurableRequirement[] {
+  return governingRequirements(
+    project.objective ?? '',
+    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
+    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
+  );
+}
+
 export function eachPartMeasurements(
   project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
   content: string
 ): Measurement[] {
   if (!content.trim()) return [];
-  return governingRequirements(
-    project.objective ?? '',
-    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
-    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
-  )
+  return projectRequirements(project)
     .filter((r) => r.per)
     .map((r) => measure(r, content))
     .filter((m): m is Measurement => m !== null);
@@ -400,11 +407,7 @@ export function stageRequirements(
   template: WorkflowTemplate,
   stage: StageDefinition
 ): { requirement: MeasurableRequirement; whole: boolean }[] {
-  const requirements = governingRequirements(
-    project.objective ?? '',
-    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
-    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
-  );
+  const requirements = projectRequirements(project);
   if (!requirements.length) return [];
   if (finishingStage(template)?.id === stage.id) return requirementsForStage(stage, stage.id, requirements, true);
   return requirementsForStage(stage, deliverableStage(template)?.id, requirements);

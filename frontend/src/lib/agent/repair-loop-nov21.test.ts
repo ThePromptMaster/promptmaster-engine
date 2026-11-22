@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { lengthRows } from './deliverable-check';
+import { projectRequirements } from '@/lib/workflow/context';
 import { repairStuckNeed, repairTries, staleRepair } from './needs';
 import type { AgentStep } from '@/types/agent';
 
@@ -82,7 +83,17 @@ describe('a part\'s limit named in a change is not counted on the whole delivera
   it('counted on the whole text when the deliverable has no part with that limit, as before', () => {
     expect(lengthRows([i1], whole).get('i1')?.met).toBe(false);
   });
-  it('left to the part, already counted there, when a part has that limit', () => {
+  it('left to where the brief\'s own limit applies, when the change only restates it', () => {
     expect(lengthRows([i1], whole, false, [80]).has('i1')).toBe(false);
+  });
+  it('the brief\'s email limit is among the limits, though "email" is a document, not a part (production pass of #763)', () => {
+    const project = {
+      objective: 'Build a launch readiness brief and a short internal email (at most 80 words) for a fictional inventory system rollout.',
+      constraints: 'The internal email is at most 80 words.',
+      output_format: 'Launch readiness brief plus an internal email (at most 80 words).',
+    };
+    const limits = projectRequirements(project as never).flatMap((r) => (r.kind === 'words' && !r.per && r.max !== undefined ? [r.max] : []));
+    expect(limits).toContain(80);
+    expect(lengthRows([i1], whole, false, limits).has('i1')).toBe(false);
   });
 });

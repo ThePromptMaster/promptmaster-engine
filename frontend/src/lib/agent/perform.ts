@@ -31,7 +31,7 @@ import { materialiseOutlineInto } from '@/lib/outline/actions';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
-import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
+import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, projectRequirements, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, countWords, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement, describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
@@ -3556,8 +3556,8 @@ async function checkDeliverable(
   const claim = noAccessClaim(content);
   // 12 Nov: a length is counted, never judged. The check is given the count,
   // and a change that asks for a length is decided by it before the call.
-  const partLimits = stageRequirements(ctx.project, ctx.template, holder).flatMap(({ requirement: r }) => (r.kind === 'words' && isPart(r) && r.max !== undefined ? [r.max] : []));
-  const lengths = lengthRows(rows, content, working, partLimits);
+  const briefLimits = projectRequirements(ctx.project).flatMap((r) => (r.kind === 'words' && !r.per && r.max !== undefined ? [r.max] : []));
+  const lengths = lengthRows(rows, content, working, briefLimits);
   const sent = rows.map((r) => (lengths.has(r.id) ? { ...r, length_decided: lengths.get(r.id)!.line } : r));
   const measured = [
     { label: `${label} — length`, value: `${countWords(content).toLocaleString('en-US')} words`, met: null, info: true },
