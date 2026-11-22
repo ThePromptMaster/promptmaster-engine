@@ -55,3 +55,27 @@ describe('an answer to Go that names an option over a requirement is refused and
     await waitFor(() => expect(document.querySelector('[data-answer-refused]')?.textContent).toContain('Nothing was recorded'));
   });
 });
+
+describe('Go\'s own question choices naming a failing option are explained, not offered (L-274 follow-up)', () => {
+  it('the failing choice is greyed with its reason, the others stay buttons', async () => {
+    const { failingChoices } = await import('@/lib/workflow/decision-options');
+    const choices = ['Approve Option A ($52,000; $2,000 over the hard budget)', 'Approve Option B ($49,000)'];
+    const blocked = failingChoices(choices, [[A, B]]);
+    expect(Object.keys(blocked)).toEqual([choices[0]]);
+    const onAnswer = vi.fn();
+    render(<QuestionPrompt question="Which option do you approve?" choices={choices} blocked={blocked} onAnswer={onAnswer} />);
+    expect(screen.queryByRole('button', { name: choices[0] })).toBeNull();
+    expect(document.querySelector('[data-option-fails]')!.textContent).toContain('breaks your requirement');
+    fireEvent.click(screen.getByRole('button', { name: choices[1] }));
+    expect(onAnswer).toHaveBeenCalledWith(choices[1]);
+  });
+
+  it('when every choice fails, it says none meets the requirements', async () => {
+    const { failingChoices } = await import('@/lib/workflow/decision-options');
+    const B2 = { ...B, fails: { requirement: CAP, quote: 'B is $1,500 over the cap' } };
+    const choices = ['Approve Option A', 'Approve Option B'];
+    render(<QuestionPrompt question="Which?" choices={choices} blocked={failingChoices(choices, [[A, B2]])} onAnswer={vi.fn()} />);
+    expect(document.querySelector('[data-none-eligible]')!.textContent).toContain('None of these meets your requirements');
+  });
+});
+
