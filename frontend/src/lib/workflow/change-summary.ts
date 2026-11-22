@@ -142,3 +142,30 @@ export function changeSummary(input: ChangeSummaryInput): ChangeSummary {
   }
   return { usable, redoing, needsYou };
 }
+
+/**
+ * The latest change that set a decision aside, while that decision is still to be made
+ * again (L-277 follow-up). Once Go had updated the work, nothing waited for a recheck and
+ * the reopened decision stage was not finished, so the notice disappeared just when the
+ * choice was the one thing left for the user (22 Nov, production pass on the example).
+ */
+export function decisionStillAwaited(
+  events: readonly WorkflowEvent[],
+  manualChecks: Record<string, boolean> | null | undefined,
+  now: number,
+  shownMs: number
+): { event: WorkflowEvent; stageIds: string[] } | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const e = events[i];
+    if (e.type !== 'brief_changed') continue;
+    const aside = Array.isArray(e.payload?.decisions_set_aside) ? (e.payload!.decisions_set_aside as Partial<SetAside>[]) : [];
+    if (!aside.length) continue;
+    if (now - Date.parse(e.created_at) > shownMs) return null;
+    if (!aside.some((d) => typeof d.criterionId === 'string' && !manualChecks?.[d.criterionId])) return null;
+    const affected = Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: unknown }[]) : [];
+    const stageIds = [...new Set(affected.map((a) => (typeof a.stage_id === 'string' ? a.stage_id : '')).filter(Boolean))];
+    return { event: e, stageIds };
+  }
+  return null;
+}
+

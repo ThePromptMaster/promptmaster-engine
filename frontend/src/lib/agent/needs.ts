@@ -14,6 +14,7 @@ import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
+import { asksForDecision } from '@/lib/workflow/decision-options';
 import type { RoutineDecisions } from '@/types/project';
 import { USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
@@ -901,6 +902,38 @@ function commitRoutine(
   return null;
 }
 
+/** A choice an earlier stage still waits for the user to make. */
+export interface EarlierChoice {
+  stageId: string;
+  criterionId: string;
+  label: string;
+}
+
+/**
+ * The first stage before `stageId` that is not finished and waits on a choice only the
+ * user makes: a reserved approval worded as a choice, not given (L-277 follow-up).
+ * 22 Nov, production pass on the vendor example: after a quote change set the choice
+ * aside and Go updated the work, the run stopped on the final memo's sign-off, with the
+ * choice it records listed second under "Also waiting on you".
+ */
+export function earlierChoiceWaiting(
+  template: Pick<WorkflowTemplate, 'stages'>,
+  state: Pick<WorkflowState, 'stages'>,
+  manualChecks: Record<string, boolean> | null | undefined,
+  stageId: string
+): EarlierChoice | null {
+  for (const stage of template.stages) {
+    if (stage.id === stageId) return null;
+    const status = state.stages[stage.id]?.status;
+    if (!status || isDone(status) || status === 'skipped' || status === 'not_started') continue;
+    const c = stage.exit_criteria.find(
+      (x) => x.check === 'manual' && x.blocking && x.authority !== 'delegable' && !manualChecks?.[x.id] && asksForDecision(x.label)
+    );
+    if (c) return { stageId: stage.id, criterionId: c.id, label: c.label };
+  }
+  return null;
+}
+
 /**
  * Decide, before the planner is asked, whether the next move is the user's.
  *
@@ -935,6 +968,8 @@ export function needsUser(input: {
   asItStands?: boolean;
   /** Undecided findings on other stages that block finishing (`openRowsOf`). */
   openElsewhere?: readonly OpenRow[];
+  /** A choice an earlier stage still waits for (`earlierChoiceWaiting`): asked before this stage's own sign-off. */
+  earlierChoice?: EarlierChoice | null;
 }): NeedsUser | null {
   const { state, stage, facts, stageEvaluation, allowed, policy, outlineStageId } = input;
 
@@ -1030,6 +1065,11 @@ export function needsUser(input: {
     // The user's own decisions first; a routine one is asked only when the policy says ask.
     const c = [...blockingUnmet].sort((a, b) => Number(authorityOf(stage, a.id) === 'delegable') - Number(authorityOf(stage, b.id) === 'delegable'))[0];
     const authority = authorityOf(stage, c.id) === 'delegable' ? (input.routine === 'handle' ? undefined : 'policy_ask') : 'reserved';
+    // A sign-off on later work waits for the choice it records: that is the question to ask.
+    if (input.earlierChoice && authority === 'reserved') {
+      const e = input.earlierChoice;
+      return { kind: 'tick_criterion', stageId: e.stageId, criterionId: e.criterionId, label: e.label, authority: 'reserved' };
+    }
     // A routine approval reaches the user under "handle them for me" only once
     // Go's check has refused it: the card says what the check said (12 Nov).
     const refusal = authority ? '' : (input.commitRefused ?? []).find((r) => r.criterionId === c.id)?.reason ?? '';

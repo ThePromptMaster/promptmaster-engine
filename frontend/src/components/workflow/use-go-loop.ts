@@ -51,7 +51,7 @@ import { keptQuestions } from '@/lib/agent/account';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, refusalToRepair, refusedCommits, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser, REPAIR_TRIES } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, earlierChoiceWaiting, refusalToRepair, refusedCommits, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser, REPAIR_TRIES } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -1314,6 +1314,7 @@ export function useGoLoop(opts: Options) {
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           runAttemptsLeft, lookupDue, routine, commitTried, commitRefused, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
+          earlierChoice: earlierChoiceWaiting(o.template, o.state, o.project.manual_checks, o.stage.id),
         };
         const need = repair || merge ? null : needsUser(needInput);
         if (need) {

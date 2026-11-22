@@ -162,7 +162,7 @@ function latestChange(events: readonly WorkflowEvent[], state: WorkflowState): O
 }
 
 /** How long "Updated and checked" stays on the page after the last stage it reopened is done. */
-const SETTLED_SHOWN_MS = 12 * 60 * 60 * 1000;
+export const SETTLED_SHOWN_MS = 12 * 60 * 60 * 1000;
 
 /**
  * The last step of "facts recorded → affected work awaiting update → updated
