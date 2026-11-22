@@ -18,6 +18,7 @@
 import type { ProjectFact } from '@/types/project';
 import { answered, describeValue, timeRanges, valueMentions, type FactValues, type ValueMention } from './fact-values';
 import { currentFacts } from './facts';
+import { aboutAnotherItem } from './item-labels';
 import { getLocale, tr } from '@/lib/i18n/store';
 
 /** Kinds a revision can change; a bare number is too easily something else. */
@@ -178,13 +179,21 @@ function side(piece: string, raw: string): 'old' | 'new' | null {
  * the promotional message under 80 words" offered the plan's limit as 80 and
  * the message's as 600. The value was chosen from the whole instruction.
  */
-function inInstruction(instruction: string, m: ValueMention, statement: string): { paired?: ValueMention; restated: boolean } {
+function inInstruction(instruction: string, m: ValueMention, statement: string): { paired?: ValueMention; restated: boolean; otherItem?: boolean } {
   const about = stemmed(statement.split(m.raw).join(' '));
   let restated = false;
+  let otherItem = false;
   for (const piece of instruction.split(/(?<=[.!?;])\s+|\n+/)) {
     const here = valueMentions(piece).filter((x) => x.kind === m.kind);
     const own = here.find((x) => x.value === m.value);
     if (!own) continue;
+    // A sentence about another item is not this fact's (L-270, 21 Nov, Sean,
+    // scanner: "The Option B vendor has corrected the training charge from
+    // $6,000 to $7,500" was offered as Option A's and Option C's new charge).
+    if (aboutAnotherItem(piece, statement)) {
+      otherItem = true;
+      continue;
+    }
     const others = here.filter((x) => x.value !== m.value && (m.kind !== 'limits' || sameUnit(x.value, m.value)));
     const sameThing = [...stemmed(piece)].some((w) => about.has(w));
     if (!REPLACING.test(piece) || !others.length) {
@@ -207,7 +216,7 @@ function inInstruction(instruction: string, m: ValueMention, statement: string):
       .sort((a, b) => a.d - b.d)[0].o;
     return { paired: nearest, restated: false };
   }
-  return { restated };
+  return { restated, otherItem };
 }
 
 /**
@@ -287,6 +296,10 @@ export function factChangesFromRevision(input: {
         replacement = told.paired;
       } else {
         if (told.restated) continue;
+        // The user's words gave this value's change to another item: the fact keeps it,
+        // whatever the new text says of it (a revision that also rewrote Option A's row
+        // without being asked does not get Option A's fact changed).
+        if (told.otherItem) continue;
         const candidates = [
           ...(said.get(m.kind) ?? []).map((n) => ({ m: n, text: input.instruction })),
           ...(after.get(m.kind) ?? []).filter((a) => !has(before.get(m.kind), a.value)).map((n) => ({ m: n, text: input.after })),
@@ -437,6 +450,8 @@ export async function withMeaningChanges(
     const byId = new Map(rest.map((f) => [f.id, f]));
     const meaning = res.changes.flatMap((m): FactChange[] => {
       const fact = byId.get(m.fact_id);
+      // The instruction names another item than this fact's (L-270): not this fact's change.
+      if (fact && said && aboutAnotherItem(said, fact.statement)) return [];
       return fact
         ? [{ fact: { id: fact.id, statement: fact.statement, subject: fact.subject, kind: fact.kind }, changes: [{ kind: 'meaning', was: fact.statement, now: m.why ? `${m.why} — “${m.quote}”` : `“${m.quote}”` }], proposed: m.proposed }]
         : [];

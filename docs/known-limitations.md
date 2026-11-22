@@ -5078,3 +5078,23 @@ brief's own limits is now left to where that limit applies, where code already c
 email is at most 80 words", counted on the email. The first version of this fix looked only at limits on parts.
 The production pass showed "email" is read as a document, not a part, so the 80 never reached the list.
 Not changed: a change naming a number the brief does not set is still counted on the whole text.
+
+### L-270 — A change to one item stays with that item (2026-11-22)
+Sean's scanner replacement test, 21 Nov. On the final memo he pressed "Change it" with "The Option B vendor
+has corrected the training charge from $6,000 to $7,500. All other quoted costs, dates, and requirements stay
+the same." The revision itself was right: A and C kept $6,000. But the facts offered with it were the Option
+A, B and C facts, all moved to $7,500 and all ticked. `inInstruction` (`lib/workflow/fact-reconcile.ts`) took
+the sentence as about each fact because they share "option", "vendor" and "training". Once applied, Go's
+recheck rewrote A and C in every stage, and the review checked the totals against those facts.
+
+Now a sentence that names an item ("Option B", "Site 3", "Phase II") is not about a fact that names another
+item of the same kind, or one about every item of the kind ("Each option includes $6,000 training"). The
+fact keeps its value, even when the new text changed that item's row without being asked. A sentence about
+every item ("every option's training is now $7,500") is still about them all. The same rule drops a change the
+model reads in meaning for a fact about another item (`withMeaningChanges`), and the side chat's "Record
+these facts" no longer lets one item's statement replace another item's fact (`reply_actions.py`, recorded as
+a new fact instead). Items are read in code by `lib/workflow/item-labels.ts` and its Python copy in
+`promptmaster/fact_filters.py`.
+
+Not covered: an item without a label ("the cheaper vendor", "the in-house option") is not narrowed, and a
+capitalised word followed by a letter or number is read as an item wherever it appears.
