@@ -85,6 +85,11 @@ export function changeSummary(input: ChangeSummaryInput): ChangeSummary {
     if (st?.status === 'stale' && st.stale && st.stale.since >= since) touched.add(id);
   }
   const after = events.filter((e) => e.created_at >= since);
+  // And what Go repaired or checked because of it, once that is done: a check repaired after the
+  // costs changed was listed as untouched (22 Nov, production pass on the vendor example).
+  for (const e of after) {
+    if (e.type === 'stage_marked_complete' && (e.payload?.repaired_after || e.payload?.checked_unchanged)) touched.add(e.stage_id);
+  }
   const checkedKept = new Set(after.filter((e) => e.type === 'stage_marked_complete' && e.payload?.checked_unchanged).map((e) => e.stage_id));
   // "Keep them as they are": on the stages it names, or on every stage the change reopened.
   const dismissals = after.filter((e) => e.type === 'brief_change_dismissed');

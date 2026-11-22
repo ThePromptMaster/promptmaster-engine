@@ -139,3 +139,16 @@ describe('the summary stays while the set-aside choice waits (L-277 follow-up)',
   });
 });
 
+describe('a stage Go repaired because of the change is redone, not untouched (production pass)', () => {
+  it('a check repaired after the costs changed is listed with its new version', () => {
+    const s = changeSummary(input({
+      state: { stages: { brief: { status: 'completed_with_artifact' }, costs: { status: 'completed_with_artifact' }, check: { status: 'completed_with_artifact' } } } as never,
+      events: [{ type: 'stage_marked_complete', stage_id: 'check', created_at: later(4), payload: { repaired_after: 'Costs was changed (now v2) after this stage used it.' } }] as never,
+      touched: ['costs'],
+      outcomes: [{ stageId: 'costs', version: 2, by: 'go', check: 'clean', count: 0 }, { stageId: 'check', version: 4, by: 'go', check: 'table', count: 0 }, { stageId: 'brief', version: null, by: null, check: 'none', count: 0 }],
+    }));
+    expect(s.usable).toEqual([{ stageId: 'brief' }]);
+    expect(s.redoing.map((r) => [r.stageId, r.state, r.version])).toEqual([['costs', 'updated', 2], ['check', 'updated', 4]]);
+  });
+});
+

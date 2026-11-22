@@ -5290,12 +5290,16 @@ Two follow-ups from the production pass the same day (vendor example, project 93
   while the choice that memo records waited, listed second under "Also waiting on you". A reserved sign-off
   now waits for a choice an earlier, unfinished stage still needs (`earlierChoiceWaiting` in `lib/agent/needs.ts`),
   and Go stops on that choice instead.
+- **What Go repaired because of the change is redone, not untouched.** A check repaired after the costs changed
+  was listed under "Still usable". A stage Go marks complete again after the change (`repaired_after`,
+  `checked_unchanged`) now counts as reopened by it.
+
+The example's first production run (john@ 93db976d, 22 Nov) is its recorded result: 23 minutes, $3.47, with the
+demo change halfway and Option A chosen again.
 
 Not covered:
 - "Still usable" means "not reopened": a stage the change check missed is listed as usable.
 - Only the latest change is summarised; stages still waiting from an earlier one are counted with it.
 - "Needs you" lists only what is at or after the change point.
 - Nothing reaches the user away from the page.
-- The example's first production run is recorded the day it ships (`AWAITING_FIRST_RUN` in `examples.test.ts`
-  until then).
 
