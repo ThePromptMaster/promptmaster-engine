@@ -5181,6 +5181,12 @@ requirement is changed in Facts first. The other options stay buttons. Typed, th
 same reason and nothing is recorded, whether it is typed in the card's box or as an answer to Go's question
 (`failingChoice`, `ChoiceRefused`). `decideApproval` checks it too.
 
+Follow-up the same day (peer production pass on the scanner case): Go's own question offered every option as
+a choice button ("Approve Option B ($61,500; $1,500 over the hard budget)"). Pressing one was refused, but it
+should not have been offered. A question choice that names an option a waiting decision's stage shows failing
+a requirement is now drawn the same way, with the reason (`failingChoices`). When every choice fails, the card
+says that none meets the requirements.
+
 Not covered: an option the text does not show failing anything is offered, even if it does fail a
 requirement. Only the stage's own words are read, never a model's own judgement. If every option fails, the
 card says so and offers nothing to press.
@@ -5205,7 +5211,8 @@ Now:
 - **Go follows the record.** Its memory leaves out an answer that was replaced and lists each decision of
   record. The repeat-question check counts a decision made on the approval as a change.
 - **The page says what it recorded.** Go's panel says "Recorded on Approve option: Option A … It replaces: …"
-  until it is dismissed, wherever Go goes next. The decision trail carries the same text.
+  until it is dismissed, wherever Go goes next, and only while that choice is still the decision of record. A
+  later change that sets it aside clears it. The decision trail carries the same text.
 - **A set-aside stage is re-marked.** A decision stage still waiting for Go to write a choice in is re-marked
   when that choice is set aside (L-272); before, it kept "record the decision".
 

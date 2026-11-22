@@ -29,6 +29,7 @@ import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
 import { doingNow } from '@/lib/agent/doing';
+import { failingChoices } from '@/lib/workflow/decision-options';
 
 /**
  * Go mode (PM-17 … PM-20): the four layers side by side — the stage (where),
@@ -532,6 +533,10 @@ export function GoPanel({
               question={shownStopReason(locale, go.run.stop_reason, stageByEnglish)}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
+              blocked={failingChoices(
+                go.run.needs?.kind === 'answer_question' ? go.run.needs.choices ?? [] : [],
+                [...Object.values(decisionOffers ?? {}), ...Object.values(queue?.offers ?? {})].filter((o) => !o.loading).map((o) => o.options)
+              )}
               canLeaveToGo={!(go.run.needs?.kind === 'answer_question' && go.run.needs.repeat) && !asksForApproval(go.run.stop_reason)}
               change={latestChange ?? undefined}
               onAnswer={async (t, contradicted) => {

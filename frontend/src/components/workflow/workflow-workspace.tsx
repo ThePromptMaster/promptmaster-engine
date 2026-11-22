@@ -1894,7 +1894,7 @@ export function WorkflowWorkspace({
   // decision". Used by Go's card and by the stage's checklist.
   const goRunId = go.run?.id ?? null;
   // The last decision recorded here, shown in Go's panel until dismissed (L-275).
-  const [recordedDecision, setRecordedDecision] = useState<{ stageId: string; choice: string; replaces: string[]; at: number } | null>(null);
+  const [recordedDecision, setRecordedDecision] = useState<{ stageId: string; criterionId: string; choice: string; replaces: string[]; at: number } | null>(null);
   const decideApproval = useCallback(
     async (criterionId: string, onStageId: string, choice: string) => {
       const target = getStage(template, onStageId);
@@ -1976,7 +1976,7 @@ export function WorkflowWorkspace({
       }
       // Said where the user lands, not only on the stage the press left (L-275: "I couldn't tell
       // what happened to my tap on A").
-      setRecordedDecision({ stageId: onStageId, choice: text, replaces, at: Date.now() });
+      setRecordedDecision({ stageId: onStageId, criterionId, choice: text, replaces, at: Date.now() });
       await onReload?.();
     },
     [template, stageBundles, project, goRunId, handleToggleManual, appendEvent, onReload]
@@ -3187,7 +3187,12 @@ export function WorkflowWorkspace({
               queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
               decideByAnswer={decideByAnswer}
               leftForGo={goLeftForGo}
-              recordedDecision={recordedDecision ? { ...recordedDecision, stage: stageNameShown(recordedDecision.stageId) } : null}
+              // Only while it is still the decision of record: a later change that set it aside clears it.
+              recordedDecision={
+                recordedDecision && project.manual_checks?.[recordedDecision.criterionId] && decidedChoices[recordedDecision.criterionId] === recordedDecision.choice
+                  ? { ...recordedDecision, stage: stageNameShown(recordedDecision.stageId) }
+                  : null
+              }
               onDismissRecorded={() => setRecordedDecision(null)}
             />
           )}

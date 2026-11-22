@@ -64,6 +64,30 @@ export function givenByChoosing(offer: DecisionOffer | null | undefined): boolea
 
 export const offerKey = (t: Pick<DecisionTarget, 'criterionId' | 'versionId'>): string => `${t.criterionId}:${t.versionId}`;
 
+/**
+ * Go's own question choices that name an option a waiting decision's stage shows
+ * failing a requirement, by choice (L-274 follow-up). 22 Nov, production pass on the
+ * scanner case: after a quote change, Go asked which option to approve with all three
+ * as buttons ("Approve Option B ($61,500; $1,500 over the hard budget)"), though the
+ * stage showed each failing a requirement. Pressing one was refused; it is not offered.
+ */
+export function failingChoices(
+  choices: readonly string[],
+  offers: readonly (readonly DecisionOption[])[]
+): Record<string, DecisionOption> {
+  const out: Record<string, DecisionOption> = {};
+  for (const choice of choices) {
+    for (const options of offers) {
+      const failing = failingChoice(choice, options);
+      if (failing?.fails) {
+        out[choice] = failing;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /** A quoted passage without its closing full stop, for a sentence that ends with its own (“…requirement.”. read twice). */
 export function unstopped(text: string): string {
   return text.trim().replace(/[.。]+$/, '');

@@ -9,6 +9,8 @@ import { DiffText, useWordDiff } from '@/components/workflow/revised-preview';
 import type { AgentStep } from '@/types/agent';
 import type { AnswerContradiction } from '@/lib/api/client';
 import { DELEGATED_ANSWER } from '@/lib/workflow/answers';
+import type { DecisionOption } from '@/lib/workflow/decision-options';
+import { FailingOption } from './decision-options';
 
 /** The run is waiting on the user: approve this move, or decline it. */
 export function DecisionPrompt({
@@ -78,6 +80,7 @@ export function QuestionPrompt({
   onTick,
   expertPackage,
   choices = [],
+  blocked = {},
   change,
   canLeaveToGo = true,
 }: {
@@ -92,6 +95,8 @@ export function QuestionPrompt({
   change?: LatestChange;
   /** One-click answers (13 Oct, Sean: "which version should govern" was a typed answer). */
   choices?: string[];
+  /** Choices that name an option its stage shows failing a requirement (`failingChoices`): explained, not offered. */
+  blocked?: Record<string, DecisionOption>;
   /** Q3a: the package prepared for an expert's review, as markdown. */
   expertPackage?: string;
   /** With the contradiction the user chose to record the answer over (L-65). */
@@ -154,17 +159,27 @@ export function QuestionPrompt({
       {change && <WhatChanged change={change} />}
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
       <div aria-label={t('qp.answers')} className="mt-3 flex flex-wrap gap-2">
-          {choices.map((c) => (
-            <button
-              key={c}
-              type="button"
-              disabled={checking || sending}
-              onClick={() => send(c)}
-              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-start text-title text-[var(--on-primary)] disabled:opacity-60"
-            >
-              {c}
-            </button>
-          ))}
+          {choices.map((c) =>
+            // A choice naming an option its stage shows failing a requirement is explained, not offered (L-274).
+            blocked[c] ? (
+              <div key={c} className="basis-full">
+                <FailingOption option={{ ...blocked[c], label: c }} />
+              </div>
+            ) : (
+              <button
+                key={c}
+                type="button"
+                disabled={checking || sending}
+                onClick={() => send(c)}
+                className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-start text-title text-[var(--on-primary)] disabled:opacity-60"
+              >
+                {c}
+              </button>
+            )
+          )}
+          {choices.length > 0 && choices.every((c) => blocked[c]) && (
+            <p data-none-eligible className="basis-full text-label text-[var(--on-surface-variant)]">{t('nyc.noneEligible')}</p>
+          )}
           {canLeaveToGo && (
             <button
               type="button"
