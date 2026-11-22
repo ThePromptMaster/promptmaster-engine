@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import { dbError } from './errors';
 import { OBJECTIVE_CHANGES, objectiveUnmet } from '@/lib/workflow/objective';
 import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { liveEvents } from '@/lib/workflow/engine';
@@ -67,13 +68,13 @@ export async function getTemplateById(
   id: string
 ): Promise<(WorkflowTemplate & { id: string }) | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('id', id)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return data ? toTemplate(data as unknown as TemplateRow) : null;
 }
 
@@ -89,11 +90,11 @@ export async function templateNamesById(
   const unique = [...new Set(ids)];
   if (!unique.length) return new Map();
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .select('id, name, stages:definition->stages')
     .in('id', unique);
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return new Map(
     ((data ?? []) as unknown as { id: string; name: string; stages: StageDefinition[] | null }[]).map((row) => [
       row.id,
@@ -110,7 +111,7 @@ export async function getLatestTemplate(
   key: string
 ): Promise<(WorkflowTemplate & { id: string }) | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('key', key)
@@ -119,7 +120,7 @@ export async function getLatestTemplate(
     .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return data ? toTemplate(data as unknown as TemplateRow) : null;
 }
 
@@ -151,7 +152,7 @@ export async function publishUserTemplate(
   { listed = true }: { listed?: boolean } = {}
 ): Promise<WorkflowTemplate & { id: string }> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .insert({
       key: template.key,
@@ -167,7 +168,7 @@ export async function publishUserTemplate(
     })
     .select(TEMPLATE_COLUMNS)
     .single();
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return toTemplate(data as unknown as TemplateRow);
 }
 
@@ -179,7 +180,7 @@ export async function publishUserTemplate(
  */
 export async function listTemplates(): Promise<(WorkflowTemplate & { id: string })[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('status', 'published')
@@ -187,14 +188,14 @@ export async function listTemplates(): Promise<(WorkflowTemplate & { id: string 
     .order('key')
     .order('version', { ascending: false });
 
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return latestPerKey(((data ?? []) as unknown as TemplateRow[]).map(toTemplate));
 }
 
 /** The user's presets removed from the list, latest version of each, to put back. */
 export async function listRemovedTemplates(): Promise<(WorkflowTemplate & { id: string })[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('status', 'archived')
@@ -202,7 +203,7 @@ export async function listRemovedTemplates(): Promise<(WorkflowTemplate & { id: 
     .order('key')
     .order('version', { ascending: false });
 
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return latestPerKey(((data ?? []) as unknown as TemplateRow[]).map(toTemplate));
 }
 
@@ -215,12 +216,12 @@ export async function listRemovedTemplates(): Promise<(WorkflowTemplate & { id: 
 export async function setTemplateRemoved(key: string, removed: boolean): Promise<void> {
   if (!key.startsWith('custom_')) throw new Error('Only a workflow you designed can be removed from the list.');
   const supabase = createClient();
-  const { error } = await supabase
+  const { error, status } = await supabase
     .from('workflow_templates')
     .update({ status: removed ? 'archived' : 'published', ...(removed ? {} : { listed: true }) })
     .eq('key', key)
     .eq('is_system', false);
-  if (error) throw error;
+  if (error) throw dbError(error, status);
 }
 
 // --- events -----------------------------------------------------------------
@@ -248,13 +249,13 @@ export async function listWorkflowEvents(projectId: string): Promise<WorkflowEve
 
 export async function listAllWorkflowEvents(projectId: string): Promise<WorkflowEvent[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_events')
     .select('seq, type, stage_id, to_stage_id, actor, reason, payload, agent_run_id, created_at')
     .eq('project_id', projectId)
     .order('seq', { ascending: true });
 
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return ((data ?? []) as unknown as EventRow[]).map((r) => ({
     type: r.type,
     stage_id: r.stage_id,
@@ -307,7 +308,7 @@ export async function appendWorkflowEvent(
   event: NewWorkflowEvent
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from('workflow_events').insert({
+  const { error, status } = await supabase.from('workflow_events').insert({
     project_id: projectId,
     user_id: userId,
     type: event.type,
@@ -319,7 +320,7 @@ export async function appendWorkflowEvent(
     proposal_id: event.proposal_id ?? null,
     agent_run_id: event.agent_run_id ?? null,
   });
-  if (error) throw error;
+  if (error) throw dbError(error, status);
 }
 
 
@@ -334,13 +335,13 @@ export async function pausedProjectIds(projectIds: readonly string[]): Promise<S
   // The same rule as the workspace (`objectiveUnmet`): a later change, answer
   // or new version makes a "not met" something to check again, not a pause
   // (13 Oct, Sean: a resolved blocker must clear "throughout the interface").
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('workflow_events')
     .select('project_id, type, payload, created_at, seq')
     .in('type', ['objective_assessed', ...OBJECTIVE_CHANGES])
     .in('project_id', projectIds as string[])
     .order('seq', { ascending: true });
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   const byProject = new Map<string, WorkflowEvent[]>();
   for (const row of (data ?? []) as (WorkflowEvent & { project_id: string })[]) {
     byProject.set(row.project_id, [...(byProject.get(row.project_id) ?? []), row]);

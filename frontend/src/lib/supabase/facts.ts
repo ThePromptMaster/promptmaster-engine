@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import { dbError } from './errors';
 import type { ProjectFact } from '@/types/project';
 
 /**
@@ -26,9 +27,9 @@ export interface NewFact {
 
 export async function listProjectFacts(projectId: string): Promise<ProjectFact[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('project_facts').select(COLUMNS).eq('project_id', projectId).order('created_at', { ascending: true });
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return (data ?? []) as unknown as ProjectFact[];
 }
 
@@ -46,8 +47,8 @@ export async function recordFacts(project: { id: string; user_id: string }, fact
     source_ref: f.source_ref ?? {},
     ...(f.origin ? { origin: f.origin } : {}),
   }));
-  const { data, error } = await supabase.from('project_facts').insert(rows).select(COLUMNS);
-  if (error) throw error;
+  const { data, error, status } = await supabase.from('project_facts').insert(rows).select(COLUMNS);
+  if (error) throw dbError(error, status);
   return (data ?? []) as unknown as ProjectFact[];
 }
 
@@ -62,7 +63,7 @@ export async function supersedeFact(
   sourceKind: ProjectFact['source_kind'] = 'user_edit'
 ): Promise<ProjectFact> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('project_facts')
     .insert({
       project_id: project.id, user_id: project.user_id, statement: statement.trim(), subject: old.subject,
@@ -70,18 +71,18 @@ export async function supersedeFact(
     })
     .select(COLUMNS)
     .single();
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return data as unknown as ProjectFact;
 }
 
 /** Take a fact out of the current record; it stays in the history. */
 export async function retireFact(id: string, reason: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase
+  const { error, status } = await supabase
     .from('project_facts')
     .update({ retired_at: new Date().toISOString(), retired_reason: reason.slice(0, 500) || 'retired' })
     .eq('id', id);
-  if (error) throw error;
+  if (error) throw dbError(error, status);
 }
 
 /**
@@ -96,7 +97,7 @@ export async function recordPolicyFacts(
 ): Promise<ProjectFact[]> {
   if (!facts.length) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('project_facts')
     .insert(
       facts.map((f) => ({
@@ -105,7 +106,7 @@ export async function recordPolicyFacts(
       }))
     )
     .select(COLUMNS);
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return (data ?? []) as unknown as ProjectFact[];
 }
 
@@ -122,7 +123,7 @@ export async function recordRoutineDefault(
   taken: { statement: string; stageId: string; question: string }
 ): Promise<ProjectFact> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('project_facts')
     .insert({
       project_id: project.id, user_id: project.user_id, statement: taken.statement.trim().slice(0, 1_000), subject: 'Routine default',
@@ -131,6 +132,6 @@ export async function recordRoutineDefault(
     })
     .select(COLUMNS)
     .single();
-  if (error) throw error;
+  if (error) throw dbError(error, status);
   return data as unknown as ProjectFact;
 }

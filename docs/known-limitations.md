@@ -5098,3 +5098,23 @@ a new fact instead). Items are read in code by `lib/workflow/item-labels.ts` and
 
 Not covered: an item without a label ("the cheaper vendor", "the in-house option") is not narrowed, and a
 capitalised word followed by a letter or number is read as an item wherever it appears.
+
+### L-271 — A decision that does not save says why, and is tried once more (2026-11-22)
+Sean's scanner replacement test, 21 Nov. He pressed "Approve Option B at $60,000" on Go's card and got "That
+did not work." The workflow stayed at the approval. Typing the same decision a few minutes later worked.
+Supabase's request log shows why: the fact insert got a **522** from the gateway at 00:28:40 UTC (Cloudflare
+gave up waiting for the database). It was the only failed request in the two hours around it, and nothing
+was written. supabase-js returns such an error as a plain object whose message is Cloudflare's HTML page, so
+the card fell back to its generic sentence and nothing was logged.
+
+Now the fact and event helpers (`lib/supabase/facts.ts`, `workflow.ts`) throw an `Error` with the response's
+status (`dbError` in `lib/supabase/errors.ts`). A gateway timeout reads "The database did not answer in time
+(522)", a dropped connection says so, and a refusal keeps the database's own words. A decision
+(`decideApproval`, through `lib/workflow/record-decision.ts`) is written once more when its fact or its
+event failed in a way a second try may pass. The retry comes only after re-reading the record: a write the
+gateway timed out on may still have been committed, and a decision recorded twice would be two current
+facts. A write that still fails is logged to `error_events` (`decision_not_recorded`,
+`decision_not_written_in`) and says what happened and that nothing was changed.
+
+Not covered: other writes are not retried by this; they now show the database's reason instead of a generic
+sentence. The tick itself is the project's debounced save, which already retries on its own.

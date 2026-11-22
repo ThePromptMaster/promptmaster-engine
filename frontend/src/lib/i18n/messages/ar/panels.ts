@@ -485,6 +485,8 @@ export const ar: Record<keyof typeof en, string> = {
   'out.objNotRechecked': 'لم يتحقق الهدف عند آخر فحص وتغيّر العمل منذ ذلك الحين: لم يُعَد فحصه',
   'out.approvalEarlier': '{label}: أُعطيت موافقتك «{approval}» على v{version}؛ والإصدار الحالي هو v{current}',
   'wserr.noChange': 'لن يتغير شيء في الجدول.',
+  'wserr.decisionNotSaved': 'لم يُسجَّل قرارك: {why}. لم يتغير شيء. اضغط مرة أخرى.',
+  'wserr.decisionNotWrittenIn': 'سُجِّل قرارك، لكن المرحلة لم تُفتح مجددًا لكتابته فيها: {why}. اختره مرة أخرى للإنهاء.',
   'wserr.noDrafting': 'لا توجد مرحلة صياغة في سير العمل هذا.',
   'wserr.noPlace': 'لا مكان في هذه المرحلة لحفظ مسودة بعد. أعد تحميل الصفحة وحاول مرة أخرى.',
   'wserr.noOutline': 'لا يوجد مخطط محفوظ للموافقة عليه بعد.',
