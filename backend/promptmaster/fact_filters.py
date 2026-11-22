@@ -178,3 +178,64 @@ RULES = (
     "approved the budget\") is an approval, not a request, even where it replaces an earlier "
     "proposed figure. Say who granted it.\n"
 )
+
+
+# The labelled items a text names: "Option B", "Site 3", "Phase II" (L-270, 21 Nov,
+# Sean, scanner: "The Option B vendor has corrected the training charge" was offered
+# as Option A's and Option C's new charge too). The same pattern as
+# `frontend/src/lib/workflow/item-labels.ts`: keep the two in step.
+_NOT_HEADS = {
+    "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "the", "and", "but", "for", "with", "from", "under", "over", "each", "every", "all", "both", "only", "not", "than", "this", "that",
+    "about", "after", "before", "until", "since", "by", "at", "on", "in", "to", "of", "per", "via",
+}
+_ID = r"(?:[A-Z]|\d{1,3}|[IVX]{2,4})"
+_LABEL = re.compile(rf"\b([A-Z][a-z]{{2,}})\s+({_ID}(?:\s*(?:,|and|&|or)\s*{_ID})*)(?![A-Za-z0-9])")
+
+
+def _head(word: str) -> str:
+    w = word.lower()
+    return w[:-1] if len(w) > 4 and w.endswith("s") and not w.endswith("ss") else w
+
+
+def item_labels(text: str) -> dict[str, set[str]]:
+    """Each kind of item the text names, with its ids: "Option B" gives option → {B}."""
+    out: dict[str, set[str]] = {}
+    for m in _LABEL.finditer(text or ""):
+        head = _head(m.group(1))
+        if head in _NOT_HEADS:
+            continue
+        ids = [s.strip().upper() for s in re.split(r"\s*(?:,|and|&|or)\s*", m.group(2)) if s.strip()]
+        out.setdefault(head, set()).update(ids)
+    return out
+
+
+def _speaks_of_every(text: str, head: str) -> bool:
+    return re.search(rf"\b(?:all|each|every|both)\b(?:\s+(?:of\s+)?(?:the\s+)?(?:\w+\s+)?)?{head}s?\b", text, re.I) is not None
+
+
+def _speaks_of_kind(text: str, head: str) -> bool:
+    return _speaks_of_every(text, head) or re.search(rf"\b{head}s\b(?!\s+{_ID}(?![A-Za-z0-9]))", text, re.I) is not None
+
+
+def about_another_item(statement: str, fact: str) -> bool:
+    """The statement names an item of a kind the fact is about, and not the fact's
+    own ("Option B's training …" against "Option A: … $6,000 training"), or the fact
+    is about every item of that kind. A statement about every item is about them all."""
+    said = item_labels(statement)
+    if not said:
+        return False
+    theirs = item_labels(fact)
+    for head, ids in said.items():
+        if _speaks_of_every(statement, head):
+            continue
+        own = theirs.get(head)
+        if own:
+            if not ids & own:
+                return True
+            continue
+        if _speaks_of_kind(fact, head):
+            return True
+    return False

@@ -108,3 +108,36 @@ def test_reported_survives_parsing_and_only_true_counts():
     assert parse_record_facts(item, q)[0].reported is True
     item = {"facts": [{"statement": "The vendor says it moved the date to November 20.", "reported": "yes"}]}
     assert parse_record_facts(item, q)[0].reported is False
+
+
+def test_one_items_statement_never_replaces_another_items_fact():
+    """L-270, 21 Nov (Sean, scanner): a change to Option B's training charge was
+    recorded over Option A's and Option C's facts."""
+    from promptmaster.reply_actions import parse_record_facts
+
+    q = "Option B's training charge alone has gone from $6,000 to $7,500."
+    a = "Option A: one vendor; $47,000 equipment and installation + $6,000 training"
+    b = "Option B: two vendors; $49,000 equipment and installation + $6,000 training"
+    general = "Each option includes a $6,000 training charge."
+    known = [a, b, general]
+    stmt = "Option B: two vendors; $49,000 equipment and installation + $7,500 training"
+    for wrong in (a, general):
+        item = {"facts": [{"statement": stmt, "replaces": wrong}]}
+        assert parse_record_facts(item, q + " $49,000", known)[0].replaces == ""
+    item = {"facts": [{"statement": stmt, "replaces": b}]}
+    assert parse_record_facts(item, q + " $49,000", known)[0].replaces == b
+
+
+def test_item_labels_match_the_frontend():
+    from promptmaster.fact_filters import about_another_item, item_labels
+
+    assert item_labels("The Option B vendor") == {"option": {"B"}}
+    assert item_labels("Options A and C miss the deadline") == {"option": {"A", "C"}}
+    assert item_labels("live by December 18, Friday 9 a.m.") == {}
+    assert item_labels("the Option Board met") == {}
+    s = "The Option B vendor has corrected the training charge from $6,000 to $7,500."
+    assert about_another_item(s, "Option A: one vendor; $47,000 + $6,000 training")
+    assert not about_another_item(s, "Option B: two vendors; $49,000 + $6,000 training")
+    assert not about_another_item(s, "Requirement: Hard $60,000 all-in budget")
+    assert about_another_item(s, "Each option includes a $6,000 training charge.")
+    assert not about_another_item("All options now include $7,500 training.", "Option A: $6,000 training")

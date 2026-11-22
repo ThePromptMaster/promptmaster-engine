@@ -265,3 +265,68 @@ describe('a value is replaced by the one the user names in its place (2 Nov, pho
     expect(out.map((c) => [c.fact.id, c.proposed])).toEqual([['w', 'Whole document under 500 words, including headings and tables.']]);
   });
 });
+
+describe('a change to one item stays with that item (L-270, 21 Nov, Sean, scanner replacement)', () => {
+  // His facts and instruction, word for word; Final memo v3 → v4, the table and the sums.
+  const facts = [
+    fact('b', 'Option B: two vendors; $49,000 equipment and installation + $6,000 training; all three sites live by December 18'),
+    fact('c', 'Option C: in-house installation; $44,000 equipment and labor + $6,000 training; two sites live by December 18, third site live December 22'),
+    fact('a', 'Option A: one vendor; $47,000 equipment and installation + $6,000 training; two sites live by December 16, third site live December 21'),
+    fact('cap', 'Requirement: Hard $60,000 all-in budget, including a mandatory $5,000 contingency', 'requirement'),
+  ];
+  const instruction =
+    'The Option B vendor has corrected the training charge from $6,000 to $7,500. All other quoted costs, dates, and requirements stay the same. Please update the memo to reflect the corrected quote.';
+  const rowA = '| A: one vendor | $47,000 | $6,000 | $5,000 | **$58,000** | $2,000 under (pass) |';
+  const rowC = '| C: in-house install | $44,000 | $6,000 | $5,000 | **$55,000** | $5,000 under (pass) |';
+  const before = [
+    rowA,
+    '| B: two vendors | $49,000 | $6,000 | $5,000 | **$60,000** | At the cap (pass) |',
+    rowC,
+    '- **A:** $47,000 + $6,000 + $5,000 = $58,000.',
+    '- **B:** $49,000 + $6,000 + $5,000 = $60,000.',
+    '- **C:** $44,000 + $6,000 + $5,000 = $55,000.',
+  ].join('\n');
+  const after = [
+    rowA,
+    '| B: two vendors | $49,000 | $7,500 | $5,000 | **$61,500** | $1,500 over (fail) |',
+    rowC,
+    '- **A:** $47,000 + $6,000 + $5,000 = $58,000.',
+    '- **B:** $49,000 + $7,500 + $5,000 = $61,500. $61,500 − $60,000 = $1,500 over the cap.',
+    '- **C:** $44,000 + $6,000 + $5,000 = $55,000.',
+  ].join('\n');
+
+  it('only Option B\'s fact is offered for $7,500; A and C keep $6,000', () => {
+    const out = factChangesFromRevision({ facts, instruction, before, after });
+    expect(out.map((c) => c.fact.id)).toEqual(['b']);
+    expect(out[0].proposed).toBe('Option B: two vendors; $49,000 equipment and installation + $7,500 training; all three sites live by December 18');
+  });
+
+  it('a revision that also rewrote Option A\'s row does not get Option A\'s fact changed', () => {
+    const wrong = after.replace(rowA, '| A: one vendor | $47,000 | $7,500 | $5,000 | **$59,500** | $500 under (pass) |').replace('**A:** $47,000 + $6,000 + $5,000 = $58,000', '**A:** $47,000 + $7,500 + $5,000 = $59,500');
+    const out = factChangesFromRevision({ facts, instruction, before, after: wrong });
+    expect(out.map((c) => c.fact.id)).toEqual(['b']);
+  });
+
+  it('a sentence about every option changes them all', () => {
+    const all = after.replaceAll('$6,000', '$7,500');
+    const out = factChangesFromRevision({ facts, instruction: 'Every option\'s training charge is now $7,500 instead of $6,000.', before, after: all });
+    expect(out.map((c) => c.fact.id).sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('one option\'s change does not rewrite a fact about every option', () => {
+    const general = [fact('g', 'Each option includes a $6,000 training charge.')];
+    const out = factChangesFromRevision({ facts: general, instruction, before, after });
+    expect(out).toEqual([]);
+  });
+
+  it('a change the model reads in meaning is dropped for an option the instruction does not name', async () => {
+    const check = vi.fn(async () => ({
+      changes: [
+        { fact_id: 'a', proposed: 'Option A: … + $7,500 training', quote: '$7,500', why: 'training corrected' },
+        { fact_id: 'cap', proposed: 'Requirement: Hard $61,500 all-in budget', quote: '$61,500', why: 'budget' },
+      ],
+    }));
+    const out = await withMeaningChanges([], { facts: facts.filter((f) => f.id !== 'b'), instruction, before, after }, check);
+    expect(out.map((c) => c.fact.id)).toEqual(['cap']);
+  });
+});
