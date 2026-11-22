@@ -330,3 +330,44 @@ describe('a change to one item stays with that item (L-270, 21 Nov, Sean, scanne
     expect(out.map((c) => c.fact.id)).toEqual(['cap']);
   });
 });
+
+describe('the user\'s decision is never offered for change (L-278, 22 Nov, production pass of Sean\'s scanner case)', () => {
+  // Project 90ef866a: Option B decided at $60,000 by the option button, then Sean's correction to B's training.
+  const decision = {
+    ...fact('d', 'Decided by the user — on "I choose the option to approve" (Decision): Option B: two vendors, $60,000 all-in, all three sites live by December 18.'),
+    source_kind: 'user_edit',
+    source_ref: { criterion_id: 'approver_decision.approved', choice: 'Option B: two vendors, $60,000 all-in, all three sites live by December 18', stage_id: 'approver_decision' },
+  } as unknown as ProjectFact;
+  const optionB = fact('b', 'Option B: two vendors; $49,000 equipment and installation + $6,000 training; all three sites live by December 18');
+  const instruction =
+    'The Option B vendor has corrected the training charge from $6,000 to $7,500. All other quoted costs, dates, and requirements stay the same. Please update the memo to reflect the corrected quote.';
+  const before = 'Option B is approved: two vendors, $60,000 all-in, all three sites live by December 18.\n- **B:** $49,000 + $6,000 + $5,000 = $60,000.';
+  const after = 'No option qualifies. Option B was approved at $60,000 all-in; it is now $61,500 all-in.\n- **B:** $49,000 + $7,500 + $5,000 = $61,500.';
+  // What the model's meaning check offered on production, ticked by default.
+  const rewrite = {
+    fact_id: 'd',
+    proposed: 'Decided by the user — on "I choose the option to approve" (Decision): Option B: two vendors, $60,000 all-in as approved, now $61,500 all-in after the vendor\'s corrected training charge, all three sites live by December 18',
+    quote: 'which raises Option B\'s all-in total to $61,500',
+    why: 'Option B\'s all-in total rose from $60,000 to $61,500',
+  };
+
+  it('the value pass offers Option B\'s fact and not the decision', () => {
+    const out = factChangesFromRevision({ facts: [decision, optionB], instruction, before, after });
+    expect(out.map((c) => c.fact.id)).toEqual(['b']);
+  });
+
+  it('the meaning check is not shown the decision, and a change it returns for it is dropped', async () => {
+    const check = vi.fn(async (_req: { facts: { id: string }[] }) => ({ changes: [rewrite] }));
+    const values = factChangesFromRevision({ facts: [decision, optionB], instruction, before, after });
+    const out = await withMeaningChanges(values, { facts: [decision, optionB], instruction, before, after }, check);
+    expect(out.map((c) => c.fact.id)).toEqual(['b']);
+    expect(check.mock.calls[0]![0].facts.map((f) => f.id)).not.toContain('d');
+  });
+
+  it('a decision line with no criterion on it is the user\'s decision too', async () => {
+    const typed = fact('t', 'Decided by the user: Approve Option B at $60,000 all-in.');
+    const check = vi.fn(async () => ({ changes: [{ ...rewrite, fact_id: 't' }] }));
+    const out = await withMeaningChanges(factChangesFromRevision({ facts: [typed], instruction, before, after }), { facts: [typed], instruction, before, after }, check);
+    expect(out).toEqual([]);
+  });
+});

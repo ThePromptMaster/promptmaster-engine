@@ -17,7 +17,7 @@
 
 import type { ProjectFact } from '@/types/project';
 import { answered, describeValue, timeRanges, valueMentions, type FactValues, type ValueMention } from './fact-values';
-import { currentFacts } from './facts';
+import { currentFacts, isDecisionRecord } from './facts';
 import { aboutAnotherItem } from './item-labels';
 import { getLocale, tr } from '@/lib/i18n/store';
 
@@ -242,6 +242,19 @@ function limitFor(instruction: string, m: ValueMention, statement: string, ambig
  * - A length limit is not written in the document, so only the instruction
  *   can change it: "under 70 words" replaces the fact's "under 120 words".
  */
+/**
+ * The current facts a revision may offer to change: every one but the user's
+ * decisions (L-278, 22 Nov, production pass of Sean's scanner case: with Option B
+ * decided at $60,000, his correction of B's training charge offered, ticked, to
+ * rewrite "Decided by the user — … Option B … $60,000" as "… now $61,500". Applied,
+ * that superseded the decision inside the same change, so nothing set it aside
+ * (L-272) and the approval stayed ticked). A decision a change concerns is set
+ * aside by `decisionsSetAside`, and the user decides again.
+ */
+function reconcilable(facts: readonly ProjectFact[] | undefined): ProjectFact[] {
+  return currentFacts(facts).filter((f) => !isDecisionRecord(f));
+}
+
 export function factChangesFromRevision(input: {
   facts: readonly ProjectFact[] | undefined;
   instruction: string;
@@ -252,7 +265,8 @@ export function factChangesFromRevision(input: {
   const before = byKind(input.before);
   const after = byKind(input.after);
   const out: FactChange[] = [];
-  const current = currentFacts(input.facts);
+  // The user's decision is their record of what they chose, never a value to update (L-278).
+  const current = reconcilable(input.facts);
   // How many facts hold a limit in each unit: with two, a new limit belongs to the one it names.
   const limitFacts = new Map<string, number>();
   for (const f of current) {
@@ -433,7 +447,7 @@ export async function withMeaningChanges(
   }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
-  const rest = currentFacts(input.facts).filter((f) => !offered.has(f.id));
+  const rest = reconcilable(input.facts).filter((f) => !offered.has(f.id));
   // A standing change can come only from the user's own instruction (12 Oct,
   // Atlas: "the permitted evidence is now S1–S7"), so with none there is
   // nothing to add, and with no facts left there is nothing to contradict.

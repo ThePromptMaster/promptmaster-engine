@@ -239,3 +239,14 @@ def about_another_item(statement: str, fact: str) -> bool:
         if _speaks_of_kind(fact, head):
             return True
     return False
+
+
+#: A line that records the user's decision; the same pattern as `DECISION_LINE` in
+#: frontend/src/lib/workflow/facts.ts.
+_DECISION_LINE = re.compile(r"^(?:Decision:\s*)?Decided by the user\b", re.I)
+
+
+def is_decision_line(fact: str) -> bool:
+    """The user's record of what they chose (L-278). A statement never replaces it:
+    a decision changes only when the user decides again."""
+    return _DECISION_LINE.match((fact or "").strip()) is not None
