@@ -10,6 +10,7 @@
  */
 import type { ArtifactVersion, Project, ProjectFact } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
+import { concernsItem } from './item-labels';
 import type { WorkflowEvent, WorkflowTemplate } from './types';
 
 export interface GivenApproval {
@@ -205,4 +206,52 @@ export function withApprovals<P extends Project>(
 ): P {
   const approvals = approvalsGiven(project, template, bundles, events);
   return approvals.length ? { ...project, approvals } : project;
+}
+
+/** A decision the user made by choosing an option, set aside because a fact about that option changed (L-272). */
+export interface SetAsideDecision {
+  criterionId: string;
+  stageId: string;
+  /** The option chosen, as it was recorded. */
+  choice: string;
+  /** The fact the choice rested on, as it read before the change. */
+  because: string;
+}
+
+/** A line of `factsText` that records a decision, not a fact a decision rests on. */
+const DECISION_LINE = /^(?:Decision:\s*)?Decided by the user\b/i;
+
+/**
+ * The decisions a change to the facts sets aside (L-272, 21 Nov, Sean: Option B
+ * was approved at $60,000, its training charge then rose to $7,500, and the
+ * approval stage was repaired and closed again with the $60,000 choice still
+ * standing; the warehouse run did the same for Option A). A decision made by
+ * choosing an option, still ticked, whose option a changed or removed fact
+ * names, no longer stands: it is unticked and its stage reopens, so Go asks
+ * again with the options. The decision's fact stays, as history; deciding
+ * again replaces it. A fact replaced by a new decision never counts.
+ * `removed`: the statements the change took out of the facts (`statementsOf`).
+ */
+export function decisionsSetAside(
+  project: Pick<Project, 'facts' | 'manual_checks'>,
+  removed: readonly string[]
+): SetAsideDecision[] {
+  const changed = removed.filter((r) => !DECISION_LINE.test(r.trim()));
+  if (!changed.length) return [];
+  const out: SetAsideDecision[] = [];
+  for (const f of project.facts ?? []) {
+    if (f.retired_at) continue;
+    const ref = (f.source_ref ?? {}) as { criterion_id?: unknown; choice?: unknown; stage_id?: unknown };
+    if (typeof ref.criterion_id !== 'string' || typeof ref.choice !== 'string' || typeof ref.stage_id !== 'string') continue;
+    if (!project.manual_checks?.[ref.criterion_id]) continue;
+    if (out.some((d) => d.criterionId === ref.criterion_id)) continue;
+    const because = changed.find((r) => concernsItem(r, ref.choice as string));
+    if (because) out.push({ criterionId: ref.criterion_id, stageId: ref.stage_id, choice: ref.choice, because });
+  }
+  return out;
+}
+
+/** What the reopened decision stage is told, and what the record says. */
+export function setAsideReason(d: Pick<SetAsideDecision, 'choice' | 'because'>): string {
+  return `the user's decision "${d.choice}" was made when the record said "${d.because}", which has changed. That decision is set aside until the user decides again: keep it only as an earlier decision, say the decision is awaited, and change nothing else.`;
 }

@@ -643,14 +643,26 @@ export function projectState(
  * "12 done · 1 to go" (Sean, 28 Sep, item 20: Positioning). It is reported on
  * its own so the caption can say what it is.
  */
-export function progressSummary(template: WorkflowTemplate, state: WorkflowState) {
+export function progressSummary(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  /**
+   * Done stages whose approval was given on an earlier text (`reapprovalByStage`):
+   * counted on their own, not as done (L-273, 21 Nov, Sean, warehouse: "5 done · 0
+   * to go" with ticks beside Approve option and Final memo while the same screen
+   * said "2 approvals to re-confirm" and "Needs your decision").
+   */
+  reapprove?: Readonly<Record<string, unknown>>
+) {
   let complete = 0;
   let skipped = 0;
   let leftOpen = 0;
+  const reapproveIds: string[] = [];
   for (const stage of template.stages) {
     const st = state.stages[stage.id];
     const status = st?.status;
-    if (isDone(status)) complete += 1;
+    if (isDone(status) && reapprove?.[stage.id]) reapproveIds.push(stage.id);
+    else if (isDone(status)) complete += 1;
     else if (status === 'skipped') skipped += 1;
     else if (status === 'in_progress' && st?.left_open) leftOpen += 1;
   }
@@ -658,9 +670,30 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
     complete,
     skipped,
     leftOpen,
-    remaining: template.stages.length - complete - skipped - leftOpen,
+    reapprove: reapproveIds.length,
+    reapproveIds,
+    remaining: template.stages.length - complete - skipped - leftOpen - reapproveIds.length,
     total: template.stages.length,
   };
+}
+
+/**
+ * Per stage: the approvals given on an earlier text than the stage holds now
+ * (L-273). The rail draws such a done stage as "re-approve", not a tick, and the
+ * count puts it apart from "done". Read from the same outstanding items as the
+ * caption, so the two cannot disagree.
+ */
+export function reapprovalByStage(items: readonly OutstandingItem[]): Record<string, { approvals: string[]; version: number; current: number }> {
+  const out: Record<string, { approvals: string[]; version: number; current: number }> = {};
+  for (const item of items) {
+    if (item.kind !== 'approval_on_earlier_version') continue;
+    const at = out[item.stageId];
+    if (at) {
+      at.approvals.push(item.approval);
+      at.version = Math.min(at.version, item.version);
+    } else out[item.stageId] = { approvals: [item.approval], version: item.version, current: item.current };
+  }
+  return out;
 }
 
 /**
@@ -669,20 +702,23 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
  * 0 to go" beside a Go waiting on corrections, three times in one day).
  */
 export function progressCaptionText(
-  progress: ReturnType<typeof progressSummary>,
+  progress: Omit<ReturnType<typeof progressSummary>, 'reapprove' | 'reapproveIds'> & { reapprove?: number; reapproveIds?: readonly string[] },
   finished: boolean,
   outstanding: readonly OutstandingItem[] = []
 ): string {
   const waiting = outstanding.some((o) => o.kind === 'go_waiting');
   // A stale stage is already counted "to go"; the rest is open on top of the stages.
   const open = outstanding.filter((o) => blocksCompletion(o) && o.kind !== 'stale_stage' && o.kind !== 'go_waiting' && o.kind !== 'objective_not_rechecked').length;
-  const reconfirm = outstanding.filter((o) => o.kind === 'approval_on_earlier_version').length;
+  // A done stage to re-approve is counted as a stage (L-273); an approval on a stage not done is listed apart.
+  const counted = new Set(progress.reapproveIds ?? []);
+  const reconfirm = outstanding.filter((o) => o.kind === 'approval_on_earlier_version' && !counted.has(o.stageId)).length;
   // In the interface's language (client, 21 Oct): the rail's caption is read, not parsed.
   return [
     finished ? tr('progress.finished') : null,
     tr('progress.done', { count: progress.complete }),
     progress.skipped > 0 ? tr('progress.skipped', { count: progress.skipped }) : null,
     progress.leftOpen > 0 ? tr('progress.leftOpen', { count: progress.leftOpen }) : null,
+    (progress.reapprove ?? 0) > 0 ? tr('progress.reapprove', { count: progress.reapprove ?? 0 }) : null,
     progress.remaining > 0 || !finished ? tr('progress.toGo', { count: progress.remaining }) : null,
     open > 0 ? tr('progress.stillOpen', { count: open }) : null,
     outstanding.some((o) => o.kind === 'objective_not_rechecked') ? tr('progress.objectiveNotRechecked') : null,

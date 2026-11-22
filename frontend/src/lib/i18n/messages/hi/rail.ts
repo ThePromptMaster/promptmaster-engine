@@ -17,6 +17,8 @@ export const hi: Record<keyof typeof en, string> = {
   'rail.doneOpen': 'पूरा · {count} खुले',
   'rail.doneOpenWhy_one': 'पूरा, पर {count} निष्कर्ष अभी भी खुला है — उसे देखने के लिए चरण खोलें',
   'rail.doneOpenWhy_other': 'पूरा, पर {count} निष्कर्ष अभी भी खुले हैं — उन्हें देखने के लिए चरण खोलें',
+  'rail.reapprove': 'फिर से स्वीकृत करें',
+  'rail.reapproveWhy': 'पूरा, पर आपकी स्वीकृति v{version} पर दी गई थी और चरण अब v{current} पर है: {approvals}। चरण की सूची में इसे फिर से स्वीकृत करें।',
   'rail.waiting': 'आपकी प्रतीक्षा में',
   'rail.waitingWhy': 'इस चरण का काम पूरा हो गया है, पर प्रोजेक्ट का उद्देश्य अभी पूरा नहीं हुआ — यह किसकी प्रतीक्षा कर रहा है, चरण पर देखें',
   'rail.recheck': 'दोबारा जाँच की प्रतीक्षा',
@@ -31,4 +33,5 @@ export const hi: Record<keyof typeof en, string> = {
   'rail.legend.skipped': 'जानबूझकर, कारण के साथ छोड़ा गया',
   'rail.legend.blocked': 'अटका हुआ — किसी चीज़ की प्रतीक्षा में',
   'rail.legend.stale': 'दोबारा जाँचें — इससे पहले का कुछ बदल गया है',
+  'rail.legend.reapprove': 'पुराने पाठ पर पूरा — आपकी स्वीकृति फिर से देनी है',
 };

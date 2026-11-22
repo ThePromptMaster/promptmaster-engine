@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { approvalsOnEarlierVersion } from './approvals';
-import { blocksCompletion, describeOutstanding, outstandingWork, progressCaptionText } from './engine';
+import { blocksCompletion, describeOutstanding, outstandingWork, progressCaptionText, progressSummary, reapprovalByStage } from './engine';
 import { objectiveNotRechecked, objectiveUnmet } from './objective';
 import type { WorkflowEvent, WorkflowState, WorkflowTemplate } from './types';
 
@@ -99,5 +99,31 @@ describe('the caption', () => {
     expect(describeOutstanding(approval)).toBe('Pack: your approval “I approve this pack” was given on v3; the current version is v9');
     const [check] = work({ objectiveNotRechecked: true });
     expect(blocksCompletion(check)).toBe(true);
+  });
+});
+
+describe('a done stage to re-approve is not counted done (L-273, 21 Nov, Sean, warehouse)', () => {
+  // His five stages, all marked complete again after the quote change, two approvals on earlier versions.
+  const T = { stages: ['objective', 'draft', 'check', 'approve_option', 'final_memo'].map((id) => ({ id, label: id, exit_criteria: [] })) } as unknown as WorkflowTemplate;
+  const done = { current_stage_id: 'final_memo', stages: Object.fromEntries(T.stages.map((s) => [s.id, { status: 'complete' }])) } as unknown as WorkflowState;
+  const items = outstandingWork(T, done, {}, {
+    approvalsOnEarlier: [
+      { stageId: 'approve_option', label: 'Approve option', approval: 'I choose the labeling option to approve.', version: 1, current: 3 },
+      { stageId: 'final_memo', label: 'Final memo', approval: 'I approve the finished memo as it stands.', version: 1, current: 4 },
+    ],
+  });
+
+  it('reads "3 done · 2 to re-approve · 0 to go", not "5 done · 0 to go"', () => {
+    const reapprove = reapprovalByStage(items);
+    expect(Object.keys(reapprove)).toEqual(['approve_option', 'final_memo']);
+    const progress = progressSummary(T, done, reapprove);
+    expect(progress).toMatchObject({ complete: 3, reapprove: 2, remaining: 0 });
+    expect(progressCaptionText(progress, false, items)).toBe('3 done · 2 to re-approve · 0 to go');
+  });
+
+  it('an approval on a stage not done is still listed as an approval', () => {
+    const open = { ...done, stages: { ...done.stages, final_memo: { status: 'in_progress' } } } as unknown as WorkflowState;
+    const progress = progressSummary(T, open, reapprovalByStage(items));
+    expect(progressCaptionText(progress, false, items)).toBe('3 done · 1 to re-approve · 1 to go · 1 approval to re-confirm');
   });
 });

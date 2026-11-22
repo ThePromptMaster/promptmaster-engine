@@ -84,6 +84,7 @@ import {
   type OutstandingShow,
   type OutstandingItem,
   openFindingsByStage,
+  reapprovalByStage,
   outstandingWork,
   rowsRequired,
   tickClosesStage,
@@ -735,7 +736,10 @@ export function WorkflowWorkspace({
     [template, state, evaluation, blockingElsewhere.length]
   );
 
-  const progress = useMemo(() => progressSummary(template, state), [template, state]);
+  // Done stages whose approval was given on an earlier text (L-273): the rail
+  // marks them and the count keeps them apart from "done".
+  const reapprove = useMemo(() => reapprovalByStage(outstanding), [outstanding]);
+  const progress = useMemo(() => progressSummary(template, state, reapprove), [template, state, reapprove]);
   // "12 done · 1 left open · 0 to go" rather than "12 done · 1 to go" on a
   // finished project: a stage moved past is named for what it is.
 
@@ -1331,9 +1335,19 @@ export function WorkflowWorkspace({
   // A saved change to the brief reopens only what relied on it (5 Oct).
   // The stage a side-chat revision was applied to already carries the setup change that came with it (18 Nov).
   const revisedWith = useRef<{ stageId: string; at: number } | null>(null);
+  // A decision whose option a fact change concerns is taken back (L-272): the
+  // tick is written through before the event that reopens its stage.
+  const setDecisionAside = useCallback(
+    async (d: { criterionId: string; stageId: string }) => {
+      await handleToggleManual(d.criterionId, false, undefined, d.stageId);
+      await flushProject();
+    },
+    [handleToggleManual, flushProject]
+  );
   const judgingChange = useBriefChange({
     project, template, state, bundles: stageBundles, stageId, appendEvent,
     enabled: project.status !== 'finalized' && events !== null, revisedWith,
+    onDecisionSetAside: setDecisionAside,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   // A commitments sign-off on a version that proposes none is recorded as not
@@ -2768,6 +2782,7 @@ export function WorkflowWorkspace({
           approvalPendingIds={approvalPendingIds}
           projectOpenOn={projectOpenOn}
           openFindings={openFindings}
+          reapprove={reapprove}
         />
       </aside>
 
@@ -2813,6 +2828,7 @@ export function WorkflowWorkspace({
               state={state}
               projectOpenOn={projectOpenOn}
               openFindings={openFindings}
+              reapprove={reapprove}
               nextSuggestedId={nextSuggested}
               approvalPendingIds={approvalPendingIds}
               onSelect={(stageId) => {
@@ -2858,7 +2874,7 @@ export function WorkflowWorkspace({
               </span>
               <span className="block text-label text-[var(--on-surface-variant)]">
                 {t('stageHead.position', { index: stageIndex + 1, total: template.stages.length })}
-                {progress.leftOpen > 0 && t('ws.leftOpenCount', { count: progress.leftOpen })}{t('ws.toGo', { count: progress.remaining })}
+                {progress.leftOpen > 0 && t('ws.leftOpenCount', { count: progress.leftOpen })}{progress.reapprove > 0 && t('ws.reapproveCount', { count: progress.reapprove })}{t('ws.toGo', { count: progress.remaining })}
               </span>
               {overall !== 'in_progress' && (
                 <span data-overall-status-phone className="block truncate text-label font-semibold text-[var(--on-surface)]">{t(`status.${overall}` as const)}</span>

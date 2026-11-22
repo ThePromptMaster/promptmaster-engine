@@ -76,3 +76,20 @@ export function aboutAnotherItem(sentence: string, fact: string): boolean {
   }
   return false;
 }
+
+/**
+ * The statement is about an item the text names, or about every item of its
+ * kind: "Option A: … $7,000 training" concerns "Option A: $48,000 all-in", and
+ * so does "Each option includes $6,000 training". Used to tell which decisions
+ * a changed fact sets aside (L-272).
+ */
+export function concernsItem(statement: string, text: string): boolean {
+  const named = itemLabels(text);
+  if (!named.size) return false;
+  const theirs = itemLabels(statement);
+  for (const [head, ids] of named) {
+    const own = theirs.get(head);
+    if (own ? [...ids].some((id) => own.has(id)) : speaksOfKind(statement, head)) return true;
+  }
+  return false;
+}

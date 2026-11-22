@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 
 import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, onlyFromTheChat, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
+import { decisionsSetAside, setAsideReason, type SetAsideDecision } from '@/lib/workflow/approvals';
 import { factsText } from '@/lib/workflow/facts';
 import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -44,6 +45,7 @@ export function useBriefChange({
   appendEvent,
   enabled,
   revisedWith,
+  onDecisionSetAside,
 }: {
   project: Project;
   template: WorkflowTemplate;
@@ -58,12 +60,17 @@ export function useBriefChange({
    * and is not reopened for it (18 Nov, East Dock).
    */
   revisedWith?: MutableRefObject<{ stageId: string; at: number } | null>;
+  /**
+   * Untick a decision a fact change set aside (L-272), before the event that
+   * reopens its stage, so Go's recheck finds the approval not given and asks.
+   */
+  onDecisionSetAside?: (decision: SetAsideDecision) => Promise<unknown>;
 }) {
   const baseline = useRef<Record<WatchedField, string> | null>(null);
   /** When the brief was last edited away from the baseline. */
   const changedAt = useRef<string | null>(null);
-  const latest = useRef({ project, template, state, bundles, stageId, appendEvent });
-  latest.current = { project, template, state, bundles, stageId, appendEvent };
+  const latest = useRef({ project, template, state, bundles, stageId, appendEvent, onDecisionSetAside });
+  latest.current = { project, template, state, bundles, stageId, appendEvent, onDecisionSetAside };
   const values = watched(project);
   const key = WATCHED.map((f) => values[f]).join('\u0000');
   // Between a change and its event: the page says it is being worked out
@@ -82,7 +89,7 @@ export function useBriefChange({
     const now = watched(project);
     if (WATCHED.some((f) => now[f] !== baseline.current![f])) changedAt.current = new Date().toISOString();
     const timer = setTimeout(() => {
-      const { project: p, template: t, state: s, bundles: b, stageId: at, appendEvent: append } = latest.current;
+      const { project: p, template: t, state: s, bundles: b, stageId: at, appendEvent: append, onDecisionSetAside: setAside } = latest.current;
       const was = baseline.current!;
       const is = watched(p);
       const changed = WATCHED.filter((f) => is[f] !== was[f]);
@@ -119,9 +126,28 @@ export function useBriefChange({
                 removed,
                 finishedConclusions(t, s, b, since, true).filter((st) => st.stage_id !== carried).map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
               );
+              // A decision whose option the change concerns no longer stands (L-272): its
+              // approval is taken back first, then its stage reopens with the reason, and
+              // Go asks again with the options.
+              const aside = setAside ? decisionsSetAside(p, removed) : [];
+              for (const d of aside) {
+                try {
+                  await setAside!(d);
+                } catch {
+                  // The approval stays; the stage still reopens below and says why.
+                }
+                const reason = setAsideReason(d);
+                const idx = affected.findIndex((a) => a.stage_id === d.stageId);
+                if (idx >= 0) affected[idx] = { stage_id: d.stageId, reason };
+                else affected.push({ stage_id: d.stageId, reason });
+              }
               await append({
                 type: 'brief_changed', stage_id: at,
-                payload: { field, kind: 'fact', presentation_only: false, affected, method: 'fact_match', changed_facts: removed, ...texts },
+                payload: {
+                  field, kind: 'fact', presentation_only: false, affected, method: 'fact_match', changed_facts: removed,
+                  ...(aside.length ? { decisions_set_aside: aside } : {}),
+                  ...texts,
+                },
               });
               continue;
             }

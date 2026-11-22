@@ -17,6 +17,8 @@ export const sw: Record<keyof typeof en, string> = {
   'rail.doneOpen': 'imekamilika · {count} wazi',
   'rail.doneOpenWhy_one': 'Imekamilika, huku hoja {count} bado iko wazi — fungua hatua ili kuiona',
   'rail.doneOpenWhy_other': 'Imekamilika, huku hoja {count} bado ziko wazi — fungua hatua ili kuziona',
+  'rail.reapprove': 'idhinisha upya',
+  'rail.reapproveWhy': 'Imekamilika, lakini idhini yako ilitolewa kwenye v{version} na hatua sasa iko v{current}: {approvals}. Iidhinishe tena kwenye orodha ya hatua.',
   'rail.waiting': 'inakusubiri',
   'rail.waitingWhy': 'Kazi ya hatua hii imekamilika, lakini lengo la mradi bado halijatimizwa — angalia kwenye hatua inasubiri nini',
   'rail.recheck': 'inasubiri ukaguzi upya',
@@ -31,4 +33,5 @@ export const sw: Record<keyof typeof en, string> = {
   'rail.legend.skipped': 'Imerukwa kwa makusudi, pamoja na sababu',
   'rail.legend.blocked': 'Imekwama — inasubiri kitu',
   'rail.legend.stale': 'Kagua upya — kitu kilichoitangulia kimebadilika',
+  'rail.legend.reapprove': 'Imekamilika kwenye maandishi ya awali — idhini yako inahitaji kutolewa tena',
 };
