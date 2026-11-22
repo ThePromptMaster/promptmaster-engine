@@ -14,9 +14,9 @@ const FOR_WORK: Record<WorkAnswer, Partial<Record<ExampleKey, number>>> = {
 };
 
 const FOR_NEED: Record<NeedAnswer, Partial<Record<ExampleKey, number>>> = {
-  memo: { investment_memo: 2, business_analysis: 1 },
+  memo: { investment_memo: 2, business_analysis: 1, vendor_choice: 1 },
   slides: { slide_deck: 4 },
-  compare: { deal_screening: 3, business_analysis: 1 },
+  compare: { deal_screening: 3, business_analysis: 1, vendor_choice: 4 },
   numbers: { business_analysis: 3, investment_memo: 1 },
   meeting: { meeting_briefing: 5 },
 };

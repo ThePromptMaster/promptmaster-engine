@@ -575,7 +575,10 @@ user — and the database fixes what each may record (`workflow_events_agent_aut
    but `use-go-loop.ts` and `perform.ts` are browser code;
 2. one "where the project stands" view: what was done, what changed, what is blocked,
    what is next, what needs the user (today spread across the Go panel, the stage
-   checklist and the needs card), and a way to reach the user when it does.
+   checklist and the needs card), and a way to reach the user when it does. Since 22 Nov
+   (L-277) the change notice gives it for the latest change: what still stands, what is
+   being redone and what needs the user (`changeSummary`). A view that does not hang on a
+   change, and reaching the user away from the page, are still to build.
 
 **Outside agents connected to PromptMaster** needs:
 1. an agent identity distinct from the user (an `agent_principal` on events and steps),

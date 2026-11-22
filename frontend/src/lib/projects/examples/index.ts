@@ -9,6 +9,7 @@ import { INVESTMENT_MEMO } from './investment-memo';
 import { MEETING_BRIEFING } from './meeting-briefing';
 import { FINISHED_RESULTS, type FinishedResult } from './results';
 import { SLIDE_DECK } from './slide-deck';
+import { VENDOR_CHOICE } from './vendor-choice';
 
 /**
  * A curated example: a workflow written by hand, in the form the workflow
@@ -45,6 +46,11 @@ export interface Example {
   prepared: string;
   /** Data files the project starts with. */
   files?: { name: string; text: string }[];
+  /**
+   * Facts and requirements the sample starts with, one per item (L-277): a change to one
+   * quote is then a change to that option's fact, and what used it is reopened.
+   */
+  facts?: { statement: string; kind: 'fact' | 'requirement' }[];
 }
 
 /** An example with what a real run of it produced, for its preview page. */
@@ -52,7 +58,7 @@ export function resultOf(example: Pick<Example, 'key'>): FinishedResult | undefi
   return FINISHED_RESULTS[example.key];
 }
 
-export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK, MEETING_BRIEFING];
+export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK, MEETING_BRIEFING, VENDOR_CHOICE];
 
 export function exampleBySlug(slug: string): Example | undefined {
   return EXAMPLES.find((e) => e.slug === slug);

@@ -185,6 +185,8 @@ import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluatio
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
 import { changeOutcomes } from '@/lib/workflow/change-outcomes';
+import { changeSummary } from '@/lib/workflow/change-summary';
+import { plainReason } from '@/lib/workflow/plain-reason';
 
 interface Props {
   project: Project;
@@ -2127,6 +2129,24 @@ export function WorkflowWorkspace({
     const all = [...go.priorSteps, ...go.steps];
     return keptQuestions(all, answeredKept(project.facts, all));
   }, [go.priorSteps, go.steps, project.facts]);
+  // After a change: what still stands, what is being redone, what needs the user (L-277).
+  const changeSummaryNow = useMemo(() => {
+    const open = briefChange ? { since: briefChange.event.created_at, touched: [...briefChange.stageIds, ...(briefChange.alsoWaiting ?? [])] } : null;
+    const shown = open ?? (settled ? { since: settled.event.created_at, touched: settled.stageIds } : null);
+    if (!shown) return null;
+    const done = shown.touched.filter((id) => isDone(state.stages[id]?.status));
+    const outcomes = open
+      ? changeOutcomes(
+          done, shown.since, template.stages, (id) => stageBundles[id]?.versions ?? [], evaluations, (id) => context.openRows?.[id]?.length ?? 0,
+          new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string))
+        )
+      : settledOutcomes;
+    return changeSummary({
+      template, state, events: events ?? [], since: shown.since, touched: shown.touched, outcomes, reapprove,
+      queue: project.status === 'finalized' ? [] : userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
+      manualChecks: project.manual_checks,
+    });
+  }, [briefChange, settled, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow]);
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
@@ -2986,7 +3006,7 @@ export function WorkflowWorkspace({
                   {state.stages[stage.id]?.status === 'not_started' || !state.stages[stage.id]
                     ? t('ws.notReached')
                     : viewedStale
-                      ? t('ws.staleNote', { reason: shownCheckText(locale, viewedState?.stale?.reason ?? '') })
+                      ? t('ws.staleNote', { reason: shownCheckText(locale, plainReason(viewedState?.stale?.reason)) })
                       : t('ws.viewOnly')}
                 </span>
               )}
@@ -3258,6 +3278,8 @@ export function WorkflowWorkspace({
               settled={settled}
               outcomes={settledOutcomes}
               onDismissSettled={() => settled && setSettledDismissed(settled.event.created_at)}
+              summary={changeSummaryNow}
+              onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
             />
             {factReconcile && factReconcile.stageId === stage.id && (
               <FactReconcileNotice
