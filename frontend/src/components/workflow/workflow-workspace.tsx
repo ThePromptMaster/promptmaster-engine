@@ -1344,8 +1344,10 @@ export function WorkflowWorkspace({
       // The decision's fact goes into the history: read as current, a review asked
       // about the old choice after the user had made a new one (22 Nov, production pass).
       await retireFact(d.factId, `Set aside: it was made when the record said "${d.because}", which changed.`).catch(() => undefined);
+      // Read again now: Go's next repair reads the store's facts, and the event only refreshes the log.
+      await onReload?.();
     },
-    [handleToggleManual, flushProject]
+    [handleToggleManual, flushProject, onReload]
   );
   const judgingChange = useBriefChange({
     project, template, state, bundles: stageBundles, stageId, appendEvent,
