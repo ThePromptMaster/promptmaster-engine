@@ -5135,7 +5135,11 @@ $60,000"; a fact about every option counts too) is set aside (`decisionsSetAside
 Its approval is unticked first, and then its stage reopens, with a reason that says the decision was made on
 the old fact and is awaited again. The `brief_changed` event carries `decisions_set_aside`. Go's recheck then
 leaves the stage open until the approval is given, stops on its card, and the options are read again for the
-new version. The old decision fact stays as history; deciding again supersedes it.
+new version. The old decision fact stays as history; deciding again supersedes it. Since the production pass the
+same day, such a stage is reopened as a draft in progress, not as a finished stage (`projectState`, `brief_changed`
+with `decisions_set_aside`): the version its repair saves answers the reopening. Reopened as finished, it stayed
+"awaiting recheck" through a repair that could not close it, and Go repaired it again and then stopped with
+"2 repairs of Decision did not settle it" instead of asking for the decision.
 
 Not covered: a change to another option (A's price when B was chosen) does not reopen the decision, even if
 it would now win. A choice that names no labelled option is not matched. Approvals that are not decisions
