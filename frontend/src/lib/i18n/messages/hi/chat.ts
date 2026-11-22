@@ -28,6 +28,7 @@ export const hi: Record<keyof typeof en, string> = {
   'chat.dismiss': 'खारिज करें',
   'chat.redraft': 'मेरा बदलाव नए संस्करण पर लागू करें',
   'chat.redraftV': 'मेरा बदलाव नए संस्करण (v{version}) पर लागू करें',
+  'chat.retryChange': 'यह बदलाव फिर से आज़माएँ',
   'chat.saveDiscussion': 'इस चर्चा को नए संस्करण के रूप में सहेजें',
   'chat.askAria': 'प्रश्न पूछें',
   'chat.changeAria': 'संशोधन का निर्देश दें',

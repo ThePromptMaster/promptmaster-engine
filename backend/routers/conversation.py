@@ -25,7 +25,7 @@ from promptmaster.composio_client import Composio
 from promptmaster.engine import generate
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
-from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from promptmaster.llm_client import OpenRouterClient, OpenRouterError, request_deadline
 from routers._errors import llm_http_error
 from promptmaster.page_context import MAX_ATTACHMENTS, ChatAttachment, ChatContext, scrub_button_mentions
 from promptmaster.schemas import AccountUse, ChatMessage, Iteration, PMInput
@@ -52,6 +52,10 @@ from promptmaster.web_search import (
 from routers._pipeline import build_iteration_with_full_pipeline
 
 logger = logging.getLogger(__name__)
+
+#: Seconds a writer leaves at the end of the request for the evaluation,
+#: suggestions and summary that follow it (L-276).
+PIPELINE_RESERVE_SECONDS = 60.0
 
 router = APIRouter(prefix="/api", tags=["conversation"])
 
@@ -271,10 +275,12 @@ async def api_apply_to_answer(
             iterations=req.iteration_history,
             context=req.context,
         )
+        # The rewrite stops in time for its checks to run (L-276).
         output, _usage, finish_reason = await client.generate_with_meta(
             prompt=prompt_text,
             system=system_text,
             model=model,
+            deadline=request_deadline(PIPELINE_RESERVE_SECONDS),
         )
         trigger_source = "apply_conversation"
         iteration, suggestions = await build_iteration_with_full_pipeline(
@@ -317,10 +323,12 @@ async def api_save_as_new_version(
             iterations=req.iteration_history,
             context=req.context,
         )
+        # The new version stops in time for its checks to run (L-276).
         output, _usage, finish_reason = await client.generate_with_meta(
             prompt=prompt_text,
             system=system_text,
             model=model,
+            deadline=request_deadline(PIPELINE_RESERVE_SECONDS),
         )
         trigger_source = "refined_from_conversation"
         iteration, suggestions = await build_iteration_with_full_pipeline(

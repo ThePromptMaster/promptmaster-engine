@@ -28,6 +28,7 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.dismiss': 'Puuza',
   'chat.redraft': 'Tumia mabadiliko yangu kwenye toleo jipya',
   'chat.redraftV': 'Tumia mabadiliko yangu kwenye toleo jipya (v{version})',
+  'chat.retryChange': 'Jaribu mabadiliko haya tena',
   'chat.saveDiscussion': 'Hifadhi mjadala huu kama toleo jipya',
   'chat.askAria': 'Uliza swali',
   'chat.changeAria': 'Toa maelekezo ya marekebisho',

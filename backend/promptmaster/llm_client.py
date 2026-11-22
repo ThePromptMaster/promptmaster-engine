@@ -153,9 +153,37 @@ class OpenRouterDeadlineError(OpenRouterError):
 
     Distinct from a plain timeout so callers (the job drain in particular) can
     re-queue the work instead of counting it as a failed attempt.
+
+    `request_limit`: the budget was the request's own (L-276), not a job's, so
+    the user is told the request ran out of time and nothing was changed,
+    rather than that a job will pick up where it left off.
     """
 
-    pass
+    def __init__(self, message: str, *, request_limit: bool = False, **kwargs: Any):
+        super().__init__(message, **kwargs)
+        self.request_limit = request_limit
+
+
+class RequestDeadline(float):
+    """A deadline taken from the request's own (`request_deadline`), so running
+    out of it is reported as the request's time limit (L-276)."""
+
+
+def request_deadline(reserve: float = 0.0) -> "RequestDeadline | None":
+    """The request's deadline less `reserve` seconds, or None outside a request.
+
+    A writer whose result still needs checking (the revision's evaluation,
+    suggestions and summary) keeps that reserve for them.
+    """
+    from observability import request_deadline_var  # late, as `_thinking` below
+
+    at = request_deadline_var.get()
+    return RequestDeadline(at - reserve) if at is not None else None
+
+
+#: Room a reply that came back empty needs, as a share of the time the empty one took:
+#: the retry asks for twice the tokens, so it takes at least as long (L-276).
+_ROOMED_RETRY_SHARE = 1.2
 
 
 def _provider_code(response: httpx.Response) -> str | None:
@@ -620,25 +648,53 @@ class OpenRouterClient:
         """
         last_error: Exception | None = None
         roomed = False
+        # With no budget of its own, a call keeps to the request's (L-276): 22 Nov, Sean's
+        # Migration Week revision ran 181 s, answered nothing, and its retry was killed by the
+        # platform at 300 s, so the browser saw only a dropped connection, twice.
+        if deadline is None:
+            deadline = request_deadline()
+        from_request = isinstance(deadline, RequestDeadline)
 
         for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
             # Never let one attempt outlive the budget.
             call_timeout = timeout if timeout is not None else self.timeout
+            remaining: float | None = None
             if deadline is not None:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise OpenRouterDeadlineError(
-                        f"Deadline exceeded before attempt {attempt}"
+                        f"Deadline exceeded before attempt {attempt}", request_limit=from_request
                     ) from last_error
                 call_timeout = min(call_timeout, remaining)
 
+            started = time.monotonic()
             try:
-                return await self._on_a_key_with_credit(payload, headers, attempt, call_timeout)
+                one = self._on_a_key_with_credit(payload, headers, attempt, call_timeout)
+                # httpx's timeout is per read, and OpenRouter keeps a slow call's connection
+                # alive, so only a bound on the whole attempt keeps it inside the budget.
+                if remaining is None:
+                    return await one
+                try:
+                    return await asyncio.wait_for(one, timeout=remaining)
+                except asyncio.TimeoutError as e:
+                    raise OpenRouterDeadlineError(
+                        f"Deadline reached during attempt {attempt}", request_limit=from_request
+                    ) from e
+            except OpenRouterDeadlineError:
+                raise
             except OpenRouterError as e:
                 # 1 Nov (production, a stage check): the model reasoned until
                 # the limit and answered nothing. Once, straight away, with low
                 # effort and twice the room, rather than failing the check.
                 if e.provider_code == "empty_length" and not roomed and attempt < _RETRY_MAX_ATTEMPTS:
+                    # Only when it can finish: it asks for twice the tokens, so it takes at least
+                    # as long as the empty one did (L-276).
+                    took = time.monotonic() - started
+                    if deadline is not None and deadline - time.monotonic() < took * _ROOMED_RETRY_SHARE:
+                        raise OpenRouterDeadlineError(
+                            f"Out of time after an empty reply at the token limit ({took:.0f}s): {e}",
+                            request_limit=from_request,
+                        ) from e
                     roomed = True
                     last_error = e
                     payload = _with_room_for_answer(payload)
@@ -658,7 +714,7 @@ class OpenRouterClient:
                 # Don't sleep into the deadline just to fail on the far side.
                 if deadline is not None and time.monotonic() + delay >= deadline:
                     raise OpenRouterDeadlineError(
-                        f"Deadline would elapse during backoff after attempt {attempt}: {e}"
+                        f"Deadline would elapse during backoff after attempt {attempt}: {e}", request_limit=from_request
                     ) from e
                 logger.warning(
                     f"Retryable error (attempt {attempt}/{_RETRY_MAX_ATTEMPTS}), "

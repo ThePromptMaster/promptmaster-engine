@@ -204,3 +204,33 @@ describe('a dropped connection (4 Oct, "Load failed")', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a request that failed after minutes hit the server\'s limit, not the connection (L-276, 22 Nov, Sean)', () => {
+  it('is not sent again, and says it got no answer in time', async () => {
+    vi.useFakeTimers();
+    // The platform stops the function after five minutes; its page has no CORS headers,
+    // so the browser reports a network failure.
+    fetchMock.mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new TypeError('Load failed')), 300_000)));
+    const pending = api.buildPrompt(INPUTS);
+    const settled = expect(pending).rejects.toMatchObject({
+      code: 'no_answer_in_time', message: expect.stringMatching(/did not answer within 5 minutes, so it stopped\. Nothing was changed\./),
+    });
+    await vi.advanceTimersByTimeAsync(300_000);
+    await settled;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('a drop soon after sending is still asked again once', async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new TypeError('Load failed')), 5_000)))
+      .mockResolvedValueOnce(jsonResponse({ system_prompt: 's', user_prompt: 'u' }));
+    const pending = api.buildPrompt(INPUTS);
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toEqual({ system_prompt: 's', user_prompt: 'u' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+});
+

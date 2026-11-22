@@ -28,6 +28,7 @@ RATE_LIMITED = "rate_limited"
 CONTEXT_LENGTH = "context_length"
 OUTPUT_TRUNCATED = "output_truncated"
 FUNCTION_TIMEOUT = "function_timeout"
+OUT_OF_TIME = "out_of_time"
 JOB_DEAD = "job_dead"
 PROVIDER_UNAVAILABLE = "provider_unavailable"
 INVALID_REQUEST = "invalid_request"
@@ -158,7 +159,8 @@ def classify_error(error: BaseException) -> ClassifiedError:
     into the UI as a stack trace — is the exact FR-16 failure.
     """
     if isinstance(error, OpenRouterDeadlineError):
-        return function_timeout()
+        # The request's own time ran out (L-276), not a job's: nothing picks it up again.
+        return out_of_time() if getattr(error, "request_limit", False) else function_timeout()
 
     if isinstance(error, OpenRouterError):
         provider_code = error.provider_code
@@ -226,6 +228,29 @@ def function_timeout() -> ClassifiedError:
         code=FUNCTION_TIMEOUT,
         title="Paused — the run hit its time limit",
         message="Generation stopped partway through and will pick up automatically from where it left off.",
+        retryable=True,
+    )
+
+
+def out_of_time() -> ClassifiedError:
+    """A request that could not finish within its time (L-276).
+
+    22 Nov, Sean, Migration Week: a whole-document revision reasoned for three
+    minutes, answered nothing, and its retry was killed by the platform, so the
+    browser could only say the connection had dropped, twice. Now the request
+    stops in time and says so; nothing was written, and the user's request is
+    kept to send again.
+    """
+    from observability import request_budget_seconds  # late: observability imports promptmaster
+
+    minutes = max(1, round(request_budget_seconds() / 60))
+    return ClassifiedError(
+        code=OUT_OF_TIME,
+        title="This took too long",
+        message=(
+            f"PromptMaster ran out of time on this request (about {minutes} minutes) and stopped. "
+            "Nothing was changed. Try again; if it stops again, ask for a smaller change."
+        ),
         retryable=True,
     )
 

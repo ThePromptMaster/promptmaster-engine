@@ -1950,8 +1950,8 @@ while it is on. Limits:
   one more small call, which decides whether the question needs the web; a search follows only
   when it does. That decision is a model's judgement: a question it wrongly thinks the project
   answers is answered without searching; asking it to "search for …" or "look up …" does
-  search. The chat is told on every message whether it can search, so it never denies it. Change it (Instruct) never searches; it cites the
-  saved sources. A failed search doesn't lose the reply: it is answered from the project and
+  search. The chat is told on every message whether it can search, so it never denies it. Change it (Instruct) searches too
+  since 22 Oct (59f00053: `apply-to-answer` takes `web_access`), as every writer does. A failed search doesn't lose the reply: it is answered from the project and
   says so. What the chat cites is saved before the reply is, numbered after the saved sources;
   past 40 saved sources (the most a request carries) the numbers stop lining up.
 - **On by default costs something on every project (22 Oct).** Since the switch starts on, every
@@ -5211,3 +5211,39 @@ Now:
 
 Not covered: an answer that names no labelled option ("the cheaper one") is still a note. A choice between
 items of different kinds in one answer is not matched.
+
+### L-276 — A long revision gets more time, stops before the limit, and says so (2026-11-22)
+Sean, 22 Nov, Migration Week Operating Packet (project 63cb65ed). At 18:38 and 18:54 UTC he pressed "Change it
+→ Whole document → Draft revision" with three new records (OPS-02, ENG-02, CUST-02). Vercel's request log shows
+four `POST /api/apply-to-answer` calls, all **504 "Task timed out after 300 seconds"**: two per press, because
+the browser asked again. In each, the Opus call reasoned for 181 s, used its whole 18,432 tokens, and returned
+nothing (`finish_reason=length`). The "more room" retry then ran until the platform stopped it. Vercel's 504
+page has no CORS headers, so Safari reported "Load failed". The page said the connection had dropped twice and
+that nothing was changed, which was true. His instruction was saved twice as a side-chat message and nothing
+else: no version, no facts, and no `model_usage` rows, because usage is recorded from the response. The spend
+for those calls is only in the backend's log.
+
+Now:
+- **More time.** The backend's function limit is 800 s, not 300 (`docs/deployment.md`).
+- **A request stops in time.** Every request has a deadline 760 s after it starts (`request_deadline_var`,
+  `REQUEST_BUDGET_SECONDS`). A model call keeps to it as a bound on the whole attempt, because httpx's
+  per-read timeout never fires while OpenRouter keeps a slow call's connection alive (the 181 s call against a
+  55 s timeout).
+- **No retry that cannot finish.** The "more room" retry after an empty reply is sent only when at least 1.2×
+  the empty attempt's time remains.
+- **The checks still fit.** `apply-to-answer` and `save-as-new-version` stop the rewrite 60 s early, so its
+  evaluation, suggestions and summary still run.
+- **The user is told.** A request that runs out of time answers with a readable 502 (`out_of_time`: "ran out of
+  time on this request … Nothing was changed"). The job drain's own budget still reads as a pause.
+- **The browser does not ask again for a slow failure.** A network failure that comes 120 s or more after
+  sending, on a page that stayed visible, is the server's limit, so the browser does not ask again. It says it
+  got no answer in time, and logs `no_answer_in_time` with the time waited. A drop soon after sending, or on a
+  hidden tab, is still asked again once.
+- **Nothing to retype.** A revision that fails keeps the request on offer: "Try this change again" sends it
+  again, without saving the message a second time.
+
+Not covered: the call itself is still one whole-document rewrite. A change that means recomputing a plan (a
+schedule optimised in code) is rewritten by the model in words, not recomputed; the way to have it recomputed is to
+record the new records as facts and let Go update the stages (L-277 shows what that changes). A request stopped
+by the deadline is billed for what the model produced, and that spend reaches only the backend log.
+

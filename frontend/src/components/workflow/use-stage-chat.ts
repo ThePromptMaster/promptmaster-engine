@@ -77,7 +77,17 @@ export interface RedraftRequest {
   instruction: string;
   kind: ScopeKind;
   options: { selection?: string; sectionId?: string; precedence?: string[] };
+  /**
+   * The draft itself failed (L-276: the server ran out of time, or the connection dropped):
+   * the same request is offered again with nothing to retype, and is not saved twice.
+   */
+  failed?: boolean;
+  /** The chat message the request was saved as, reused when it is sent again. */
+  savedId?: string;
 }
+
+/** Said after a revision that failed, beside the button that sends it again (L-276). */
+export const KEPT_FOR_RETRY = 'Your request is kept: press "Try this change again" below.';
 
 /**
  * A refusal because the stage moved on under the proposal — Go saved a
@@ -472,6 +482,8 @@ export function useStageChat({
          * fact's change again.
          */
         facts?: readonly ProjectFact[];
+        /** The chat message this request was already saved as (a retry after a failure, L-276). */
+        savedId?: string;
       } = {}
     ) => {
       const typed = instruction.trim();
@@ -494,6 +506,7 @@ export function useStageChat({
 
       setBusy(true);
       setError(null);
+      let savedId = options.savedId;
 
       try {
         // An instruction that was never applied — discarded, set aside, or
@@ -511,7 +524,10 @@ export function useStageChat({
         }
         const { ask, revisedFrom } = resolved;
 
-        const saved = await persist('user', text, 'instruct', target.label);
+        // Sent again after a failure, the request is the message already saved (22 Nov, Sean:
+        // his instruction was saved twice, one per press, and never answered).
+        savedId = savedId ?? (await persist('user', text, 'instruct', target.label)).id;
+        const saved = { id: savedId };
 
         // The persisted message is the user's own words; the message *sent*
         // adds the scope contract, because `apply-to-answer` was written for
@@ -579,7 +595,11 @@ export function useStageChat({
         });
       } catch (err) {
         if (live.current) {
-          setError(errorText(err, 'Could not draft that revision. Try again in a moment.'));
+          // Nothing to retype (L-276; 22 Nov, Sean, Migration Week: "said nothing was changed",
+          // and the box was empty). The request stays on offer with one button.
+          const { selection, sectionId, precedence } = options;
+          setRedo({ instruction: typed, kind, options: { selection, sectionId, precedence }, failed: true, savedId });
+          setError(`${errorText(err, 'Could not draft that revision. Nothing was changed.')} ${KEPT_FOR_RETRY}`);
         }
       } finally {
         if (live.current) setBusy(false);
@@ -843,7 +863,7 @@ export function useStageChat({
     if (!redo) return;
     const ask = redo;
     setRedo(null);
-    await propose(ask.instruction, ask.kind, ask.options);
+    await propose(ask.instruction, ask.kind, { ...ask.options, ...(ask.savedId ? { savedId: ask.savedId } : {}) });
   }, [redo, propose]);
 
   return {

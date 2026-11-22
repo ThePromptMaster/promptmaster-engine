@@ -28,6 +28,7 @@ export const ar: Record<keyof typeof en, string> = {
   'chat.dismiss': 'تجاهل',
   'chat.redraft': 'طبّق تغييري على النسخة الجديدة',
   'chat.redraftV': 'طبّق تغييري على النسخة الجديدة (v{version})',
+  'chat.retryChange': 'حاول هذا التغيير مرة أخرى',
   'chat.saveDiscussion': 'احفظ هذا النقاش نسخةً جديدة',
   'chat.askAria': 'اطرح سؤالًا',
   'chat.changeAria': 'أعطِ تعليمات مراجعة',

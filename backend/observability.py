@@ -74,6 +74,23 @@ thinking_var: ContextVar[str] = ContextVar("thinking", default="standard")
 LANGUAGE_HEADER = "X-PromptMaster-Language"
 language_var: ContextVar[str] = ContextVar("language", default="en")
 
+#: When the request in hand must have answered by, as `time.monotonic()` (L-276). Every model
+#: call it makes stops before then, so a request answers in words instead of the platform
+#: killing it. None outside a request.
+request_deadline_var: ContextVar[float | None] = ContextVar("pm_request_deadline", default=None)
+
+#: Under the backend's function limit (800 s on Vercel since 22 Nov), with room to answer.
+DEFAULT_REQUEST_BUDGET_SECONDS = 760.0
+
+
+def request_budget_seconds() -> float:
+    """`REQUEST_BUDGET_SECONDS`, read per call so it can be tuned without a redeploy."""
+    try:
+        value = float(os.environ.get("REQUEST_BUDGET_SECONDS", "") or DEFAULT_REQUEST_BUDGET_SECONDS)
+    except ValueError:
+        return DEFAULT_REQUEST_BUDGET_SECONDS
+    return value if value > 0 else DEFAULT_REQUEST_BUDGET_SECONDS
+
 
 def parse_thinking(raw: str | None) -> str:
     """`deep`, or `standard` for anything else — an unknown level never raises the bill."""
@@ -302,6 +319,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         from promptmaster.language import resolve as resolve_language  # late: promptmaster imports this module
 
         language_var.set(resolve_language(request.headers.get(LANGUAGE_HEADER)))
+        # 22 Nov, Sean, Migration Week: a whole-document revision ran past the function limit
+        # twice per press, and the browser saw only "the connection dropped" (L-276).
+        request_deadline_var.set(time.monotonic() + request_budget_seconds())
         user_id_var.set("")
         accumulator = UsageAccumulator()
         usage_var.set(accumulator)

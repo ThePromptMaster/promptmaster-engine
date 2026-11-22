@@ -231,7 +231,7 @@ Supabase user ids allowed to read `/api/admin/overview`. Deliberately *not*
 `NEXT_PUBLIC_`, and **unset denies everyone**; a missing var must never mean "no
 restriction". Backend: `RATE_LIMIT_PER_MINUTE` (60), `RATE_LIMIT_PER_HOUR`
 (600), `RATE_LIMIT_ENABLED` (kill switch), `LOG_FORMAT=json` (auto on Vercel),
-`LOG_LEVEL`. All read per call, so they are tunable without a redeploy.
+`LOG_LEVEL`, `REQUEST_BUDGET_SECONDS` (760: every request's model calls stop before the backend's 800 s function limit and it answers "ran out of time", L-276). All read per call, so they are tunable without a redeploy.
 
 ## Branches
 
