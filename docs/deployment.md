@@ -26,6 +26,14 @@ which holds the service-role key.
   python-dotenv, `pyjwt[crypto]` (the `[crypto]` extra is required for the
   asymmetric-JWT verification path).
 - A `Dockerfile` also exists for container hosting, if the platform ever changes.
+- **Function time limit: 800 s** (Pro, fluid compute), set on the project
+  (`resourceConfig.functionDefaultTimeout`), not in `vercel.json`, which uses `builds` and
+  so cannot carry `functions`. Raised from the 300 s default on 22 Nov 2026 (L-276): a
+  whole-document revision of a long packet needs more than five minutes when the model
+  reasons first. Check it with `vercel api /v9/projects/promptmaster-api`. Requests stop
+  themselves before it (`REQUEST_BUDGET_SECONDS`, below), so the platform's limit is a
+  backstop: a request it kills reaches the browser with no CORS headers, as a dropped
+  connection.
 
 Local development is `uvicorn main:app --reload --port 8000`. Backend dependencies live
 in a pyenv 3.12.4 environment on the original developer's machine; if `pytest` resolves
@@ -75,6 +83,7 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | `OPENROUTER_API_KEY` | Yes | The provider credential, used first. Server-side only. |
 | `OPENROUTER_API_KEY_2` | No | A second key. A call moves to it when OpenRouter refuses the first for credit. Read at start-up, so a change needs a redeploy. Credit belongs to an OpenRouter account, so it only helps on a different account, or when each key has its own spending limit. Server-side only. L-231. |
 | `OPENROUTER_DATA_COLLECTION` | No | `deny` (the default) routes only to providers that do not keep what they are sent; `allow` lifts that if a model has no such provider. Read per call, but Vercel needs a redeploy to see a change. L-200. |
+| `REQUEST_BUDGET_SECONDS` | No | How long one request may run before its model calls stop and it answers "ran out of time" (760 by default, under the 800 s function limit). Read per call. Keep it below the function limit, or the platform stops the request first and the browser sees a dropped connection. L-276. |
 | `ALLOWED_ORIGINS` | Yes | Comma-separated. **No hardcoded default — CORS fails closed if unset.** Must include the frontend's production origin, and any preview origin you want to work. |
 | `SUPABASE_URL` | Yes | Used to build the JWKS URL for asymmetric token verification. |
 | `SUPABASE_JWT_SECRET` | If the project signs HS256 | Legacy symmetric signing. Harmless to set alongside `SUPABASE_URL`. |

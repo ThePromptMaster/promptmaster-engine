@@ -173,7 +173,7 @@ import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workf
 import { approvalsToRead, leavesChoiceToGo, leftToGoSignature, withApprovalsLeftToGo, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
 import { answeredText, answersReplacedBy, approvalsOnEarlierVersion, chosenFor, earlierDecision, replacedReason, withApprovals } from '@/lib/workflow/approvals';
 import {
-  asksForDecision, choosesAnOption, ChoiceRefused, decisionCandidates, decisionForAnswer, decisionTargets, decisionText, failingChoice, recordDecisionReason,
+  asksForDecision, choosesAnOption, ChoiceRefused, decisionCandidates, decisionForAnswer, decisionTargets, decisionText, failingChoice, recordDecisionReason, unstopped,
   type PendingDecision,
 } from '@/lib/workflow/decision-options';
 import { itemLabels } from '@/lib/workflow/item-labels';
@@ -1923,7 +1923,7 @@ export function WorkflowWorkspace({
       // against a hard $50,000 cap was pressed and recorded).
       const failing = failingChoice(text, cachedDecisionOffer(criterionId, head?.id)?.options);
       if (failing?.fails) {
-        throw new Error(tr('nyc.typedFails', { option: failing.label, requirement: failing.fails.requirement, quote: failing.fails.quote }));
+        throw new Error(tr('nyc.typedFails', { option: failing.label, requirement: unstopped(failing.fails.requirement), quote: unstopped(failing.fails.quote) }));
       }
       const fact = decisionAsFact(criterion.label, target.short_label || target.label, text, {
         criterion_id: criterionId, stage_id: onStageId, version_id: head?.id ?? null, run_id: goRunId,
@@ -2170,7 +2170,7 @@ export function WorkflowWorkspace({
       }
       const made = decisionForAnswer(answer, pending);
       if (!made) return false;
-      if (made.fails) throw new ChoiceRefused(tr('nyc.typedFails', { option: made.choice, requirement: made.fails.requirement, quote: made.fails.quote }));
+      if (made.fails) throw new ChoiceRefused(tr('nyc.typedFails', { option: made.choice, requirement: unstopped(made.fails.requirement), quote: unstopped(made.fails.quote) }));
       // The same option chosen again: already the decision of record, nothing to write.
       if (project.manual_checks?.[made.criterionId] && chosenFor(project.facts).get(made.criterionId) === decisionText(made.choice)) return true;
       await decideApproval(made.criterionId, made.stageId, made.choice);

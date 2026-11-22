@@ -868,7 +868,7 @@ export function ChatPanel({
             disabled={chat.busy}
             className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-40"
           >
-            {headVersion ? t('chat.redraftV', { version: headVersion.version_number }) : t('chat.redraft')}
+            {chat.redo.failed ? t('chat.retryChange') : headVersion ? t('chat.redraftV', { version: headVersion.version_number }) : t('chat.redraft')}
           </button>
         </div>
       )}

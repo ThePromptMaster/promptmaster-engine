@@ -28,6 +28,7 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.dismiss': '忽略',
   'chat.redraft': '将我的修改应用到新版本',
   'chat.redraftV': '将我的修改应用到新版本（v{version}）',
+  'chat.retryChange': '再试一次这个修改',
   'chat.saveDiscussion': '将此讨论保存为新版本',
   'chat.askAria': '提出问题',
   'chat.changeAria': '给出修改指示',

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { useT } from '@/lib/i18n/i18n-provider';
-import { eligibleOptions, failingChoice, type DecisionOffer, type DecisionOption } from '@/lib/workflow/decision-options';
+import { eligibleOptions, failingChoice, unstopped, type DecisionOffer, type DecisionOption } from '@/lib/workflow/decision-options';
 
 /**
  * An option the stage's own text shows failing one of the user's requirements
@@ -19,7 +19,7 @@ export function FailingOption({ option }: { option: DecisionOption }) {
       <span className="min-w-0">
         <span className="block text-title text-[var(--on-surface-variant)]">{option.label}</span>
         <span className="block text-label text-[var(--on-surface-variant)]">
-          {t('nyc.optionFails', { requirement: option.fails.requirement, quote: option.fails.quote })} {t('nyc.changeRequirement')}
+          {t('nyc.optionFails', { requirement: unstopped(option.fails.requirement), quote: unstopped(option.fails.quote) })} {t('nyc.changeRequirement')}
         </span>
       </span>
     </div>
@@ -61,7 +61,7 @@ export function DecisionChoices({
     // Typed, an option the text shows failing a requirement is refused too (L-274).
     const failing = failingChoice(text, offer.options);
     if (failing?.fails) {
-      setRefused(t('nyc.typedFails', { option: failing.label, requirement: failing.fails.requirement, quote: failing.fails.quote }));
+      setRefused(t('nyc.typedFails', { option: failing.label, requirement: unstopped(failing.fails.requirement), quote: unstopped(failing.fails.quote) }));
       return;
     }
     setRefused('');

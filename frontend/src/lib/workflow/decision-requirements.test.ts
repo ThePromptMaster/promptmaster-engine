@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { ProjectFact } from '@/types/project';
 import { answeredText, answersReplacedBy, replacedReason } from './approvals';
 import {
-  choosesAnOption, decisionCandidates, decisionForAnswer, eligibleOptions, failingChoice, type DecisionOption,
+  choosesAnOption, decisionCandidates, decisionForAnswer, eligibleOptions, failingChoice, unstopped, type DecisionOption,
 } from './decision-options';
 
 const CAP = 'Hard cap of $50,000 all-in, including a mandatory $5,000 contingency.';
@@ -134,3 +134,11 @@ describe('a decision stage already waiting for its choice to be recorded is re-m
     expect(state.stages.b?.stale?.reason).toBe('first');
   });
 });
+
+describe('a quoted passage ends the sentence once (22 Nov, production pass: “…requirement.”. read twice)', () => {
+  it('drops the passage\'s own closing stop', () => {
+    expect(unstopped('Option A exceeds the $50,000 cap by $2,000, so it does not meet every requirement.')).toBe('Option A exceeds the $50,000 cap by $2,000, so it does not meet every requirement');
+    expect(unstopped('Hard cap of $50,000 all-in')).toBe('Hard cap of $50,000 all-in');
+  });
+});
+

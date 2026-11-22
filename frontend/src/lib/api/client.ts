@@ -299,6 +299,15 @@ function untilVisible(signal?: AbortSignal | null): Promise<void> {
 export const RECONNECT_DELAY_MS = 1500;
 
 /**
+ * A request that fails this long after it was sent, on a page that stayed open,
+ * hit the server's time limit rather than a dropped connection (L-276).
+ * 22 Nov, Sean, Migration Week: four tries of a revision each ran until the
+ * platform stopped them, five minutes apart, and the page said the connection
+ * had dropped twice. Asking again then only waits as long again.
+ */
+export const SLOW_FAILURE_MS = 120_000;
+
+/**
  * One request, retried once if the connection dropped.
  *
  * On 4 Oct "Apply the findings" failed with Safari's "Load failed" on an iPad
@@ -310,6 +319,7 @@ export const RECONNECT_DELAY_MS = 1500;
  */
 async function sendWithReconnect(path: string, options: RequestInit | undefined, requestId: string): Promise<Response> {
   const signal = options?.signal;
+  const sentAt = Date.now();
   let wasHidden = pageHidden();
   const onVisibility = () => {
     if (pageHidden()) wasHidden = true;
@@ -320,6 +330,20 @@ async function sendWithReconnect(path: string, options: RequestInit | undefined,
       return await rawFetch(path, options, requestId);
     } catch (e) {
       if (!isNetworkFailure(e) || signal?.aborted) throw e;
+      const waited = Date.now() - sentAt;
+      if (!wasHidden && !pageHidden() && waited >= SLOW_FAILURE_MS) {
+        const minutes = Math.max(1, Math.round(waited / 60_000));
+        const error = new ApiError(
+          `PromptMaster did not answer within ${minutes} minute${minutes === 1 ? '' : 's'}, so it stopped. Nothing was changed.`,
+          0,
+          { code: 'no_answer_in_time', title: 'No answer in time', retryable: true, technical: `waited ${waited} ms; ${e instanceof Error ? e.message : String(e)}` }
+        );
+        void recordErrorEvent({
+          code: 'no_answer_in_time', title: error.title ?? '', message: error.message, technical: error.technical,
+          route: path, requestId, httpStatus: 0,
+        });
+        throw error;
+      }
       if (wasHidden || pageHidden()) await untilVisible(signal);
       else await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
       if (signal?.aborted) throw e;

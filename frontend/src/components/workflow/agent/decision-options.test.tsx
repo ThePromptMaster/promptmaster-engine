@@ -20,7 +20,8 @@ describe('an option over a requirement is explained, not offered (L-274)', () =>
     expect(screen.queryByRole('button', { name: A.label })).toBeNull();
     const why = document.querySelector('[data-option-fails]')!;
     expect(why.textContent).toContain(A.label);
-    expect(why.textContent).toContain(`breaks your requirement “${CAP}”`);
+    expect(why.textContent).toContain(`breaks your requirement “${CAP.replace(/\.$/, '')}”`);
+    expect(why.textContent).not.toContain('.”.');
     expect(why.textContent).toContain('Ineligible: $2,000 over the cap');
     expect(why.textContent).toContain('change that requirement in Facts first');
     fireEvent.click(screen.getByRole('button', { name: B.label }));

@@ -64,6 +64,11 @@ export function givenByChoosing(offer: DecisionOffer | null | undefined): boolea
 
 export const offerKey = (t: Pick<DecisionTarget, 'criterionId' | 'versionId'>): string => `${t.criterionId}:${t.versionId}`;
 
+/** A quoted passage without its closing full stop, for a sentence that ends with its own (“…requirement.”. read twice). */
+export function unstopped(text: string): string {
+  return text.trim().replace(/[.。]+$/, '');
+}
+
 /** The options that may be chosen: those the stage's text does not show failing a requirement. */
 export function eligibleOptions(options: readonly DecisionOption[]): DecisionOption[] {
   return options.filter((o) => !o.fails);
