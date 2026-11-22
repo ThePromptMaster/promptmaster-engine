@@ -485,6 +485,8 @@ export const zh: Record<keyof typeof en, string> = {
   'out.objNotRechecked': '上次检查时目标未达成，此后工作已有变化：尚未重新检查',
   'out.approvalEarlier': '{label}：你的批准“{approval}”是在 v{version} 上给出的；当前版本是 v{current}',
   'wserr.noChange': '表格中没有任何内容会改变。',
+  'wserr.decisionNotSaved': '您的决定没有被记录：{why}。没有任何更改。请再按一次。',
+  'wserr.decisionNotWrittenIn': '您的决定已记录，但该阶段没有重新打开以写入它：{why}。请再选一次以完成。',
   'wserr.noDrafting': '此工作流没有起草阶段。',
   'wserr.noPlace': '此阶段还没有保存草稿的位置。请刷新页面后重试。',
   'wserr.noOutline': '还没有可批准的已保存大纲。',

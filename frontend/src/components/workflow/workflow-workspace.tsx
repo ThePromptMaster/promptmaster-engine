@@ -94,7 +94,9 @@ import { batchAwaited, leftToAssess, scaleForRequest, serializeAssessment, type 
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
-import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import { listProjectFacts, recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import { dbErrorTechnical } from '@/lib/supabase/errors';
+import { writeDecision } from '@/lib/workflow/record-decision';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
 import { ProjectThirdParty } from './project-third-party';
@@ -156,7 +158,7 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageContext, StageDefinition, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
-import { setUsageProject } from '@/lib/supabase/model-usage';
+import { recordErrorEvent, setUsageProject } from '@/lib/supabase/model-usage';
 import { setRequestThinking } from '@/lib/api/thinking';
 import { setRequestLanguage } from '@/lib/api/language';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -1896,15 +1898,34 @@ export function WorkflowWorkspace({
       });
       // Decided again: the new decision replaces the earlier one, which is retired, not kept beside it.
       const earlier = earlierDecision(project.facts, criterionId);
-      if (fact && earlier) await supersedeFact(project, earlier, fact.statement, fact.source_ref ?? {}, 'user_edit');
-      else if (fact) await recordFacts(project, [fact]);
-      await handleToggleManual(criterionId, true, `Decided: ${text}`, onStageId);
-      if (target.renderer === 'prose' && head) {
-        await appendEvent({
-          type: 'brief_changed', stage_id: onStageId, reason: `Your decision: ${text}`.slice(0, 300),
-          payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: onStageId, reason: recordDecisionReason(text) }] },
-        });
-      }
+      const eventReason = `Your decision: ${text}`.slice(0, 300);
+      // Each write is tried once more when the database did not answer, after checking it did
+      // not land, and a failure says why and is logged (L-271; 21 Nov, Sean: a 522 on the fact
+      // insert showed only "That did not work.").
+      await writeDecision(
+        { criterionId, stageId: onStageId, choice: (fact?.source_ref as { choice?: string } | undefined)?.choice ?? text, eventReason, since: Date.now() },
+        {
+          writeFact: () =>
+            fact && earlier ? supersedeFact(project, earlier, fact.statement, fact.source_ref ?? {}, 'user_edit') : fact ? recordFacts(project, [fact]) : Promise.resolve(),
+          readFacts: () => listProjectFacts(project.id),
+          afterFact: () => handleToggleManual(criterionId, true, `Decided: ${text}`, onStageId),
+          ...(target.renderer === 'prose' && head
+            ? {
+                writeEvent: () =>
+                  appendEvent({
+                    type: 'brief_changed', stage_id: onStageId, reason: eventReason,
+                    payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: onStageId, reason: recordDecisionReason(text) }] },
+                  }),
+                readEvents: () => listWorkflowEvents(project.id),
+              }
+            : {}),
+          report: (code, e) =>
+            void recordErrorEvent({
+              code, title: 'Decision not recorded', message: e instanceof Error ? e.message : '', technical: dbErrorTechnical(e),
+              route: 'decide-approval', projectId: project.id, httpStatus: (e as { status?: number } | null)?.status ?? null,
+            }),
+        }
+      );
       await onReload?.();
     },
     [template, stageBundles, project, goRunId, handleToggleManual, appendEvent, onReload]
