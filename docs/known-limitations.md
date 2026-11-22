@@ -5135,7 +5135,9 @@ $60,000"; a fact about every option counts too) is set aside (`decisionsSetAside
 Its approval is unticked first, and then its stage reopens, with a reason that says the decision was made on
 the old fact and is awaited again. The `brief_changed` event carries `decisions_set_aside`. Go's recheck then
 leaves the stage open until the approval is given, stops on its card, and the options are read again for the
-new version. The old decision fact stays as history; deciding again supersedes it. Since the production pass the
+new version. The old decision fact is retired, so it stays in the history and no prompt reads it as current. (Kept
+current at first, it made the review raise "the record holds a user decision choosing Option A" after the user had
+chosen B, and Go stopped on that finding.) Since the production pass the
 same day, such a stage is reopened as a draft in progress, not as a finished stage (`projectState`, `brief_changed`
 with `decisions_set_aside`): the version its repair saves answers the reopening. Reopened as finished, it stayed
 "awaiting recheck" through a repair that could not close it, and Go repaired it again and then stopped with
