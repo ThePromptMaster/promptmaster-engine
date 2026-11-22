@@ -543,12 +543,21 @@ export function projectState(
       // change was saved (lib/workflow/brief-change.ts) and is on the event.
       case 'brief_changed': {
         const affected = Array.isArray(event.payload?.affected) ? (event.payload.affected as { stage_id?: unknown; reason?: unknown }[]) : [];
+        // A stage whose decision the change took back (L-272) is no longer done: its
+        // approval is the user's to give again. Reopened as a draft in progress, so the
+        // version its repair saves answers the reopening and Go asks for the decision,
+        // rather than repairing it again until it gives up (22 Nov, production pass).
+        const aside = new Set(
+          (Array.isArray(event.payload?.decisions_set_aside) ? (event.payload.decisions_set_aside as { stageId?: unknown }[]) : [])
+            .map((d) => d.stageId)
+            .filter((x): x is string => typeof x === 'string')
+        );
         for (const a of affected) {
           const id = typeof a.stage_id === 'string' ? a.stage_id : '';
           const was = state.stages[id]?.status;
           // A draft in progress that used the old value is reopened too (8 Oct).
           if (!id || !(isDone(was) || was === 'in_progress')) continue;
-          set(id, { status: 'stale', stale: { reason: typeof a.reason === 'string' ? a.reason : '', since: event.created_at, was: was! } });
+          set(id, { status: 'stale', stale: { reason: typeof a.reason === 'string' ? a.reason : '', since: event.created_at, was: aside.has(id) ? 'in_progress' : was! } });
         }
         break;
       }

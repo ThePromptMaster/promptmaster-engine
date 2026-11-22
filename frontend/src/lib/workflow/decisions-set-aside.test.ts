@@ -51,3 +51,24 @@ describe('a decision whose option a fact change concerns is set aside (L-272, 21
     expect(decisionsSetAside({ facts: [chose], manual_checks: { 'approve_an_option.approved': true } }, removed).map((d) => d.stageId)).toEqual(['approve_an_option']);
   });
 });
+
+describe('the reopened decision stage is answered by its next version (L-272, 22 Nov, production pass)', () => {
+  it('a decision stage reopened by a set-aside goes back to in progress when its repair is saved; another done stage stays stale', async () => {
+    const { projectState } = await import('./engine');
+    const T = { key: 't', stages: ['draft', 'decision', 'final'].map((id) => ({ id, label: id, exit_criteria: [], transitions: {} })) } as never;
+    const at = (n: number) => `2026-11-22T19:0${n}:00Z`;
+    const ev = (seq: number, type: string, stage_id: string, payload: Record<string, unknown> = {}) => ({ seq, type, stage_id, payload, created_at: at(seq), actor: 'system' });
+    const events = [
+      ev(1, 'stage_marked_complete', 'draft'), ev(2, 'stage_marked_complete', 'decision'), ev(3, 'stage_marked_complete', 'final'),
+      ev(4, 'brief_changed', 'final', {
+        kind: 'fact', affected: [{ stage_id: 'decision', reason: 'set aside' }, { stage_id: 'final', reason: 'changed' }],
+        decisions_set_aside: [{ stageId: 'decision', criterionId: 'decision.approved', choice: 'Option A', because: 'Option A: …' }],
+      }),
+      ev(5, 'stage_version_saved', 'decision', { version_number: 4 }),
+      ev(6, 'stage_version_saved', 'final', { version_number: 5 }),
+    ];
+    const state = projectState(T, events as never);
+    expect(state.stages.decision?.status).toBe('in_progress');
+    expect(state.stages.final?.status).toBe('stale');
+  });
+});
