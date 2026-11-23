@@ -142,3 +142,15 @@ describe('a quoted passage ends the sentence once (22 Nov, production pass: “�
   });
 });
 
+describe('what Go chose when a question was left to it is replaced by the user\'s own choice (23 Nov, production pass)', () => {
+  const goChose = {
+    id: 'g1', retired_at: null,
+    statement: 'Chosen by Go when you left it to Go — asked "Option A\'s year-one total is now $21,650 (training $1,400, previously $1,200). It is still $2,350 under the $24,000 cap, still on sale February 16, 2027, and still the lowest-cost option that meets both requirements. Which box-office system do you choose to buy?": Option A, Curtain Call Ticketing, at $21,650 all-in for the first year, on sale February 16, 2027.',
+    source_ref: { via: 'go answer', delegated: true },
+  } as never;
+  it('reads Go\'s choice, not the question, and the user\'s decision replaces it', () => {
+    expect(answeredText((goChose as { statement: string }).statement)).toBe('Option A, Curtain Call Ticketing, at $21,650 all-in for the first year, on sale February 16, 2027.');
+    expect(answersReplacedBy([goChose], 'Option B: Marquee Box Office, $21,750').map((f) => (f as { id: string }).id)).toEqual(['g1']);
+  });
+});
+

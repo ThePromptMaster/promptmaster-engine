@@ -1935,7 +1935,10 @@ export function WorkflowWorkspace({
       // And an answer to Go's own question that chose an option of this kind ("Approve Option
       // B", typed) is replaced too: kept beside the decision, the final memo followed it and Go
       // asked which one stood (L-275, 22 Nov, Sean's warehouse test).
-      const replacedAnswers = answersReplacedBy(project.facts, text);
+      // Read fresh: an answer Go recorded during the run may not be on the page yet (23 Nov, production
+      // pass: "Chosen by Go when you left it to Go" stayed current beside the user's own choice).
+      const freshFacts = await listProjectFacts(project.id).catch(() => project.facts ?? []);
+      const replacedAnswers = answersReplacedBy(freshFacts, text);
       const before = earlier ?? [...(project.facts ?? [])].reverse().find((f) => (f.source_ref as { criterion_id?: unknown } | null)?.criterion_id === criterionId) ?? null;
       const beforeChoice = (before?.source_ref as { choice?: unknown } | null | undefined)?.choice;
       const replaces = [

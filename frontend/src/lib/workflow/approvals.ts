@@ -104,7 +104,11 @@ export function earlierDecision<F extends Pick<ProjectFact, 'source_ref' | 'reti
 /** The answer part of an answer fact: "…, answered: Approve Option B at $49,000" is "Approve Option B at $49,000". */
 export function answeredText(statement: string): string {
   const at = statement.lastIndexOf('answered:');
-  return at >= 0 ? statement.slice(at + 'answered:'.length).trim() : statement.replace(/^Decided by the user:\s*/, '').trim();
+  if (at >= 0) return statement.slice(at + 'answered:'.length).trim();
+  // What Go chose when the question was left to it: "Chosen by Go … — asked "…": Option A, …".
+  const chosen = /^Chosen by Go\b[\s\S]*?asked "[\s\S]*":\s*([\s\S]+)$/.exec(statement);
+  if (chosen) return chosen[1].trim();
+  return statement.replace(/^Decided by the user:\s*/, '').trim();
 }
 
 /**
@@ -125,10 +129,12 @@ export function answersReplacedBy<F extends Pick<ProjectFact, 'statement' | 'sou
   if (!kinds.size) return [];
   return (facts ?? []).filter((f) => {
     if (f.retired_at) return false;
-    const ref = f.source_ref as { via?: unknown; criterion_id?: unknown } | null | undefined;
+    const ref = f.source_ref as { via?: unknown; criterion_id?: unknown; delegated?: unknown } | null | undefined;
     if (ref?.via !== 'go answer' || typeof ref?.criterion_id === 'string') return false;
     const answer = answeredText(f.statement);
-    return choosesAnOption(answer) && [...itemLabels(answer).keys()].some((k) => kinds.has(k));
+    // What Go chose when the question was left to it is a choice by its nature.
+    const chose = ref.delegated === true || choosesAnOption(answer);
+    return chose && [...itemLabels(answer).keys()].some((k) => kinds.has(k));
   });
 }
 

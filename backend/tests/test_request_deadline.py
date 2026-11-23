@@ -145,3 +145,9 @@ def test_the_revision_keeps_time_for_its_checks(mocked):
     assert isinstance(deadline, RequestDeadline)
     # About the budget less the 60 s kept for the evaluation, suggestions and summary.
     assert DEFAULT_REQUEST_BUDGET_SECONDS - 75 < deadline - time.monotonic() < DEFAULT_REQUEST_BUDGET_SECONDS - 55
+
+
+def test_a_one_minute_budget_reads_as_a_minute(monkeypatch):
+    monkeypatch.setenv("REQUEST_BUDGET_SECONDS", "80")
+    assert "about a minute" in classify_error(OpenRouterDeadlineError("x", request_limit=True)).message
+
