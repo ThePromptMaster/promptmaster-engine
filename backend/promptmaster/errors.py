@@ -244,11 +244,12 @@ def out_of_time() -> ClassifiedError:
     from observability import request_budget_seconds  # late: observability imports promptmaster
 
     minutes = max(1, round(request_budget_seconds() / 60))
+    span = "a minute" if minutes == 1 else f"{minutes} minutes"
     return ClassifiedError(
         code=OUT_OF_TIME,
         title="This took too long",
         message=(
-            f"PromptMaster ran out of time on this request (about {minutes} minutes) and stopped. "
+            f"PromptMaster ran out of time on this request (about {span}) and stopped. "
             "Nothing was changed. Try again; if it stops again, ask for a smaller change."
         ),
         retryable=True,

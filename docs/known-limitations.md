@@ -5213,6 +5213,9 @@ Now:
 - **The page says what it recorded.** Go's panel says "Recorded on Approve option: Option A … It replaces: …"
   until it is dismissed, wherever Go goes next, and only while that choice is still the decision of record. A
   later change that sets it aside clears it. The decision trail carries the same text.
+- **What Go chose when a question was left to it is replaced too** (23 Nov, hand pass): a "Chosen by Go when you
+  left it to Go" note stayed current beside the user's own choice, because the page's facts were stale. The
+  decision now reads the facts fresh, and Go's chosen part of such a note is what is compared.
 - **A set-aside stage is re-marked.** A decision stage still waiting for Go to write a choice in is re-marked
   when that choice is set aside (L-272); before, it kept "record the decision".
 
