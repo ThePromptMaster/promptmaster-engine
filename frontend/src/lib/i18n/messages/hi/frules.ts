@@ -170,4 +170,5 @@ export const hi: Record<keyof typeof en, string> = {
   "frules.sample": "एक सैंपल सर्च-फ़र्म वर्कस्पेस बनाएँ",
   "frules.sampleMaking": "सैंपल बन रहा है…",
   "frules.sampleError": "सैंपल नहीं बन सका।",
+  "frules.choiceMade": "चुन लिया गया। फिर से शुरू करें दबाएँ, और Go उस काम को आगे बढ़ाएगा जो इसकी प्रतीक्षा कर रहा था।",
 };

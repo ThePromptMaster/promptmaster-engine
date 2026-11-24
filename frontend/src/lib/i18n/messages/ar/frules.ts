@@ -170,4 +170,5 @@ export const ar: Record<keyof typeof en, string> = {
   "frules.sample": "إنشاء مساحة عمل نموذجية لشركة بحث عن كفاءات",
   "frules.sampleMaking": "جارٍ إنشاء النموذج…",
   "frules.sampleError": "تعذّر إنشاء النموذج.",
+  "frules.choiceMade": "تم الاختيار. اضغط «استئناف» وسيواصل Go العمل الذي كان ينتظر هذا القرار.",
 };

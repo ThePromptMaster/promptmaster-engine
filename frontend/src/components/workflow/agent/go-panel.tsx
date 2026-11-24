@@ -6,7 +6,7 @@ import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { shownModeName } from '@/lib/i18n/stage';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { ModeType } from '@/types';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { asksForApproval } from '@/lib/agent/repeat-question';
@@ -79,6 +79,7 @@ export interface NeedsActions {
 }
 
 export function GoPanel({
+  folderChoice,
   go,
   stageLabel,
   mode,
@@ -153,6 +154,8 @@ export function GoPanel({
   otherWork?: (stageId: string) => boolean;
   /** The latest version of the stage Go asks about, when it came from applied findings. */
   latestChange?: LatestChange | null;
+  /** The mismatch card for a stop on a folder rule and a note (L-280), by its conflict id; null once chosen. */
+  folderChoice?: (conflictId: string) => ReactNode;
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
   routine?: { value: RoutinePolicy; onChange: (v: RoutinePolicy) => void };
   /** L-93: ask which takes priority about a record Go kept under the routine-decision policy. */
@@ -527,7 +530,14 @@ export function GoPanel({
               onDecline={() => void go.decline()}
             />
           )}
-          {askingUser && !need && !cleared && go.run?.stop_reason && (
+          {askingUser && !need && !cleared && go.run?.stop_reason && go.run.needs?.kind === 'answer_question' && go.run.needs.folderChoice && folderChoice && (
+            <section aria-label={t('qp.label')} data-folder-choice className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
+              <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('qp.asks')}</p>
+              <p className="mt-1 whitespace-pre-line text-body text-[var(--on-surface)]">{shownStopReason(locale, go.run.stop_reason, stageByEnglish)}</p>
+              <div className="mt-3">{folderChoice(go.run.needs.folderChoice) ?? <p className="text-body text-[var(--on-surface)]">{t('frules.choiceMade')}</p>}</div>
+            </section>
+          )}
+          {askingUser && !need && !cleared && go.run?.stop_reason && !(go.run.needs?.kind === 'answer_question' && go.run.needs.folderChoice && folderChoice) && (
             <QuestionPrompt
               key={go.run.stop_reason}
               question={shownStopReason(locale, go.run.stop_reason, stageByEnglish)}

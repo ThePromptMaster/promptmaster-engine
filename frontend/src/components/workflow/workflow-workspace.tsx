@@ -2,6 +2,7 @@
 
 import { heldStages, mismatchOutstanding } from '@/lib/folders/holds';
 import { HeldStageNotice } from '@/components/folders/held-stage-notice';
+import { MismatchChoice } from '@/components/folders/mismatch-choice';
 import { useInheritedChecks } from './use-inherited-checks';
 import { useRequirementsRecheck } from './use-requirements-recheck';
 import { shownModeReason } from '@/lib/i18n/stage';
@@ -3190,6 +3191,10 @@ export function WorkflowWorkspace({
           {isCurrent && appendStageVersion && project.status !== 'finalized' && !isQuickAnswer(template) && (
             <GoPanel
               go={go}
+              folderChoice={(id) => {
+                const mismatch = project.inherited?.mismatches.find((m) => m.conflict.id === id);
+                return mismatch ? <MismatchChoice mismatch={mismatch} userId={project.user_id} projectId={project.id} onDone={() => onReload?.()} /> : null;
+              }}
               stageLabel={stageNameShown(stage.id)}
               stageName={(id) => stageNameShown(id, 'short')}
               stageByEnglish={shownStageByEnglish}
