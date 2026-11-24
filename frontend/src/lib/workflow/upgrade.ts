@@ -27,9 +27,14 @@ export function templateDiff(from: WorkflowTemplate, to: WorkflowTemplate): Temp
     .filter((s) => {
       const before = fromIds.get(s.id);
       if (!before) return false;
+      // A stage's wording is a change too (24 Nov, folder copies): an edited
+      // instruction was listed only as "wording and guidance updates".
       return (
         before.renderer !== s.renderer ||
-        JSON.stringify(before.exit_criteria) !== JSON.stringify(s.exit_criteria)
+        JSON.stringify(before.exit_criteria) !== JSON.stringify(s.exit_criteria) ||
+        before.label !== s.label ||
+        (before.entry_prompt_hint ?? '') !== (s.entry_prompt_hint ?? '') ||
+        (before.entry_guidance ?? '') !== (s.entry_guidance ?? '')
       );
     })
     .map((s) => s.label);

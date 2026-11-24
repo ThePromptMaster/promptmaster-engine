@@ -164,4 +164,10 @@ export const sw: Record<keyof typeof en, string> = {
   "ftpl.standardInUse": "Kiwango cha mradi huu",
   "ftpl.useStandard": "Tumia kama kiwango",
   "ftpl.useNewer": "Toleo jipya lipo hapa: litumie",
+  "ftpl.startWith": "Anzisha mradi kwa {name} v{version}",
+  "ftpl.startGoal": "Mradi huu ni wa nini?",
+  "ftpl.startGo": "Uanzishe hapa",
+  "frules.sample": "Weka eneo la kazi la mfano la kampuni ya utafutaji",
+  "frules.sampleMaking": "Inaweka mfano…",
+  "frules.sampleError": "Mfano haukuweza kuwekwa.",
 };

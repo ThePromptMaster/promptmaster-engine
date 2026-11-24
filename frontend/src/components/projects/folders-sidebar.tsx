@@ -28,6 +28,8 @@ interface Props {
   onDelete: (id: string) => Promise<void>;
   /** A project dropped on a folder row (desktop), or on Unfiled (null). */
   onDropProject: (projectId: string, folderId: string | null) => void;
+  /** Make the sample search-firm workspace (24 Nov). */
+  onSample?: () => Promise<void>;
 }
 
 /**
@@ -36,7 +38,7 @@ interface Props {
  * projects"). A project can be dragged onto a folder on a computer; the card's
  * folder button does the same everywhere, keyboard and touch included.
  */
-export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, onRename, onDelete, onDropProject }: Props) {
+export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, onRename, onDelete, onDropProject, onSample }: Props) {
   const t = useT();
   const tree = flattenTree(folderTree(folders));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -45,6 +47,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   const [name, setName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [makingSample, setMakingSample] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -222,6 +225,27 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         <p className="px-2 text-label leading-snug text-[var(--on-surface-variant)]">
           {t('folders.emptyHint')}
         </p>
+      )}
+      {onSample && (
+        <button
+          type="button"
+          disabled={makingSample}
+          onClick={() => void (async () => {
+            setMakingSample(true);
+            setError(null);
+            try {
+              await onSample();
+            } catch (e) {
+              setError(e instanceof Error && e.message ? e.message : t('frules.sampleError'));
+            } finally {
+              setMakingSample(false);
+            }
+          })()}
+          className="mt-3 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-label text-[var(--pm-primary)] hover:bg-[var(--surface-container)] disabled:opacity-50"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[16px]">domain</span>
+          {makingSample ? t('frules.sampleMaking') : t('frules.sample')}
+        </button>
       )}
       {error && <p role="alert" className="px-2 text-label text-[var(--pm-error)]">{error}</p>}
     </nav>

@@ -164,4 +164,10 @@ export const ar: Record<keyof typeof en, string> = {
   "ftpl.standardInUse": "المعيار المعتمد لهذا المشروع",
   "ftpl.useStandard": "استخدامه كمعيار",
   "ftpl.useNewer": "توجد نسخة أحدث: استخدامها",
+  "ftpl.startWith": "بدء مشروع باستخدام {name} الإصدار {version}",
+  "ftpl.startGoal": "ما الغرض من هذا المشروع؟",
+  "ftpl.startGo": "ابدأه هنا",
+  "frules.sample": "إنشاء مساحة عمل نموذجية لشركة بحث عن كفاءات",
+  "frules.sampleMaking": "جارٍ إنشاء النموذج…",
+  "frules.sampleError": "تعذّر إنشاء النموذج.",
 };
