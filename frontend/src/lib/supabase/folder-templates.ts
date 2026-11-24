@@ -40,6 +40,12 @@ export async function listFolderTemplates(folderIds: readonly string[]): Promise
   return (data ?? []) as unknown as FolderTemplateRow[];
 }
 
+/** Offer a workflow (its key, so every later version) in a folder. */
+export async function addFolderTemplate(folder: { id: string; user_id: string }, key: string): Promise<void> {
+  const { error, status } = await createClient().from('folder_templates').insert({ user_id: folder.user_id, folder_id: folder.id, template_key: key });
+  if (error) throw dbError(error, status);
+}
+
 export async function removeFolderTemplate(id: string): Promise<void> {
   const { error, status } = await createClient().from('folder_templates').update({ removed_at: new Date().toISOString() }).eq('id', id).is('removed_at', null);
   if (error) throw dbError(error, status);
@@ -123,10 +129,16 @@ export async function applyMasterToCopy(copy: TemplateWithLineage, userId: strin
 export async function startProjectFrom(
   template: WorkflowTemplate & { id: string },
   folder: { id: string; user_id: string },
-  language?: string
+  language?: string,
+  /** What the project is for, asked before it is made: its first stage drafts itself against it. */
+  objective = '',
+  /** Material to start with (the sample's transcript). */
+  context = ''
 ): Promise<string> {
+  const goal = objective.trim();
+  const title = goal ? (goal.length > 80 ? `${goal.slice(0, 79).replace(/\s+\S*$/, '')}…` : goal) : template.name;
   const project = await createProject(
-    { title: template.name, objective: '', workflow: template.key, folder_id: folder.id, ...(language ? { language } : {}) },
+    { title, objective: goal, workflow: template.key, folder_id: folder.id, ...(context ? { context } : {}), ...(language ? { language } : {}) },
     folder.user_id
   );
   const first = template.stages[0];

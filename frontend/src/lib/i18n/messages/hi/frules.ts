@@ -164,4 +164,10 @@ export const hi: Record<keyof typeof en, string> = {
   "ftpl.standardInUse": "इस प्रोजेक्ट का मानक",
   "ftpl.useStandard": "मानक के रूप में उपयोग करें",
   "ftpl.useNewer": "नया संस्करण यहाँ है: उसका उपयोग करें",
+  "ftpl.startWith": "{name} v{version} से प्रोजेक्ट शुरू करें",
+  "ftpl.startGoal": "यह प्रोजेक्ट किसलिए है?",
+  "ftpl.startGo": "यहाँ शुरू करें",
+  "frules.sample": "एक सैंपल सर्च-फ़र्म वर्कस्पेस बनाएँ",
+  "frules.sampleMaking": "सैंपल बन रहा है…",
+  "frules.sampleError": "सैंपल नहीं बन सका।",
 };

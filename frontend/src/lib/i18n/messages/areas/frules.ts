@@ -162,6 +162,12 @@ export const en = {
   "ftpl.standardInUse": "This project's standard to match",
   "ftpl.useStandard": "Use as the standard to match",
   "ftpl.useNewer": "A newer version is here: use it",
+  "ftpl.startWith": "Start a project with {name} v{version}",
+  "ftpl.startGoal": "What is this project for?",
+  "ftpl.startGo": "Start it here",
+  "frules.sample": "Set up a sample search-firm workspace",
+  "frules.sampleMaking": "Setting up the sample…",
+  "frules.sampleError": "The sample could not be set up.",
 };
 
 type Keys = Record<keyof typeof en, string>;
@@ -329,6 +335,12 @@ export const es: Keys = {
   "ftpl.standardInUse": "El estándar de este proyecto",
   "ftpl.useStandard": "Usar como estándar",
   "ftpl.useNewer": "Hay una versión más reciente: usarla",
+  "ftpl.startWith": "Empezar un proyecto con {name} v{version}",
+  "ftpl.startGoal": "¿Para qué es este proyecto?",
+  "ftpl.startGo": "Empezarlo aquí",
+  "frules.sample": "Crear un espacio de ejemplo de una firma de búsqueda",
+  "frules.sampleMaking": "Creando el ejemplo…",
+  "frules.sampleError": "No se pudo crear el ejemplo.",
 };
 
 export const fr: Keys = {
@@ -494,6 +506,12 @@ export const fr: Keys = {
   "ftpl.standardInUse": "Le standard de ce projet",
   "ftpl.useStandard": "Utiliser comme standard",
   "ftpl.useNewer": "Une version plus récente est ici : l'utiliser",
+  "ftpl.startWith": "Démarrer un projet avec {name} v{version}",
+  "ftpl.startGoal": "À quoi sert ce projet ?",
+  "ftpl.startGo": "Le démarrer ici",
+  "frules.sample": "Créer un espace d'exemple de cabinet de recrutement",
+  "frules.sampleMaking": "Création de l'exemple…",
+  "frules.sampleError": "L'exemple n'a pas pu être créé.",
 };
 
 export const pt: Keys = {
@@ -659,4 +677,10 @@ export const pt: Keys = {
   "ftpl.standardInUse": "O padrão deste projeto",
   "ftpl.useStandard": "Usar como padrão",
   "ftpl.useNewer": "Há uma versão mais nova: usar",
+  "ftpl.startWith": "Iniciar um projeto com {name} v{version}",
+  "ftpl.startGoal": "Para que serve este projeto?",
+  "ftpl.startGo": "Iniciar aqui",
+  "frules.sample": "Criar um espaço de exemplo de uma firma de busca",
+  "frules.sampleMaking": "Criando o exemplo…",
+  "frules.sampleError": "Não foi possível criar o exemplo.",
 };

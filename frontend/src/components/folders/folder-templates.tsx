@@ -58,6 +58,8 @@ export function FolderTemplates({ folder, chain }: { folder: { id: string; user_
   const [note, setNote] = useState<string | null>(null);
   const [open, setOpen] = useState<{ id: string; what: 'changes' | 'edit' } | null>(null);
   const [edit, setEdit] = useState<{ stageId: string; text: string }>({ stageId: '', text: '' });
+  // "Start a project" asks what it is for first: its first stage drafts itself against that.
+  const [starting, setStarting] = useState<{ id: string; template: TemplateWithLineage; goal: string } | null>(null);
   const chainIds = chain.map((l) => l.id).join(',');
 
   const load = useCallback(async () => {
@@ -125,8 +127,7 @@ export function FolderTemplates({ folder, chain }: { folder: { id: string; user_
                 <p className="mt-1 text-label font-semibold text-[var(--pm-error)]">{t('ftpl.masterChanged', { from: s.update.base.version, to: s.update.master.version })}</p>
               )}
               <div className="mt-1 flex flex-wrap gap-1">
-                <button type="button" disabled={busy} className={quiet}
-                  onClick={() => void act(async () => router.push(`/projects/${await startProjectFrom(s.copy, folder, locale)}`))}>
+                <button type="button" disabled={busy} className={quiet} onClick={() => setStarting({ id: s.row.id, template: s.copy, goal: '' })}>
                   {t('ftpl.start')}
                 </button>
                 <button type="button" disabled={busy} className={quiet}
@@ -219,7 +220,7 @@ export function FolderTemplates({ folder, chain }: { folder: { id: string; user_
               <li key={s.row.id} className="text-body text-[var(--on-surface-variant)]">
                 {t('ftpl.nameVersion', { name: s.copy.name, version: s.copy.version })}
                 <span className="ms-2 text-label">{t('frules.fromLevel', { level: levelName(s.level) })}</span>
-                <button type="button" disabled={busy} className={`ms-1 ${quiet}`} onClick={() => void act(async () => router.push(`/projects/${await startProjectFrom(s.copy, folder, locale)}`))}>
+                <button type="button" disabled={busy} className={`ms-1 ${quiet}`} onClick={() => setStarting({ id: s.row.id, template: s.copy, goal: '' })}>
                   {t('ftpl.start')}
                 </button>
                 <button type="button" disabled={busy} className={quiet} onClick={() => void act(() => copyIntoFolder(s.copy, folder))}>
@@ -228,6 +229,20 @@ export function FolderTemplates({ folder, chain }: { folder: { id: string; user_
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {starting && (
+        <div className="flex flex-col gap-2 rounded-lg bg-[var(--surface-container)] px-3 py-2">
+          <p className="text-label font-semibold text-[var(--on-surface)]">{t('ftpl.startWith', { name: starting.template.name, version: starting.template.version })}</p>
+          <textarea value={starting.goal} rows={2} aria-label={t('ftpl.startGoal')} placeholder={t('ftpl.startGoal')}
+            onChange={(e) => setStarting({ ...starting, goal: e.target.value.slice(0, 2_000) })} className={field} />
+          <div className="flex gap-2">
+            <button type="button" className={primary} disabled={busy || !starting.goal.trim()}
+              onClick={() => void act(async () => router.push(`/projects/${await startProjectFrom(starting.template, folder, locale, starting.goal)}`))}>
+              {t('ftpl.startGo')}
+            </button>
+            <button type="button" className={quiet} onClick={() => setStarting(null)}>{t('frules.cancel')}</button>
+          </div>
         </div>
       )}
       {note && <p className="text-label text-[var(--on-surface)]">{note}</p>}

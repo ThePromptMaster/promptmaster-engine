@@ -223,6 +223,14 @@ export default function ProjectsPage() {
       onRename={rename}
       onDelete={remove}
       onDropProject={(id, folderId) => void handleMove(id, folderId)}
+      onSample={async () => {
+        if (!user) return;
+        // The sample search-firm workspace (24 Nov): made in the user's own account, then shown.
+        const { startSearchFirmSample } = await import('@/lib/projects/demo/start-search-firm');
+        const made = await startSearchFirmSample(user.id, locale);
+        loadFolders();
+        select(made.workspaceId);
+      }}
     />
   );
 

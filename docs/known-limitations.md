@@ -5473,3 +5473,18 @@ old one.
 - **A copy is one user's.** Shared libraries across a team wait for teams (L-102).
 - **Several copies of one master each follow it on their own.** Applying a change to the client's copy does not
   apply it to a search's copy of that copy until the search applies it too.
+
+### L-283 — A sample search-firm workspace (2026-11-24)
+"Set up a sample search-firm workspace", at the bottom of the folders list, makes in the user's own account an
+invented firm (Larchmere Search Partners), one client (Quillfield Dairy Co-op) with a required reference rule, a
+PDF default and its engagement terms, a Finance Director search with an exception recorded (who, how confirmed,
+why) and its position specification, a Head of Supply Chain search on the client's default, a "Transcript
+review" workflow at the firm with the client's copy one version behind, and one interview review with an
+invented transcript (`lib/projects/demo/`). It is ordinary data: nothing about it is special once made, and
+nothing is drafted until the project is opened. It is made in several writes; a failure part way leaves what was
+made, all of it named "(sample)".
+
+Also from the 24 Nov production passes:
+- **Starting a project from a folder's workflow asks what it is for first**, so its first stage, which drafts
+  itself when opened ("no stage opens blank"), drafts against a real objective.
+- **A workflow update names the stages whose wording changed**, rather than "wording and guidance updates".

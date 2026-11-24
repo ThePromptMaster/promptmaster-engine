@@ -164,4 +164,10 @@ export const zh: Record<keyof typeof en, string> = {
   "ftpl.standardInUse": "此项目的参照标准",
   "ftpl.useStandard": "用作参照标准",
   "ftpl.useNewer": "这里有更新版本：使用它",
+  "ftpl.startWith": "用 {name} v{version} 开始项目",
+  "ftpl.startGoal": "这个项目是做什么的？",
+  "ftpl.startGo": "在这里开始",
+  "frules.sample": "创建示例猎头公司工作区",
+  "frules.sampleMaking": "正在创建示例…",
+  "frules.sampleError": "无法创建示例。",
 };
