@@ -14,6 +14,7 @@ import { en as projectsArea } from './areas/projects';
 import { en as templatesArea } from './areas/templates';
 import { en as railArea } from './areas/rail';
 import { en as refsArea } from './areas/refs';
+import { en as frulesArea } from './areas/frules';
 import { en as headerArea } from './areas/header';
 import { en as briefArea } from './areas/brief';
 import { en as factsArea } from './areas/facts';
@@ -342,6 +343,7 @@ export const en = {
   ...templatesArea,
   ...railArea,
   ...refsArea,
+  ...frulesArea,
   ...headerArea,
   ...briefArea,
   ...factsArea,

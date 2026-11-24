@@ -3,6 +3,7 @@ import { sw as projectsArea } from './sw/projects';
 import { sw as templatesArea } from './sw/templates';
 import { sw as railArea } from './sw/rail';
 import { sw as refsArea } from './sw/refs';
+import { sw as frulesArea } from './sw/frules';
 import { sw as headerArea } from './sw/header';
 import { sw as briefArea } from './sw/brief';
 import { sw as factsArea } from './sw/facts';
@@ -319,6 +320,7 @@ export const sw: Messages = {
   ...templatesArea,
   ...railArea,
   ...refsArea,
+  ...frulesArea,
   ...headerArea,
   ...briefArea,
   ...factsArea,

@@ -3,6 +3,7 @@ import { zh as projectsArea } from './zh/projects';
 import { zh as templatesArea } from './zh/templates';
 import { zh as railArea } from './zh/rail';
 import { zh as refsArea } from './zh/refs';
+import { zh as frulesArea } from './zh/frules';
 import { zh as headerArea } from './zh/header';
 import { zh as briefArea } from './zh/brief';
 import { zh as factsArea } from './zh/facts';
@@ -326,6 +327,7 @@ export const zh: Messages = {
   ...templatesArea,
   ...railArea,
   ...refsArea,
+  ...frulesArea,
   ...headerArea,
   ...briefArea,
   ...factsArea,

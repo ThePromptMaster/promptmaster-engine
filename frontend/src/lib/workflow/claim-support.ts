@@ -16,6 +16,7 @@ import type { Project } from '@/types/project';
 import { api } from '@/lib/api/client';
 import { dependentClaimFindings, dependentClaimsFor } from './dependent-claims';
 import { factsForRequest } from './facts';
+import { materialWithInherited } from '@/lib/folders/inheritance';
 
 export interface UnsupportedClaim {
   quote: string;
@@ -28,13 +29,14 @@ export interface UnsupportedClaim {
  * the approvals they gave themselves (19 Nov, Sean, Scanner Readiness: "The staff
  * announcement is approved (v1)." was flagged as saying more than the supplied facts).
  */
-export function suppliedMaterial(project: Pick<Project, 'context' | 'facts' | 'approvals'>): string {
-  const facts = factsForRequest(project.facts).map((f) => `- ${f.statement}`);
+export function suppliedMaterial(project: Pick<Project, 'context' | 'facts' | 'approvals' | 'inherited'>): string {
+  // A folder's rules and documents are the user's too (Sean, 23 Nov).
+  const facts = factsForRequest(project.facts, project.inherited).map((f) => `- ${f.statement}`);
   const approvals = (project.approvals ?? [])
     .filter((a) => !a.by_policy)
     .map((a) => `- ${a.stage}${a.version ? ` v${a.version}` : ''}: approved by the user ("${a.approval}")${a.choice ? `, choosing: ${a.choice}` : ''}`);
   return [
-    (project.context ?? '').trim(),
+    materialWithInherited(project.context ?? '', project.inherited).trim(),
     facts.length ? `ACCEPTED FACTS:\n${facts.join('\n')}` : '',
     approvals.length ? `APPROVED BY THE USER:\n${approvals.join('\n')}` : '',
   ]

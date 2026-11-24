@@ -4,6 +4,7 @@ import { hi as projectsArea } from './hi/projects';
 import { hi as templatesArea } from './hi/templates';
 import { hi as railArea } from './hi/rail';
 import { hi as refsArea } from './hi/refs';
+import { hi as frulesArea } from './hi/frules';
 import { hi as headerArea } from './hi/header';
 import { hi as briefArea } from './hi/brief';
 import { hi as factsArea } from './hi/facts';
@@ -326,6 +327,7 @@ export const hi: Messages = {
   ...templatesArea,
   ...railArea,
   ...refsArea,
+  ...frulesArea,
   ...headerArea,
   ...briefArea,
   ...factsArea,

@@ -5,6 +5,9 @@ import { useState } from 'react';
 
 import { recordFacts, retireFact, supersedeFact } from '@/lib/supabase/facts';
 import { currentFacts, retiredFacts } from '@/lib/workflow/facts';
+import { projectReplacements } from '@/lib/folders/inheritance';
+import { InheritedFactsLine } from './inherited-facts-line';
+import { useLevelName } from '@/components/projects/folder-rules-panel';
 import type { Project, ProjectFact } from '@/types/project';
 
 /**
@@ -45,18 +48,22 @@ export function ProjectFacts({
   onChanged,
   readOnly = false,
 }: {
-  project: Pick<Project, 'id' | 'user_id' | 'facts'>;
+  project: Pick<Project, 'id' | 'user_id' | 'facts' | 'folder_id' | 'inherited'>;
   onChanged: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
   const factSource = (f: ProjectFact) => shownSource(f, t, locale);
+  const levelName = useLevelName();
   const current = currentFacts(project.facts);
   const history = retiredFacts(project.facts);
+  // Which of these replace a default of the project's folders (Sean, 23 Nov).
+  const replacing = projectReplacements(project.inherited);
+  const fromFolders = project.inherited?.inForce.length ?? 0;
   // Open whenever there are facts, until the user folds it themselves.
   const [toggled, setToggled] = useState<boolean | null>(null);
-  const open = toggled ?? current.length > 0;
+  const open = toggled ?? (current.length > 0 || fromFolders > 0);
   const [adding, setAdding] = useState('');
   const [kind, setKind] = useState<ProjectFact['kind']>('fact');
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
@@ -93,12 +100,14 @@ export function ProjectFacts({
         {t('facts.title')}
         <span className="text-label text-[var(--on-surface-variant)]">
           {current.length ? t('facts.count', { count: current.length }) : t('facts.none')}
+          {fromFolders ? ` · ${t('frules.fromFoldersCount', { count: fromFolders })}` : ''}
         </span>
         <span aria-hidden className="material-symbols-outlined ms-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>
 
       {open && (
         <div className="mt-3">
+          <InheritedFactsLine project={project} inherited={project.inherited} readOnly={readOnly} onChanged={onChanged} />
           {current.length > 0 && (
             <ul aria-label={t('facts.list')} className="space-y-2">
               {current.map((f) => (
@@ -138,6 +147,11 @@ export function ProjectFacts({
                       {f.subject ? `${f.subject}: ` : ''}
                       {f.statement}
                       <span className="ms-2 text-label text-[var(--on-surface-variant)]">{factSource(f)}</span>
+                      {replacing.get(f.id) && (
+                        <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+                          {t('frules.replaces', { level: levelName(replacing.get(f.id)!.level), statement: replacing.get(f.id)!.fact.statement })}
+                        </span>
+                      )}
                       {!readOnly && (
                         <>
                           <button type="button" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.statement })} className={`ms-2 ${quiet}`}>

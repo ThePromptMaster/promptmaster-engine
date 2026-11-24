@@ -3,6 +3,7 @@ import { es as projectsArea } from './areas/projects';
 import { es as templatesArea } from './areas/templates';
 import { es as railArea } from './areas/rail';
 import { es as refsArea } from './areas/refs';
+import { es as frulesArea } from './areas/frules';
 import { es as headerArea } from './areas/header';
 import { es as briefArea } from './areas/brief';
 import { es as factsArea } from './areas/facts';
@@ -326,6 +327,7 @@ export const es: Messages = {
   ...templatesArea,
   ...railArea,
   ...refsArea,
+  ...frulesArea,
   ...headerArea,
   ...briefArea,
   ...factsArea,

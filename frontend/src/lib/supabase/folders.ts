@@ -1,13 +1,29 @@
 import { createClient } from './client';
-import type { ProjectFolder } from '@/types/project';
+import type { FolderKind, ProjectFolder } from '@/types/project';
 
 /**
  * A user's folders for projects (client, 21 Oct, email 5: "organizing
  * projects and folders ... however someone wants to freely organize").
- * Up to three levels deep; the database refuses deeper or circular trees.
+ * Up to five levels deep (workspace › client › search › subfolder, Sean, 23
+ * Nov); the database refuses deeper or circular trees.
  */
 
-const COLUMNS = 'id, user_id, parent_id, name, position, created_at, updated_at';
+const COLUMNS = 'id, user_id, parent_id, name, position, kind, created_at, updated_at';
+
+/** How deep folders go; the database refuses a sixth level. */
+export const MAX_FOLDER_DEPTH = 5;
+
+/**
+ * The kind a new folder takes under its parent: a client under a workspace, a
+ * search under a client. A top-level folder is a plain folder until its owner
+ * calls it a workspace; nobody filing projects is made to think in workspaces.
+ */
+export function kindUnder(parent: Pick<ProjectFolder, 'kind'> | null | undefined): FolderKind | null {
+  if (!parent) return null;
+  if (parent.kind === 'workspace') return 'client';
+  if (parent.kind === 'client') return 'search';
+  return parent.kind ? 'folder' : null;
+}
 
 export const FOLDER_NAME_MAX = 80;
 
@@ -21,10 +37,10 @@ export async function listFolders(): Promise<ProjectFolder[]> {
   return (data ?? []) as ProjectFolder[];
 }
 
-export async function createFolder(userId: string, name: string, parentId: string | null = null): Promise<ProjectFolder> {
+export async function createFolder(userId: string, name: string, parentId: string | null = null, kind: FolderKind | null = null): Promise<ProjectFolder> {
   const { data, error } = await createClient()
     .from('project_folders')
-    .insert({ user_id: userId, name: name.trim().slice(0, FOLDER_NAME_MAX), parent_id: parentId })
+    .insert({ user_id: userId, name: name.trim().slice(0, FOLDER_NAME_MAX), parent_id: parentId, ...(kind ? { kind } : {}) })
     .select(COLUMNS)
     .single();
   if (error || !data) throw error ?? new Error('The folder could not be made.');
@@ -36,6 +52,12 @@ export async function renameFolder(id: string, name: string): Promise<void> {
     .from('project_folders')
     .update({ name: name.trim().slice(0, FOLDER_NAME_MAX) })
     .eq('id', id);
+  if (error) throw error;
+}
+
+/** What the folder stands for: a label only, used in wording. */
+export async function setFolderKind(id: string, kind: FolderKind | null): Promise<void> {
+  const { error } = await createClient().from('project_folders').update({ kind }).eq('id', id);
   if (error) throw error;
 }
 

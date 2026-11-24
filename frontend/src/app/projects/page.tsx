@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, moveProject, softDeleteProject } from '@/lib/supabase/projects';
-import { createFolder, deleteFolder, folderCounts, listFolders, renameFolder } from '@/lib/supabase/folders';
+import { createFolder, deleteFolder, folderCounts, kindUnder, listFolders, renameFolder } from '@/lib/supabase/folders';
+import { FolderRulesPanel } from '@/components/projects/folder-rules-panel';
 import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
 import { MoveToMenu } from '@/components/projects/move-to-menu';
 import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
@@ -194,7 +195,8 @@ export default function ProjectsPage() {
 
   const createAndShow = async (name: string, parentId: string | null) => {
     if (!user) return;
-    await createFolder(user.id, name, parentId);
+    // A client under a workspace, a search under a client (Sean, 23 Nov); the folder's panel changes it.
+    await createFolder(user.id, name, parentId, kindUnder(folders.find((f) => f.id === parentId)));
     loadFolders();
   };
   const rename = async (id: string, name: string) => {
@@ -207,8 +209,9 @@ export default function ProjectsPage() {
     load();
   };
 
+  const selectedFolder = selection === 'all' || selection === 'unfiled' ? null : folders.find((f) => f.id === selection) ?? null;
   const selectedLabel =
-    selection === 'all' ? null : selection === 'unfiled' ? t('folders.unfiled') : folders.find((f) => f.id === selection)?.name ?? null;
+    selection === 'all' ? null : selection === 'unfiled' ? t('folders.unfiled') : selectedFolder?.name ?? null;
 
   const sidebar = (
     <FoldersSidebar
@@ -282,7 +285,8 @@ export default function ProjectsPage() {
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">{t('list.subtitle')}</p>
         </div>
         <Link
-          href="/projects/new"
+          // Started in a folder, a project is filed there and follows its rules from the start (Sean, 23 Nov).
+          href={selectedFolder ? `/projects/new?folder=${selectedFolder.id}` : '/projects/new'}
           className="flex shrink-0 items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
         >
           <span className="material-symbols-outlined text-[20px]">add</span>
@@ -291,6 +295,8 @@ export default function ProjectsPage() {
       </header>
 
       <GuestBanner />
+
+      {selectedFolder && <FolderRulesPanel key={selectedFolder.id} folder={selectedFolder} onKindChanged={loadFolders} />}
 
       {error && (
         <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">

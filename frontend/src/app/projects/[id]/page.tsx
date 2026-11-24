@@ -11,6 +11,7 @@ import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import { templateFitsProject } from '@/lib/workflow/template-fit';
+import { resolveInherited } from '@/lib/folders/inheritance';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
@@ -32,12 +33,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const sources = useProjectStore((s) => s.sources);
   const codeRuns = useProjectStore((s) => s.codeRuns);
   const references = useProjectStore((s) => s.referenceMaterial);
+  const inheritedSource = useProjectStore((s) => s.inheritedSource);
+  // What the project's folders hand down, resolved with its own facts, so a
+  // fact that replaces a folder default counts the moment it is saved (Sean, 23 Nov).
+  const inherited = useMemo(
+    () =>
+      inheritedSource && storedProject
+        ? resolveInherited({ ...inheritedSource, folderId: storedProject.folder_id, projectFacts: facts })
+        : undefined,
+    [inheritedSource, storedProject, facts]
+  );
   // The data files and the accepted facts ride on the project wherever it is
   // handed on, so every prompt built from it knows what data exists and reads
   // the same current facts.
   const project = useMemo(
-    () => (storedProject ? { ...storedProject, data_files: files, facts, sources, references, code_runs: codeRuns } : null),
-    [storedProject, files, facts, sources, references, codeRuns]
+    () => (storedProject ? { ...storedProject, data_files: files, facts, sources, references, code_runs: codeRuns, inherited } : null),
+    [storedProject, files, facts, sources, references, codeRuns, inherited]
   );
   const artifact = useProjectStore((s) => s.artifact);
   const versions = useProjectStore((s) => s.versions);
