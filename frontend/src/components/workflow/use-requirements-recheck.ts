@@ -45,7 +45,12 @@ export function useRequirementsRecheck(input: {
   useEffect(() => {
     if (!enabled || !events || !inherited || !key || done.current.has(key)) return;
     if (events.some((e) => e.type === 'brief_changed' && e.payload?.requirements_key === key)) return;
-    const finished = template.stages.filter((s) => isDone(state.stages[s.id]?.status) && bundles[s.id]?.versions.at(-1));
+    // A draft still in progress was written under the old rules too (24 Nov pass: a held report
+    // drafted before the user chose "this search differs" was then put up for approval as it was).
+    const finished = template.stages.filter((s) => {
+      const status = state.stages[s.id]?.status;
+      return (isDone(status) || status === 'in_progress') && bundles[s.id]?.versions.at(-1);
+    });
     if (!finished.length) return;
     done.current.add(key);
     void (async () => {
@@ -60,7 +65,7 @@ export function useRequirementsRecheck(input: {
         const diff = changedSince(used, inherited);
         if (!diff || (!diff.added.length && !diff.removed.length)) return;
         const stageIds = new Set(older.map(([, sid]) => sid));
-        const stages = finishedConclusions(template, state, bundles).filter((c) => stageIds.has(c.stage_id));
+        const stages = finishedConclusions(template, state, bundles, undefined, true).filter((c) => stageIds.has(c.stage_id));
         const before = diff.removed.map((s) => `- ${s}`).join('\n') || '(nothing)';
         const after = diff.added.map((s) => `- ${s}`).join('\n') || '(nothing)';
         const impact = await api.assessChange({

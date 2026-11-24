@@ -5495,3 +5495,5 @@ Also from the 24 Nov production passes:
 - **A second tab shows a recheck the first tab wrote**: it read the log again only on a refused duplicate.
 - **Go's stop on a folder choice shows the mismatch card**, not an answer box: "Do whatever is best" was offered
   there and could only bring the same stop back. The run's need names the conflict (`folderChoice`).
+- **A draft still in progress is rechecked when a folder rule changes**, not only finished work: a held report
+  drafted before the user chose "this search differs" was otherwise put up for approval as it was.
