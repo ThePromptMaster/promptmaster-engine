@@ -31,6 +31,7 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
   const [open, setOpen] = useState(false);
   const lines = [
     ...diff.changed.map((label) => t('pnl.upChanged', { stage: label })),
+    ...(diff.reworded ?? []).map((label) => t('pnl.upReworded', { stage: label })),
     ...diff.added.map((label) => t('pnl.upAdded', { stage: label })),
     ...diff.removed.map((label) => t('pnl.upRemoved', { stage: label })),
   ];

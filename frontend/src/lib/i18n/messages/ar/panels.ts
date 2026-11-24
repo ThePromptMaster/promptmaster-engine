@@ -40,6 +40,7 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.allProjects': 'كل المشاريع',
   'pnl.reopen': 'إعادة الفتح',
   'pnl.upChanged': '{stage}: حُدّثت المتطلبات أو التخطيط',
+  'pnl.upReworded': '{stage}: أُعيدت صياغة التعليمات',
   'pnl.upAdded': 'مرحلة جديدة: {stage}',
   'pnl.upRemoved': 'مرحلة أُزيلت: {stage} (يُحفظ كل ما كُتب فيها)',
   'pnl.upLabel': 'تحديث سير العمل',

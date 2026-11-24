@@ -131,7 +131,7 @@ export const zh: Record<keyof typeof en, string> = {
   "evid.show": "在{name}中显示",
   "evid.needLook_one": "{count} 个项目有按旧规则完成的工作",
   "evid.needLook_other": "{count} 个项目有按旧规则完成的工作",
-  "evid.needLookExplain": "其已完成的工作写于此处或上层某条规则更改之前。打开它会检查哪些内容依赖该更改，并只将这些标记为需要重新检查；之前的版本会保留。",
+  "evid.needLookExplain": "其部分工作写于此处或上层某条规则更改之前。打开它会检查哪些内容依赖该更改，并只将这些标记为需要重新检查；之前的版本会保留。",
   "ftpl.loadError": "无法加载此文件夹的工作流。",
   "ftpl.title": "此处提供的工作流",
   "ftpl.none": "这里还没有复制任何工作流。",
@@ -171,4 +171,6 @@ export const zh: Record<keyof typeof en, string> = {
   "frules.sampleMaking": "正在创建示例…",
   "frules.sampleError": "无法创建示例。",
   "frules.choiceMade": "已选择。按“继续”，Go 将继续处理等待此选择的工作。",
+  "ftpl.addedText": "新增“{text}”",
+  "ftpl.removedText": "删除“{text}”",
 };

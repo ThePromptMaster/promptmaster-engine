@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { FolderLevel } from '@/lib/folders/inheritance';
-import { masterChanges } from '@/lib/folders/template-lineage';
+import { changedPart, masterChanges } from '@/lib/folders/template-lineage';
 import { getTemplateById, listTemplates } from '@/lib/supabase/workflow';
 import {
   applyMasterToCopy,
@@ -160,7 +160,10 @@ export function FolderTemplates({ folder, chain }: { folder: { id: string; user_
                       {c.fields.map((f) => (
                         <span key={f.field} className="block text-[var(--on-surface-variant)]">
                           {fieldName(f.field)}
-                          {f.before !== undefined && f.after !== undefined ? `: “${f.before.slice(0, 200)}” → “${f.after.slice(0, 200)}”` : ''}
+                          {f.before !== undefined && f.after !== undefined ? (() => {
+                            const part = changedPart(f.before, f.after);
+                            return !part.before ? `: ${t('ftpl.addedText', { text: part.after })}` : !part.after ? `: ${t('ftpl.removedText', { text: part.before })}` : `: “${part.before}” → “${part.after}”`;
+                          })() : ''}
                         </span>
                       ))}
                     </li>

@@ -131,7 +131,7 @@ export const ar: Record<keyof typeof en, string> = {
   "evid.show": "عرض في {name}",
   "evid.needLook_one": "مشروع ({count}) فيه عمل صُنع وفق قواعد سابقة",
   "evid.needLook_other": "مشاريع ({count}) فيها عمل صُنع وفق قواعد سابقة",
-  "evid.needLookExplain": "كُتب عمله المنجز قبل أن تتغيّر قاعدة هنا أو في الأعلى. فتحه يتحقق مما اعتمد على التغيير ويعلّم ذلك فقط للمراجعة؛ وتبقى النسخ السابقة.",
+  "evid.needLookExplain": "كُتب بعض عمله قبل أن تتغيّر قاعدة هنا أو في الأعلى. فتحه يتحقق مما اعتمد على التغيير ويعلّم ذلك فقط للمراجعة؛ وتبقى النسخ السابقة.",
   "ftpl.loadError": "تعذّر تحميل مسارات العمل في هذا المجلد.",
   "ftpl.title": "مسارات العمل المتاحة هنا",
   "ftpl.none": "لم يُنسخ أي مسار عمل هنا بعد.",
@@ -171,4 +171,6 @@ export const ar: Record<keyof typeof en, string> = {
   "frules.sampleMaking": "جارٍ إنشاء النموذج…",
   "frules.sampleError": "تعذّر إنشاء النموذج.",
   "frules.choiceMade": "تم الاختيار. اضغط «استئناف» وسيواصل Go العمل الذي كان ينتظر هذا القرار.",
+  "ftpl.addedText": "أُضيف «{text}»",
+  "ftpl.removedText": "حُذف «{text}»",
 };

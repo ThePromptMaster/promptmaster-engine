@@ -131,7 +131,7 @@ export const sw: Record<keyof typeof en, string> = {
   "evid.show": "Onyesha katika {name}",
   "evid.needLook_one": "Mradi {count} una kazi iliyofanywa chini ya kanuni za awali",
   "evid.needLook_other": "Miradi {count} ina kazi iliyofanywa chini ya kanuni za awali",
-  "evid.needLookExplain": "Kazi yake iliyokamilika iliandikwa kabla kanuni hapa au juu haijabadilika. Kuufungua kunakagua kilichotegemea mabadiliko na kuweka alama hicho tu kwa ukaguzi upya; matoleo ya awali yanabaki.",
+  "evid.needLookExplain": "Sehemu ya kazi yake iliandikwa kabla kanuni hapa au juu haijabadilika. Kuufungua kunakagua kilichotegemea mabadiliko na kuweka alama hicho tu kwa ukaguzi upya; matoleo ya awali yanabaki.",
   "ftpl.loadError": "Mitiririko ya kazi ya folda hii haikuweza kupakiwa.",
   "ftpl.title": "Mitiririko ya kazi inayotolewa hapa",
   "ftpl.none": "Hakuna mtiririko uliyonakiliwa hapa bado.",
@@ -171,4 +171,6 @@ export const sw: Record<keyof typeof en, string> = {
   "frules.sampleMaking": "Inaweka mfano…",
   "frules.sampleError": "Mfano haukuweza kuwekwa.",
   "frules.choiceMade": "Imechaguliwa. Bonyeza Endelea tena na Go itaendelea na kazi iliyokuwa ikisubiri uamuzi huu.",
+  "ftpl.addedText": "imeongezwa “{text}”",
+  "ftpl.removedText": "imeondolewa “{text}”",
 };

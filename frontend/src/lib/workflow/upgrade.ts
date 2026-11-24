@@ -16,6 +16,8 @@ export interface TemplateDiff {
   removed: string[];
   /** Stages present in both whose requirements or renderer changed. */
   changed: string[];
+  /** Stages whose requirements and layout are the same but whose name, instruction or guidance changed. */
+  reworded?: string[];
 }
 
 export function templateDiff(from: WorkflowTemplate, to: WorkflowTemplate): TemplateDiff {
@@ -23,20 +25,15 @@ export function templateDiff(from: WorkflowTemplate, to: WorkflowTemplate): Temp
   const toIds = new Map(to.stages.map((s) => [s.id, s]));
   const added = to.stages.filter((s) => !fromIds.has(s.id)).map((s) => s.label);
   const removed = from.stages.filter((s) => !toIds.has(s.id)).map((s) => s.label);
-  const changed = to.stages
-    .filter((s) => {
-      const before = fromIds.get(s.id);
-      if (!before) return false;
-      // A stage's wording is a change too (24 Nov, folder copies): an edited
-      // instruction was listed only as "wording and guidance updates".
-      return (
-        before.renderer !== s.renderer ||
-        JSON.stringify(before.exit_criteria) !== JSON.stringify(s.exit_criteria) ||
-        before.label !== s.label ||
-        (before.entry_prompt_hint ?? '') !== (s.entry_prompt_hint ?? '') ||
-        (before.entry_guidance ?? '') !== (s.entry_guidance ?? '')
-      );
-    })
-    .map((s) => s.label);
-  return { added, removed, changed };
+  const changed: string[] = [];
+  const reworded: string[] = [];
+  for (const s of to.stages) {
+    const before = fromIds.get(s.id);
+    if (!before) continue;
+    if (before.renderer !== s.renderer || JSON.stringify(before.exit_criteria) !== JSON.stringify(s.exit_criteria)) changed.push(s.label);
+    // A stage's wording is a change too (24 Nov, folder copies), said as what it is:
+    // "requirements or layout updated" was shown for an edited instruction.
+    else if (before.label !== s.label || (before.entry_prompt_hint ?? '') !== (s.entry_prompt_hint ?? '') || (before.entry_guidance ?? '') !== (s.entry_guidance ?? '')) reworded.push(s.label);
+  }
+  return { added, removed, changed, ...(reworded.length ? { reworded } : {}) };
 }

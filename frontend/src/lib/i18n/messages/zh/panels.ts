@@ -40,6 +40,7 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.allProjects': '所有项目',
   'pnl.reopen': '重新打开',
   'pnl.upChanged': '{stage}：要求或布局已更新',
+  'pnl.upReworded': '{stage}：说明的措辞已修改',
   'pnl.upAdded': '新阶段：{stage}',
   'pnl.upRemoved': '已移除阶段：{stage}（其中已写的内容会保留）',
   'pnl.upLabel': '工作流更新',

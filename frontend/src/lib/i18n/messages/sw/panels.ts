@@ -40,6 +40,7 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.allProjects': 'Miradi yote',
   'pnl.reopen': 'Fungua upya',
   'pnl.upChanged': '{stage}: mahitaji au mpangilio umesasishwa',
+  'pnl.upReworded': '{stage}: maagizo yameandikwa upya',
   'pnl.upAdded': 'Hatua mpya: {stage}',
   'pnl.upRemoved': 'Hatua iliyoondolewa: {stage} (chochote kilichoandikwa humo kinahifadhiwa)',
   'pnl.upLabel': 'Sasisho la mtiririko wa kazi',

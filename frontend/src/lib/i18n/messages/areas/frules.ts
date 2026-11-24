@@ -129,7 +129,7 @@ export const en = {
   "evid.show": "Show in {name}",
   "evid.needLook_one": "{count} project has work made under earlier rules",
   "evid.needLook_other": "{count} projects have work made under earlier rules",
-  "evid.needLookExplain": "Its finished work was written before a rule here or above changed. Opening it checks what relied on the change and marks only that for a recheck; the earlier versions stay.",
+  "evid.needLookExplain": "Some of its work was written before a rule here or above changed. Opening it checks what relied on the change and marks only that for a recheck; the earlier versions stay.",
   "ftpl.loadError": "This folder's workflows could not be loaded.",
   "ftpl.title": "Workflows offered here",
   "ftpl.none": "No workflow copied here yet.",
@@ -169,6 +169,8 @@ export const en = {
   "frules.sampleMaking": "Setting up the sample…",
   "frules.sampleError": "The sample could not be set up.",
   "frules.choiceMade": "Chosen. Press Resume and Go carries on with the work that waited on it.",
+  "ftpl.addedText": "added “{text}”",
+  "ftpl.removedText": "removed “{text}”",
 };
 
 type Keys = Record<keyof typeof en, string>;
@@ -303,7 +305,7 @@ export const es: Keys = {
   "evid.show": "Ver en {name}",
   "evid.needLook_one": "{count} proyecto tiene trabajo hecho con reglas anteriores",
   "evid.needLook_other": "{count} proyectos tienen trabajo hecho con reglas anteriores",
-  "evid.needLookExplain": "Su trabajo terminado se escribió antes de que cambiara una regla aquí o más arriba. Al abrirlo se revisa qué dependía del cambio y solo eso se marca para revisar; las versiones anteriores se conservan.",
+  "evid.needLookExplain": "Parte de su trabajo se escribió antes de que cambiara una regla aquí o más arriba. Al abrirlo se revisa qué dependía del cambio y solo eso se marca para revisar; las versiones anteriores se conservan.",
   "ftpl.loadError": "No se pudieron cargar los flujos de esta carpeta.",
   "ftpl.title": "Flujos de trabajo de esta carpeta",
   "ftpl.none": "Todavía no hay ningún flujo copiado aquí.",
@@ -343,6 +345,8 @@ export const es: Keys = {
   "frules.sampleMaking": "Creando el ejemplo…",
   "frules.sampleError": "No se pudo crear el ejemplo.",
   "frules.choiceMade": "Elegido. Pulse Reanudar y Go seguirá con el trabajo que esperaba esta decisión.",
+  "ftpl.addedText": "se añadió «{text}»",
+  "ftpl.removedText": "se quitó «{text}»",
 };
 
 export const fr: Keys = {
@@ -475,7 +479,7 @@ export const fr: Keys = {
   "evid.show": "Voir dans {name}",
   "evid.needLook_one": "{count} projet a du travail fait sous des règles antérieures",
   "evid.needLook_other": "{count} projets ont du travail fait sous des règles antérieures",
-  "evid.needLookExplain": "Son travail terminé a été écrit avant qu’une règle d’ici ou d’au-dessus ne change. L’ouvrir vérifie ce qui dépendait du changement et ne marque que cela à revoir ; les versions antérieures restent.",
+  "evid.needLookExplain": "Une partie de son travail a été écrite avant qu’une règle d’ici ou d’au-dessus ne change. L’ouvrir vérifie ce qui dépendait du changement et ne marque que cela à revoir ; les versions antérieures restent.",
   "ftpl.loadError": "Les flux de ce dossier n'ont pas pu être chargés.",
   "ftpl.title": "Flux de travail proposés ici",
   "ftpl.none": "Aucun flux copié ici pour l'instant.",
@@ -515,6 +519,8 @@ export const fr: Keys = {
   "frules.sampleMaking": "Création de l'exemple…",
   "frules.sampleError": "L'exemple n'a pas pu être créé.",
   "frules.choiceMade": "C’est choisi. Appuyez sur Reprendre et Go poursuit le travail qui en dépendait.",
+  "ftpl.addedText": "ajouté « {text} »",
+  "ftpl.removedText": "retiré « {text} »",
 };
 
 export const pt: Keys = {
@@ -647,7 +653,7 @@ export const pt: Keys = {
   "evid.show": "Ver em {name}",
   "evid.needLook_one": "{count} projeto tem trabalho feito sob regras anteriores",
   "evid.needLook_other": "{count} projetos têm trabalho feito sob regras anteriores",
-  "evid.needLookExplain": "O trabalho concluído foi escrito antes de uma regra aqui ou acima mudar. Ao abri-lo, verifica-se o que dependia da mudança e só isso é marcado para revisão; as versões anteriores ficam.",
+  "evid.needLookExplain": "Parte do trabalho foi escrita antes de uma regra aqui ou acima mudar. Ao abri-lo, verifica-se o que dependia da mudança e só isso é marcado para revisão; as versões anteriores ficam.",
   "ftpl.loadError": "Não foi possível carregar os fluxos desta pasta.",
   "ftpl.title": "Fluxos de trabalho oferecidos aqui",
   "ftpl.none": "Nenhum fluxo copiado aqui ainda.",
@@ -687,4 +693,6 @@ export const pt: Keys = {
   "frules.sampleMaking": "Criando o exemplo…",
   "frules.sampleError": "Não foi possível criar o exemplo.",
   "frules.choiceMade": "Escolhido. Pressione Retomar e o Go continua o trabalho que esperava por isso.",
+  "ftpl.addedText": "acrescentado “{text}”",
+  "ftpl.removedText": "retirado “{text}”",
 };
