@@ -18,7 +18,7 @@
  *   - a pointer made in a folder outside this chain does nothing. That is how
  *     the other search, and every new one, keeps the client's default.
  */
-import type { FolderDocument, FolderFact, FolderKind, ProjectFact, ProjectFolder } from '@/types/project';
+import type { FolderConflict, FolderDocument, FolderException, FolderFact, FolderKind, ProjectFact, ProjectFolder } from '@/types/project';
 
 /** One folder on the way down, top first. `depth` 0 is the top. */
 export interface FolderLevel {
@@ -44,6 +44,26 @@ export interface RuleAtLevel {
   replacedBy: Replacement | null;
   /** It replaces this default of a folder above it. */
   replaces: { fact: FolderFact; level: FolderLevel } | null;
+  /** An exception recorded here sets it aside. */
+  exceptedBy: AppliedException | null;
+}
+
+/** An exception that applies here: recorded in a folder of the chain, or for the project (`at` null). */
+export interface AppliedException {
+  exception: FolderException;
+  at: FolderLevel | null;
+  /** The rule was changed at its own folder after the exception was recorded. */
+  ruleChanged: boolean;
+}
+
+/**
+ * A rule handed down and something said lower down that cannot both hold, and
+ * nothing the user did has settled it (Sean, 23 Nov: "surface both").
+ */
+export interface OpenMismatch {
+  conflict: FolderConflict;
+  upper: RuleAtLevel;
+  lower: { kind: 'folder'; rule: RuleAtLevel } | { kind: 'project'; fact: ProjectFact };
 }
 
 /** A replacement that no longer counts, and why. */
@@ -64,9 +84,13 @@ export interface Inherited {
   /** The current documents along the chain, the place's own folder first. */
   documents: { doc: FolderDocument; level: FolderLevel }[];
   ignored: IgnoredReplacement[];
+  /** The exceptions that apply here, each with the rule it sets aside. */
+  exceptions: (AppliedException & { rule: RuleAtLevel })[];
+  /** The mismatches still waiting on the user here. */
+  mismatches: OpenMismatch[];
 }
 
-export const NO_INHERITED: Inherited = { chain: [], rules: [], inForce: [], documents: [], ignored: [] };
+export const NO_INHERITED: Inherited = { chain: [], rules: [], inForce: [], documents: [], ignored: [], exceptions: [], mismatches: [] };
 
 /** The folders from the top down to `folderId`, inclusive. Empty for Unfiled or a folder that is gone. */
 export function folderChain(folders: readonly Pick<ProjectFolder, 'id' | 'parent_id' | 'name' | 'kind'>[], folderId: string | null | undefined): FolderLevel[] {
@@ -108,6 +132,12 @@ export function resolveInherited(input: {
   documents?: readonly FolderDocument[];
   /** A project's own facts, when the place is a project. */
   projectFacts?: readonly ProjectFact[];
+  /** The project, when the place is one: its own exceptions apply. */
+  projectId?: string | null;
+  /** Current exceptions recorded in the chain's folders or for the project. */
+  exceptions?: readonly FolderException[];
+  /** Mismatches recorded against the chain's rules. */
+  conflicts?: readonly FolderConflict[];
 }): Inherited {
   const chain = folderChain(input.folders, input.folderId);
   if (!chain.length) return NO_INHERITED;
@@ -151,17 +181,79 @@ export function resolveInherited(input: {
     if (!f.retired_at && f.overrides_folder_fact) consider(f.overrides_folder_fact, f, null);
   }
 
+  // Exceptions (Sean, 23 Nov: "Apply exception to this search"): recorded in a
+  // folder of this chain below the rule's own, or for this project. One made
+  // elsewhere (the other search) does nothing here.
+  const exceptedBy = new Map<string, AppliedException>();
+  for (const e of input.exceptions ?? []) {
+    if (e.retired_at) continue;
+    const at = e.folder_id ? levelOf.get(e.folder_id) : null;
+    if (e.folder_id ? !at : !input.projectId || e.project_id !== input.projectId) continue;
+    const target = currentOf(e.rule_id, input.facts);
+    const ruleLevel = target ? levelOf.get(target.fact.folder_id) : undefined;
+    if (!target || !ruleLevel || (at && at.depth <= ruleLevel.depth)) continue;
+    const held = exceptedBy.get(target.fact.id);
+    const depthOf = (l: FolderLevel | null | undefined) => (l ? l.depth : Number.MAX_SAFE_INTEGER);
+    if (!held || depthOf(at) >= depthOf(held.at)) exceptedBy.set(target.fact.id, { exception: e, at: at ?? null, ruleChanged: target.changed });
+  }
+
   const rules: RuleAtLevel[] = current.map((fact) => ({
     fact,
     level: levelOf.get(fact.folder_id)!,
     replacedBy: replacedBy.get(fact.id) ?? null,
     replaces: replaces.get(fact.id) ?? null,
+    exceptedBy: exceptedBy.get(fact.id) ?? null,
   }));
   const documents = (input.documents ?? [])
     .filter((d) => !d.retired_at && levelOf.has(d.folder_id))
     .map((doc) => ({ doc, level: levelOf.get(doc.folder_id)! }))
     .sort((a, b) => b.level.depth - a.level.depth || a.doc.created_at.localeCompare(b.doc.created_at));
-  return { chain, rules, inForce: rules.filter((r) => !r.replacedBy), documents, ignored };
+
+  // Open mismatches: both sides still current here, not dismissed, and nothing
+  // the user did links them (an exception to the rule here, or the lower side
+  // replacing it). Worked out, never stored, so every screen reads the same.
+  const ruleById = new Map(rules.map((r) => [r.fact.id, r]));
+  const projectFactById = new Map((input.projectFacts ?? []).filter((f) => !f.retired_at).map((f) => [f.id, f]));
+  const mismatches: OpenMismatch[] = [];
+  for (const c of input.conflicts ?? []) {
+    if (c.dismissed_at) continue;
+    const upper = ruleById.get(c.upper_fact_id);
+    if (!upper || upper.exceptedBy) continue;
+    if (c.lower_folder_fact_id) {
+      const lower = ruleById.get(c.lower_folder_fact_id);
+      if (!lower || lower.level.depth <= upper.level.depth || lower.fact.overrides === upper.fact.id) continue;
+      mismatches.push({ conflict: c, upper, lower: { kind: 'folder', rule: lower } });
+    } else if (c.lower_project_fact_id) {
+      const fact = projectFactById.get(c.lower_project_fact_id);
+      if (!fact || fact.overrides_folder_fact === upper.fact.id) continue;
+      mismatches.push({ conflict: c, upper, lower: { kind: 'project', fact } });
+    }
+  }
+
+  return {
+    chain,
+    rules,
+    inForce: rules.filter((r) => !r.replacedBy && !r.exceptedBy),
+    documents,
+    ignored,
+    exceptions: rules.flatMap((r) => (r.exceptedBy ? [{ ...r.exceptedBy, rule: r }] : [])),
+    mismatches,
+  };
+}
+
+/** What disagrees with a rule here, in words, for a prompt: "…" (said in the search folder "CFO"). */
+function otherSide(m: OpenMismatch, of: 'upper' | 'lower'): string {
+  if (of === 'lower') return `${m.upper.fact.statement} (set in ${levelWords(m.upper.level)})`;
+  return m.lower.kind === 'folder'
+    ? `${m.lower.rule.fact.statement} (set in ${levelWords(m.lower.rule.level)})`
+    : `${m.lower.fact.statement} (a fact of this project)`;
+}
+
+/** The project facts still in a mismatch with a folder's rule, with what they disagree with. */
+export function unresolvedProjectFacts(inh: Inherited | null | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of inh?.mismatches ?? []) if (m.lower.kind === 'project') out.set(m.lower.fact.id, otherSide(m, 'lower'));
+  return out;
 }
 
 /** Which project fact replaces which folder default here, by project fact id. */
@@ -194,29 +286,54 @@ export interface InheritedFactPayload {
   scope: string;
   required?: boolean;
   replaces_default?: string;
+  exception?: string;
+  unresolved_with?: string;
 }
 
 /** The rules in force here, for a request: required first, then from the nearest folder up; at most `MAX_INHERITED_SENT`. */
 export function inheritedForRequest(inh: Inherited | null | undefined): { facts: InheritedFactPayload[]; notSent: number } {
   const inForce = inh?.inForce ?? [];
+  // Each side of a mismatch still open is sent with the other: neither is relied on (Sean, 23 Nov).
+  const unresolved = new Map<string, string>();
+  for (const m of inh?.mismatches ?? []) {
+    unresolved.set(m.upper.fact.id, [unresolved.get(m.upper.fact.id), otherSide(m, 'upper')].filter(Boolean).join('; and '));
+    if (m.lower.kind === 'folder') unresolved.set(m.lower.rule.fact.id, otherSide(m, 'lower'));
+  }
   const ordered = [...inForce].sort(
     (a, b) => Number(b.fact.required) - Number(a.fact.required) || b.level.depth - a.level.depth || a.fact.created_at.localeCompare(b.fact.created_at)
   );
-  const sent = ordered.slice(0, MAX_INHERITED_SENT);
+  const exceptions: InheritedFactPayload[] = (inh?.exceptions ?? []).map(({ exception: e, at, rule }) => {
+    const where = at ? levelWords(at) : 'this project';
+    const when = day(e.created_at);
+    return {
+      statement: e.statement,
+      subject: rule.fact.subject ?? '',
+      kind: rule.fact.kind,
+      source: `an exception recorded for ${where}${when ? `, ${when}` : ''}`,
+      scope: where,
+      exception: `authorised by ${e.authorised_by}, confirmed ${e.how_confirmed}, because ${e.reason}. It sets aside here the ${rule.fact.required ? 'required ' : ''}rule "${rule.fact.statement}" of ${levelWords(rule.level)}, which still holds everywhere else`,
+    };
+  });
+  const sent = ordered.slice(0, Math.max(0, MAX_INHERITED_SENT - exceptions.length));
   return {
     notSent: ordered.length - sent.length,
-    facts: sent.map((r) => {
-      const when = day(r.fact.created_at);
-      return {
-        statement: r.fact.statement,
-        subject: r.fact.subject ?? '',
-        kind: r.fact.kind,
-        source: `from ${levelWords(r.level)}${when ? `, ${when}` : ''}`,
-        scope: levelWords(r.level),
-        ...(r.fact.required ? { required: true } : {}),
-        ...(r.replaces ? { replaces_default: `${r.replaces.fact.statement} (the default of ${levelWords(r.replaces.level)})` } : {}),
-      };
-    }),
+    facts: [
+      ...exceptions,
+      ...sent.map((r) => {
+        const when = day(r.fact.created_at);
+        const other = unresolved.get(r.fact.id);
+        return {
+          statement: r.fact.statement,
+          subject: r.fact.subject ?? '',
+          kind: r.fact.kind,
+          source: `from ${levelWords(r.level)}${when ? `, ${when}` : ''}`,
+          scope: levelWords(r.level),
+          ...(r.fact.required ? { required: true } : {}),
+          ...(r.replaces ? { replaces_default: `${r.replaces.fact.statement} (the default of ${levelWords(r.replaces.level)})` } : {}),
+          ...(other ? { unresolved_with: other } : {}),
+        };
+      }),
+    ],
   };
 }
 

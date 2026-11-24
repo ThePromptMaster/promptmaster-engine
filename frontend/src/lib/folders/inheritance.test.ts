@@ -10,7 +10,7 @@ import {
   projectReplacements,
   resolveInherited,
 } from './inheritance';
-import type { FolderDocument, FolderFact, ProjectFact, ProjectFolder } from '@/types/project';
+import type { FolderConflict, FolderDocument, FolderException, FolderFact, ProjectFact, ProjectFolder } from '@/types/project';
 
 /**
  * Sean, 23 Nov: "one workspace, one client, and two searches. Give the client a
@@ -191,5 +191,87 @@ describe('what a request carries', () => {
       'Own notes.\n\n### From Spec.docx (the search folder "CFO search")\n\nLed an IPO.\n\n### From Agreement.pdf (the client folder "Acme")\n\nFee is one third.'
     );
     expect(materialWithInherited('Own notes.', undefined)).toBe('Own notes.');
+  });
+});
+
+describe('scoped exceptions and mismatches (Sean, 23 Nov)', () => {
+  const exception = (id: string, ruleId: string, scope: { folder_id?: string; project_id?: string }, statement: string, extra: Partial<FolderException> = {}): FolderException => ({
+    id, user_id: 'u', folder_id: scope.folder_id ?? null, project_id: scope.project_id ?? null, rule_id: ruleId, statement,
+    authorised_by: 'Dana Ruiz, client HR director', how_confirmed: 'email of 12 Nov', reason: 'the client asked us to run references on this search',
+    from_note: {}, retired_at: null, retired_reason: null, created_at: '2026-11-24T05:00:00Z', ...extra,
+  });
+  const conflict = (id: string, upper: string, lower: { folder?: string; project?: string }, extra: Partial<FolderConflict> = {}): FolderConflict => ({
+    id, user_id: 'u', upper_fact_id: upper, lower_folder_fact_id: lower.folder ?? null, lower_project_fact_id: lower.project ?? null,
+    upper_quote: 'The client handles reference checks', lower_quote: 'We are handling references', explanation: 'Who runs references.',
+    dismissed_at: null, created_at: '2026-11-24T04:00:00Z', ...extra,
+  });
+  const REQ_REFS = rule('rrefs', 'acme', 'The client handles reference checks.', { required: true });
+  const NOTE = rule('note', 'cfo', 'We are handling references on this search.');
+
+  it('a note that disagrees is an open mismatch in its search, and sent as unresolved on both sides', () => {
+    const inh = resolveInherited({ folders: FOLDERS, folderId: 'interviews', facts: [REQ_REFS, NOTE], conflicts: [conflict('c1', 'rrefs', { folder: 'note' })] });
+    expect(inh.mismatches.map((m) => m.conflict.id)).toEqual(['c1']);
+    const sent = inheritedForRequest(inh).facts;
+    expect(sent.find((f) => f.statement === REQ_REFS.statement)?.unresolved_with).toBe('We are handling references on this search. (set in the search folder "CFO search")');
+    expect(sent.find((f) => f.statement === NOTE.statement)?.unresolved_with).toBe('The client handles reference checks. (set in the client folder "Acme")');
+  });
+
+  it('the other search has no mismatch and follows the client', () => {
+    const vp = resolveInherited({ folders: FOLDERS, folderId: 'vp', facts: [REQ_REFS, NOTE], conflicts: [conflict('c1', 'rrefs', { folder: 'note' })] });
+    expect(vp.mismatches).toEqual([]);
+    expect(vp.inForce.map((r) => r.fact.id)).toEqual(['rrefs']);
+  });
+
+  it('an exception for the search sets the rule aside there and below, closes the mismatch, and says who and why', () => {
+    const ex = exception('e1', 'rrefs', { folder_id: 'cfo' }, 'We run reference checks on this search.');
+    const input = { folders: FOLDERS, facts: [REQ_REFS], exceptions: [ex], conflicts: [conflict('c1', 'rrefs', { folder: 'note' })] };
+    const below = resolveInherited({ ...input, folderId: 'interviews' });
+    expect(below.inForce.map((r) => r.fact.id)).not.toContain('rrefs');
+    expect(below.exceptions.map((e) => e.exception.id)).toEqual(['e1']);
+    expect(below.mismatches).toEqual([]);
+    const sent = inheritedForRequest(below).facts;
+    expect(sent[0]).toMatchObject({ statement: 'We run reference checks on this search.', scope: 'the search folder "CFO search"' });
+    expect(sent[0].exception).toContain('authorised by Dana Ruiz, client HR director, confirmed email of 12 Nov');
+    expect(sent[0].exception).toContain('the required rule "The client handles reference checks." of the client folder "Acme", which still holds everywhere else');
+
+    // The other search, and a search made later, still start with the client's arrangement.
+    expect(resolveInherited({ ...input, folderId: 'vp' }).inForce.map((r) => r.fact.id)).toEqual(['rrefs']);
+    const later = resolveInherited({ ...input, folders: [...FOLDERS, folder('cto', 'CTO search', 'acme', 'search')], folderId: 'cto' });
+    expect(later.inForce.map((r) => r.fact.id)).toEqual(['rrefs']);
+  });
+
+  it('revoking the exception brings the rule back', () => {
+    const ex = exception('e1', 'rrefs', { folder_id: 'cfo' }, 'We run references.', { retired_at: '2026-11-24T06:00:00Z' });
+    expect(resolveInherited({ folders: FOLDERS, folderId: 'cfo', facts: [REQ_REFS], exceptions: [ex] }).inForce.map((r) => r.fact.id)).toEqual(['rrefs']);
+  });
+
+  it('an exception for one project applies to that project only', () => {
+    const ex = exception('e2', 'rrefs', { project_id: 'p' }, 'For this candidate we run references.');
+    expect(resolveInherited({ folders: FOLDERS, folderId: 'cfo', facts: [REQ_REFS], exceptions: [ex], projectId: 'p' }).inForce).toEqual([]);
+    expect(resolveInherited({ folders: FOLDERS, folderId: 'cfo', facts: [REQ_REFS], exceptions: [ex], projectId: 'other' }).inForce.map((r) => r.fact.id)).toEqual(['rrefs']);
+  });
+
+  it('a correction at the client reaches every search', () => {
+    const retired = { ...REQ_REFS, retired_at: '2026-11-24T07:00:00Z', retired_reason: 'superseded' };
+    const corrected = rule('rrefs2', 'acme', 'We run reference checks for this client.', { supersedes: 'rrefs', required: true });
+    for (const where of ['cfo', 'vp']) {
+      expect(resolveInherited({ folders: FOLDERS, folderId: where, facts: [retired, corrected] }).inForce.map((r) => r.fact.statement)).toEqual(['We run reference checks for this client.']);
+    }
+  });
+
+  it('a mismatch closes when dismissed, when the note is taken out, or when the note replaces a default', () => {
+    const base = { folders: FOLDERS, folderId: 'cfo' };
+    expect(resolveInherited({ ...base, facts: [REQ_REFS, NOTE], conflicts: [conflict('c1', 'rrefs', { folder: 'note' }, { dismissed_at: '2026-11-24T08:00:00Z' })] }).mismatches).toEqual([]);
+    expect(resolveInherited({ ...base, facts: [REQ_REFS, { ...NOTE, retired_at: '2026-11-24T08:00:00Z' }], conflicts: [conflict('c1', 'rrefs', { folder: 'note' })] }).mismatches).toEqual([]);
+    const def = rule('def', 'acme', 'The client handles reference checks.');
+    const replacing = rule('rep', 'cfo', 'We handle references here.', { overrides: 'def' });
+    expect(resolveInherited({ ...base, facts: [def, replacing], conflicts: [conflict('c2', 'def', { folder: 'rep' })] }).mismatches).toEqual([]);
+  });
+
+  it("a project fact in a mismatch is sent as unresolved, with the folder's rule", () => {
+    const own = pfact('pf', 'We are running the references ourselves.');
+    const inh = resolveInherited({ folders: FOLDERS, folderId: 'cfo', facts: [REQ_REFS], projectFacts: [own], projectId: 'p', conflicts: [conflict('c3', 'rrefs', { project: 'pf' })] });
+    expect(inh.mismatches.map((m) => m.lower.kind)).toEqual(['project']);
+    expect(factsForRequest([own], inh)[0]).toMatchObject({ unresolved_with: 'The client handles reference checks. (set in the client folder "Acme")' });
   });
 });

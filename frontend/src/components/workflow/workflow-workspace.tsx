@@ -1,5 +1,8 @@
 'use client';
 
+import { heldStages, mismatchOutstanding } from '@/lib/folders/holds';
+import { HeldStageNotice } from '@/components/folders/held-stage-notice';
+import { useInheritedChecks } from './use-inherited-checks';
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { translate } from '@/lib/i18n/translate';
@@ -697,8 +700,10 @@ export function WorkflowWorkspace({
         checkSays: currentCheckSays ? { stageId: state.current_stage_id, says: currentCheckSays } : null,
         objectiveNotRechecked: objectiveStale,
         approvalsOnEarlier,
+        // A folder rule and a note the user has not chosen between (L-280).
+        inheritedMismatches: mismatchOutstanding(project.inherited, events ?? [], (id) => getStage(template, id)?.label ?? id),
       }),
-    [template, state, context, objectiveAssessment, currentCheckSays, objectiveStale, approvalsOnEarlier]
+    [template, state, context, objectiveAssessment, currentCheckSays, objectiveStale, approvalsOnEarlier, project.inherited, events]
   );
   const openFindings = useMemo(() => openFindingsByStage(outstanding), [outstanding]);
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
@@ -1360,7 +1365,14 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null, revisedWith,
     onDecisionSetAside: setDecisionAside,
   });
+  // A fact read against the folders' rules, and the stages a mismatch holds (L-280).
+  useInheritedChecks({
+    project, template, events, stageId: state.current_stage_id, appendEvent,
+    enabled: project.status !== 'finalized' && !project.example_key && events !== null,
+    onReload,
+  });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  const heldHereNow = useMemo(() => heldStages(project.inherited, events).get(stageId), [project.inherited, events, stageId]);
   // A commitments sign-off on a version that proposes none is recorded as not
   // applying to that version, with the words that show it (18 Nov, Sean,
   // Executive Search). Each version is looked at once; a failure leaves the
@@ -3302,6 +3314,17 @@ export function WorkflowWorkspace({
               summary={changeSummaryNow}
               onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
             />
+            {/* A stage that waits on a folder rule and a note the user has not chosen between (L-280). */}
+            {heldHereNow && project.status !== 'finalized' && (
+              <HeldStageNotice
+                held={heldHereNow}
+                stageLabel={stageNameShown(stage.id)}
+                userId={project.user_id}
+                projectId={project.id}
+                onChanged={() => onReload?.()}
+                onRelease={() => appendEvent({ type: 'inherited_hold', stage_id: stage.id, actor: 'user', payload: { conflict_id: heldHereNow.mismatch.conflict.id, released: [stage.id] } })}
+              />
+            )}
             {factReconcile && factReconcile.stageId === stage.id && (
               <FactReconcileNotice
                 project={project}

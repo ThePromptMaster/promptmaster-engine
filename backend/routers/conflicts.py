@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -10,12 +12,14 @@ from promptmaster.change_impact import ChangeImpact, StageConclusion, assess_cha
 from promptmaster.limits import MAX_CONTEXT_CHARS
 from promptmaster.conflicts import Conflict, ConflictSource, ConflictStage, find_conflicts
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
+from promptmaster.inherited_mismatch import MismatchRequest, MismatchResponse, inherited_mismatches
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import PMInput
 from routers._errors import llm_http_error
 
 router = APIRouter(prefix="/api", tags=["conflicts"])
+logger = logging.getLogger(__name__)
 
 
 class CheckConflictsRequest(BaseModel):
@@ -68,3 +72,15 @@ async def api_assess_change(req: AssessChangeRequest, client: OpenRouterClient =
         return await assess_change(client, req.model or None, field, req.before, req.after, req.stages)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+
+
+@router.post("/inherited-mismatches", response_model=MismatchResponse)
+async def api_inherited_mismatches(req: MismatchRequest, client: OpenRouterClient = Depends(get_client)) -> MismatchResponse:
+    """Which statements made lower down disagree with a rule a folder above hands down
+    (24 Nov). 1 small LLM call; commits nothing, and the browser records the pairs.
+    Any failure finds nothing: the user still sees both statements in the folder."""
+    try:
+        return await inherited_mismatches(client, req)
+    except Exception:  # noqa: BLE001 - "none found" is the safe answer to any failure here
+        logger.warning("Inherited-mismatch check failed; nothing is held", exc_info=True)
+        return MismatchResponse()

@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { inheritedCounts, type Inherited } from '@/lib/folders/inheritance';
 import { recordFacts } from '@/lib/supabase/facts';
-import { useLevelName } from '@/components/projects/folder-rules-panel';
+import { revokeException } from '@/lib/supabase/folder-rules';
+import { MismatchChoice } from '@/components/folders/mismatch-choice';
+import { useLevelName } from '@/components/folders/level-name';
 
 /**
  * What the project's folders hand down, as one line in the Facts panel (Sean,
@@ -30,7 +32,10 @@ export function InheritedFactsLine({
 }) {
   const t = useT();
   const levelName = useLevelName();
-  const [open, setOpen] = useState(false);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  // A mismatch waiting on the user is shown, not folded away (L-280).
+  const open = toggled ?? Boolean(inherited?.mismatches.length);
+  const setOpen = (next: (v: boolean) => boolean) => setToggled(next(open));
   const [replacing, setReplacing] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +47,8 @@ export function InheritedFactsLine({
   const counts = inheritedCounts(inherited);
   if (!inherited.rules.length && !counts.documents) return null;
   const parts = [
+    inherited.mismatches.length ? t('frules.needsChoice', { count: inherited.mismatches.length }) : null,
+    inherited.exceptions.length ? t('frules.exceptionCount', { count: inherited.exceptions.length }) : null,
     ...counts.from.map(({ level, count }) => t('frules.lineFrom', { count, level: levelName(level) })),
     counts.differentHere ? t('frules.lineDifferent', { count: counts.differentHere }) : null,
     counts.documents ? t('frules.docCount', { count: counts.documents }) : null,
@@ -74,8 +81,44 @@ export function InheritedFactsLine({
       </button>
       {open && (
         <div className="mt-2">
+          {inherited.mismatches.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {inherited.mismatches.map((m) => (
+                <MismatchChoice key={m.conflict.id} mismatch={m} userId={project.user_id} projectId={project.id} onDone={onChanged} />
+              ))}
+            </div>
+          )}
+          {inherited.exceptions.length > 0 && (
+            <ul aria-label={t('frules.exceptionsHere')} className="mb-3 space-y-1.5">
+              {inherited.exceptions.map(({ exception: e, rule, at, ruleChanged }) => (
+                <li key={e.id} className="text-body text-[var(--on-surface)]">
+                  <span className={chip}>{t('frules.exception')}</span>
+                  {t('frules.exceptionLine', { statement: e.statement, rule: rule.fact.statement, level: levelName(rule.level) })}
+                  <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+                    {at ? `${t('frules.fromLevel', { level: levelName(at) })} · ` : ''}
+                    {t('frules.exceptionBy', { who: e.authorised_by, how: e.how_confirmed, why: e.reason })}
+                    {ruleChanged ? ` ${t('frules.ruleChanged')}` : ''}
+                  </span>
+                  {!readOnly && !at && (
+                    <button type="button" disabled={busy} className={quiet}
+                      onClick={() => void (async () => {
+                        setBusy(true);
+                        try {
+                          await revokeException(e.id);
+                          await onChanged();
+                        } finally {
+                          setBusy(false);
+                        }
+                      })()}>
+                      {t('frules.revoke')}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           <ul className="space-y-1.5">
-            {inherited.rules.map((r) => (
+            {inherited.rules.filter((r) => !r.exceptedBy).map((r) => (
               <li key={r.fact.id} className="text-body text-[var(--on-surface)]">
                 <span className={r.replacedBy ? 'text-[var(--on-surface-variant)] line-through' : ''}>
                   {r.fact.required && <span className={chip}>{t('frules.required')}</span>}

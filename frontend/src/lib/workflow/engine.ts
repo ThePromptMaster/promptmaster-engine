@@ -929,7 +929,18 @@ export type OutstandingItem =
   /** The check said not met and the work has changed since: it has to be checked again (5 Nov). */
   | { kind: 'objective_not_rechecked'; label: string }
   /** The user approved an earlier text than the stage holds now (5 Nov). Listed; it holds nothing up. */
-  | { kind: 'approval_on_earlier_version'; stageId: string; label: string; approval: string; version: number; current: number };
+  | { kind: 'approval_on_earlier_version'; stageId: string; label: string; approval: string; version: number; current: number }
+  /**
+   * A folder's rule and something said lower down disagree, and the user has
+   * not chosen (24 Nov, L-280). It holds the finish, and the stages named in `held`.
+   */
+  | { kind: 'inherited_mismatch'; label: string; conflictId: string; upper: MismatchLevel; rule: string; lower: MismatchLevel | null; note: string; held: string[] };
+
+/** Where one side of a mismatch was set: a folder by name and kind; null is the project itself. */
+export interface MismatchLevel {
+  name: string;
+  kind: 'workspace' | 'client' | 'search' | 'folder' | null;
+}
 
 export interface OutstandingExtras {
   /** Go stopped and is waiting on the user: what it needs, in one line. */
@@ -943,6 +954,8 @@ export interface OutstandingExtras {
   objectiveNotRechecked?: boolean;
   /** Approvals given on an earlier text than the stage holds now (`approvalsOnEarlierVersion`). */
   approvalsOnEarlier?: readonly { stageId: string; label: string; approval: string; version: number; current: number }[];
+  /** Mismatches between a folder's rule and something said lower down, not chosen yet (`mismatchOutstanding`). */
+  inheritedMismatches?: readonly { conflictId: string; upper: MismatchLevel; rule: string; lower: MismatchLevel | null; note: string; held: string[] }[];
 }
 
 export function outstandingWork(
@@ -1025,6 +1038,7 @@ export function outstandingWork(
   }
   if (extras.objectiveNotRechecked) out.push({ kind: 'objective_not_rechecked', label: 'Objective' });
   for (const a of extras.approvalsOnEarlier ?? []) out.push({ kind: 'approval_on_earlier_version', ...a });
+  for (const m of extras.inheritedMismatches ?? []) out.push({ kind: 'inherited_mismatch', label: m.upper.name, ...m });
   if (extras.goWaiting) out.push({ kind: 'go_waiting', label: 'Go', need: extras.goWaiting });
   return out;
 }
@@ -1131,6 +1145,12 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
       return t('out.objNotRechecked');
     case 'approval_on_earlier_version':
       return t('out.approvalEarlier', { label: item.label, approval: item.approval, version: item.version, current: item.current });
+    case 'inherited_mismatch': {
+      const level = (l: MismatchLevel | null) => (l ? t(`frules.lvl.${l.kind ?? 'folder'}`, { name: l.name }) : t('frules.thisProject'));
+      const bare = (x: string) => x.replace(/[.\s]+$/, '');
+      const said = t('frules.outMismatch', { upper: level(item.upper), rule: bare(item.rule), lower: level(item.lower), note: bare(item.note) });
+      return item.held.length ? `${said} ${t('frules.outHolds', { stages: item.held.join(', ') })}` : said;
+    }
   }
 }
 

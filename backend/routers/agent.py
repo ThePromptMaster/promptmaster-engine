@@ -47,6 +47,7 @@ from promptmaster.decision_options import DecisionOptionsRequest, DecisionOption
 from promptmaster.commitments import CommitmentsRequest, CommitmentsResponse, check_commitments
 from promptmaster.delegated_approvals import ApprovalDelegatedRequest, ApprovalDelegatedResponse, approvals_delegated
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
+from promptmaster.stages_concerned import StagesConcernedRequest, StagesConcernedResponse, stages_concerned
 from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
@@ -549,6 +550,18 @@ async def api_settles(req: SettlesRequest, client: OpenRouterClient = Depends(ge
     except Exception:  # noqa: BLE001 - "still open" is the safe answer to any failure here
         logger.warning("Settled-items check failed; the findings stay open", exc_info=True)
         return SettlesResponse()
+
+
+@router.post("/stages-concerned", response_model=StagesConcernedResponse)
+async def api_stages_concerned(req: StagesConcernedRequest, client: OpenRouterClient = Depends(get_client)) -> StagesConcernedResponse:
+    """Which stages of a project depend on two instructions the user has not chosen between
+    (24 Nov). 1 small LLM call; commits nothing, and the browser records the hold. Any
+    failure names none: nothing is held, and the choice is still put to the user."""
+    try:
+        return await stages_concerned(client, req)
+    except Exception:  # noqa: BLE001 - holding nothing is the safe answer to any failure here
+        logger.warning("Stages-concerned check failed; nothing is held", exc_info=True)
+        return StagesConcernedResponse()
 
 
 @router.post("/sections-to-repair", response_model=SectionsToRepairResponse)

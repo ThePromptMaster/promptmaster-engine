@@ -39,7 +39,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const inherited = useMemo(
     () =>
       inheritedSource && storedProject
-        ? resolveInherited({ ...inheritedSource, folderId: storedProject.folder_id, projectFacts: facts })
+        ? resolveInherited({ ...inheritedSource, folderId: storedProject.folder_id, projectFacts: facts, projectId: storedProject.id })
         : undefined,
     [inheritedSource, storedProject, facts]
   );

@@ -4,27 +4,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '@/lib/i18n/i18n-provider';
 import { DOCUMENT_EXTENSIONS, extractText } from '@/lib/data/extract-text';
-import { resolveInherited, type FolderLevel, type RuleAtLevel } from '@/lib/folders/inheritance';
+import { resolveInherited, type RuleAtLevel } from '@/lib/folders/inheritance';
 import {
   addFolderDocument,
   addFolderFact,
   readInherited,
+  recordConflicts,
   retireFolderDocument,
   retireFolderFact,
+  revokeException,
   supersedeFolderFact,
   type InheritedSource,
 } from '@/lib/supabase/folder-rules';
+import { api } from '@/lib/api/client';
+import { levelWords, type Inherited } from '@/lib/folders/inheritance';
+import { MismatchChoice } from '@/components/folders/mismatch-choice';
+import type { FolderFact } from '@/types/project';
 import { setFolderKind } from '@/lib/supabase/folders';
 import type { FolderKind, ProjectFolder } from '@/types/project';
 import type { MessageKey } from '@/lib/i18n/messages/en';
+import { useLevelName } from '@/components/folders/level-name';
 
 const KINDS: FolderKind[] = ['workspace', 'client', 'search', 'folder'];
-
-/** "Client “Acme”": a folder named with what it stands for, in the interface's language. */
-export function useLevelName() {
-  const t = useT();
-  return (level: Pick<FolderLevel, 'name' | 'kind'>) => t(`frules.lvl.${level.kind ?? 'folder'}` as MessageKey, { name: level.name });
-}
 
 /**
  * A folder's rules and documents, and what it inherits (Sean, 23 Nov: "A
@@ -63,6 +64,14 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
     setOpen(false);
     load();
   }, [load]);
+  // Something here disagrees with a rule from above: shown, not left folded away.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (!opened && source && (resolveInherited({ ...source, folderId: folder.id }).mismatches.some((m) => m.lower.kind === 'folder' && m.lower.rule.level.id === folder.id))) {
+      setOpen(true);
+      setOpened(true);
+    }
+  }, [source, folder.id, opened]);
 
   const inh = useMemo(() => (source ? resolveInherited({ ...source, folderId: folder.id }) : null), [source, folder.id]);
   const here = inh?.chain.at(-1);
@@ -71,6 +80,9 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
   const docsHere = (inh?.documents ?? []).filter((d) => d.level.id === folder.id);
   const docsAbove = (inh?.documents ?? []).filter((d) => d.level.id !== folder.id);
   const ignoredHere = (inh?.ignored ?? []).filter((i) => i.why === 'now_required' && i.at?.id === folder.id);
+  // What was said here and disagrees with a rule from above, waiting on the user (L-280).
+  const mismatchesHere = (inh?.mismatches ?? []).filter((m) => m.lower.kind === 'folder' && m.lower.rule.level.id === folder.id);
+  const exceptionsHere = (inh?.exceptions ?? []).filter((e) => e.at?.id === folder.id);
 
   const act = async (work: () => Promise<unknown>) => {
     setBusy(true);
@@ -98,6 +110,25 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
     if (fileInput.current) fileInput.current.value = '';
   };
 
+  // A rule added here is read against the rules handed down from above; what
+  // cannot both hold is recorded and put to the user (Sean, 23 Nov: "surface both").
+  const checkAgainstAbove = async (made: FolderFact, resolved: Inherited | null) => {
+    const above = (resolved?.rules ?? []).filter((r) => r.level.id !== folder.id && !r.replacedBy && !r.exceptedBy);
+    const at = resolved?.chain.at(-1);
+    if (!above.length || !at) return;
+    try {
+      const res = await api.inheritedMismatches({
+        rules: above.slice(0, 100).map((r) => ({ id: r.fact.id, statement: r.fact.statement, scope: levelWords(r.level), required: r.fact.required })),
+        statements: [{ id: made.id, statement: made.statement, place: levelWords(at), kind: 'new' }],
+      });
+      await recordConflicts(made.user_id, res.mismatches.map((m) => ({
+        upper_fact_id: m.rule_id, lower_folder_fact_id: m.statement_id, upper_quote: m.rule_quote, lower_quote: m.statement_quote, explanation: m.explanation ?? '',
+      })));
+    } catch {
+      // The rule is saved; a check that did not run finds nothing, and both still show here.
+    }
+  };
+
   const field =
     'w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40';
   const quiet = 'rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)] disabled:opacity-40';
@@ -115,6 +146,7 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
   );
 
   const summary = [
+    mismatchesHere.length ? t('frules.needsChoice', { count: mismatchesHere.length }) : null,
     here?.kind ? t(`frules.kind.${here.kind}` as MessageKey) : null,
     t('frules.setHereCount', { count: setHere.length }),
     fromAbove.length ? t('frules.fromAboveCount', { count: fromAbove.length }) : null,
@@ -138,6 +170,35 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
       {open && source && (
         <div className="mt-3 space-y-5">
           <p className="text-label leading-snug text-[var(--on-surface-variant)]">{t('frules.explain')}</p>
+
+          {mismatchesHere.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-label font-semibold uppercase tracking-wider text-[var(--pm-error)]">{t('frules.needsChoice', { count: mismatchesHere.length })}</h3>
+              {mismatchesHere.map((m) => (
+                <MismatchChoice key={m.conflict.id} mismatch={m} userId={folder.user_id} onDone={load} />
+              ))}
+            </div>
+          )}
+
+          {exceptionsHere.length > 0 && (
+            <div>
+              <h3 className="text-label font-semibold uppercase tracking-wider text-[var(--on-surface-variant)]">{t('frules.exceptionsHere')}</h3>
+              <ul className="mt-2 space-y-2">
+                {exceptionsHere.map(({ exception: e, rule, ruleChanged }) => (
+                  <li key={e.id} className="text-body text-[var(--on-surface)]">
+                    {t('frules.exceptionLine', { statement: e.statement, rule: rule.fact.statement, level: levelName(rule.level) })}
+                    <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+                      {t('frules.exceptionBy', { who: e.authorised_by, how: e.how_confirmed, why: e.reason })}
+                      {ruleChanged ? ` ${t('frules.ruleChanged')}` : ''}
+                    </span>
+                    <button type="button" disabled={busy} className={quiet} onClick={() => void act(() => revokeException(e.id))}>
+                      {t('frules.revoke')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <label className="flex flex-wrap items-center gap-2 text-label text-[var(--on-surface-variant)]">
             {t('frules.kindLabel')}
@@ -219,9 +280,10 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
                 </label>
                 <button type="button" className={primary} disabled={busy || !adding.trim()}
                   onClick={() => void act(async () => {
-                    await addFolderFact(folder, { statement: adding, required, kind: 'requirement' });
+                    const made = await addFolderFact(folder, { statement: adding, required, kind: 'requirement' });
                     setAdding('');
                     setRequired(false);
+                    await checkAgainstAbove(made, inh);
                   })}>
                   {busy ? t('frules.saving') : t('frules.add')}
                 </button>
@@ -259,7 +321,7 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
               <ul className="mt-2 space-y-2">
                 {fromAbove.map((r) => (
                   <li key={r.fact.id} className="text-body text-[var(--on-surface-variant)]">
-                    <span className={r.replacedBy ? 'line-through' : ''}>{ruleText(r)}</span>
+                    <span className={r.replacedBy || r.exceptedBy ? 'line-through' : ''}>{ruleText(r)}</span>
                     <span className="ms-2 text-label">{t('frules.fromLevel', { level: levelName(r.level) })}</span>
                     {r.replacedBy && (
                       <span className="mt-0.5 block text-label text-[var(--on-surface)]">
@@ -269,7 +331,12 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
                         {r.replacedBy.defaultChanged ? ` ${t('frules.defaultChanged')}` : ''}
                       </span>
                     )}
-                    {!r.fact.required && !r.replacedBy && replacing?.id !== r.fact.id && (
+                    {r.exceptedBy && (
+                      <span className="mt-0.5 block text-label text-[var(--on-surface)]">
+                        {t('frules.exceptedAt', { level: r.exceptedBy.at ? levelName(r.exceptedBy.at) : t('frules.thisProjectCap'), statement: r.exceptedBy.exception.statement })}
+                      </span>
+                    )}
+                    {!r.fact.required && !r.replacedBy && !r.exceptedBy && replacing?.id !== r.fact.id && (
                       <button type="button" disabled={busy} className={`ms-2 ${quiet}`} onClick={() => setReplacing({ id: r.fact.id, text: '' })}>
                         {t('frules.replaceHere')}
                       </button>

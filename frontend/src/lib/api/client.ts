@@ -1041,6 +1041,32 @@ export const api = {
   },
 
   /**
+   * Which statements made lower down disagree with a rule a folder above hands
+   * down (24 Nov). Finds nothing on any failure.
+   */
+  async inheritedMismatches(
+    req: {
+      rules: { id: string; statement: string; scope?: string; required?: boolean }[];
+      statements: { id: string; statement: string; place?: string; kind?: 'new' | 'below' }[];
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<{ mismatches: { rule_id: string; statement_id: string; rule_quote: string; statement_quote: string; explanation?: string }[]; checked?: boolean }> {
+    return apiFetch('/api/inherited-mismatches', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  /**
+   * Which stages of a project depend on two instructions the user has not
+   * chosen between (24 Nov). Names none on any failure.
+   */
+  async agentStagesConcerned(
+    req: { rule: string; statement: string; explanation?: string; stages: { id: string; label: string; instruction?: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ stages: { stage_id: string; quote: string }[]; checked?: boolean }> {
+    return apiFetch('/api/agent/stages-concerned', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  /**
    * Which open findings the user's own words have settled: the note on the
    * finding, or a fact or decision they stated (12 Nov). Settles nothing on
    * any failure.
