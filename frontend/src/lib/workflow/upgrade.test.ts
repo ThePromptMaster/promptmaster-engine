@@ -32,3 +32,12 @@ describe('templateDiff', () => {
     expect(templateDiff(BOOK_V1, smaller).removed).toHaveLength(1);
   });
 });
+
+describe('templateDiff: wording apart from requirements (24 Nov pass)', () => {
+  it('an edited instruction is reworded, not "requirements or layout updated"', () => {
+    const v2 = { ...BOOK_V1, stages: BOOK_V1.stages.map((s, i) => (i === 0 ? { ...s, entry_prompt_hint: `${s.entry_prompt_hint ?? ''} Mark anything new.` } : s)) };
+    const diff = templateDiff(BOOK_V1, v2);
+    expect(diff.changed).toEqual([]);
+    expect(diff.reworded).toEqual([BOOK_V1.stages[0].label]);
+  });
+});

@@ -40,6 +40,7 @@ export const hi: Record<keyof typeof en, string> = {
   'pnl.allProjects': 'सभी प्रोजेक्ट्स',
   'pnl.reopen': 'फिर से खोलें',
   'pnl.upChanged': '{stage}: आवश्यकताएँ या लेआउट अपडेट हुए',
+  'pnl.upReworded': '{stage}: निर्देशों की भाषा बदली गई',
   'pnl.upAdded': 'नया चरण: {stage}',
   'pnl.upRemoved': 'हटाया गया चरण: {stage} (वहाँ लिखा गया सब कुछ रखा गया है)',
   'pnl.upLabel': 'वर्कफ़्लो अपडेट',

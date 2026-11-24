@@ -5497,3 +5497,7 @@ Also from the 24 Nov production passes:
   there and could only bring the same stop back. The run's need names the conflict (`folderChoice`).
 - **A draft still in progress is rechecked when a folder rule changes**, not only finished work: a held report
   drafted before the user chose "this search differs" was otherwise put up for approval as it was.
+- **"What changed" shows the part that changed**, with the words either side cut to an ellipsis (an instruction
+  whose master added a sentence at the end showed the same first 200 characters on both sides), and the upgrade
+  banner says "instructions reworded" for a wording-only change rather than "requirements or layout updated".
+  The folder flag says "some of its work", since drafts in progress are rechecked too.

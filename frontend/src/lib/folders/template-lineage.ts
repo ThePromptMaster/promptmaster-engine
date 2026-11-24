@@ -47,6 +47,28 @@ export interface StageChange {
   fields: { field: Field; before?: string; after?: string }[];
 }
 
+/**
+ * The part of a text that changed, with the words either side cut to an ellipsis
+ * (24 Nov pass: an instruction whose master added a sentence at the end showed the
+ * same first 200 characters on both sides, so nothing seemed to change).
+ */
+export function changedPart(before: string, after: string, max = 200): { before: string; after: string } {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) start++;
+  let end = 0;
+  while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+  // Whole words: a cut inside a word moves to the word's edge.
+  const word = (c: string | undefined) => c !== undefined && /\S/.test(c);
+  while (start > 0 && word(before[start - 1]) && (word(before[start]) || word(after[start]))) start--;
+  while (end > 0 && word(before[before.length - end]) && (word(before[before.length - end - 1]) || word(after[after.length - end - 1]))) end--;
+  const cut = (text: string) => {
+    const mid = text.slice(start, text.length - end).trim();
+    const body = mid.length > max ? `${mid.slice(0, max - 1).trimEnd()}…` : mid;
+    return body ? `${start > 0 ? '…' : ''}${body}${end > 0 ? '…' : ''}` : '';
+  };
+  return { before: cut(before), after: cut(after) };
+}
+
 /** What changed from one version of a workflow to another, stage by stage, wording included. */
 export function masterChanges(from: WorkflowTemplate, to: WorkflowTemplate): StageChange[] {
   const before = new Map(from.stages.map((s) => [s.id, s]));

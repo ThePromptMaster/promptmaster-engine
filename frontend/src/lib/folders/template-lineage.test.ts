@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { copyOf, masterChanges, mergeFromMaster, withStageEdit } from './template-lineage';
+import { changedPart, copyOf, masterChanges, mergeFromMaster, withStageEdit } from './template-lineage';
 import { validateTemplate } from '@/lib/workflow/validate';
 import { SINGLE_OUTPUT_V1 as singleOutputTemplate } from '@/lib/workflow/templates/single-output.v1';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -80,5 +80,21 @@ describe('what the master changed, and taking it into a copy', () => {
   it('each stage moves on to the next one after a merge', () => {
     const merged = mergeFromMaster(base, copyOf(base, 'custom_abc'), theirs).template;
     merged.stages.forEach((s, i) => expect(s.transitions.default_next).toBe(merged.stages[i + 1]?.id ?? null));
+  });
+});
+
+describe('changedPart (24 Nov pass)', () => {
+  it('shows a sentence added at the end, not the shared opening', () => {
+    const before = 'Read the interview transcript against the topics. Use only the transcript.';
+    const after = `${before} Mark any answer that differs from the CV.`;
+    expect(changedPart(before, after)).toEqual({ before: '', after: '…Mark any answer that differs from the CV.' });
+  });
+
+  it('a word changed in the middle keeps whole words and marks the cuts', () => {
+    expect(changedPart('Reports go to the client as PDF every week.', 'Reports go to the client as Word every week.')).toEqual({ before: '…PDF…', after: '…Word…' });
+  });
+
+  it('a removed sentence is said as removed text', () => {
+    expect(changedPart('One. Two.', 'One.')).toEqual({ before: '…Two.', after: '' });
   });
 });
