@@ -170,4 +170,5 @@ export const sw: Record<keyof typeof en, string> = {
   "frules.sample": "Weka eneo la kazi la mfano la kampuni ya utafutaji",
   "frules.sampleMaking": "Inaweka mfano…",
   "frules.sampleError": "Mfano haukuweza kuwekwa.",
+  "frules.choiceMade": "Imechaguliwa. Bonyeza Endelea tena na Go itaendelea na kazi iliyokuwa ikisubiri uamuzi huu.",
 };

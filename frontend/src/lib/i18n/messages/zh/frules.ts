@@ -170,4 +170,5 @@ export const zh: Record<keyof typeof en, string> = {
   "frules.sample": "创建示例猎头公司工作区",
   "frules.sampleMaking": "正在创建示例…",
   "frules.sampleError": "无法创建示例。",
+  "frules.choiceMade": "已选择。按“继续”，Go 将继续处理等待此选择的工作。",
 };

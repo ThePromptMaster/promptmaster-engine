@@ -5493,3 +5493,5 @@ Also from the 24 Nov production passes:
   repair skipped the hold), and Go then asked for its sign-off. Both now wait on the choice (`staleRepair`'s
   `held`, and the hold is read before `needsUser`).
 - **A second tab shows a recheck the first tab wrote**: it read the log again only on a refused duplicate.
+- **Go's stop on a folder choice shows the mismatch card**, not an answer box: "Do whatever is best" was offered
+  there and could only bring the same stop back. The run's need names the conflict (`folderChoice`).

@@ -65,6 +65,12 @@ type Need =
        * their own stage, as the user's, rather than reopening the stage it was asked on.
        */
       rows?: { id: string; stageId: string }[];
+      /**
+       * A stop on the user's choice between a folder rule and a note (L-280): the choice is
+       * made on the mismatch card, shown with the question, never answered in words or left
+       * to Go (24 Nov pass: "Do whatever is best" was offered and could only bring it back).
+       */
+      folderChoice?: string;
     }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   /**

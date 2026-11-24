@@ -168,6 +168,7 @@ export const en = {
   "frules.sample": "Set up a sample search-firm workspace",
   "frules.sampleMaking": "Setting up the sample…",
   "frules.sampleError": "The sample could not be set up.",
+  "frules.choiceMade": "Chosen. Press Resume and Go carries on with the work that waited on it.",
 };
 
 type Keys = Record<keyof typeof en, string>;
@@ -341,6 +342,7 @@ export const es: Keys = {
   "frules.sample": "Crear un espacio de ejemplo de una firma de búsqueda",
   "frules.sampleMaking": "Creando el ejemplo…",
   "frules.sampleError": "No se pudo crear el ejemplo.",
+  "frules.choiceMade": "Elegido. Pulse Reanudar y Go seguirá con el trabajo que esperaba esta decisión.",
 };
 
 export const fr: Keys = {
@@ -512,6 +514,7 @@ export const fr: Keys = {
   "frules.sample": "Créer un espace d'exemple de cabinet de recrutement",
   "frules.sampleMaking": "Création de l'exemple…",
   "frules.sampleError": "L'exemple n'a pas pu être créé.",
+  "frules.choiceMade": "C’est choisi. Appuyez sur Reprendre et Go poursuit le travail qui en dépendait.",
 };
 
 export const pt: Keys = {
@@ -683,4 +686,5 @@ export const pt: Keys = {
   "frules.sample": "Criar um espaço de exemplo de uma firma de busca",
   "frules.sampleMaking": "Criando o exemplo…",
   "frules.sampleError": "Não foi possível criar o exemplo.",
+  "frules.choiceMade": "Escolhido. Pressione Retomar e o Go continua o trabalho que esperava por isso.",
 };

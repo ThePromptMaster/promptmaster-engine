@@ -1351,7 +1351,8 @@ export function useGoLoop(opts: Options) {
               params: { held_by: heldHere.mismatch.conflict.id },
             };
           } else {
-            await setRunStatus('awaiting_decision', `${o.stage.label} waits on your choice: ${choice}. Choose on the page; everything that does not depend on it is done.`);
+            const question = `${o.stage.label} waits on your choice: ${choice}. Choose on the page; everything that does not depend on it is done.`;
+            await setRunStatus('awaiting_decision', question, { kind: 'answer_question', question, folderChoice: heldHere.mismatch.conflict.id });
             break;
           }
         }
@@ -1360,7 +1361,8 @@ export function useGoLoop(opts: Options) {
         if (heldLeft.length && !repair && !merge) {
           const first = heldByChoice.get(heldLeft[0])!;
           const names = heldLeft.map((id) => o.template.stages.find((s) => s.id === id)?.label ?? id).join(', ');
-          await setRunStatus('awaiting_decision', `${names} ${heldLeft.length === 1 ? 'waits' : 'wait'} on your choice: ${levelWords(first.mismatch.upper.level)} says "${first.mismatch.upper.fact.statement}", and ${lowerPlace(first.mismatch)} says "${lowerStatement(first.mismatch)}". Choose on the page; everything that does not depend on it is done.`);
+          const question = `${names} ${heldLeft.length === 1 ? 'waits' : 'wait'} on your choice: ${levelWords(first.mismatch.upper.level)} says "${first.mismatch.upper.fact.statement}", and ${lowerPlace(first.mismatch)} says "${lowerStatement(first.mismatch)}". Choose on the page; everything that does not depend on it is done.`;
+          await setRunStatus('awaiting_decision', question, { kind: 'answer_question', question, folderChoice: first.mismatch.conflict.id });
           break;
         }
         // Nor is the objective called met while one is still open.
