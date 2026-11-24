@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
 
-import { FOLDER_NAME_MAX, flattenTree, folderTree, type FolderNode } from '@/lib/supabase/folders';
-import type { ProjectFolder } from '@/types/project';
+import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, type FolderNode } from '@/lib/supabase/folders';
+import type { FolderKind, ProjectFolder } from '@/types/project';
 
 /** What the list shows: everything, the Unfiled projects, or one folder. */
 export type FolderSelection = 'all' | 'unfiled' | string;
@@ -12,7 +12,10 @@ export type FolderSelection = 'all' | 'unfiled' | string;
 /** The drag type a project card sets, so a folder row accepts only projects. */
 export const PROJECT_DRAG_TYPE = 'application/x-pm-project';
 
-const MAX_DEPTH = 3;
+const MAX_DEPTH = MAX_FOLDER_DEPTH;
+
+/** A folder's icon says what it stands for (Sean, 23 Nov: workspace › client › search). */
+const KIND_ICON: Record<FolderKind, string> = { workspace: 'domain', client: 'work', search: 'person_search', folder: 'folder' };
 
 interface Props {
   folders: readonly ProjectFolder[];
@@ -159,7 +162,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         // at rest the name has the whole width (23 Oct pass: "Prod ..." for a
         // short name). On a touch screen, with no hover, they stay in the row.
         <div className="group relative flex items-center">
-          <div className="min-w-0 flex-1">{row(f.id, f.name, selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
+          <div className="min-w-0 flex-1">{row(f.id, f.name, f.kind && f.kind !== 'folder' ? KIND_ICON[f.kind] : selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
           <div className="absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
               <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={t('folders.newIn', { name: f.name })} title={t('folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
@@ -178,6 +181,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       {confirmDelete === f.id && (
         <div role="alert" className="my-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label text-[var(--on-surface)]" style={{ marginLeft: `${f.depth * 14}px` }}>
           <p>{t('folders.confirmDelete', { name: f.name })}</p>
+          <p className="mt-1 text-[var(--on-surface-variant)]">{t('frules.deleteToo')}</p>
           <div className="mt-2 flex gap-2">
             <button type="button" disabled={busy} onClick={() => void remove(f.id)} className="rounded-lg bg-[var(--pm-error)] px-3 py-1 text-[var(--on-error)] disabled:opacity-60">{t('folders.deleteFolder')}</button>
             <button type="button" onClick={() => setConfirmDelete(null)} className="rounded-lg px-2 py-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">{t('folders.keep')}</button>

@@ -5337,3 +5337,35 @@ again, and a change to the facts it rests on sets it aside (L-272).
 
 Not covered: a decision whose option has no fact of its own (the figures only in the brief or the stage text)
 is not set aside by a revision that changes them. It stays ticked until the user changes it.
+
+### L-279 — Folders carry their rules and documents down (2026-11-24)
+Sean, 23 Nov ("Inheritance & exceptions"): "Workspace → client folder → search folder → subfolders for the
+work ... A folder should be able to show what it inherits, where it came from, and what's different here. A
+more specific folder can replace a default ... A required rule should only change through an explicit
+exception ... A newer note or a deeper folder shouldn't silently win."
+
+A folder now holds rules (facts and requirements, `folder_facts`) and documents (`folder_documents`), and
+everything filed under it gets them: every request a project sends carries its folders' rules in force after its
+own facts, each naming its folder ("from the client folder "Acme""), and the folders' documents after its own
+material, under the same 200,000-character budget (`lib/folders/inheritance.ts`, `inputsFrom`). Folders go five
+deep and may be called a workspace, client, search or folder; the kind only changes words and icons. A folder's
+panel on the projects list is one line until opened (what is set here, how much comes from above, documents),
+and the project's Facts panel has the same line. A project started from a folder's list is filed there.
+
+- **A default is replaced only by pointing at it.** "Replace here" on a folder, or "Replace for this project" in
+  the Facts panel, records the replacement against the default. A rule that merely says something different
+  replaces nothing: both are sent, and the prompt says to follow the folder's rule and say plainly what disagrees.
+  Showing the two side by side and choosing between them (an exception, a correction) is the next change.
+- **A required rule is never replaced below.** The database refuses the pointer; a replacement made before the
+  default became required stops counting, and the folder says so.
+- **A corrected default keeps its replacements.** A replacement follows the default forward through its
+  corrections, and the folder says the default has changed since.
+- **One user.** Folders, their rules and documents are their owner's, like everything else (L-102); nothing is
+  shared with a team or limited by role yet.
+- **Deleting a folder deletes its rules and documents.** Its projects become Unfiled and its subfolders move to
+  the top, as before; a replacement that pointed at a deleted rule stands as a plain rule.
+- **At most 100 folder rules ride with a request**, required ones first, then the nearest folder's. A folder's
+  document is read from the file in the browser when it is added, at most 1,000,000 characters, and is never edited;
+  a new version is added and the old one taken out.
+- **What a run used is not recorded yet.** A version does not yet say which folder rules were in force when it was
+  written, and a rule changed at a folder does not yet flag the finished work below it. That comes with the run record.

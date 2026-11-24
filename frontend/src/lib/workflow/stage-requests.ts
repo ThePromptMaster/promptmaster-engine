@@ -3,6 +3,7 @@ import { factsForRequest } from './facts';
 import { referencePayload } from './references';
 import { sourcesForRequest, withoutSourcesList } from './sources';
 import { contextForRequest } from '@/lib/data/context-for-request';
+import { materialWithInherited } from '@/lib/folders/inheritance';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
  * their responses. Pure.
@@ -60,13 +61,14 @@ export function inputsFrom(project: Project, citing = '', focus: { user?: string
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
-    context: contextForRequest(project.context ?? '', {
+    // The documents of the project's folders follow its own material, under the same budget (Sean, 23 Nov).
+    context: contextForRequest(materialWithInherited(project.context ?? '', project.inherited), {
       primary: [project.objective, project.title, focus.user ?? ''].join('\n'),
       secondary: [focus.step ?? '', citing.slice(0, 6_000)].join('\n'),
     }).context,
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
     ...(project.third_party?.length ? { third_party: project.third_party } : {}),
-    facts: factsForRequest(project.facts),
+    facts: factsForRequest(project.facts, project.inherited),
     ...(project.sources?.some((s) => !s.retired_at) ? { sources: sourcesForRequest(project.sources, citing) } : {}),
     ...(project.applied_instructions?.length
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }

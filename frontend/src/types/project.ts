@@ -56,6 +56,12 @@ export interface ProjectFact {
   origin?: 'user_stated' | 'model_assumed' | 'policy';
   agent_run_id: string | null;
   supersedes: string | null;
+  /**
+   * A default of one of the project's folders this fact replaces for this
+   * project (Sean, 23 Nov). Never a required rule; absent on rows read before
+   * the column existed.
+   */
+  overrides_folder_fact?: string | null;
   retired_at: string | null;
   retired_reason: string | null;
   created_at: string;
@@ -128,6 +134,13 @@ export interface Project {
    * `facts`; prompts cite them as [R1], [R2], ….
    */
   references?: import('@/lib/workflow/references').ReferenceMaterial[];
+  /**
+   * What the project's folders hand down: their rules in force here and their
+   * documents (Sean, 23 Nov). Not a column: read in the browser when the
+   * project opens, resolved with the project's own facts; undefined when the
+   * folders could not be read yet.
+   */
+  inherited?: import('@/lib/folders/inheritance').Inherited;
 
   title: string;
   objective: string;
@@ -256,14 +269,56 @@ export interface ReferenceSnapshot {
 }
 
 /** One of a user's folders for projects (client, 21 Oct, email 5). */
+/** What a folder stands for, used only in wording ("Apply exception to this search"). */
+export type FolderKind = 'workspace' | 'client' | 'search' | 'folder';
+
 export interface ProjectFolder {
   id: string;
   user_id: string;
   parent_id: string | null;
   name: string;
   position: number;
+  /** Null on folders made before kinds existed: read as a plain folder. */
+  kind?: FolderKind | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A folder's fact or requirement (Sean, 23 Nov): it carries down to every
+ * folder and project below. Append-only like `ProjectFact`.
+ */
+export interface FolderFact {
+  id: string;
+  folder_id: string;
+  user_id: string;
+  statement: string;
+  subject: string | null;
+  kind: 'fact' | 'requirement';
+  /** Nothing below replaces it; only a recorded exception gets round it. */
+  required: boolean;
+  source_kind: 'typed' | 'note' | 'file';
+  source_ref: Record<string, unknown>;
+  origin: 'user_stated' | 'model_assumed';
+  supersedes: string | null;
+  /** An ancestor folder's default this one replaces, here and below. */
+  overrides: string | null;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
+}
+
+/** A document kept on a folder (an agreement, a position spec), as its text. */
+export interface FolderDocument {
+  id: string;
+  folder_id: string;
+  user_id: string;
+  name: string;
+  text: string;
+  source_ref: Record<string, unknown>;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
 }
 
 /**
@@ -397,6 +452,8 @@ export interface ProjectInput {
   workflow?: string;
   /** Client, 21 Oct: the language the work is written in. */
   language?: string;
+  /** The folder it is filed in from the start, so it follows that folder's rules (Sean, 23 Nov). */
+  folder_id?: string | null;
 }
 
 /**

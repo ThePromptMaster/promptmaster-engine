@@ -93,6 +93,8 @@ export function FolderChoices({
         {options.map((f) => item(f.id, f.name, f.depth))}
       </ul>
       {options.length === 0 && <p className="px-2.5 py-1.5 text-label text-[var(--on-surface-variant)]">{t('move.none')}</p>}
+      {/* A project follows the rules of the folder it is in (Sean, 23 Nov): a move changes them. */}
+      {options.length > 0 && <p className="px-2.5 pt-1.5 text-label leading-snug text-[var(--on-surface-variant)]">{t('frules.moveNote')}</p>}
     </>
   );
 }

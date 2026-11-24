@@ -37,6 +37,13 @@ class AcceptedFact(BaseModel):
     replaces: str = Field(default="", max_length=2_000)
     #: "model_assumed" when PromptMaster supplied it rather than the user; absent otherwise (8 Nov).
     origin: str = Field(default="", max_length=40)
+    #: Set on a rule one of the project's folders hands down (Sean, 23 Nov): which
+    #: folder, in words ('the client folder "Acme"'). Empty for the project's own.
+    scope: str = Field(default="", max_length=300)
+    #: A folder's required rule: nothing below replaces it; only a recorded exception does.
+    required: bool = False
+    #: A folder's default this one replaces here, with where the default is set.
+    replaces_default: str = Field(default="", max_length=2_400)
 
 
 class WebSource(BaseModel):
@@ -167,7 +174,8 @@ class PMInput(BaseModel):
     # each with its source. Every prompt that carries the context carries these
     # first (`project_context.context_block`), so every stage, check and chat
     # reads the same current evidence.
-    facts: list[AcceptedFact] = Field(default_factory=list, max_length=200)
+    #: The project's own (at most 200), then its folders' rules in force (at most 100).
+    facts: list[AcceptedFact] = Field(default_factory=list, max_length=300)
     # 20 Oct (Sean: "citations and saved sources"): the web sources the
     # project saved, numbered [S1]… in this order.
     sources: list[SavedSource] = Field(default_factory=list, max_length=40)

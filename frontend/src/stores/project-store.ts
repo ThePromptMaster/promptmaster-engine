@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
+import { readInherited, type InheritedSource } from '@/lib/supabase/folder-rules';
 import { listProjectSources } from '@/lib/supabase/sources';
 import { listCleanRunIds } from '@/lib/supabase/agent';
 import { listReferences, loadReferenceMaterial } from '@/lib/supabase/references';
@@ -153,6 +154,13 @@ interface ProjectState {
   referenceMaterial: ReferenceMaterial[];
   /** Re-read the references and their material, after one is added or removed. */
   reloadReferences: () => Promise<void>;
+  /**
+   * What the project's folders hand down, as read (Sean, 23 Nov); null until
+   * read. A failed read keeps what was last read, never "no folder rules".
+   */
+  inheritedSource: InheritedSource | null;
+  /** Re-read the folders' rules and documents, after one is changed from the workspace. */
+  reloadInherited: () => Promise<void>;
   /** The latest web search a writer made on this project (22 Oct), for the stage it was made from. */
   lastWeb: WebFound | null;
 
@@ -373,6 +381,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   codeRuns: [],
   references: [],
   referenceMaterial: [],
+  inheritedSource: null,
   lastWeb: null,
   activeVersionId: null,
   loading: false,
@@ -412,7 +421,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // down: the derived half of the panel still works. Events do not fail to
       // an empty log — that reads as a reset project (4 Oct). They stay null,
       // or keep the log already on hand on a background reload, and say so.
-      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources, referenced, codeRuns] = await Promise.all([
+      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources, referenced, codeRuns, inheritedSource] = await Promise.all([
         listArtifacts(id),
         listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
@@ -428,6 +437,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         ),
         // Like facts: a failed read keeps what was last read, never "nothing has run".
         listCleanRunIds(id).catch(() => (get().projectId === id ? get().codeRuns : [])),
+        // Like facts: a failed read keeps what was last read, never "no folder rules".
+        readInherited(project.folder_id).catch(() => (get().projectId === id ? get().inheritedSource : null)),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -522,6 +533,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         sources,
         codeRuns,
         ...referenced,
+        inheritedSource,
         activeVersionId: head?.id ?? null,
         loading: false,
         // A reload that worked clears a refresh failure; a save failure keeps
@@ -555,6 +567,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       codeRuns: [],
       references: [],
       referenceMaterial: [],
+      inheritedSource: null,
       lastWeb: null,
       activeVersionId: null,
       saveState: 'idle',
@@ -621,6 +634,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (!id) return;
     const referenced = await readReferences(id);
     if (get().projectId === id) set(referenced);
+  },
+
+  async reloadInherited() {
+    const id = get().projectId;
+    const folderId = get().project?.folder_id;
+    if (!id) return;
+    const inheritedSource = await readInherited(folderId);
+    if (get().projectId === id) set({ inheritedSource });
   },
 
   async reloadRecommendations() {

@@ -170,6 +170,18 @@ SUGGESTIONS_RULE = (
 )
 
 
+#: Sean, 23 Nov ("Inheritance & exceptions"): a firm's workspace, a client's folder and a
+#: search's folder each hold rules that carry down to the work below them. They are the
+#: user's own word, like the project's facts, and a different-sounding note does not
+#: quietly replace one.
+FOLDER_RULES_RULE = (
+    "A rule marked as from a workspace, client folder, search folder or folder was set by the user for "
+    "everything filed under it, and applies to this project exactly like the project's own facts. Only a "
+    "fact that says it replaces it here changes it. Where something else in the project seems to "
+    "disagree with one, do not choose between them: follow the rule and say plainly what disagrees."
+)
+
+
 def facts_block(inputs: PMInput) -> str:
     """The accepted facts as a block, or "" when there are none. Never cut: they
     are bounded where they are sent, and a fact silently dropped is the stale
@@ -191,9 +203,15 @@ def facts_block(inputs: PMInput) -> str:
             "it to anyone the work is written for)" if f.origin == "policy"
             else ""
         )
-        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{assumed}")
+        required = " (a required rule: it holds here unless an exception recorded for this project says otherwise)" if f.required else ""
+        default = (
+            f' (replaces here "{" ".join(f.replaces_default.split())}", which still holds elsewhere but not for this project)'
+            if f.replaces_default.strip() else ""
+        )
+        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{default}{required}{assumed}")
     current = reporting_date_line(inputs)
-    return f"{FACTS_HEADER}\n" + "\n".join(lines) + f"\n{SUGGESTIONS_RULE}" + (f"\n{current}" if current else "")
+    folders = f"\n{FOLDER_RULES_RULE}" if any(f.scope.strip() for f in facts) else ""
+    return f"{FACTS_HEADER}\n" + "\n".join(lines) + f"\n{SUGGESTIONS_RULE}" + folders + (f"\n{current}" if current else "")
 
 
 SOURCES_HEADER = (

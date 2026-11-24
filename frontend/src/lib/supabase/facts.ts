@@ -13,7 +13,7 @@ import type { ProjectFact } from '@/types/project';
  */
 
 const COLUMNS =
-  'id, project_id, user_id, statement, subject, kind, source_kind, source_ref, accepted_by, origin, agent_run_id, supersedes, retired_at, retired_reason, created_at';
+  'id, project_id, user_id, statement, subject, kind, source_kind, source_ref, accepted_by, origin, agent_run_id, supersedes, overrides_folder_fact, retired_at, retired_reason, created_at';
 
 export interface NewFact {
   statement: string;
@@ -23,6 +23,8 @@ export interface NewFact {
   source_ref?: Record<string, unknown>;
   /** Default `user_stated`; `model_assumed` for what the brief's drafter inferred. */
   origin?: 'user_stated' | 'model_assumed';
+  /** A default of one of the project's folders this replaces here (never a required rule). */
+  overrides_folder_fact?: string | null;
 }
 
 export async function listProjectFacts(projectId: string): Promise<ProjectFact[]> {
@@ -46,6 +48,7 @@ export async function recordFacts(project: { id: string; user_id: string }, fact
     source_kind: f.source_kind,
     source_ref: f.source_ref ?? {},
     ...(f.origin ? { origin: f.origin } : {}),
+    ...(f.overrides_folder_fact ? { overrides_folder_fact: f.overrides_folder_fact } : {}),
   }));
   const { data, error, status } = await supabase.from('project_facts').insert(rows).select(COLUMNS);
   if (error) throw dbError(error, status);
@@ -55,7 +58,7 @@ export async function recordFacts(project: { id: string; user_id: string }, fact
 /** Change a fact: a new row that supersedes it; the database retires the old one in the same insert. */
 export async function supersedeFact(
   project: { id: string; user_id: string },
-  old: Pick<ProjectFact, 'id' | 'kind' | 'subject'>,
+  old: Pick<ProjectFact, 'id' | 'kind' | 'subject'> & Partial<Pick<ProjectFact, 'overrides_folder_fact'>>,
   statement: string,
   /** Where the change came from, beside the fact it replaces: a revision names its stage and instruction. */
   from?: Record<string, unknown>,
@@ -68,6 +71,8 @@ export async function supersedeFact(
     .insert({
       project_id: project.id, user_id: project.user_id, statement: statement.trim(), subject: old.subject,
       kind: old.kind, source_kind: sourceKind, source_ref: { ...(from ?? {}), supersedes: old.id }, supersedes: old.id,
+      // A changed replacement of a folder default still replaces it.
+      ...(old.overrides_folder_fact ? { overrides_folder_fact: old.overrides_folder_fact } : {}),
     })
     .select(COLUMNS)
     .single();

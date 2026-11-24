@@ -259,6 +259,10 @@ export default function NewProjectPage() {
   // 13 Oct (production pass): words typed into the box before the page became
   // interactive were wiped when it did — they are taken from the box first.
   const goalBox = useRef<HTMLTextAreaElement | null>(null);
+  // "New project" from a folder's list carries the folder (Sean, 23 Nov).
+  const [startFolder] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('folder')?.trim() || null
+  );
   useEffect(() => {
     const typed = goalBox.current?.value ?? '';
     const goal = typed.trim()
@@ -605,6 +609,8 @@ export default function NewProjectPage() {
           mode: draft.mode,
           workflow: selected.key,
           language,
+          // Started from a folder: filed there, under its rules from the first stage (Sean, 23 Nov).
+          ...(startFolder ? { folder_id: startFolder } : {}),
         },
         user.id
       );

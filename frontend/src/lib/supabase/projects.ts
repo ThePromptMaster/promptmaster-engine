@@ -90,6 +90,7 @@ export async function createProject(
       model: input.model ?? '',
       workflow: input.workflow ?? 'single_output',
       ...(input.language && input.language !== 'en' ? { language: input.language } : {}),
+      ...(input.folder_id ? { folder_id: input.folder_id } : {}),
     }))
     .select(FULL_COLUMNS)
     .single();

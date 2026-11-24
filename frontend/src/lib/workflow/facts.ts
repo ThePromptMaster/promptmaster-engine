@@ -3,7 +3,9 @@
  * 7 Oct). Pure; the rows come from `lib/supabase/facts.ts`.
  */
 import type { Project, ProjectFact } from '@/types/project';
+import type { PMInput } from '@/types';
 import { factValues, supersededValues, type SupersededValue } from './fact-values';
+import { inheritedForRequest, levelWords, projectReplacements, type Inherited } from '@/lib/folders/inheritance';
 
 /** Facts sent with a request: enough for every prompt, bounded. */
 export const MAX_FACTS_SENT = 200;
@@ -102,10 +104,18 @@ export function assumedByModel(statement: string, userText: string): boolean {
   return !words.length || words.filter((w) => said.includes(w)).length < Math.max(1, Math.ceil(words.length / 2));
 }
 
-/** What a request carries: the current facts, each with its source in words. */
-export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
+/**
+ * What a request carries: the current facts, each with its source in words,
+ * then the rules the project's folders hand down (Sean, 23 Nov). The
+ * project's own come first, so a conflict check's F1, F2, … name the same
+ * project facts with or without folders (`factCitedAs`).
+ */
+export type RequestFact = NonNullable<PMInput['facts']>[number];
+
+export function factsForRequest(facts: readonly ProjectFact[] | undefined, inherited?: Inherited | null): RequestFact[] {
   const byId = new Map((facts ?? []).map((f) => [f.id, f]));
-  return currentFacts(facts)
+  const replacing = projectReplacements(inherited);
+  const own = currentFacts(facts)
     .slice(-MAX_FACTS_SENT)
     .map((f) => {
       // The value it replaced rides with it, so every prompt is told what is
@@ -113,8 +123,16 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
       // A correction to a figure only the brief stated names it in its own
       // words, with no earlier fact to point at (18 Oct, Ridgeway).
       const replaced = (f.supersedes ? byId.get(f.supersedes)?.statement : undefined) ?? namedReplaced(f.statement);
-      return { statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f), ...(replaced ? { replaces: replaced } : {}), ...(f.origin === 'model_assumed' || f.origin === 'policy' ? { origin: f.origin } : {}) };
+      // A folder's default this project replaces: still true where it applies, not here.
+      const rule = replacing.get(f.id);
+      return {
+        statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f),
+        ...(replaced ? { replaces: replaced } : {}),
+        ...(f.origin === 'model_assumed' || f.origin === 'policy' ? { origin: f.origin } : {}),
+        ...(rule ? { replaces_default: `${rule.fact.statement} (the default of ${levelWords(rule.level)})` } : {}),
+      };
     });
+  return [...own, ...inheritedForRequest(inherited).facts];
 }
 
 /**

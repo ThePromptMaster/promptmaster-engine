@@ -24,7 +24,12 @@ export interface PMInput {
   /** What other people wrote, ticked by the user: evidence, never their word (`project_context.third_party_block`). */
   third_party?: ThirdPartyItem[];
   /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
-  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string; origin?: string }[];
+  /**
+   * The project's own facts, then the rules its folders hand down (Sean, 23
+   * Nov): `scope` names the folder, `required` marks a rule only an exception
+   * gets round, `replaces_default` the folder default a fact replaces here.
+   */
+  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string; origin?: string; scope?: string; required?: boolean; replaces_default?: string }[];
   /** Saved web sources, cited as [S1]… in this order (20 Oct). */
   sources?: { url: string; title: string; excerpt: string; retrieved: string }[];
   /** Instructions the user applied with "Change it", oldest first (12 Oct): their later word. */

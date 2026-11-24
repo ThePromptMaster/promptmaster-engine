@@ -1,6 +1,7 @@
 'use client';
 
 import { contextForRequest } from '@/lib/data/context-for-request';
+import { materialWithInherited } from '@/lib/folders/inheritance';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
@@ -107,7 +108,7 @@ function inputsFor(project: Project): PMInput {
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
-    context: contextForRequest(project.context ?? '', [project.objective, project.title, 'outline chapters sections contents structure'].join('\n')).context,
+    context: contextForRequest(materialWithInherited(project.context ?? '', project.inherited), [project.objective, project.title, 'outline chapters sections contents structure'].join('\n')).context,
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
     ...(project.third_party?.length ? { third_party: project.third_party } : {}),
     mode: project.mode,
