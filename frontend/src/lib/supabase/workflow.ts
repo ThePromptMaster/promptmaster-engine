@@ -47,6 +47,8 @@ export function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } 
 export function definitionOf(template: WorkflowTemplate): TemplateRow['definition'] {
   return {
     outline_stage: template.outline_stage,
+    // A copy of a workflow that derives its outline keeps how (24 Nov, folder copies).
+    ...(template.derived_outline ? { derived_outline: template.derived_outline } : {}),
     ...(template.nouns ? { nouns: template.nouns } : {}),
     ...(template.inquiry ? { inquiry: true } : {}),
     ...(template.execution ? { execution: template.execution } : {}),
@@ -149,7 +151,7 @@ export async function publishUserTemplate(
   template: WorkflowTemplate,
   ownerId: string,
   /** `listed: false` — designed for one project, not offered on the start screen (24 Oct). */
-  { listed = true }: { listed?: boolean } = {}
+  { listed = true, copiedFromId = null }: { listed?: boolean; /** The version a copy was made from (24 Nov). */ copiedFromId?: string | null } = {}
 ): Promise<WorkflowTemplate & { id: string }> {
   const supabase = createClient();
   const { data, error, status } = await supabase
@@ -164,6 +166,7 @@ export async function publishUserTemplate(
       listed,
       is_system: false,
       owner_id: ownerId,
+      ...(copiedFromId ? { copied_from_id: copiedFromId } : {}),
       published_at: new Date().toISOString(),
     })
     .select(TEMPLATE_COLUMNS)

@@ -19,9 +19,9 @@ import type { FolderConflict, FolderDocument, FolderException, FolderFact, Proje
 
 const FACT_COLUMNS =
   'id, folder_id, user_id, statement, subject, kind, required, source_kind, source_ref, origin, supersedes, overrides, retired_at, retired_reason, created_at';
-const DOC_COLUMNS = 'id, folder_id, user_id, name, text, source_ref, retired_at, retired_reason, created_at';
+const DOC_COLUMNS = 'id, folder_id, user_id, name, text, is_template, source_ref, retired_at, retired_reason, created_at';
 /** A document's text without its body, for lists that only name it. */
-const DOC_HEAD_COLUMNS = 'id, folder_id, user_id, name, source_ref, retired_at, retired_reason, created_at';
+const DOC_HEAD_COLUMNS = 'id, folder_id, user_id, name, is_template, source_ref, retired_at, retired_reason, created_at';
 
 export const FOLDER_DOC_MAX_CHARS = 1_000_000;
 
@@ -123,7 +123,7 @@ export async function retireFolderFact(id: string, reason: string): Promise<void
 
 export async function addFolderDocument(
   folder: { id: string; user_id: string },
-  doc: { name: string; text: string; source_ref?: Record<string, unknown> }
+  doc: { name: string; text: string; source_ref?: Record<string, unknown>; is_template?: boolean }
 ): Promise<FolderDocument> {
   const { data, error, status } = await createClient()
     .from('folder_documents')
@@ -133,6 +133,7 @@ export async function addFolderDocument(
       name: doc.name.trim().slice(0, 300) || 'Document',
       text: doc.text.slice(0, FOLDER_DOC_MAX_CHARS),
       source_ref: doc.source_ref ?? {},
+      ...(doc.is_template ? { is_template: true } : {}),
     })
     .select(DOC_COLUMNS)
     .single();

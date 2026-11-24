@@ -42,6 +42,7 @@ const eslintConfig = defineConfig([
       "src/components/folders/held-stage-notice.tsx",
       "src/components/evidence/version-inputs.tsx",
       "src/components/evidence/source-viewer.tsx",
+      "src/components/folders/folder-templates.tsx",
       "src/components/projects/use-in-project-menu.tsx",
       "src/components/projects/deleted-projects.tsx",
       "src/components/projects/guest-banner.tsx",

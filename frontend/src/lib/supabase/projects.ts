@@ -14,7 +14,7 @@ const LIST_COLUMNS =
   'id, title, objective, mode, workflow, workflow_template_id, example_key, stage, status, accent, folder_id, updated_at, created_at';
 
 const FULL_COLUMNS = `
-  id, user_id, title, objective, audience, constraints, output_format, context, sample_output,
+  id, user_id, title, objective, audience, constraints, output_format, context, sample_output, sample_source,
   mode, custom_name, custom_preamble, custom_tone,
   model, session_facts, active_stack_id, constraint_presets, format_presets,
   workflow, workflow_template_id, example_key, third_party, stage, status, manual_checks, manual_check_versions, routine_decisions, web_access, account_search, thinking, language, accent, folder_id, stage_modes, revision,
