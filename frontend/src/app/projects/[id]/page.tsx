@@ -309,10 +309,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           grids stacked, so the title floated left of the content it titled and
           nothing on the page lined up with anything else. It now mirrors the
           workspace exactly: the same rail-width gutter, the same padding, the
-          same column width. The title starts where the stage content starts. */}
+          same column width. The title starts where the stage content starts.
+          The gutter follows the stages when they are dragged or pulled in
+          (`--pm-rail-w`, set by `StageRailAside`). */}
       <div className="bg-[var(--surface-container-lowest)]">
         <div className="flex">
-          <div aria-hidden className="hidden w-[248px] shrink-0 md:block" />
+          <div aria-hidden className="hidden w-[var(--pm-rail-w,248px)] shrink-0 md:block" />
           <div className="min-w-0 flex-1 px-6 py-4 md:px-10">
             <div className="max-w-[820px]">
               <div className="flex items-center gap-4">
@@ -337,7 +339,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         // the stages anyway would project an empty log — every stage "not
         // started" — which reads as the project having been reset (4 Oct).
         <div className="flex">
-          <div aria-hidden className="hidden w-[248px] shrink-0 md:block" />
+          <div aria-hidden className="hidden w-[var(--pm-rail-w,248px)] shrink-0 md:block" />
           <div className="min-w-0 flex-1 px-6 py-10 md:px-10">
             <div role="alert" className="max-w-[820px] rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
               <p className="text-title text-[var(--on-surface)]">

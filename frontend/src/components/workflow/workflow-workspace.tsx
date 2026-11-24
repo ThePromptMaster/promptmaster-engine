@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
+import { StageRailAside } from './stage-rail-aside';
 import { approvedVersions, ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { commitmentsToCheck } from '@/lib/workflow/not-applicable';
 import { MORE_GROUPS, StageTransitionBar, type MoreAction } from './stage-transition-bar';
@@ -2871,24 +2872,28 @@ export function WorkflowWorkspace({
           They were set in the smallest size available, below the stage names
           they are meant to caption. The name is now a title and the progress a
           label, so the block reads top-down instead of flat. */}
-      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 pb-24 pt-6 md:block sidebar-scroll">
-        <div className="mb-5 px-3">
-          <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
-          <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
-          {overallLine}
-        </div>
-
-        <StageRail
-          template={template}
-          state={state}
-          nextSuggestedId={nextSuggested}
-          onSelect={setViewingStageId}
-          approvalPendingIds={approvalPendingIds}
-          projectOpenOn={projectOpenOn}
-          openFindings={openFindings}
-          reapprove={reapprove}
-        />
-      </aside>
+      <StageRailAside
+        header={
+          <>
+            <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
+            <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
+            {overallLine}
+          </>
+        }
+        rail={(compact) => (
+          <StageRail
+            template={template}
+            state={state}
+            nextSuggestedId={nextSuggested}
+            onSelect={setViewingStageId}
+            approvalPendingIds={approvalPendingIds}
+            projectOpenOn={projectOpenOn}
+            openFindings={openFindings}
+            reapprove={reapprove}
+            compact={compact}
+          />
+        )}
+      />
 
       {/* Below 768px the rail is hidden and, until now, replaced by nothing at
           all: on a narrow window or a phone there was no way to see the other
@@ -2898,7 +2903,7 @@ export function WorkflowWorkspace({
           viewport can learn what stage it is on out of how many.
 
           One `StageRail`, two placements. `md:hidden` on this and `md:block`
-          on the aside means exactly one is ever mounted. */}
+          on `StageRailAside` means exactly one is ever shown. */}
       {mobileRailOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div

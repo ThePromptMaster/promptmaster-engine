@@ -40,7 +40,27 @@ describe('the folders sidebar (client, 21 Oct, email 5)', () => {
     const props = sidebar();
     await userEvent.click(screen.getByRole('button', { name: 'New folder' }));
     await userEvent.type(screen.getByLabelText('Folder name'), 'Research{Enter}');
-    expect(props.onCreate).toHaveBeenCalledWith('Research', null);
+    expect(props.onCreate).toHaveBeenCalledWith('Research', null, null);
+  });
+
+  // 24 Nov, Sean: "how do I make the workspace folders?" Only the sample could.
+  it('makes a workspace, a client inside it and a search inside the client', async () => {
+    const tree: ProjectFolder[] = [
+      { ...folder('w', 'Larchmere'), kind: 'workspace' },
+      { ...folder('c', 'Quillfield', 'w'), kind: 'client' },
+    ];
+    const props = sidebar({ folders: tree, counts: {} });
+    await userEvent.click(screen.getByRole('button', { name: 'New workspace' }));
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Northgate{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Northgate', null, 'workspace');
+
+    await userEvent.click(screen.getByRole('button', { name: 'New client in Larchmere' }));
+    await userEvent.type(screen.getByLabelText('Client name'), 'Acme{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Acme', 'w', 'client');
+
+    await userEvent.click(screen.getByRole('button', { name: 'New search in Quillfield' }));
+    await userEvent.type(screen.getByLabelText('Search name'), 'CFO search{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('CFO search', 'c', 'search');
   });
 
   it('asks before deleting, and says the projects are kept', async () => {
