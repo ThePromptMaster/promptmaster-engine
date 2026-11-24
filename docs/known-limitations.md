@@ -5480,7 +5480,7 @@ invented firm (Larchmere Search Partners), one client (Quillfield Dairy Co-op) w
 PDF default and its engagement terms, a Finance Director search with an exception recorded (who, how confirmed,
 why) and its position specification, a Head of Supply Chain search on the client's default, a "Transcript
 review" workflow at the firm with the client's copy one version behind, and one interview review with an
-invented transcript (`lib/projects/demo/`). It is ordinary data: nothing about it is special once made, and
+invented transcript (`lib/projects/demo/`), with web access and account search off, like the other samples. It is ordinary data: nothing about it is special once made, and
 nothing is drafted until the project is opened. It is made in several writes; a failure part way leaves what was
 made, all of it named "(sample)".
 

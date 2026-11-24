@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/client';
 import { createFolder } from '@/lib/supabase/folders';
 import { addFolderDocument, addFolderFact, recordException, retireFolderFact } from '@/lib/supabase/folder-rules';
 import { addFolderTemplate, copyIntoFolder, startProjectFrom } from '@/lib/supabase/folder-templates';
@@ -59,5 +60,9 @@ export async function startSearchFirmSample(userId: string, language?: string): 
     "Review Priya Raman's first interview for the Finance Director search: the topics the search must cover, what she said on each, the follow-up questions, and notes for the candidate report.",
     `### From Interview transcript.txt\n\n${SAMPLE_TRANSCRIPT}`
   );
+  // Invented material only, like the other samples: nothing from the person's accounts or the web
+  // (24 Nov pass: the sample's first draft brought in unrelated emails from a connected account).
+  const { error } = await createClient().from('projects').update({ web_access: 'off', account_search: 'off' }).eq('id', projectId);
+  if (error) throw error;
   return { workspaceId: ws.id, projectId };
 }
