@@ -259,10 +259,10 @@ export default function NewProjectPage() {
   // 13 Oct (production pass): words typed into the box before the page became
   // interactive were wiped when it did — they are taken from the box first.
   const goalBox = useRef<HTMLTextAreaElement | null>(null);
-  // "New project" from a folder's list carries the folder (Sean, 23 Nov).
-  const [startFolder] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('folder')?.trim() || null
-  );
+  // "New project" from a folder's list carries the folder (Sean, 23 Nov). Read when the
+  // project is made, not on the first render: reached by a link inside the app, the page
+  // renders before the address bar shows its query, and the folder was lost (24 Nov pass).
+  const startFolderNow = () => new URLSearchParams(window.location.search).get('folder')?.trim() || null;
   useEffect(() => {
     const typed = goalBox.current?.value ?? '';
     const goal = typed.trim()
@@ -610,7 +610,7 @@ export default function NewProjectPage() {
           workflow: selected.key,
           language,
           // Started from a folder: filed there, under its rules from the first stage (Sean, 23 Nov).
-          ...(startFolder ? { folder_id: startFolder } : {}),
+          ...(startFolderNow() ? { folder_id: startFolderNow() } : {}),
         },
         user.id
       );

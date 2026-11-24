@@ -13,6 +13,8 @@ vi.mock('@/lib/supabase/workflow', () => ({ appendWorkflowEvent: (...a: unknown[
 vi.mock('@/lib/supabase/sources', () => ({ saveSources: vi.fn(async () => []) }));
 const CHAPTERS = { id: 'a1', stage_id: 'manuscript', long_form: { outline: [{ id: 's1', title: 'Chapter 4', status: 'complete', content: `Sam approves 2:30. ${Array.from({ length: 300 }, () => 'word').join(' ')}` }] } };
 vi.mock('@/lib/supabase/versions', () => ({
+  getInputsUsed: vi.fn(async () => null),
+  folderKeysOf: vi.fn(async () => new Map()),
   getArtifact: vi.fn(async () => CHAPTERS),
   listVersions: vi.fn(async () => []),
   listArtifacts: vi.fn(async () => []),

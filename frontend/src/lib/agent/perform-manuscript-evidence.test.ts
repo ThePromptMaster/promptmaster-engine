@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getArtifact = vi.fn();
 const listVersions = vi.fn();
 vi.mock('@/lib/supabase/versions', () => ({
+  getInputsUsed: vi.fn(async () => null),
+  folderKeysOf: vi.fn(async () => new Map()),
   getArtifact: (...a: unknown[]) => getArtifact(...a),
   listVersions: (...a: unknown[]) => listVersions(...a),
   listArtifacts: vi.fn(async () => []),

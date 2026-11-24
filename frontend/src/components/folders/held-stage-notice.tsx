@@ -35,7 +35,7 @@ export function HeldStageNotice({
         <span aria-hidden className="material-symbols-outlined text-[18px]">pause_circle</span>
         {t('frules.heldTitle')}
       </p>
-      <p className="mt-1 text-body text-[var(--on-surface-variant)]">{t('frules.heldWhy', { stage: stageLabel, quote: held.quote })}</p>
+      <p className="mt-1 text-body text-[var(--on-surface-variant)]">{t('frules.heldWhy', { stage: stageLabel, quote: held.quote.replace(/[.\s]+$/, '') })}</p>
       <div className="mt-3">
         <MismatchChoice mismatch={held.mismatch} userId={userId} projectId={projectId} onDone={onChanged} />
       </div>

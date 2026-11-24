@@ -3,6 +3,7 @@
 import { heldStages, mismatchOutstanding } from '@/lib/folders/holds';
 import { HeldStageNotice } from '@/components/folders/held-stage-notice';
 import { useInheritedChecks } from './use-inherited-checks';
+import { useRequirementsRecheck } from './use-requirements-recheck';
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { translate } from '@/lib/i18n/translate';
@@ -1370,6 +1371,11 @@ export function WorkflowWorkspace({
     project, template, events, stageId: state.current_stage_id, appendEvent,
     enabled: project.status !== 'finalized' && !project.example_key && events !== null,
     onReload,
+  });
+  // Finished work written under folder rules that changed since: judged once per set of rules (L-281).
+  useRequirementsRecheck({
+    project, template, state, bundles: stageBundles, events, stageId: state.current_stage_id, appendEvent,
+    enabled: project.status !== 'finalized' && !project.example_key && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   const heldHereNow = useMemo(() => heldStages(project.inherited, events).get(stageId), [project.inherited, events, stageId]);

@@ -25,6 +25,8 @@ vi.mock('@/lib/supabase/workflow', () => ({ listWorkflowEvents, appendWorkflowEv
 vi.mock('@/lib/supabase/recommendations', () => ({ listRecommendations, supersedePending }));
 vi.mock('@/lib/supabase/tasks', () => ({ listTasks }));
 vi.mock('@/lib/supabase/versions', () => ({
+  getInputsUsed: vi.fn(async () => null),
+  folderKeysOf: vi.fn(async () => new Map()),
   listArtifacts,
   listVersions,
   getEvaluation,

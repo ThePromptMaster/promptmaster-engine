@@ -125,3 +125,22 @@ export function mismatchLines(items: ReturnType<typeof mismatchOutstanding>): st
     `Waiting on the user's choice between two instructions: ${words(i.upper)} says "${i.rule}", and ${words(i.lower)} says "${i.note}". The choice is on the page; do not ask it again.${i.held.length ? ` It holds up: ${i.held.join(', ')}; do not draft ${i.held.length === 1 ? 'that stage' : 'those stages'} until it is chosen.` : ''}`
   );
 }
+
+/**
+ * Every stage still open waits on a choice, and the stage Go is on is finished: there
+ * is no other work, so Go stops on the choice itself rather than asking it in words of
+ * its own (24 Nov pass: Go asked "who makes the calls?" with "Do whatever is best", which
+ * would have handed a required rule to Go). The held stages, in order; empty otherwise.
+ */
+export function onlyHeldLeft(
+  stages: readonly { id: string }[],
+  status: (id: string) => string | undefined,
+  held: ReadonlyMap<string, unknown>,
+  currentStageId: string
+): string[] {
+  if (!held.size) return [];
+  const done = (s: string | undefined) => s === 'complete' || s === 'completed_with_artifact' || s === 'skipped';
+  if (!done(status(currentStageId))) return [];
+  const open = stages.filter((s) => !done(status(s.id)));
+  return open.length && open.every((s) => held.has(s.id)) ? open.map((s) => s.id) : [];
+}

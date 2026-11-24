@@ -1,6 +1,7 @@
 import { createClient } from './client';
 import { dbError } from './errors';
 import { listFolders } from './folders';
+import { folderKeysOf } from './versions';
 import { folderChain } from '@/lib/folders/inheritance';
 import type { FolderConflict, FolderDocument, FolderException, FolderFact, ProjectFolder } from '@/types/project';
 
@@ -289,4 +290,34 @@ export async function revokeException(id: string, reason = 'revoked by the user'
     .eq('id', id)
     .is('retired_at', null);
   if (error) throw dbError(error, status);
+}
+
+/**
+ * The projects with work made under other folder rules than `currentKey`, and not
+ * rechecked for it yet (L-281): read from each stage's current version's record,
+ * without opening any project.
+ */
+export async function projectsNeedingAnotherLook(projectIds: readonly string[], currentKey: string | null): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!projectIds.length || !currentKey) return out;
+  const supabase = createClient();
+  const [{ data: artifacts, error: aErr }, { data: rechecks, error: eErr }] = await Promise.all([
+    supabase.from('artifacts').select('project_id, current_version_id').in('project_id', [...projectIds]).not('current_version_id', 'is', null),
+    supabase
+      .from('workflow_events')
+      .select('project_id, key:payload->>requirements_key')
+      .in('project_id', [...projectIds])
+      .eq('type', 'brief_changed')
+      .not('payload->>requirements_key', 'is', null),
+  ]);
+  if (aErr) throw aErr;
+  if (eErr) throw eErr;
+  const rechecked = new Set(((rechecks ?? []) as unknown as { project_id: string; key: string | null }[]).filter((r) => r.key === currentKey).map((r) => r.project_id));
+  const heads = ((artifacts ?? []) as unknown as { project_id: string; current_version_id: string }[]).filter((a) => !rechecked.has(a.project_id));
+  const keys = await folderKeysOf(heads.map((a) => a.current_version_id));
+  for (const a of heads) {
+    const k = keys.get(a.current_version_id);
+    if (k && k !== currentKey) out.add(a.project_id);
+  }
+  return out;
 }
