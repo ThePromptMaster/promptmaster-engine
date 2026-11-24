@@ -7,8 +7,8 @@ vi.mock('@/lib/folders/inputs-used', () => ({
   folderKey: () => 'NEW',
   changedSince: () => ({ added: ['Candidate reports for this search go as Word documents.'], removed: ['Candidate reports go to the client as PDF.'] }),
 }));
-const finishedConclusions = vi.fn((tpl: { stages: { id: string }[] }) => tpl.stages.map((s) => ({ stage_id: s.id, label: s.id, summary: '' })));
-vi.mock('@/lib/workflow/brief-change', () => ({ finishedConclusions: (...a: unknown[]) => finishedConclusions(...(a as [never])) }));
+const finishedConclusions = vi.fn((...a: unknown[]) => (a[0] as { stages: { id: string }[] }).stages.map((s) => ({ stage_id: s.id, label: s.id, summary: '' })));
+vi.mock('@/lib/workflow/brief-change', () => ({ finishedConclusions: (...a: unknown[]) => finishedConclusions(...a) }));
 vi.mock('@/lib/supabase/versions', () => ({
   folderKeysOf: async (ids: string[]) => new Map(ids.map((id) => [id, 'OLD'])),
   getInputsUsed: async () => ({}),
@@ -29,12 +29,12 @@ describe('a folder rule changed after the work was written (L-281, 24 Nov pass)'
 
   it('a draft still in progress is judged too, not only finished stages', async () => {
     assessChange.mockResolvedValue({ kind: 'fact', affected: [{ stage_id: 'report', reason: 'It says PDF.' }], calculations_hold: [] });
-    const appendEvent = vi.fn(async () => undefined);
+    const appendEvent = vi.fn(async (e: unknown) => void e);
     renderHook(() => useRequirementsRecheck({ project, template, state, bundles, events: [], stageId: 'report', enabled: true, appendEvent }));
     await waitFor(() => expect(appendEvent).toHaveBeenCalled());
     expect(finishedConclusions.mock.calls[0][4]).toBe(true);
     expect(assessChange.mock.calls[0][0].stages.map((s: { stage_id: string }) => s.stage_id)).toEqual(['review', 'report']);
-    expect(appendEvent.mock.calls[0][0]).toMatchObject({ type: 'brief_changed', payload: { origin: 'folder', requirements_key: 'NEW', checked: ['review', 'report'], affected: [{ stage_id: 'report' }] } });
+    expect(appendEvent.mock.calls[0]![0]).toMatchObject({ type: 'brief_changed', payload: { origin: 'folder', requirements_key: 'NEW', checked: ['review', 'report'], affected: [{ stage_id: 'report' }] } });
   });
 
   it('a recheck another tab wrote first is read, so this tab shows it', async () => {
