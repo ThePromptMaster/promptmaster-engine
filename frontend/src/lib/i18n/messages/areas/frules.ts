@@ -92,7 +92,7 @@ export const en = {
   "frules.needsChoice_one": "{count} needs your choice",
   "frules.needsChoice_other": "{count} need your choice",
   "frules.exceptionsHere": "Exceptions here",
-  "frules.exceptionLine": "“{statement}” instead of {level}’s “{rule}”",
+  "frules.exceptionLine": "“{statement}” instead of “{rule}” ({level})",
   "frules.exceptionBy": "Authorised by {who} ({how}), because {why}",
   "frules.ruleChanged": "The rule has changed since the exception was recorded.",
   "frules.revoke": "Revoke",

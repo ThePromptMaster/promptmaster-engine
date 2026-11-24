@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { approvedAsItStands, COMMIT_REPAIRS, delegableToCommit, refusalToRepair, refusedCommits, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, waitingOnTable, type NeedsUser } from './needs';
+import { approvedAsItStands, COMMIT_REPAIRS, delegableToCommit, refusalToRepair, refusedCommits, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, exhaustedRepair, staleRepair, unrepairableStale, waitingOnTable, type NeedsUser } from './needs';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
@@ -651,6 +651,14 @@ describe('a reopened stage Go does not revise is the user\'s to keep or open (2 
     // A reopened prose stage is Go's to repair, not this.
     expect(unrepairableStale(BOOK_V1, withStale({ positioning: stale }))).toBeNull();
     expect(unrepairableStale(BOOK_V1, withStale({}))).toBeNull();
+  });
+
+  it('a reopened stage waiting on the user\'s choice of folder rule is not repaired meanwhile (24 Nov pass)', () => {
+    expect(staleRepair(BOOK_V1, withStale({ positioning: stale }))?.params).toMatchObject({ stage_id: 'positioning' });
+    const args = [[], {}, new Set<string>(), null, {}, false, null] as const;
+    expect(staleRepair(BOOK_V1, withStale({ positioning: stale }), ...args, new Set(['positioning']))).toBeNull();
+    // Nor is it reported as needing the user's hand: the choice on the page is what it waits on.
+    expect(exhaustedRepair(BOOK_V1, withStale({ positioning: stale }), [])).toBeNull();
   });
 
   it('asks keep or open, never "try once more", and the stop reason reads in Spanish', () => {

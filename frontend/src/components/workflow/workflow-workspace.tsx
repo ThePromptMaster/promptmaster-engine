@@ -1374,7 +1374,7 @@ export function WorkflowWorkspace({
   });
   // Finished work written under folder rules that changed since: judged once per set of rules (L-281).
   useRequirementsRecheck({
-    project, template, state, bundles: stageBundles, events, stageId: state.current_stage_id, appendEvent,
+    project, template, state, bundles: stageBundles, events, stageId: state.current_stage_id, appendEvent, refreshEvents,
     enabled: project.status !== 'finalized' && !project.example_key && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);

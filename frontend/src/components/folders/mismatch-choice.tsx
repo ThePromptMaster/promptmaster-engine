@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { lowerStatement } from '@/lib/folders/holds';
 import type { FolderLevel, OpenMismatch } from '@/lib/folders/inheritance';
@@ -34,6 +34,7 @@ export function MismatchChoice({
   onDone: () => void | Promise<void>;
 }) {
   const t = useT();
+  const locale = useLocale();
   const levelName = useLevelName();
   const [mode, setMode] = useState<'choose' | 'exception' | 'correct'>('choose');
   const [who, setWho] = useState('');
@@ -120,7 +121,7 @@ export function MismatchChoice({
                 }
                 await retireLower('replaced the default here');
               })}>
-              {t('frules.mmDiffers', { place })}
+              {t('frules.mmDiffers', { place: place.charAt(0).toLocaleUpperCase(locale) + place.slice(1) })}
             </button>
           )}
           <button type="button" disabled={busy} className={choice} onClick={() => void act(() => dismissConflict(mismatch.conflict.id))}>

@@ -5488,3 +5488,8 @@ Also from the 24 Nov production passes:
 - **Starting a project from a folder's workflow asks what it is for first**, so its first stage, which drafts
   itself when opened ("no stage opens blank"), drafts against a real objective.
 - **A workflow update names the stages whose wording changed**, rather than "wording and guidance updates".
+- **Go never revises a held stage, nor asks for its approval** (second 24 Nov pass): a stage waiting on the
+  user's choice between a folder rule and a note was rewritten when the stages before it changed (the stale
+  repair skipped the hold), and Go then asked for its sign-off. Both now wait on the choice (`staleRepair`'s
+  `held`, and the hold is read before `needsUser`).
+- **A second tab shows a recheck the first tab wrote**: it read the log again only on a refused duplicate.
