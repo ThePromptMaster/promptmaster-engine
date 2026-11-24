@@ -7,7 +7,7 @@ import { recordFacts, retireFact, supersedeFact } from '@/lib/supabase/facts';
 import { currentFacts, retiredFacts } from '@/lib/workflow/facts';
 import { projectReplacements } from '@/lib/folders/inheritance';
 import { InheritedFactsLine } from './inherited-facts-line';
-import { useLevelName } from '@/components/projects/folder-rules-panel';
+import { useLevelName } from '@/components/folders/level-name';
 import type { Project, ProjectFact } from '@/types/project';
 
 /**

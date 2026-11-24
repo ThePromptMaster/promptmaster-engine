@@ -97,6 +97,8 @@ import { evaluateStage, getStage, nextSuggestedStage, outstandingWork } from '@/
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { addedByRun, mayAddStages, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
+import { heldStages, lowerPlace, lowerStatement, mismatchLines, mismatchOutstanding } from '@/lib/folders/holds';
+import { levelWords } from '@/lib/folders/inheritance';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
@@ -1322,6 +1324,40 @@ export function useGoLoop(opts: Options) {
           break;
         }
 
+        // Sean, 23 Nov: "If the two instructions are still in conflict, pause the reference
+        // work that depends on the answer and let the rest of the search continue." A stage
+        // that turns on a folder rule and a note the user has not chosen between is left open
+        // and the work moves on; with nothing else left, Go stops on the choice (L-280).
+        // Go never makes the choice itself, whatever the routine-decision setting.
+        const heldByChoice = heldStages(o.project.inherited, freshEvents);
+        const heldHere = heldByChoice.get(o.stage.id);
+        let heldMove: { key: string; rationale: string; expected: string; params: Record<string, unknown> } | null = null;
+        if (heldHere && !repair && !merge) {
+          const at = o.template.stages.findIndex((s) => s.id === o.stage!.id);
+          const later = o.template.stages.slice(at + 1).find((s) => {
+            const status = o.state.stages[s.id]?.status;
+            return !heldByChoice.has(s.id) && !isDone(status) && status !== 'skipped';
+          });
+          const choice = `${levelWords(heldHere.mismatch.upper.level)} says "${heldHere.mismatch.upper.fact.statement}", and ${lowerPlace(heldHere.mismatch)} says "${lowerStatement(heldHere.mismatch)}"`;
+          if (later && o.stage.transitions.default_next) {
+            if (!allowed.includes('advance_stage')) allowed.push('advance_stage');
+            heldMove = {
+              key: 'advance_stage',
+              rationale: `${o.stage.label} waits on your choice: ${choice}. Moving on to the work that does not depend on it.`,
+              expected: `${o.stage.label} is left open until you choose; ${later.label} is worked on meanwhile.`,
+              params: { held_by: heldHere.mismatch.conflict.id },
+            };
+          } else {
+            await setRunStatus('awaiting_decision', `${o.stage.label} waits on your choice: ${choice}. Choose on the page; everything that does not depend on it is done.`);
+            break;
+          }
+        }
+        // Nor is the objective called met while one is still open.
+        if (o.project.inherited?.mismatches.length) {
+          const at = allowed.indexOf('declare_objective_complete');
+          if (at >= 0) allowed.splice(at, 1);
+        }
+
         // What the stage itself still requires comes before anything the
         // planner might prefer (4 Oct): a cut-off draft is finished, and at an
         // approval the findings are applied and the work checked first.
@@ -1332,7 +1368,7 @@ export function useGoLoop(opts: Options) {
         const justLeftToGo = lastStep?.action_key === USER_ANSWER_STEP && isDelegatedAnswer(lastStep.output ?? '');
         const repairNote = repair ? repairNotesRef.current.get(String(repair.params?.stage_id ?? '')) : undefined;
         if (repair && repairNote) repairNotesRef.current.delete(String(repair.params?.stage_id ?? ''));
-        const required = (repair && repairNote ? { ...repair, params: { ...repair.params, user_note: repairNote } } : repair) ?? (userReturn
+        const required = heldMove ?? (repair && repairNote ? { ...repair, params: { ...repair.params, user_note: repairNote } } : repair) ?? (userReturn
           ? {
               key: 'return_to_stage',
               rationale: `You chose: "${userReturn.answer.slice(0, 200)}". Going back to ${userReturn.label} to do it.`,
@@ -1367,11 +1403,15 @@ export function useGoLoop(opts: Options) {
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
                   polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance, Boolean(o.stage && isSetupStage(o.stage))) && !allowed.includes('revise_stage') ? polishedHere : undefined,
                   // What already waits on the user anywhere in the project (12 Nov): not asked one by one.
-                  waitingOnUser: queueLines(userQueue({
-                    template: o.template, state: o.state, outstanding: outstandingWork(o.template, o.state, context),
-                    bundles: o.bundles, manualChecks: o.project.manual_checks, routine,
-                    kept: keptQuestions([...priorStepsRef.current, ...stepsRef.current], answeredKept(o.project.facts, [...priorStepsRef.current, ...stepsRef.current])),
-                  })),
+                  waitingOnUser: [
+                    ...queueLines(userQueue({
+                      template: o.template, state: o.state, outstanding: outstandingWork(o.template, o.state, context),
+                      bundles: o.bundles, manualChecks: o.project.manual_checks, routine,
+                      kept: keptQuestions([...priorStepsRef.current, ...stepsRef.current], answeredKept(o.project.facts, [...priorStepsRef.current, ...stepsRef.current])),
+                    })),
+                    // A folder rule and a note the user has not chosen between (L-280): theirs, already on the page.
+                    ...mismatchLines(mismatchOutstanding(o.project.inherited, freshEvents, stageLabelFor)),
+                  ],
                 }),
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
               },

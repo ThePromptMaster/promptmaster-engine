@@ -2,7 +2,7 @@ import { createClient } from './client';
 import { dbError } from './errors';
 import { listFolders } from './folders';
 import { folderChain } from '@/lib/folders/inheritance';
-import type { FolderDocument, FolderFact, ProjectFolder } from '@/types/project';
+import type { FolderConflict, FolderDocument, FolderException, FolderFact, ProjectFolder } from '@/types/project';
 
 /**
  * A folder's rules and documents (Sean, 23 Nov: "Workspace: ... facts and
@@ -153,13 +153,140 @@ export interface InheritedSource {
   folders: ProjectFolder[];
   facts: FolderFact[];
   documents: FolderDocument[];
+  /** Current exceptions recorded in the chain's folders or for the project. */
+  exceptions: FolderException[];
+  /** Mismatches recorded against the chain's rules. */
+  conflicts: FolderConflict[];
 }
 
-/** The folders, and the rules and documents of every folder from the top down to `folderId`. */
-export async function readInherited(folderId: string | null | undefined, withText = true): Promise<InheritedSource> {
-  if (!folderId) return { folders: [], facts: [], documents: [] };
+const EMPTY_SOURCE: InheritedSource = { folders: [], facts: [], documents: [], exceptions: [], conflicts: [] };
+
+/**
+ * The folders, and the rules, documents, exceptions and mismatches of every
+ * folder from the top down to `folderId` (and the project's own exceptions).
+ */
+export async function readInherited(folderId: string | null | undefined, withText = true, projectId?: string | null): Promise<InheritedSource> {
+  if (!folderId) return EMPTY_SOURCE;
   const folders = await listFolders();
   const ids = folderChain(folders, folderId).map((l) => l.id);
-  const [facts, documents] = await Promise.all([listFolderFacts(ids), listFolderDocuments(ids, withText)]);
-  return { folders, facts, documents };
+  const [facts, documents, exceptions] = await Promise.all([
+    listFolderFacts(ids),
+    listFolderDocuments(ids, withText),
+    listFolderExceptions(ids, projectId ?? null),
+  ]);
+  const conflicts = await listFolderConflicts(facts.filter((f) => !f.retired_at).map((f) => f.id));
+  return { folders, facts, documents, exceptions, conflicts };
+}
+
+const EXCEPTION_COLUMNS =
+  'id, user_id, folder_id, project_id, rule_id, statement, authorised_by, how_confirmed, reason, from_note, retired_at, retired_reason, created_at';
+const CONFLICT_COLUMNS =
+  'id, user_id, upper_fact_id, lower_folder_fact_id, lower_project_fact_id, upper_quote, lower_quote, explanation, dismissed_at, created_at';
+
+/** The current exceptions recorded in these folders, and for this project. */
+export async function listFolderExceptions(folderIds: readonly string[], projectId: string | null): Promise<FolderException[]> {
+  if (!folderIds.length && !projectId) return [];
+  const scope = [
+    folderIds.length ? `folder_id.in.(${folderIds.join(',')})` : '',
+    projectId ? `project_id.eq.${projectId}` : '',
+  ].filter(Boolean).join(',');
+  const { data, error, status } = await createClient()
+    .from('folder_exceptions')
+    .select(EXCEPTION_COLUMNS)
+    .or(scope)
+    .is('retired_at', null)
+    .order('created_at', { ascending: true });
+  if (error) throw dbError(error, status);
+  return (data ?? []) as unknown as FolderException[];
+}
+
+/** The mismatches recorded against these rules, open or not. */
+export async function listFolderConflicts(upperIds: readonly string[]): Promise<FolderConflict[]> {
+  if (!upperIds.length) return [];
+  const { data, error, status } = await createClient()
+    .from('folder_conflicts')
+    .select(CONFLICT_COLUMNS)
+    .in('upper_fact_id', [...upperIds])
+    .order('created_at', { ascending: true });
+  if (error) throw dbError(error, status);
+  return (data ?? []) as unknown as FolderConflict[];
+}
+
+export interface NewConflict {
+  upper_fact_id: string;
+  lower_folder_fact_id?: string | null;
+  lower_project_fact_id?: string | null;
+  upper_quote: string;
+  lower_quote: string;
+  explanation?: string;
+}
+
+/** Record the mismatches a check found; a pair already on record is left as it is. */
+export async function recordConflicts(userId: string, rows: readonly NewConflict[]): Promise<void> {
+  if (!rows.length) return;
+  const { error, status } = await createClient()
+    .from('folder_conflicts')
+    .insert(rows.map((r) => ({
+      user_id: userId,
+      upper_fact_id: r.upper_fact_id,
+      lower_folder_fact_id: r.lower_folder_fact_id ?? null,
+      lower_project_fact_id: r.lower_project_fact_id ?? null,
+      upper_quote: r.upper_quote.slice(0, 600),
+      lower_quote: r.lower_quote.slice(0, 600),
+      explanation: (r.explanation ?? '').slice(0, 600),
+    })));
+  // The same pair found again: already on record.
+  if (error && error.code !== '23505') throw dbError(error, status);
+}
+
+/** "Not a mismatch": the user's word, once. */
+export async function dismissConflict(id: string): Promise<void> {
+  const { error, status } = await createClient()
+    .from('folder_conflicts')
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('dismissed_at', null);
+  if (error) throw dbError(error, status);
+}
+
+export interface NewException {
+  rule_id: string;
+  folder_id?: string | null;
+  project_id?: string | null;
+  statement: string;
+  authorised_by: string;
+  how_confirmed: string;
+  reason: string;
+  from_note?: Record<string, unknown>;
+}
+
+/** Record that a rule does not apply in one place, with who authorised it, how that was confirmed and why. */
+export async function recordException(userId: string, e: NewException): Promise<FolderException> {
+  const { data, error, status } = await createClient()
+    .from('folder_exceptions')
+    .insert({
+      user_id: userId,
+      rule_id: e.rule_id,
+      folder_id: e.folder_id ?? null,
+      project_id: e.project_id ?? null,
+      statement: e.statement.trim(),
+      authorised_by: e.authorised_by.trim(),
+      how_confirmed: e.how_confirmed.trim(),
+      reason: e.reason.trim(),
+      from_note: e.from_note ?? {},
+    })
+    .select(EXCEPTION_COLUMNS)
+    .single();
+  if (error) throw dbError(error, status);
+  return data as unknown as FolderException;
+}
+
+/** Revoke an exception: the rule applies there again. */
+export async function revokeException(id: string, reason = 'revoked by the user'): Promise<void> {
+  const { error, status } = await createClient()
+    .from('folder_exceptions')
+    .update({ retired_at: new Date().toISOString(), retired_reason: reason.slice(0, 500) })
+    .eq('id', id)
+    .is('retired_at', null);
+  if (error) throw dbError(error, status);
 }

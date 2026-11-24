@@ -5369,3 +5369,39 @@ and the project's Facts panel has the same line. A project started from a folder
   a new version is added and the old one taken out.
 - **What a run used is not recorded yet.** A version does not yet say which folder rules were in force when it was
   written, and a rule changed at a folder does not yet flag the finished work below it. That comes with the run record.
+
+### L-280 — A folder rule and a note that disagree: both shown, an exception scoped, the work that turns on it held (2026-11-24)
+Sean, 23 Nov: "say the client folder says the client handles references, but a consultant adds a note saying
+[the firm] is handling them on this search. I'd want PromptMaster to surface both and offer something like Apply
+exception to this search. That would record who confirmed it and why. The next search would still start with
+the client's usual arrangement. If the two instructions are still in conflict, pause the reference work that
+depends on the answer and let the rest of the search continue."
+
+A rule added to a folder is read against the rules handed down from above it, and a project's own facts are read
+against all of its folders' rules, by one small call each (`/api/inherited-mismatches`, `promptmaster/inherited_mismatch.py`);
+a pair is kept only with words from each side found in it, and recorded in `folder_conflicts`. While a pair is
+open both sides are sent marked UNRESOLVED and no prompt relies on either. The folder, the project's Facts panel
+and the held stage show both, each with where it was set, and offer: **Apply exception to this search** (or this
+folder, or this project), which records in `folder_exceptions` what applies there instead, who authorised it, how
+that was confirmed and why, all three required; **Correct the rule** where it is set, for everything below it;
+**Follow** the rule here; for a default only, **replace it here**; or **Not a mismatch**. Go never chooses, whatever
+the routine-decision setting. An exception applies to its folder and everything below it, or to one project; the
+other search and every new one keep the rule. Revoking it brings the rule back.
+
+The stages whose work turns on the pair are read once by another small call (`/api/agent/stages-concerned`), each
+with words of its own name or instruction, and recorded as `inherited_hold`. Go moves past a held stage and leaves
+it open, works on the rest, and stops on the choice only when nothing else is left; the objective is never called
+met while a pair is open. "This stage doesn't depend on it" releases a stage.
+
+- **A check that did not run records nothing**, and runs again when the project is next opened; a check that ran and
+  found nothing is not repeated until a folder rule changes.
+- **A rule added higher up is read against rules already set below it only when they are in the same chain** as the
+  folder open on the page. A client rule added after a search note is caught when the search's project is next
+  opened (its facts are read again against the new set) but a search folder's own note is read only when it is added.
+- **A released held stage is the user's to draft.** Once the choice is made, the stage left open shows its ordinary
+  Draft; Go does not go back to a stage it moved past.
+- **A copy of a project keeps its exceptions only through its folder.** An exception recorded for the original
+  project alone is not copied, and the copy's facts are not read again, so a pair open on the original is not
+  shown on the copy.
+- **One user.** Who may authorise an exception is recorded as the user types it; there are no roles to check it
+  against until teams exist.

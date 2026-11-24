@@ -308,6 +308,41 @@ export interface FolderFact {
   created_at: string;
 }
 
+/**
+ * A rule that does not apply in one place (a folder and everything below it,
+ * or one project), with what applies there instead, who authorised it, how
+ * that was confirmed and why (Sean, 23 Nov). Revoked by retiring; never edited.
+ */
+export interface FolderException {
+  id: string;
+  user_id: string;
+  folder_id: string | null;
+  project_id: string | null;
+  rule_id: string;
+  statement: string;
+  authorised_by: string;
+  how_confirmed: string;
+  reason: string;
+  from_note: Record<string, unknown>;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
+}
+
+/** A folder's rule and something said lower down that cannot both hold, each with its words. */
+export interface FolderConflict {
+  id: string;
+  user_id: string;
+  upper_fact_id: string;
+  lower_folder_fact_id: string | null;
+  lower_project_fact_id: string | null;
+  upper_quote: string;
+  lower_quote: string;
+  explanation: string;
+  dismissed_at: string | null;
+  created_at: string;
+}
+
 /** A document kept on a folder (an agreement, a position spec), as its text. */
 export interface FolderDocument {
   id: string;

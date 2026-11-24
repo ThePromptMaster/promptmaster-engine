@@ -38,6 +38,8 @@ const eslintConfig = defineConfig([
       "src/components/projects/move-to-menu.tsx",
       "src/components/projects/folder-rules-panel.tsx",
       "src/components/workflow/inherited-facts-line.tsx",
+      "src/components/folders/mismatch-choice.tsx",
+      "src/components/folders/held-stage-notice.tsx",
       "src/components/projects/use-in-project-menu.tsx",
       "src/components/projects/deleted-projects.tsx",
       "src/components/projects/guest-banner.tsx",

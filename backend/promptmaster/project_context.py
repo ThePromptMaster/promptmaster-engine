@@ -178,7 +178,8 @@ FOLDER_RULES_RULE = (
     "A rule marked as from a workspace, client folder, search folder or folder was set by the user for "
     "everything filed under it, and applies to this project exactly like the project's own facts. Only a "
     "fact that says it replaces it here changes it. Where something else in the project seems to "
-    "disagree with one, do not choose between them: follow the rule and say plainly what disagrees."
+    "disagree with one, do not choose between them: follow the rule and say plainly what disagrees, unless the two "
+    "are marked UNRESOLVED below, when neither is relied on."
 )
 
 
@@ -208,7 +209,14 @@ def facts_block(inputs: PMInput) -> str:
             f' (replaces here "{" ".join(f.replaces_default.split())}", which still holds elsewhere but not for this project)'
             if f.replaces_default.strip() else ""
         )
-        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{default}{required}{assumed}")
+        exception = f" (an exception recorded for this project's folders: {' '.join(f.exception.split())})" if f.exception.strip() else ""
+        unresolved = (
+            f' (UNRESOLVED: this disagrees with "{" ".join(f.unresolved_with.split())}", and the user has not chosen '
+            "between them yet. Rely on neither: write nothing that turns on which one holds, and say that it waits "
+            "on the user's choice)"
+            if f.unresolved_with.strip() else ""
+        )
+        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}{default}{exception}{required}{unresolved}{assumed}")
     current = reporting_date_line(inputs)
     folders = f"\n{FOLDER_RULES_RULE}" if any(f.scope.strip() for f in facts) else ""
     return f"{FACTS_HEADER}\n" + "\n".join(lines) + f"\n{SUGGESTIONS_RULE}" + folders + (f"\n{current}" if current else "")

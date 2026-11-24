@@ -50,6 +50,8 @@ const UNION: WorkflowEventType[] = [
   'workflow_switched',
   'criterion_not_applicable',
   'approval_left_to_go',
+  'inherited_checked',
+  'inherited_hold',
 ];
 
 function checkConstraintValues(): string[] {

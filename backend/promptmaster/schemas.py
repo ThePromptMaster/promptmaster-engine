@@ -44,6 +44,12 @@ class AcceptedFact(BaseModel):
     required: bool = False
     #: A folder's default this one replaces here, with where the default is set.
     replaces_default: str = Field(default="", max_length=2_400)
+    #: A scoped exception to a folder's rule, recorded with who authorised it, how it
+    #: was confirmed and why (24 Nov): in words, with the rule it sets aside here.
+    exception: str = Field(default="", max_length=3_000)
+    #: The statement this one disagrees with, when the user has not chosen between
+    #: them yet (24 Nov): neither is relied on until they do.
+    unresolved_with: str = Field(default="", max_length=2_400)
 
 
 class WebSource(BaseModel):

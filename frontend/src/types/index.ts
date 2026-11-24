@@ -29,7 +29,7 @@ export interface PMInput {
    * Nov): `scope` names the folder, `required` marks a rule only an exception
    * gets round, `replaces_default` the folder default a fact replaces here.
    */
-  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string; origin?: string; scope?: string; required?: boolean; replaces_default?: string }[];
+  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string; origin?: string; scope?: string; required?: boolean; replaces_default?: string; exception?: string; unresolved_with?: string }[];
   /** Saved web sources, cited as [S1]… in this order (20 Oct). */
   sources?: { url: string; title: string; excerpt: string; retrieved: string }[];
   /** Instructions the user applied with "Change it", oldest first (12 Oct): their later word. */

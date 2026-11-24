@@ -404,6 +404,17 @@ export type WorkflowEventType =
    */
   | 'approval_left_to_go'
   /**
+   * Which of the project's facts were read against its folders' rules (24 Nov).
+   * payload: rules_fp, fact_ids. Written by the browser, never by a run.
+   */
+  | 'inherited_checked'
+  /**
+   * Stages that wait on a mismatch between a folder's rule and something said
+   * lower down, each with the stage's own words that show it; or a stage the
+   * user released (24 Nov). payload: conflict_id, stages?, released?.
+   */
+  | 'inherited_hold'
+  /**
    * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
    * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only
    * the affected done stages for recheck.

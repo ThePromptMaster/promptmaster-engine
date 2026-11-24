@@ -5,7 +5,7 @@
 import type { Project, ProjectFact } from '@/types/project';
 import type { PMInput } from '@/types';
 import { factValues, supersededValues, type SupersededValue } from './fact-values';
-import { inheritedForRequest, levelWords, projectReplacements, type Inherited } from '@/lib/folders/inheritance';
+import { inheritedForRequest, levelWords, projectReplacements, unresolvedProjectFacts, type Inherited } from '@/lib/folders/inheritance';
 
 /** Facts sent with a request: enough for every prompt, bounded. */
 export const MAX_FACTS_SENT = 200;
@@ -115,6 +115,7 @@ export type RequestFact = NonNullable<PMInput['facts']>[number];
 export function factsForRequest(facts: readonly ProjectFact[] | undefined, inherited?: Inherited | null): RequestFact[] {
   const byId = new Map((facts ?? []).map((f) => [f.id, f]));
   const replacing = projectReplacements(inherited);
+  const unresolved = unresolvedProjectFacts(inherited);
   const own = currentFacts(facts)
     .slice(-MAX_FACTS_SENT)
     .map((f) => {
@@ -130,6 +131,8 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined, inher
         ...(replaced ? { replaces: replaced } : {}),
         ...(f.origin === 'model_assumed' || f.origin === 'policy' ? { origin: f.origin } : {}),
         ...(rule ? { replaces_default: `${rule.fact.statement} (the default of ${levelWords(rule.level)})` } : {}),
+        // Disagrees with a folder's rule, and the user has not chosen yet (Sean, 23 Nov).
+        ...(unresolved.get(f.id) ? { unresolved_with: unresolved.get(f.id) } : {}),
       };
     });
   return [...own, ...inheritedForRequest(inherited).facts];

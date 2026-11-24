@@ -8,6 +8,7 @@
  * a workflow event the database checks like any other.
  */
 
+import { mismatchOutstanding } from '@/lib/folders/holds';
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
@@ -2438,7 +2439,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       // Optional rows (a table that says it does not block finishing) do not
       // hold it up (C3, 8 Oct); a row carried forward that says a requirement
       // is unmet does (C2).
-      const open = outstandingWork(ctx.template, ctx.state, ctx.context).filter(
+      // A folder rule and a note the user has not chosen between hold the finish too (L-280).
+      const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
+      const open = outstandingWork(ctx.template, ctx.state, ctx.context, {
+        inheritedMismatches: mismatchOutstanding(ctx.project.inherited, ctx.loadEvents ? await ctx.loadEvents() : [], label),
+      }).filter(
         (i) => !(i.kind === 'unmet_blocking' && i.stageId === ctx.stage.id) && blocksCompletion(i)
       );
       if (ctx.deliverableDone && open.length > 0) {

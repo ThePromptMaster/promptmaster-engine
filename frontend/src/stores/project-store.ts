@@ -438,7 +438,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         // Like facts: a failed read keeps what was last read, never "nothing has run".
         listCleanRunIds(id).catch(() => (get().projectId === id ? get().codeRuns : [])),
         // Like facts: a failed read keeps what was last read, never "no folder rules".
-        readInherited(project.folder_id).catch(() => (get().projectId === id ? get().inheritedSource : null)),
+        readInherited(project.folder_id, true, project.id).catch(() => (get().projectId === id ? get().inheritedSource : null)),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -640,7 +640,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const id = get().projectId;
     const folderId = get().project?.folder_id;
     if (!id) return;
-    const inheritedSource = await readInherited(folderId);
+    const inheritedSource = await readInherited(folderId, true, id);
     if (get().projectId === id) set({ inheritedSource });
   },
 
