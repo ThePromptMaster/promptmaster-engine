@@ -1228,9 +1228,11 @@ export function useGoLoop(opts: Options) {
         // After a loop of repairs was withdrawn, the next choice is the
         // planner's, not the same repair forced again (13 Oct).
         const outlineToo = current.policy === 'autonomous' && routine === 'handle';
+        // A stage waiting on the user's choice of folder rule is not revised meanwhile (L-280).
+        const heldByChoice = heldStages(o.project.inherited, freshEvents);
         const repair = reconsider?.withdrawn.includes('recheck_stage')
           ? null
-          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])), outlineToo, fixes);
+          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried, Object.fromEntries(Object.entries(context.sections ?? {}).filter(([, v]) => v.cut?.length).map(([id, v]) => [id, v.cut!])), outlineToo, fixes, new Set(heldByChoice.keys()));
         if (repair) allowed.push('recheck_stage');
         // A reopened stage whose repairs are used up is the user's next
         // decision, said with what is unresolved (13 Oct, screenplay).
@@ -1318,7 +1320,10 @@ export function useGoLoop(opts: Options) {
           runAttemptsLeft, lookupDue, routine, commitTried, commitRefused, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
           earlierChoice: earlierChoiceWaiting(o.template, o.state, o.project.manual_checks, o.stage.id),
         };
-        const need = repair || merge ? null : needsUser(needInput);
+        // A stage waiting on the user's choice of folder rule asks for nothing else first: not
+        // its approval, not its findings (24 Nov pass: Go asked to approve a held report).
+        const heldHere = heldByChoice.get(o.stage.id);
+        const need = repair || merge || heldHere ? null : needsUser(needInput);
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
           break;
@@ -1329,8 +1334,6 @@ export function useGoLoop(opts: Options) {
         // that turns on a folder rule and a note the user has not chosen between is left open
         // and the work moves on; with nothing else left, Go stops on the choice (L-280).
         // Go never makes the choice itself, whatever the routine-decision setting.
-        const heldByChoice = heldStages(o.project.inherited, freshEvents);
-        const heldHere = heldByChoice.get(o.stage.id);
         let heldMove: { key: string; rationale: string; expected: string; params: Record<string, unknown> } | null = null;
         if (heldHere && !repair && !merge) {
           const at = o.template.stages.findIndex((s) => s.id === o.stage!.id);

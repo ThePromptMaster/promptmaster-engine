@@ -531,7 +531,13 @@ export function staleRepair(
    * Hidden Innovation): carried into the chapters they concern, under any policy,
    * because the user accepted them. Without this Go copied the manuscript.
    */
-  fixes: { deliverableId: string; rows: readonly FixToCarry[] } | null = null
+  fixes: { deliverableId: string; rows: readonly FixToCarry[] } | null = null,
+  /**
+   * Stages waiting on the user's choice between a folder rule and a note (L-280):
+   * never revised meanwhile, even when a change before them reopened them (24 Nov
+   * pass: Go rewrote a held report after the stages before it changed).
+   */
+  held: ReadonlySet<string> = new Set()
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -542,6 +548,7 @@ export function staleRepair(
   const ahead = !loops && !reworking;
   for (const [index, stage] of template.stages.entries()) {
     const st = state.stages[stage.id];
+    if (held.has(stage.id)) continue;
     if (here >= 0 && index > here && !(ahead && st?.stale)) continue;
     if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) {
       // Every stage after it reads this one. Repairing them against text that

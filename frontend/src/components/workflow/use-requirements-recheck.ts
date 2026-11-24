@@ -34,8 +34,10 @@ export function useRequirementsRecheck(input: {
   stageId: string;
   enabled: boolean;
   appendEvent: (e: NewWorkflowEvent) => Promise<unknown>;
+  /** Read the log again: another tab may have written this recheck first. */
+  refreshEvents?: () => Promise<unknown>;
 }): void {
-  const { project, template, state, bundles, events, stageId, enabled, appendEvent } = input;
+  const { project, template, state, bundles, events, stageId, enabled, appendEvent, refreshEvents } = input;
   const done = useRef(new Set<string>());
   const inherited = project.inherited;
   const key = folderKey(inherited);
@@ -72,10 +74,13 @@ export function useRequirementsRecheck(input: {
             added: diff.added, removed: diff.removed, calculations_hold: impact.calculations_hold,
           },
         });
-      } catch {
-        // Recorded by another tab already (23505), or not judged: nothing is marked,
-        // and it is looked at again the next time the project opens.
+      } catch (e) {
+        // Recorded by another tab already (23505): read the log, so this tab shows
+        // the recheck that tab wrote (24 Nov pass: the second tab still showed the
+        // stages as done). Not judged: nothing is marked, and it is looked at
+        // again the next time the project opens.
+        if ((e as { code?: string } | null)?.code === '23505') await refreshEvents?.().catch(() => undefined);
       }
     })();
-  }, [enabled, events, inherited, key, template, state, bundles, project.model, stageId, appendEvent]);
+  }, [enabled, events, inherited, key, template, state, bundles, project.model, stageId, appendEvent, refreshEvents]);
 }
