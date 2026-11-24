@@ -24,6 +24,7 @@ import { shownOperationLabel } from '@/lib/i18n/stage';
 import { backgroundOfVersion, colourOfVersion, VERSION_SWATCHES } from '@/lib/appearance/colours';
 import type { VersionColourField } from '@/lib/supabase/versions';
 import { useProjectStore } from '@/stores/project-store';
+import { VersionInputs } from '@/components/evidence/version-inputs';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -48,6 +49,8 @@ export function VersionBar({
   // C6 (Sean, 28 Sep, item 19): the current version, the ones the user
   // chose to keep, and the full history behind a toggle — not eleven pills.
   const [showAll, setShowAll] = useState(false);
+  // What the version on show was made with, and the passages behind its quotes (L-281).
+  const [showInputs, setShowInputs] = useState(false);
   const t = useT();
   if (versions.length === 0) return null;
 
@@ -117,6 +120,16 @@ export function VersionBar({
           pill and seeing the newest version's alignment would be a lie. */}
       <EvaluationScores evaluation={evaluation} />
 
+      <button
+        type="button"
+        onClick={() => setShowInputs((v) => !v)}
+        aria-expanded={showInputs}
+        className="rounded-lg px-2 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)]"
+      >
+        <span aria-hidden className="material-symbols-outlined me-1 align-[-3px] text-[16px]">info</span>
+        {t('evid.title')}
+      </button>
+
       {/* Restoring appends a new version rather than rewinding — reachable
           only while looking at an older one, so browsing stays free. */}
       {!isHead && !readOnly && (
@@ -126,6 +139,11 @@ export function VersionBar({
         >
           {t('stage.restoreV', { n: active.version_number })}
         </button>
+      )}
+      {showInputs && (
+        <div className="basis-full">
+          <VersionInputs key={active.id} version={active} />
+        </div>
       )}
     </div>
   );

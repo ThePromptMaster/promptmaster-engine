@@ -55,6 +55,8 @@ vi.mock('@/lib/supabase/workflow', () => ({
 }));
 
 vi.mock('@/lib/supabase/versions', () => ({
+  getInputsUsed: vi.fn(async () => null),
+  folderKeysOf: vi.fn(async () => new Map()),
   saveLongForm: vi.fn(async () => undefined),
 }));
 

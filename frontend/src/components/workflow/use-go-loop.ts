@@ -97,7 +97,7 @@ import { evaluateStage, getStage, nextSuggestedStage, outstandingWork } from '@/
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { addedByRun, mayAddStages, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
-import { heldStages, lowerPlace, lowerStatement, mismatchLines, mismatchOutstanding } from '@/lib/folders/holds';
+import { heldStages, lowerPlace, lowerStatement, mismatchLines, mismatchOutstanding, onlyHeldLeft } from '@/lib/folders/holds';
 import { levelWords } from '@/lib/folders/inheritance';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { modeForStage } from '@/lib/workflow/stage-mode';
@@ -1351,6 +1351,14 @@ export function useGoLoop(opts: Options) {
             await setRunStatus('awaiting_decision', `${o.stage.label} waits on your choice: ${choice}. Choose on the page; everything that does not depend on it is done.`);
             break;
           }
+        }
+        // On a finished stage with only held work left: the choice is the user's, on the page (24 Nov pass).
+        const heldLeft = heldHere ? [] : onlyHeldLeft(o.template.stages, (id) => o.state.stages[id]?.status, heldByChoice, o.stage.id);
+        if (heldLeft.length && !repair && !merge) {
+          const first = heldByChoice.get(heldLeft[0])!;
+          const names = heldLeft.map((id) => o.template.stages.find((s) => s.id === id)?.label ?? id).join(', ');
+          await setRunStatus('awaiting_decision', `${names} ${heldLeft.length === 1 ? 'waits' : 'wait'} on your choice: ${levelWords(first.mismatch.upper.level)} says "${first.mismatch.upper.fact.statement}", and ${lowerPlace(first.mismatch)} says "${lowerStatement(first.mismatch)}". Choose on the page; everything that does not depend on it is done.`);
+          break;
         }
         // Nor is the objective called met while one is still open.
         if (o.project.inherited?.mismatches.length) {

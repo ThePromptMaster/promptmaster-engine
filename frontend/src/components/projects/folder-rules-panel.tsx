@@ -21,6 +21,9 @@ import { levelWords, type Inherited } from '@/lib/folders/inheritance';
 import { MismatchChoice } from '@/components/folders/mismatch-choice';
 import type { FolderFact } from '@/types/project';
 import { setFolderKind } from '@/lib/supabase/folders';
+import { folderKey } from '@/lib/folders/inputs-used';
+import { projectsNeedingAnotherLook } from '@/lib/supabase/folder-rules';
+import Link from 'next/link';
 import type { FolderKind, ProjectFolder } from '@/types/project';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { useLevelName } from '@/components/folders/level-name';
@@ -36,7 +39,16 @@ const KINDS: FolderKind[] = ['workspace', 'client', 'search', 'folder'];
  * set here, how much comes from above, how many documents. Opened, it lists
  * them, with the folder each came from.
  */
-export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFolder; onKindChanged: () => void }) {
+export function FolderRulesPanel({
+  folder,
+  onKindChanged,
+  projects = [],
+}: {
+  folder: ProjectFolder;
+  onKindChanged: () => void;
+  /** The projects listed in this folder: those with work made under earlier rules are named (L-281). */
+  projects?: readonly { id: string; title: string }[];
+}) {
   const t = useT();
   const levelName = useLevelName();
   const [source, setSource] = useState<InheritedSource | null>(null);
@@ -74,6 +86,23 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
   }, [source, folder.id, opened]);
 
   const inh = useMemo(() => (source ? resolveInherited({ ...source, folderId: folder.id }) : null), [source, folder.id]);
+  // Work made under earlier rules, flagged without opening anything (Sean, 23 Nov: "flag earlier
+  // reviews that may need another look"; L-281).
+  const [stale, setStale] = useState<Set<string>>(new Set());
+  const projectIds = projects.map((p) => p.id).join(',');
+  const key = folderKey(inh);
+  useEffect(() => {
+    if (!key || !projectIds) {
+      setStale(new Set());
+      return;
+    }
+    let live = true;
+    projectsNeedingAnotherLook(projectIds.split(','), key).then((s) => live && setStale(s), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [key, projectIds]);
+  const needLook = projects.filter((p) => stale.has(p.id));
   const here = inh?.chain.at(-1);
   const setHere = (inh?.rules ?? []).filter((r) => r.level.id === folder.id);
   const fromAbove = (inh?.rules ?? []).filter((r) => r.level.id !== folder.id);
@@ -147,6 +176,7 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
 
   const summary = [
     mismatchesHere.length ? t('frules.needsChoice', { count: mismatchesHere.length }) : null,
+    needLook.length ? t('evid.needLook', { count: needLook.length }) : null,
     here?.kind ? t(`frules.kind.${here.kind}` as MessageKey) : null,
     t('frules.setHereCount', { count: setHere.length }),
     fromAbove.length ? t('frules.fromAboveCount', { count: fromAbove.length }) : null,
@@ -177,6 +207,20 @@ export function FolderRulesPanel({ folder, onKindChanged }: { folder: ProjectFol
               {mismatchesHere.map((m) => (
                 <MismatchChoice key={m.conflict.id} mismatch={m} userId={folder.user_id} onDone={load} />
               ))}
+            </div>
+          )}
+
+          {needLook.length > 0 && (
+            <div>
+              <h3 className="text-label font-semibold uppercase tracking-wider text-[var(--on-surface-variant)]">{t('evid.needLook', { count: needLook.length })}</h3>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('evid.needLookExplain')}</p>
+              <ul className="mt-1 space-y-0.5">
+                {needLook.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/projects/${p.id}`} className={quiet}>{p.title}</Link>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

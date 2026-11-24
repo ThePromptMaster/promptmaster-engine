@@ -5405,3 +5405,41 @@ met while a pair is open. "This stage doesn't depend on it" releases a stage.
   shown on the copy.
 - **One user.** Who may authorise an exception is recorded as the user types it; there are no roles to check it
   against until teams exist.
+- **Found on the production pass (24 Nov) and fixed:** with its own stage finished and only held work left, Go
+  asked the choice in its own words, offering "Do whatever is best", which would have handed a required rule to
+  Go. It now stops on the choice instead (`onlyHeldLeft`). And a project started from a folder's "New project" by
+  a link inside the app was not filed there: the page read the folder before the address bar showed it. It is now
+  read when the project is made. Making a folder with Enter made it twice; one save at a time now.
+
+### L-281 — What a version used, the passage behind a quote, and work made under earlier folder rules (2026-11-24)
+Sean, 23 Nov: "Show what a run actually used. From a transcript review or report, the consultant should be able to
+see the prompt version, source transcript, and requirements applied, and jump to the transcript passage behind a
+finding. Flag what needs a recheck when something changes. If the client adds a required topic halfway through a
+search, use it for the next review and flag earlier reviews that may need another look. Keep the earlier versions
+available."
+
+Every stage version now records what it was made with (`artifact_versions.inputs_used`, written once by
+`appendStageVersion`; versions are append-only, so the record cannot change): the workflow and its version, the
+stage and its instruction, the model, the project's facts, the folders' rules in force with the folder each came
+from, the exceptions that applied and who authorised them, how many disagreements were waiting, and the documents
+the material held. "What this used" beside the version buttons shows it for the version on screen, says what has
+changed in the folders' rules since, and lists the version's quotes that are found word for word in the project's
+or its folders' documents, each opening the document at that passage, marked (`lib/evidence/quote-links.ts`; no
+model call). A new requirement at a folder is used by the next draft without anything else: every request carries
+it. Finished work made under earlier folder rules is found by the key each version recorded: the folder's panel
+names the projects that have some ("N projects have work made under earlier rules"), without opening them, and
+opening one judges once, by the same check a changed fact gets, which of those stages relied on what changed and
+marks only those for a recheck (`use-requirements-recheck.ts`). Their versions stay as they were.
+
+- **Versions saved before 24 Nov have no record.** The panel says so; they are never guessed at, and the recheck
+  leaves them alone.
+- **Which passages a long project sent is not recorded.** The record names the documents the material held; when the
+  material is longer than one request carries (200,000 characters), the passages chosen are not listed.
+- **Quotes are matched word for word.** A paraphrase, or a quote that changes a word, is not linked; a quote of fewer
+  than five words or 24 characters is not looked for. The first of several matches is the one opened.
+- **The recheck is of folder rules.** A change to the project's own facts is judged as before (`use-brief-change`);
+  the record lists them, but the folder list counts only work made under other folder rules.
+- **An Assess table is rechecked as a stage**, not row by row: its rows do not each record the criteria they were
+  judged under yet.
+- **Versions saved outside a stage** (a manuscript's sections written in the background, an imported manuscript, an
+  example's prepared first draft) have no record; a restored version carries its original's.

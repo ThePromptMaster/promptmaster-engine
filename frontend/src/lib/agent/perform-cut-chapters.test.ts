@@ -5,6 +5,8 @@ const listVersions = vi.fn();
 const enqueueContinueJobs = vi.fn(async () => ['s1']);
 const listWorkflowEvents = vi.fn();
 vi.mock('@/lib/supabase/versions', () => ({
+  getInputsUsed: vi.fn(async () => null),
+  folderKeysOf: vi.fn(async () => new Map()),
   getArtifact: (...a: unknown[]) => getArtifact(...a),
   listVersions: (...a: unknown[]) => listVersions(...a),
   listArtifacts: vi.fn(async () => []),

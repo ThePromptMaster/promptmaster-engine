@@ -296,7 +296,7 @@ export default function ProjectsPage() {
 
       <GuestBanner />
 
-      {selectedFolder && <FolderRulesPanel key={selectedFolder.id} folder={selectedFolder} onKindChanged={loadFolders} />}
+      {selectedFolder && <FolderRulesPanel key={selectedFolder.id} folder={selectedFolder} onKindChanged={loadFolders} projects={(projects ?? []).map((p) => ({ id: p.id, title: p.title }))} />}
 
       {error && (
         <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">

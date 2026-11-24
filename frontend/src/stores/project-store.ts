@@ -4,6 +4,8 @@ import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
 import { readInherited, type InheritedSource } from '@/lib/supabase/folder-rules';
+import { resolveInherited } from '@/lib/folders/inheritance';
+import { buildInputsUsed, type InputsUsed } from '@/lib/folders/inputs-used';
 import { listProjectSources } from '@/lib/supabase/sources';
 import { listCleanRunIds } from '@/lib/supabase/agent';
 import { listReferences, loadReferenceMaterial } from '@/lib/supabase/references';
@@ -26,6 +28,7 @@ import {
   setVersionColour as setVersionColourRow,
   type VersionColourField,
   restoreVersion as restoreVersionRow,
+  getInputsUsed,
   saveArtifactSummary,
   saveArtifactFigures,
   saveEvaluation,
@@ -361,6 +364,29 @@ export function withoutModelSourcesList(version: NewVersion): NewVersion {
   if (USER_TEXT.has(version.source_operation) || /^\s*[{[]/.test(version.content)) return version;
   const content = withoutSourcesList(version.content);
   return content === version.content ? version : { ...version, content };
+}
+
+/** What a stage version is being made with, from the store as it stands (L-281). Never throws. */
+function inputsUsedNow(state: ProjectState, stageId: string, model: string | undefined): InputsUsed | null {
+  try {
+    const { project, template, facts, inheritedSource } = state;
+    if (!project) return null;
+    const stage = template?.stages.find((s) => s.id === stageId);
+    const inherited = inheritedSource
+      ? resolveInherited({ ...inheritedSource, folderId: project.folder_id, projectFacts: facts, projectId: project.id })
+      : undefined;
+    return buildInputsUsed({
+      template: template ? { id: (template as { id?: string }).id ?? project.workflow_template_id ?? '', key: template.key, version: template.version, name: template.name } : null,
+      stage: { id: stageId, label: stage?.label ?? stageId, instruction: stage?.entry_prompt_hint ?? '' },
+      model: model || project.model || '',
+      facts,
+      inherited,
+      inFolder: Boolean(project.folder_id),
+      context: project.context,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
@@ -829,7 +855,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       throw new RefusedRevision(refused);
     }
 
-    const created = await appendVersionRow(current, version);
+    // What it was made with, recorded with it (Sean, 23 Nov: "see the prompt version, source
+    // transcript, and requirements applied"; L-281). A caller that knows better passes its own.
+    const created = await appendVersionRow(current, version.inputs_used !== undefined ? version : { ...version, inputs_used: inputsUsedNow(get(), stageId, version.model) });
 
     let saved: Evaluation | null = null;
     if (evaluation) saved = await saveEvaluation(created, evaluation);
@@ -923,7 +951,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (!bundle?.artifact || !target) throw new Error('Version not found.');
 
     // Restore appends rather than mutating, so restoring is itself undoable.
-    const created = await restoreVersionRow(bundle.artifact, target);
+    // Its record of what it was made with comes with it (L-281); read here, not loaded with the list.
+    const created = await restoreVersionRow(bundle.artifact, { ...target, inputs_used: await getInputsUsed(target.id).catch(() => null) });
     void get().retireStageProposals(stageId);
     set((s) => ({
       stages: {
@@ -995,7 +1024,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const target = versions.find((v) => v.id === versionId);
     if (!artifact || !target) throw new Error('Version not found.');
 
-    const created = await restoreVersionRow(artifact, target);
+    const created = await restoreVersionRow(artifact, { ...target, inputs_used: await getInputsUsed(target.id).catch(() => null) });
     const evaluation = await getEvaluation(created.id);
 
     set((s) => ({

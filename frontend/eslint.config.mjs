@@ -40,6 +40,8 @@ const eslintConfig = defineConfig([
       "src/components/workflow/inherited-facts-line.tsx",
       "src/components/folders/mismatch-choice.tsx",
       "src/components/folders/held-stage-notice.tsx",
+      "src/components/evidence/version-inputs.tsx",
+      "src/components/evidence/source-viewer.tsx",
       "src/components/projects/use-in-project-menu.tsx",
       "src/components/projects/deleted-projects.tsx",
       "src/components/projects/guest-banner.tsx",

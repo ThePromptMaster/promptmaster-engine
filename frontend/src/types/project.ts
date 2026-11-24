@@ -433,6 +433,8 @@ export interface ArtifactVersion {
   background_colour?: string | null;
 
   created_at: string;
+  /** What it was made with (L-281). Not loaded with the list: read with `getInputsUsed` when asked for. */
+  inputs_used?: import('@/lib/folders/inputs-used').InputsUsed | null;
 }
 
 export interface Evaluation {

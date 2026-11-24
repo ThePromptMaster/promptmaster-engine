@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
 
 import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, type FolderNode } from '@/lib/supabase/folders';
@@ -54,11 +54,16 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     setError(null);
   };
 
+  // Enter saves, and the field losing focus as it is disabled saved again: two folders of one
+  // name (24 Nov pass). One save at a time.
+  const saving = useRef(false);
   const submit = async () => {
+    if (saving.current) return;
     if (!naming || !name.trim()) {
       setNaming(null);
       return;
     }
+    saving.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -69,6 +74,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? t('folders.saveError')));
     } finally {
       setBusy(false);
+      saving.current = false;
     }
   };
 

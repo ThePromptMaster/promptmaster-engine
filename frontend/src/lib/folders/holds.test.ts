@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { blocksCompletion, describeOutstanding, outstandingWork } from '@/lib/workflow/engine';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { FolderConflict, FolderFact, ProjectFact, ProjectFolder } from '@/types/project';
-import { factsToCheck, heldStages, holdsFrom, mismatchLines, mismatchOutstanding, mismatchesToRead, rulesFingerprint, rulesToReadAgainst } from './holds';
+import { factsToCheck, heldStages, holdsFrom, mismatchLines, mismatchOutstanding, mismatchesToRead, onlyHeldLeft, rulesFingerprint, rulesToReadAgainst } from './holds';
 import { resolveInherited } from './inheritance';
 
 const folder = (id: string, name: string, parent: string | null, kind: ProjectFolder['kind']): ProjectFolder => ({
@@ -73,5 +73,20 @@ describe('what waits on a mismatch', () => {
       'Waiting on your choice: Client “Acme” says “The client handles reference checks”, and Search “CFO search” says “We are handling references on this search”. It holds up Reference plan.'
     );
     expect(mismatchLines(items)[0]).toContain('do not draft that stage until it is chosen');
+  });
+});
+
+describe('only held work left', () => {
+  const stages = [{ id: 'brief' }, { id: 'refs' }, { id: 'report' }];
+  const held = new Map([['refs', {}]]);
+  it('stops on the choice when the stage Go is on is finished and every open stage is held', () => {
+    const status = (id: string) => ({ brief: 'complete', refs: 'in_progress', report: 'complete' })[id];
+    expect(onlyHeldLeft(stages, status, held, 'report')).toEqual(['refs']);
+  });
+  it('not while other work is open, or the current stage is not finished, or nothing is held', () => {
+    const open = (id: string) => ({ brief: 'complete', refs: 'in_progress', report: 'in_progress' })[id];
+    expect(onlyHeldLeft(stages, open, held, 'brief')).toEqual([]);
+    expect(onlyHeldLeft(stages, open, held, 'report')).toEqual([]);
+    expect(onlyHeldLeft(stages, () => 'complete', new Map(), 'report')).toEqual([]);
   });
 });

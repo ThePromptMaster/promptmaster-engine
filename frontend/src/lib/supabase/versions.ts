@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import type { InputsUsed } from '@/lib/folders/inputs-used';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
 import { colourScheme, loadColours } from '@/lib/appearance/colours';
@@ -144,6 +145,12 @@ export interface NewVersion {
   continuity_snapshot?: ArtifactVersion['continuity_snapshot'];
   restored_from_version_id?: string | null;
   /**
+   * What the version was made with: workflow version, stage, model, facts, the
+   * folders' rules and exceptions in force, documents (L-281). Filled in by
+   * `appendStageVersion` when the caller gives none; written once.
+   */
+  inputs_used?: InputsUsed | null;
+  /**
    * The content this version was made from. Never stored: the commit check
    * refuses the version when the stage has moved on since (6 Oct), so a held
    * revision or a Go step cannot overwrite a change made in between.
@@ -188,6 +195,7 @@ export async function appendVersion(
       finish_reason: version.finish_reason ?? null,
       continuity_snapshot: version.continuity_snapshot ?? null,
       restored_from_version_id: version.restored_from_version_id ?? null,
+      ...(version.inputs_used ? { inputs_used: version.inputs_used } : {}),
       // The palette in force: this version keeps its colour when the palette changes (22 Oct).
       colour_scheme: typeof window === 'undefined' ? null : colourScheme(loadColours()),
     })
@@ -222,6 +230,8 @@ export async function restoreVersion(
     mode: target.mode,
     change_summary: `Restored version ${target.version_number}.`,
     restored_from_version_id: target.id,
+    // The same text, made with the same inputs: its record comes with it, when the caller read it (L-281).
+    ...(target.inputs_used !== undefined ? { inputs_used: target.inputs_used } : {}),
   });
 
   const previous = await getEvaluation(target.id);
@@ -373,4 +383,28 @@ export async function saveEvaluation(
 
   if (error || !data) throw error ?? new Error('Failed to save evaluation');
   return data as unknown as Evaluation;
+}
+
+/**
+ * What a version was made with (L-281), read when it is asked for: it is not
+ * loaded with the version list, where a long project would carry it for every
+ * version. Null for versions saved before it was recorded.
+ */
+export async function getInputsUsed(versionId: string): Promise<InputsUsed | null> {
+  const { data, error } = await createClient().from('artifact_versions').select('inputs_used').eq('id', versionId).maybeSingle();
+  if (error) throw error;
+  return ((data as { inputs_used?: InputsUsed | null } | null)?.inputs_used ?? null) as InputsUsed | null;
+}
+
+/** The folder key each of these versions was made under, by version id; versions without one are left out. */
+export async function folderKeysOf(versionIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!versionIds.length) return out;
+  const { data, error } = await createClient()
+    .from('artifact_versions')
+    .select('id, folder_key:inputs_used->requirements->>folder_key')
+    .in('id', [...versionIds]);
+  if (error) throw error;
+  for (const row of (data ?? []) as unknown as { id: string; folder_key: string | null }[]) if (row.folder_key) out.set(row.id, row.folder_key);
+  return out;
 }
