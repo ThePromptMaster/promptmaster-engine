@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api/client';
 import { levelWords, type Inherited } from '@/lib/folders/inheritance';
 import { MismatchChoice } from '@/components/folders/mismatch-choice';
+import { FolderTemplates } from '@/components/folders/folder-templates';
 import type { FolderFact } from '@/types/project';
 import { setFolderKind } from '@/lib/supabase/folders';
 import { folderKey } from '@/lib/folders/inputs-used';
@@ -61,6 +62,8 @@ export function FolderRulesPanel({
   const [editing, setEditing] = useState<{ id: string; text: string; required: boolean } | null>(null);
   const [replacing, setReplacing] = useState<{ id: string; text: string } | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  // A document added as a template: a contract or report layout the work below can match (24 Nov).
+  const [asTemplate, setAsTemplate] = useState(false);
 
   const load = useCallback(() => {
     readInherited(folder.id, false)
@@ -133,7 +136,7 @@ export function FolderRulesPanel({
       for (const file of picked) {
         const read = await extractText(file.name, await file.arrayBuffer());
         if ('error' in read) throw new Error(read.error);
-        await addFolderDocument(folder, { name: file.name, text: read.text, source_ref: { file: file.name, size: file.size, chars: read.text.length } });
+        await addFolderDocument(folder, { name: file.name, text: read.text, source_ref: { file: file.name, size: file.size, chars: read.text.length }, is_template: asTemplate });
       }
     });
     if (fileInput.current) fileInput.current.value = '';
@@ -342,6 +345,7 @@ export function FolderRulesPanel({
               {docsHere.map(({ doc }) => (
                 <li key={doc.id} className="flex flex-wrap items-center gap-2 text-body text-[var(--on-surface)]">
                   <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--on-surface-variant)]">description</span>
+                  {doc.is_template && <span className={chip}>{t('ftpl.template')}</span>}
                   {doc.name}
                   {typeof doc.source_ref?.chars === 'number' && (
                     <span className="text-label text-[var(--on-surface-variant)]">{t('frules.docWords', { words: words(doc.source_ref.chars) })}</span>
@@ -354,10 +358,18 @@ export function FolderRulesPanel({
             </ul>
             <input ref={fileInput} type="file" multiple accept={DOCUMENT_EXTENSIONS.join(',')} className="hidden" aria-label={t('frules.addDocument')}
               onChange={(e) => void attach(e.target.files)} />
-            <button type="button" disabled={busy} onClick={() => fileInput.current?.click()} className={`mt-2 ${quiet}`}>
-              {busy ? t('frules.reading') : t('frules.addDocument')}
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button type="button" disabled={busy} onClick={() => fileInput.current?.click()} className={quiet}>
+                {busy ? t('frules.reading') : t('frules.addDocument')}
+              </button>
+              <label className="flex items-center gap-1.5 text-label text-[var(--on-surface-variant)]">
+                <input type="checkbox" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />
+                {t('ftpl.docAsTemplate')}
+              </label>
+            </div>
           </div>
+
+          {inh && <FolderTemplates folder={folder} chain={inh.chain} />}
 
           {(fromAbove.length > 0 || docsAbove.length > 0) && (
             <div>

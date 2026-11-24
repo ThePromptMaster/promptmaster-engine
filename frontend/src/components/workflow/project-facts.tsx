@@ -47,10 +47,13 @@ export function ProjectFacts({
   project,
   onChanged,
   readOnly = false,
+  onUseStandard,
 }: {
-  project: Pick<Project, 'id' | 'user_id' | 'facts' | 'folder_id' | 'inherited'>;
+  project: Pick<Project, 'id' | 'user_id' | 'facts' | 'folder_id' | 'inherited' | 'sample_source'>;
   onChanged: () => void | Promise<void>;
   readOnly?: boolean;
+  /** A folder's document template taken as the standard to match (24 Nov). */
+  onUseStandard?: (text: string, source: NonNullable<Project['sample_source']>) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -107,7 +110,7 @@ export function ProjectFacts({
 
       {open && (
         <div className="mt-3">
-          <InheritedFactsLine project={project} inherited={project.inherited} readOnly={readOnly} onChanged={onChanged} />
+          <InheritedFactsLine project={project} inherited={project.inherited} readOnly={readOnly} onChanged={onChanged} onUseStandard={onUseStandard} />
           {current.length > 0 && (
             <ul aria-label={t('facts.list')} className="space-y-2">
               {current.map((f) => (

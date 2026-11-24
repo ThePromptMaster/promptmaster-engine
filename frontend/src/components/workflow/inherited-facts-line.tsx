@@ -24,11 +24,14 @@ export function InheritedFactsLine({
   inherited,
   readOnly,
   onChanged,
+  onUseStandard,
 }: {
-  project: { id: string; user_id: string; folder_id?: string | null };
+  project: { id: string; user_id: string; folder_id?: string | null; sample_source?: { document_id: string; name: string; folder: string; created_at: string } | null };
   inherited: Inherited | undefined;
   readOnly: boolean;
   onChanged: () => void | Promise<void>;
+  /** A folder's document template taken as this project's standard to match (24 Nov). */
+  onUseStandard?: (text: string, source: { document_id: string; name: string; folder: string; created_at: string }) => void;
 }) {
   const t = useT();
   const levelName = useLevelName();
@@ -163,13 +166,26 @@ export function InheritedFactsLine({
                 )}
               </li>
             ))}
-            {inherited.documents.map(({ doc, level }) => (
-              <li key={doc.id} className="flex flex-wrap items-center gap-2 text-body text-[var(--on-surface-variant)]">
-                <span aria-hidden className="material-symbols-outlined text-[16px]">description</span>
-                {doc.name}
-                <span className="text-label">{t('frules.fromLevel', { level: levelName(level) })}</span>
-              </li>
-            ))}
+            {inherited.documents.map(({ doc, level }) => {
+              const used = project.sample_source?.document_id === doc.id;
+              // The template this project took, replaced at its folder by a newer one of the same name.
+              const newer = !used && project.sample_source && project.sample_source.name === doc.name && doc.created_at > project.sample_source.created_at;
+              return (
+                <li key={doc.id} className="flex flex-wrap items-center gap-2 text-body text-[var(--on-surface-variant)]">
+                  <span aria-hidden className="material-symbols-outlined text-[16px]">description</span>
+                  {doc.is_template && <span className={chip}>{t('ftpl.template')}</span>}
+                  {doc.name}
+                  <span className="text-label">{t('frules.fromLevel', { level: levelName(level) })}</span>
+                  {used && <span className="text-label font-semibold text-[var(--on-surface)]">{t('ftpl.standardInUse')}</span>}
+                  {doc.is_template && !used && !readOnly && onUseStandard && doc.text.trim() && (
+                    <button type="button" className={quiet}
+                      onClick={() => onUseStandard(doc.text, { document_id: doc.id, name: doc.name, folder: level.name, created_at: doc.created_at })}>
+                      {newer ? t('ftpl.useNewer') : t('ftpl.useStandard')}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {home && (
             <Link href="/projects" onClick={() => { try { window.localStorage.setItem('pm.projectsFolder', home.id); } catch { /* private window */ } }} className={`mt-2 inline-block ${quiet}`}>

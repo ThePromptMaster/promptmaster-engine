@@ -3344,7 +3344,12 @@ export function WorkflowWorkspace({
             )}
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
-            <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
+            <ProjectFacts
+              project={project}
+              onChanged={() => onReload?.()}
+              readOnly={!isEditable || project.status === 'finalized'}
+              onUseStandard={(text, source) => onPatchProject({ sample_output: text, sample_source: source })}
+            />
             {/* On every stage: the other projects this one draws on (client, 21 Oct, email 5). */}
             <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} onOpenBeside={openBeside} />
             {/* On every stage: what the project holds from the person's accounts (7 Nov). */}

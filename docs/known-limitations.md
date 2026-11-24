@@ -5443,3 +5443,33 @@ marks only those for a recheck (`use-requirements-recheck.ts`). Their versions s
   judged under yet.
 - **Versions saved outside a stage** (a manuscript's sections written in the background, an imported manuscript, an
   example's prepared first draft) have no record; a restored version carries its original's.
+
+### L-282 — Workflows and documents copied into folders, and what their masters changed (2026-11-24)
+Sean, 23 Nov: "Workspace: ... shared prompts and editable templates for things like contracts, transcript reviews,
+and candidate reports ... A client could also have its own templates ... Copy and edit templates at any level.
+Show which version a copy came from. If the master changes later, show what changed and let the team choose
+whether to apply it to an active search."
+
+A folder's panel lists the workflows it offers (`folder_templates`). Each is a copy of its own key that remembers
+the version it came from (`workflow_templates.copied_from_id`); folders below see their ancestors' workflows and
+can start a project from one, filed in the folder and pinned to that version, or copy it down to edit. Editing a
+stage's instruction publishes the copy's next version. When the master has a newer version, the copy says so,
+lists what changed stage by stage with the words before and after, and "Apply to this copy" takes the changes in
+as its next version (`mergeFromMaster`): what the copy left alone takes the master's change, what only the copy
+changed stays, and where both changed the same thing the copy's edit is kept and said. A project already on the
+copy is then offered the new version on its own page, as with any newer workflow, and moves only on a press.
+A user's next version of a workflow must be theirs and the next number (`workflow_templates_lineage`): until now
+another user could take a key's next version number.
+
+A folder document added with "Keep as a template" (a contract, a report layout) is offered to each project below
+as its standard to match; taking it copies its text into the project's sample (`projects.sample_source` names the
+document). When a newer document of the same name is added at the folder, the project offers it in place of the
+old one.
+
+- **A stage's instruction is what can be edited in a copy.** Adding, removing or reordering stages, and changing a
+  stage's checks, is done by designing a workflow as before; a copy follows its master's such changes when they
+  are applied.
+- **Prose is never merged.** A document template is replaced whole, on the user's press.
+- **A copy is one user's.** Shared libraries across a team wait for teams (L-102).
+- **Several copies of one master each follow it on their own.** Applying a change to the client's copy does not
+  apply it to a search's copy of that copy until the search applies it too.

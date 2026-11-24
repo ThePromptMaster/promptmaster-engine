@@ -155,6 +155,8 @@ export interface Project {
   context?: string;
   /** A sample of what good looks like (4 Nov); a standard for depth and style, never a source. */
   sample_output?: string | null;
+  /** The folder document the standard was taken from (24 Nov), so a newer one can be offered. */
+  sample_source?: { document_id: string; name: string; folder: string; created_at: string } | null;
   /** The curated example this project is the sample of (`lib/projects/examples`); nothing drafts on its own there. */
   example_key?: string | null;
   /** What other people wrote, ticked by the user for a briefing. Web access stays off while any is held. */
@@ -350,6 +352,8 @@ export interface FolderDocument {
   user_id: string;
   name: string;
   text: string;
+  /** Kept as a template (a contract, a report layout): offered below as a standard to match. */
+  is_template?: boolean;
   source_ref: Record<string, unknown>;
   retired_at: string | null;
   retired_reason: string | null;
@@ -509,6 +513,7 @@ export type ProjectPatch = Partial<
     | 'constraints'
     | 'context'
     | 'sample_output'
+    | 'sample_source'
     | 'output_format'
     | 'mode'
     | 'custom_name'
