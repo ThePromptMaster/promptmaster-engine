@@ -89,9 +89,15 @@ interface Props {
    * warehouse: ticks beside Approve option and Final memo while Go waited on him).
    */
   reapprove?: Readonly<Record<string, { approvals: string[]; version: number; current: number }>>;
+  /**
+   * Icons only, for the rail pulled in to a strip (24 Nov, Sean: "a moving thingy
+   * to shorten the stage side, like the side chat"). Each stage keeps its glyph and
+   * colour, and its name and state are its label.
+   */
+  compact?: boolean;
 }
 
-export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn, openFindings, reapprove }: Props) {
+export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn, openFindings, reapprove, compact = false }: Props) {
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
@@ -104,6 +110,81 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
     else groups.push({ group: stage.group, stages: [stage] });
   }
 
+  // What the rail draws for one stage, shared by the full rail and the strip.
+  const marks = (stage: StageDefinition) => {
+    const status = state.stages[stage.id]?.status ?? 'not_started';
+    const isCurrent = state.current_stage_id === stage.id;
+    const isNext = !isCurrent && nextSuggestedId === stage.id;
+    // A stage moved past with something required still open, or one
+    // reopened to edit, used the "You are here" glyph: two stages
+    // looked current at once (1 Oct, item 1).
+    const openElsewhere = status === 'in_progress' && !isCurrent;
+    const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
+    const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
+    const projectOpen = projectOpenOn === stage.id;
+    const openCount = isDone(status) && !projectOpen ? openFindings?.[stage.id] ?? 0 : 0;
+    const toReapprove = isDone(status) && !projectOpen ? reapprove?.[stage.id] ?? null : null;
+    const icon = projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : toReapprove ? REAPPROVE_ICON : STATUS_ICON[status];
+    const iconColour = openElsewhere || projectOpen || ((openCount || toReapprove) && !isCurrent) ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent);
+    return { status, isCurrent, isNext, openElsewhere, leftOpen, awaitingApproval, projectOpen, openCount, toReapprove, icon, iconColour };
+  };
+
+  if (compact) {
+    return (
+      <nav aria-label={t('rail.label')} data-rail-compact className="py-1">
+        {groups.map((group, gi) => (
+          <ul key={`${group.group}-${gi}`} aria-label={groupLabel(locale, group.group, GROUP_LABEL[group.group])} className="mb-3 space-y-0.5 last:mb-0">
+            {group.stages.map((stage) => {
+              const m = marks(stage);
+              // The one word the full rail would add beside the name, so the strip loses nothing a hover can't give back.
+              const word = m.projectOpen
+                ? t('rail.waiting')
+                : m.status === 'stale'
+                  ? t('rail.recheck')
+                  : m.toReapprove
+                    ? t('rail.reapprove')
+                    : m.openCount > 0
+                      ? t('rail.doneOpen', { count: m.openCount })
+                      : m.awaitingApproval && m.isCurrent
+                        ? t('rail.yourApproval')
+                        : m.leftOpen
+                          ? t('rail.leftOpen')
+                          : m.openElsewhere
+                            ? t('rail.reopened')
+                            : m.isNext
+                              ? t('rail.next')
+                              : m.status === 'skipped'
+                                ? t('rail.legend.skipped')
+                                : null;
+              const name = stageText(locale, template.key, stage, 'short');
+              const label = word ? `${name} · ${word}` : name;
+              return (
+                <li key={stage.id}>
+                  <button
+                    onClick={() => onSelect(stage.id)}
+                    aria-current={m.isCurrent ? 'step' : undefined}
+                    aria-label={label}
+                    title={label}
+                    className={`relative flex w-full items-center justify-center rounded-lg py-2 transition-colors ${
+                      m.isCurrent ? 'bg-[var(--surface-container-high)]' : 'hover:bg-[var(--surface-container-low)]'
+                    }`}
+                  >
+                    <span aria-hidden className={`material-symbols-outlined text-[20px] ${m.iconColour}`}>
+                      {m.icon}
+                    </span>
+                    {m.isNext && (
+                      <span aria-hidden className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--pm-primary)]" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ))}
+      </nav>
+    );
+  }
+
   return (
     <nav aria-label={t('rail.label')} className="py-2">
       {groups.map((group, gi) => (
@@ -114,19 +195,8 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
 
           <ul className="space-y-0.5">
             {group.stages.map((stage) => {
-              const status = state.stages[stage.id]?.status ?? 'not_started';
-              const isCurrent = state.current_stage_id === stage.id;
-              const isNext = !isCurrent && nextSuggestedId === stage.id;
+              const { status, isCurrent, isNext, openElsewhere, leftOpen, awaitingApproval, projectOpen, openCount, toReapprove, icon, iconColour } = marks(stage);
               const skipReason = state.stages[stage.id]?.skipped_reason;
-              // A stage moved past with something required still open, or one
-              // reopened to edit, used the "You are here" glyph: two stages
-              // looked current at once (1 Oct, item 1).
-              const openElsewhere = status === 'in_progress' && !isCurrent;
-              const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
-              const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
-              const projectOpen = projectOpenOn === stage.id;
-              const openCount = isDone(status) && !projectOpen ? openFindings?.[stage.id] ?? 0 : 0;
-              const toReapprove = isDone(status) && !projectOpen ? reapprove?.[stage.id] ?? null : null;
 
               return (
                 <li key={stage.id}>
@@ -142,11 +212,8 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                         : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'
                     }`}
                   >
-                    <span
-                      aria-hidden
-                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen || ((openCount || toReapprove) && !isCurrent) ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
-                    >
-                      {projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : toReapprove ? REAPPROVE_ICON : STATUS_ICON[status]}
+                    <span aria-hidden className={`material-symbols-outlined text-[18px] ${iconColour}`}>
+                      {icon}
                     </span>
 
                     <span

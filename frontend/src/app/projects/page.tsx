@@ -14,7 +14,7 @@ import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
 import { ProjectCardMenu } from '@/components/projects/project-card-menu';
 import { pausedProjectIds, templateNamesById } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
-import type { ProjectFolder, ProjectSummary } from '@/types/project';
+import type { FolderKind, ProjectFolder, ProjectSummary } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
@@ -193,10 +193,11 @@ export default function ProjectsPage() {
     }
   }
 
-  const createAndShow = async (name: string, parentId: string | null) => {
+  const createAndShow = async (name: string, parentId: string | null, kind: FolderKind | null) => {
     if (!user) return;
-    // A client under a workspace, a search under a client (Sean, 23 Nov); the folder's panel changes it.
-    await createFolder(user.id, name, parentId, kindUnder(folders.find((f) => f.id === parentId)));
+    // A workspace from "New workspace", then a client under it and a search under a client
+    // (Sean, 23–24 Nov: `kindUnder`, in the sidebar); the folder's panel changes it.
+    await createFolder(user.id, name, parentId, kind);
     loadFolders();
   };
   const rename = async (id: string, name: string) => {

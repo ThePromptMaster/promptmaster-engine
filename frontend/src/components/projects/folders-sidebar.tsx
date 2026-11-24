@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
 
-import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, type FolderNode } from '@/lib/supabase/folders';
+import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, kindUnder, type FolderNode } from '@/lib/supabase/folders';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 import type { FolderKind, ProjectFolder } from '@/types/project';
 
 /** What the list shows: everything, the Unfiled projects, or one folder. */
@@ -17,13 +18,21 @@ const MAX_DEPTH = MAX_FOLDER_DEPTH;
 /** A folder's icon says what it stands for (Sean, 23 Nov: workspace › client › search). */
 const KIND_ICON: Record<FolderKind, string> = { workspace: 'domain', client: 'work', search: 'person_search', folder: 'folder' };
 
+/** What a name field asks for, and what "new inside" makes, by the kind it will be (24 Nov, Sean: "how do I make the workspace folders?"). */
+const NAME_KEY: Record<FolderKind, MessageKey> = { workspace: 'folders.nameWorkspace', client: 'folders.nameClient', search: 'folders.nameSearch', folder: 'folders.name' };
+const NEW_IN_KEY: Partial<Record<FolderKind, [MessageKey, MessageKey]>> = {
+  client: ['folders.newClientIn', 'folders.newClientInside'],
+  search: ['folders.newSearchIn', 'folders.newSearchInside'],
+};
+
 interface Props {
   folders: readonly ProjectFolder[];
   /** Live projects per folder id; '' is Unfiled. */
   counts: Record<string, number>;
   selected: FolderSelection;
   onSelect: (selection: FolderSelection) => void;
-  onCreate: (name: string, parentId: string | null) => Promise<void>;
+  /** `kind` is what the new folder stands for: a workspace at the top, and under one a client, then a search. */
+  onCreate: (name: string, parentId: string | null, kind: FolderKind | null) => Promise<void>;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   /** A project dropped on a folder row (desktop), or on Unfiled (null). */
@@ -43,7 +52,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   const tree = flattenTree(folderTree(folders));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   // Which row is being named: a new folder (under a parent, or at the top), or a rename.
-  const [naming, setNaming] = useState<{ kind: 'new'; parentId: string | null } | { kind: 'rename'; id: string } | null>(null);
+  const [naming, setNaming] = useState<{ kind: 'new'; parentId: string | null; folderKind: FolderKind | null } | { kind: 'rename'; id: string } | null>(null);
   const [name, setName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -70,7 +79,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     setBusy(true);
     setError(null);
     try {
-      if (naming.kind === 'new') await onCreate(name, naming.parentId);
+      if (naming.kind === 'new') await onCreate(name, naming.parentId, naming.folderKind);
       else await onRename(naming.id, name);
       setNaming(null);
     } catch (e) {
@@ -112,7 +121,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     },
   });
 
-  const nameInput = (indent: number) => (
+  const nameInput = (indent: number, kind: FolderKind | null | undefined) => (
     <form
       onSubmit={(e) => {
         e.preventDefault();
@@ -131,8 +140,8 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         onKeyDown={(e) => {
           if (e.key === 'Escape') setNaming(null);
         }}
-        aria-label={t('folders.name')}
-        placeholder={t('folders.name')}
+        aria-label={t(NAME_KEY[kind ?? 'folder'])}
+        placeholder={t(NAME_KEY[kind ?? 'folder'])}
         className="w-full rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
       />
     </form>
@@ -165,7 +174,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   const folderRow = (f: FolderNode) => (
     <li key={f.id}>
       {naming?.kind === 'rename' && naming.id === f.id ? (
-        nameInput(f.depth)
+        nameInput(f.depth, f.kind)
       ) : (
         // The actions sit over the row's end while it is hovered or focused, so
         // at rest the name has the whole width (23 Oct pass: "Prod ..." for a
@@ -174,7 +183,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
           <div className="min-w-0 flex-1">{row(f.id, f.name, f.kind && f.kind !== 'folder' ? KIND_ICON[f.kind] : selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
           <div className="absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
-              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={t('folders.newIn', { name: f.name })} title={t('folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id, folderKind: kindUnder(f) })} aria-label={t(NEW_IN_KEY[kindUnder(f) ?? 'folder']?.[0] ?? 'folders.newIn', { name: f.name })} title={t(NEW_IN_KEY[kindUnder(f) ?? 'folder']?.[1] ?? 'folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
               </button>
             )}
@@ -197,7 +206,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
           </div>
         </div>
       )}
-      {naming?.kind === 'new' && naming.parentId === f.id && nameInput(f.depth + 1)}
+      {naming?.kind === 'new' && naming.parentId === f.id && nameInput(f.depth + 1, naming.folderKind)}
     </li>
   );
 
@@ -209,7 +218,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('folders.heading')}</h2>
         <button
           type="button"
-          onClick={() => startNaming({ kind: 'new', parentId: null })}
+          onClick={() => startNaming({ kind: 'new', parentId: null, folderKind: null })}
           aria-label={t('folders.new')}
           title={t('folders.new')}
           className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
@@ -219,8 +228,18 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       </div>
       <ul className="space-y-0.5">
         {tree.map(folderRow)}
-        {naming?.kind === 'new' && naming.parentId === null && <li>{nameInput(0)}</li>}
+        {naming?.kind === 'new' && naming.parentId === null && <li>{nameInput(0, naming.folderKind)}</li>}
       </ul>
+      {/* A workspace is made here, not only by the sample: under it "new inside" makes a
+          client, and under a client a search, each with its own rules (24 Nov, Sean). */}
+      <button
+        type="button"
+        onClick={() => startNaming({ kind: 'new', parentId: null, folderKind: 'workspace' })}
+        className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)]"
+      >
+        <span aria-hidden className="material-symbols-outlined text-[16px]">add</span>
+        {t('folders.newWorkspace')}
+      </button>
       {tree.length === 0 && naming === null && (
         <p className="px-2 text-label leading-snug text-[var(--on-surface-variant)]">
           {t('folders.emptyHint')}
