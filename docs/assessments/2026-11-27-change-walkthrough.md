@@ -81,7 +81,7 @@ The notice said the Budget and the Operations plan state the rate, and that the 
 
 Go redid the Budget and the Operations plan. It checked the Customer commitment and kept it, since the switch date does not move.
 
-To stay within the cap, Go then set the contingency to what the cap leaves: $4,860 (9.7%) instead of 10%. The budget and the plan both say so, with the sums, and that there is now nothing to spare. Go settled this itself under "Handle them for me" and did not ask. Whether a trade-off like this should be put to the user is a fair question (gap 5 below).
+Go then put the overrun as a question: "What contingency should the budget and the plan use?" Because the project is on "Handle them for me", it chose the answer itself: the contingency is what the cap leaves, $4,860 (9.7%) instead of 10%. The choice is recorded in Facts as "Chosen by Go when you left it to Go", so it can be seen and changed. The budget and the plan both say so, with the sums, and that there is now nothing to spare. Whether a trade-off like this should be left to Go at all is a fair question (gap 5 below).
 
 After fixing the budget, Go first stopped to ask "Carry on with the open work?" about two rechecks it does itself. That was an unneeded stop, and it is fixed now: under "Handle them for me" Go says so and carries on.
 
@@ -112,7 +112,7 @@ The project timeline shows the same record: each change expands to "Was / Now" a
 2. **A stage that relies on a fact without stating it is found by one model check, not by a record of what it used.** Here it found the commitment correctly. Everything a stage used is recorded (`inputs_used`) but not yet used to decide what to reopen. Today the order of stages does that, so the Budget was reopened and then checked. It was kept, but it cost a check.
 3. **"Last visit" is per browser.** The timeline is the full record on any device.
 4. **A sent record is the user's word.** PromptMaster sends nothing, so it cannot confirm what was sent.
-5. **A trade-off a change forces can be settled by Go.** The crew-rate change broke the cap. Under "Handle them for me", Go met the cap by shrinking the contingency, which was an instruction, not a requirement, and said so plainly. Some teams would want that put to them. If so, a change that can only be met by giving up something the brief or a stage asked for should become a stop.
+5. **A trade-off a change forces can be settled by Go.** The crew-rate change broke the cap. Under "Handle them for me", Go asked itself the question and met the cap by shrinking the contingency, which was an instruction, not a requirement. It recorded the choice as its own and said so plainly. Some teams would want that put to them. If so, a change that can only be met by giving up something the brief or a stage asked for should become a stop.
 
 **I would close 2 first.** It is what makes the answer to "what did this change affect?" provable rather than judged, and at change 30 that is the difference between trusting the notice and checking every deliverable by hand. Gap 1 is the larger change, and is worth doing once a project with parallel deliverables shows the cost.
 
