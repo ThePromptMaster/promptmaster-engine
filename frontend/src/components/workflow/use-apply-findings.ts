@@ -21,6 +21,7 @@ import type { StageDefinition } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { AuditFinding } from '@/types';
 import type { ArtifactVersion, Project } from '@/types/project';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 
 export type { PendingRevision };
 
@@ -61,7 +62,7 @@ export function useApplyFindings({
       setRunning(true);
       setError(null);
       try {
-        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal, table, stageId: stage?.id ?? null });
+        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal, table, stageId: stage?.id ?? null, ...(stage ? { mode: modeForStage(project, stage) } : {}) });
         if (controller.signal.aborted) return;
         // The before/after preview is a text view; a table is saved as a
         // version straight away, and the one before it is a click to restore.

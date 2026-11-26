@@ -87,6 +87,8 @@ export interface EnqueueSectionArgs {
   stageHint?: string;
   /** The section's title and abstract: what the project's material is searched for. */
   sectionTitle?: string;
+  /** The stage's way of thinking (`modeForStage`); the project's when absent (26 Nov). */
+  mode?: PMInput['mode'];
 }
 
 /** A job that stopped for good: nothing will run it again unless asked. */
@@ -128,7 +130,10 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     // hours afterwards, in a process that has never seen this user.
     // A long manuscript in the context is sent as the passages that match this
     // section and its notes (15 Nov), not the same opening for every chapter.
-    inputs: inputsFromProject(args.project, { user: [args.sectionTitle ?? '', args.revise ? JSON.stringify(args.revise) : ''].join('\n'), step: args.stageHint ?? '' }),
+    inputs: {
+      ...inputsFromProject(args.project, { user: [args.sectionTitle ?? '', args.revise ? JSON.stringify(args.revise) : ''].join('\n'), step: args.stageHint ?? '' }),
+      ...(args.mode ? { mode: args.mode } : {}),
+    },
     ...(args.revise ? { revise: args.revise } : {}),
     ...(args.continueOnly ? { continue_only: true } : {}),
     // The images ride with the stage's hint: the chapter prompt is where they

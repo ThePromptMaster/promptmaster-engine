@@ -115,7 +115,7 @@ interface DraftingProps {
 }
 
 function Drafting({ ctx, readOnly }: DraftingProps) {
-  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion, stageHint } = ctx;
+  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion, stageHint, mode } = ctx;
   const revise = ctx.revise ?? null;
   const t = useT();
 
@@ -204,7 +204,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       setConfirmingLargeJob(false);
       if (!artifactId) throw new Error('This stage has no artifact to draft into.');
       // The same call Go mode's draft_sections makes (B2a).
-      await enqueueDraftJobs({ project, artifactId, stageId, outline, approvedOutlineVersionId, jobs, stageHint });
+      await enqueueDraftJobs({ project, artifactId, stageId, outline, approvedOutlineVersionId, jobs, stageHint, mode });
     });
 
   const pause = () => run(async () => void (await requestProjectCancel(project.id)));
@@ -229,6 +229,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
         sectionIndex: index,
         revision: (section.revision ?? 0) + 1,
         stageHint,
+        mode,
       });
     });
 
@@ -246,6 +247,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
         sectionIndex: index,
         revision: revisionToEnqueue(section, jobBySection.get(section.id) ?? null),
         stageHint,
+        mode,
       });
     });
 
@@ -263,7 +265,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       // through the store when the workspace provides it, so it is in the
       // bundle at once; the raw write is only for a caller without one.
       await enqueueRevisionJobs({
-        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets, stageHint, jobs,
+        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets, stageHint, jobs, mode,
         saveSnapshot: (snapshot) =>
           appendManuscriptVersion
             ? appendManuscriptVersion(snapshot)
@@ -280,7 +282,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
     run(async () => {
       if (!artifactId) throw new Error('This stage has no manuscript to revise.');
       await enqueueRevisionJobs({
-        project, artifactId, stageId, outline, approvedOutlineVersionId, stageHint, jobs,
+        project, artifactId, stageId, outline, approvedOutlineVersionId, stageHint, jobs, mode,
         brief: {
           stageLabel: section.title,
           instruction: `Make this change the user asked for, and keep everything else in the section as it is: ${instruction}`,

@@ -1258,7 +1258,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         if (!m.approvedOutlineVersionId) return done(key, { status: 'failed', output: 'No approved outline to draft against.', toolsUsed: [], changes: {} });
         const ids = await enqueueDraftJobs({
           project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs, stageHint: ctx.stage.entry_prompt_hint,
+          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs, stageHint: ctx.stage.entry_prompt_hint, mode: modeForStage(ctx.project, ctx.stage),
         });
         if (!ids.length) return done(key, { status: 'failed', output: 'Every section is already written.', toolsUsed: [], changes: {} });
         return waitForSections(ctx, key, ids, 'Wrote');
@@ -1269,7 +1269,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const append = ctx.appendStageVersion;
       const ids = await enqueueRevisionJobs({
         project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint,
+        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint, mode: modeForStage(ctx.project, ctx.stage),
         jobs: await listProjectJobs(ctx.project.id).catch(() => []),
         saveSnapshot: (v) => append(m.holderStageId, holderLabel, v, undefined, { writtenFor: ctx.stage.id }),
       });
@@ -1303,7 +1303,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           : routineKept
             ? [...findings, { id: 'priority', category: 'Priority', summary: 'Which takes priority, under the routine-decision policy', suggested_change: routineKept.precedence }]
             : findings,
-        source: 'the stage check', signal: ctx.signal, stageId: ctx.stage.id, agentRunId: ctx.run.id,
+        source: 'the stage check', signal: ctx.signal, stageId: ctx.stage.id, agentRunId: ctx.run.id, mode: modeForStage(ctx.project, ctx.stage),
         // A table is revised as rows, by the generator that drafted it.
         ...(rendererHoldsItems(ctx.stage.renderer)
           ? { table: { stage: ctx.stage, request: async (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, head.content, instruction) } }
@@ -3011,7 +3011,7 @@ async function recheckManuscript(
     }
     const events = await listWorkflowEvents(ctx.project.id);
     const ids = await enqueueRevisionJobs({
-      project: ctx.project, artifactId: fresh.id, stageId: target.id, outline,
+      project: ctx.project, artifactId: fresh.id, stageId: target.id, outline, mode: modeForStage(ctx.project, target),
       approvedOutlineVersionId: approvedOutlineVersionId(events),
       brief: {
         stageLabel: target.label,
@@ -3314,7 +3314,7 @@ async function finishCutChapters(ctx: PerformContext, key: string, target: Stage
   if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
   const append = ctx.appendStageVersion;
   const ids = await enqueueContinueJobs({
-    project: ctx.project, artifactId: fresh.id, stageId: target.id,
+    project: ctx.project, artifactId: fresh.id, stageId: target.id, mode: modeForStage(ctx.project, target),
     approvedOutlineVersionId: approvedOutlineVersionId(events),
     targets: cut.map((s) => ({ id: s.id, index: outline.indexOf(s), revision: s.revision })),
     stageHint: target.entry_prompt_hint,

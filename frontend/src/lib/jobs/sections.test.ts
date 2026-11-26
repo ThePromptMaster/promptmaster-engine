@@ -151,3 +151,18 @@ describe('enqueueing (B2a) — the same calls the buttons make', () => {
     expect(call.revise.notes).toContain('Ch 3 repeats Ch 1');
   });
 });
+
+describe('a chapter job thinks as its stage does (26 Nov hand pass)', () => {
+  it('carries the stage mode to every job it queues, and nothing when none is given', async () => {
+    const outline = [section('a', 'pending'), section('b', 'complete', 1)];
+    enqueueSectionJob.mockClear();
+    await enqueueDraftJobs({ project, artifactId: 'art', stageId: 'drafting', outline, approvedOutlineVersionId: 'ov', jobs: [], mode: 'clarity' });
+    await enqueueRevisionJobs({
+      project, artifactId: 'art', stageId: 'revision', outline, approvedOutlineVersionId: 'ov', mode: 'critic',
+      brief: { stageLabel: 'Revision', instruction: 'Tighten it.', findings: [], sources: [] }, saveSnapshot: async () => undefined,
+    });
+    await enqueueDraftJobs({ project, artifactId: 'art', stageId: 'drafting', outline, approvedOutlineVersionId: 'ov', jobs: [] });
+    const modes = enqueueSectionJob.mock.calls.map((c) => (c[0] as { mode?: string }).mode);
+    expect(modes).toEqual(['clarity', 'critic', undefined]);
+  });
+});
