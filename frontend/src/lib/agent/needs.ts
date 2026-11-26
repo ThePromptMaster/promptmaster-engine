@@ -9,6 +9,7 @@
  * the panel can render the message and the one button that clears it.
  */
 
+import { isOutgoing } from '@/lib/workflow/left-to-go-approvals';
 import type { FixToCarry } from './manuscript-fixes';
 import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { AgentStep, ExecutionPolicy } from '@/types/agent';
@@ -1305,7 +1306,9 @@ export function describeNeed(
     case 'tick_criterion': {
       // What is needed, why the policy cannot cover it, and what answering unlocks (5 Oct).
       const why =
-        need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk')
+        // Why it is the user's (26 Nov, Sean: "what decision is needed, why it's theirs to make"):
+        // something that goes out to other people is theirs to send.
+        need.authority === 'reserved' ? (isOutgoing(need.label) ? t('need.reservedOutgoing') : t('need.reserved')) : need.authority === 'policy_ask' ? t('need.policyAsk')
           : need.checkReason ? t('need.approvalRefused', { reason: need.checkReason }) : '';
       const on = ctx.versionOf?.[need.stageId];
       const message = [t('need.approval', { label: word(need.label) }), on ? t('need.approvalOn', { stage: stageLabel(need.stageId), version: on }) : '', why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');

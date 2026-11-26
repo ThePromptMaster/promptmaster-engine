@@ -2,6 +2,10 @@ import type { en } from '../areas/words';
 
 /** Swahili for `areas/words.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "tw:Recorded who has a version": "Imerekodiwa nani ana toleo",
+  "tw:Took back a record of who has a version": "Rekodi ya nani ana toleo imeondolewa",
+  "tw:Your change reopened later stages": "Badiliko lako limefungua tena hatua zinazofuata",
+  "tw:Checked after a change and kept": "Imekaguliwa baada ya badiliko na kubaki",
   'tw:Objective is stated': 'Lengo limeelezwa',
   'tw:I am satisfied it says what success looks like': 'Nimeridhika kwamba linaeleza mafanikio yanavyoonekana',
   'tw:I am satisfied it says what is out of scope': 'Nimeridhika kwamba linaeleza kilicho nje ya wigo',

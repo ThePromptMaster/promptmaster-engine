@@ -5636,3 +5636,40 @@ Two gaps found while designing L-288:
 - **The summary.** Right after a change, a finished stage after the first stage still waiting read "Still usable".
   The first update reopens it to be checked. It now reads "will be checked once Timeline is updated", but not after
   "Keep them as they are".
+
+### L-290 — Reopening a project says what changed since you were last here (2026-11-26)
+Sean, 25 Nov: "At change 30, can they pick up where they left off without repeating facts, finding stale
+recommendations themselves, or checking every deliverable by hand? Can they tell what they can rely on and see the
+record behind it?" Before, the change notice told only the latest change, and only while it was open. The timeline
+said "The brief changed". Now:
+- **"Since your last visit (date)"** appears on opening a project when something happened since. It lists:
+  - each change, with the old fact and the new one and what it reopened;
+  - each stage redone, to which version and by whom (Go or you);
+  - what was checked and kept;
+  - what was recorded as sent;
+  - then where the work stands (Still usable / Being redone / Needs you).
+  - "Show every change" widens it to the whole project. "Got it" hides it until something else happens.
+  - It stays out of the way when the change notice already shows the one change.
+- **The timeline expands a change** to show "Was / Now" for each replaced fact, what was added or taken out, the
+  stages it reopened and why, and any choice it set aside. It names "Checked after a change and kept", "Your change
+  reopened later stages" (with which), and records of who has a version.
+- **"What this used"** names a project fact replaced since the version was made, as it already did for folder rules.
+
+Limits:
+- "Last visit" is per browser (`pm.seen.<project>` in local storage). On another device, or after clearing site
+  data, there is no summary until the next visit there. The timeline always has the full record.
+
+### L-291 — A stop says why the decision is the user's and what is ready meanwhile (2026-11-26)
+Sean, 25 Nov: "When PromptMaster does stop, it should tell them what decision is needed, why it's theirs to make, and
+what can keep moving in the meantime." Now:
+- An approval that sends, signs, spends or authorises something says so: "it sends something to people outside this
+  project, and only you decide what goes out" (`isOutgoing`).
+- Go's stop card adds "Ready to use now: Timeline v2, Budget v1" for the stages that are finished, current and
+  approved, and "Comes after this decision: Operations plan".
+- "Nothing else can go ahead" now reads "Go has nothing else to do until this is decided", which is what it meant.
+
+Limits:
+- Go still stops the whole run at a reserved approval. It does not carry on with stages that do not depend on the
+  decision. "Carry on with other work first" is offered only when another stage holds work Go can do itself (a
+  recheck after a change, or a check's findings).
+- "Comes after" is by stage order, not by what each stage uses.

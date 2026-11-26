@@ -2,6 +2,7 @@ import type { en } from '../areas/need';
 
 /** Arabic for `areas/need.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "need.reservedOutgoing": "هذه لك وحدك: إنها ترسل شيئًا إلى أشخاص خارج هذا المشروع، وأنت وحدك تقرر ما يُرسل.",
   'need.setObjective': 'أحتاج إلى هدف قبل أن أختار خطوة. حدّد هدفًا أعلاه.',
   'need.stuckWhy': '{stage} معلَّمة بأنها متعثرة.',
   'need.stuckWhyReason': '{stage} معلَّمة بأنها متعثرة: {reason}.',

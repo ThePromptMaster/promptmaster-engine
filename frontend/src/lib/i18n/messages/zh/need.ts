@@ -2,6 +2,7 @@ import type { en } from '../areas/need';
 
 /** Chinese for `areas/need.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "need.reservedOutgoing": "这只能由你决定：它会把内容发给本项目之外的人，发出什么只由你决定。",
   'need.setObjective': '我需要先有一个目标，才能选择下一步。请在上方设置目标。',
   'need.stuckWhy': '{stage}已被标记为卡住。',
   'need.stuckWhyReason': '{stage}已被标记为卡住：{reason}。',

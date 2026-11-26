@@ -2,6 +2,10 @@ import type { en } from '../areas/words';
 
 /** Hindi for `areas/words.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "tw:Recorded who has a version": "दर्ज किया कि किसके पास कौन-सा संस्करण है",
+  "tw:Took back a record of who has a version": "किसके पास संस्करण है, यह रिकॉर्ड वापस लिया",
+  "tw:Your change reopened later stages": "आपके बदलाव ने बाद के चरण फिर से खोले",
+  "tw:Checked after a change and kept": "बदलाव के बाद जाँचा गया और रखा गया",
   "tw:Objective is stated": "उद्देश्य बताया गया है",
   "tw:I am satisfied it says what success looks like": "मैं संतुष्ट हूँ कि यह बताता है कि सफलता कैसी दिखती है",
   "tw:I am satisfied it says what is out of scope": "मैं संतुष्ट हूँ कि यह बताता है कि क्या दायरे से बाहर है",

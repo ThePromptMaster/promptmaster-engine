@@ -4,6 +4,14 @@
  * is sent to the model stays the template's own English.
  */
 export const en = {
+  "timeline.more": "Show what changed",
+  "timeline.less": "Hide",
+  "timeline.was": "Was:",
+  "timeline.now": "Now:",
+  "timeline.removed": "Taken out:",
+  "timeline.added": "Added:",
+  "timeline.reopened": "Reopened:",
+  "timeline.setAside": "Set aside to choose again:",
   "think.auto": "Let PromptMaster choose for each step (recommended)",
   "think.everyGroup": "Or think one way on every step",
   "think.customOption": "Your own persona",
@@ -75,6 +83,14 @@ export const en = {
 type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
+  "timeline.more": "Ver qué cambió",
+  "timeline.less": "Ocultar",
+  "timeline.was": "Antes:",
+  "timeline.now": "Ahora:",
+  "timeline.removed": "Quitado:",
+  "timeline.added": "Añadido:",
+  "timeline.reopened": "Reabierto:",
+  "timeline.setAside": "Apartado para elegir de nuevo:",
   "think.auto": "Dejar que PromptMaster elija en cada paso (recomendado)",
   "think.everyGroup": "O pensar de una sola forma en todos los pasos",
   "think.customOption": "Tu propio personaje",
@@ -144,6 +160,14 @@ export const es: Keys = {
 };
 
 export const fr: Keys = {
+  "timeline.more": "Voir ce qui a changé",
+  "timeline.less": "Masquer",
+  "timeline.was": "Avant :",
+  "timeline.now": "Maintenant :",
+  "timeline.removed": "Retiré :",
+  "timeline.added": "Ajouté :",
+  "timeline.reopened": "Rouvert :",
+  "timeline.setAside": "Mis de côté pour choisir à nouveau :",
   "think.auto": "Laisser PromptMaster choisir à chaque étape (recommandé)",
   "think.everyGroup": "Ou penser d’une seule façon à chaque étape",
   "think.customOption": "Votre propre persona",
@@ -213,6 +237,14 @@ export const fr: Keys = {
 };
 
 export const pt: Keys = {
+  "timeline.more": "Ver o que mudou",
+  "timeline.less": "Ocultar",
+  "timeline.was": "Antes:",
+  "timeline.now": "Agora:",
+  "timeline.removed": "Removido:",
+  "timeline.added": "Adicionado:",
+  "timeline.reopened": "Reaberto:",
+  "timeline.setAside": "Posto de lado para escolher de novo:",
   "think.auto": "Deixar o PromptMaster escolher em cada etapa (recomendado)",
   "think.everyGroup": "Ou pensar de um só jeito em todas as etapas",
   "think.customOption": "Sua própria persona",

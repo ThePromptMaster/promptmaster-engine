@@ -2,6 +2,8 @@ import type { en } from '../areas/go';
 
 /** Chinese for `areas/go.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "nyc.readyNow": "现在即可使用：{list}。",
+  "nyc.waitingOn": "在此决定之后进行：{list}。",
   'goAction.derive': '推导',
   'goAction.prove': '证明',
   'goAction.simplify': '化简',
@@ -164,7 +166,7 @@ export const zh: Record<keyof typeof en, string> = {
   'nyc.decideThere': '请在那里逐项定夺。它们都定夺后我会察觉；然后按“继续”。',
   'nyc.orYourself': '或者自己在阶段中完成。我会察觉到，“继续”按钮会出现在这里。',
   'nyc.carryOn': '先处理其他工作',
-  'nyc.nothingElse': '在此事决定之前，其他工作无法推进。',
+  "nyc.nothingElse": "在此事决定之前，Go 没有其他可做的事。",
   'nyc.optionsLoading': '正在读取此阶段向你提出的选项…',
   'nyc.chooseOne': '请选择一项。它会记录为你的决定，并给出此项批准。',
   'nyc.somethingElse': '或者说明你另外的决定',

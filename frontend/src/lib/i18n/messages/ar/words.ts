@@ -2,6 +2,10 @@ import type { en } from '../areas/words';
 
 /** Arabic for `areas/words.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "tw:Recorded who has a version": "سُجّل من لديه إصدار",
+  "tw:Took back a record of who has a version": "أُلغي سجل لمن لديه إصدار",
+  "tw:Your change reopened later stages": "أعاد تغييرك فتح مراحل لاحقة",
+  "tw:Checked after a change and kept": "رُوجع بعد تغيير وأُبقي",
   'tw:Objective is stated': 'الهدف مذكور',
   'tw:I am satisfied it says what success looks like': 'أنا مقتنع بأنه يذكر كيف يبدو النجاح',
   'tw:I am satisfied it says what is out of scope': 'أنا مقتنع بأنه يذكر ما هو خارج النطاق',

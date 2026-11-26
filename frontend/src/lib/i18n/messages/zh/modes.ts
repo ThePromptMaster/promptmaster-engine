@@ -2,6 +2,14 @@ import type { en } from '../areas/modes';
 
 /** Chinese for `areas/modes.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "timeline.more": "查看改动",
+  "timeline.less": "收起",
+  "timeline.was": "原为：",
+  "timeline.now": "现为：",
+  "timeline.removed": "已删除：",
+  "timeline.added": "已添加：",
+  "timeline.reopened": "已重新打开：",
+  "timeline.setAside": "已搁置，待重新选择：",
   "think.auto": "让 PromptMaster 为每一步选择（推荐）",
   "think.everyGroup": "或者每一步都用同一种思考方式",
   "think.customOption": "你自己的角色",

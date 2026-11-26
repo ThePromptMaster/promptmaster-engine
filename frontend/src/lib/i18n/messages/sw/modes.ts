@@ -2,6 +2,14 @@ import type { en } from '../areas/modes';
 
 /** Swahili for `areas/modes.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "timeline.more": "Onyesha kilichobadilika",
+  "timeline.less": "Ficha",
+  "timeline.was": "Ilikuwa:",
+  "timeline.now": "Sasa:",
+  "timeline.removed": "Imeondolewa:",
+  "timeline.added": "Imeongezwa:",
+  "timeline.reopened": "Imefunguliwa tena:",
+  "timeline.setAside": "Imewekwa kando ili uchague tena:",
   "think.auto": "Acha PromptMaster ichague kwa kila hatua (inapendekezwa)",
   "think.everyGroup": "Au fikiri kwa njia moja katika kila hatua",
   "think.customOption": "Haiba yako mwenyewe",

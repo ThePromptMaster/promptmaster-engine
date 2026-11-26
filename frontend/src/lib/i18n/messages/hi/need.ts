@@ -2,6 +2,7 @@ import type { en } from '../areas/need';
 
 /** Hindi for `areas/need.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "need.reservedOutgoing": "यह केवल आपका है: यह इस प्रोजेक्ट से बाहर के लोगों को कुछ भेजता है, और क्या बाहर जाए यह केवल आप तय करते हैं।",
   'need.setObjective': 'अगला कदम चुनने से पहले मुझे एक उद्देश्य चाहिए। ऊपर एक उद्देश्य तय करें।',
   'need.stuckWhy': '{stage} को अटका हुआ चिह्नित किया गया है।',
   'need.stuckWhyReason': '{stage} को अटका हुआ चिह्नित किया गया है: {reason}।',

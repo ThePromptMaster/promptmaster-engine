@@ -2,6 +2,8 @@ import type { en } from '../areas/go';
 
 /** Swahili for `areas/go.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "nyc.readyNow": "Tayari kutumika sasa: {list}.",
+  "nyc.waitingOn": "Inakuja baada ya uamuzi huu: {list}.",
   'goAction.derive': 'Tohoa',
   'goAction.prove': 'Thibitisha',
   'goAction.simplify': 'Rahisisha',
@@ -164,7 +166,7 @@ export const sw: Record<keyof typeof en, string> = {
   'nyc.decideThere': 'Amua kila moja hapo. Nitagundua yakishaamuliwa; kisha bonyeza Endelea tena.',
   'nyc.orYourself': 'Au ifanye mwenyewe kwenye hatua. Nitagundua, na Endelea tena itaonekana hapa.',
   'nyc.carryOn': 'Endelea na kazi nyingine kwanza',
-  'nyc.nothingElse': 'Hakuna kingine kinachoweza kuendelea hadi hili liamuliwe.',
+  "nyc.nothingElse": "Go haina kingine cha kufanya hadi hili liamuliwe.",
   'nyc.optionsLoading': 'Inasoma chaguo ambazo hatua hii inakupa…',
   'nyc.chooseOne': 'Chagua moja. Linarekodiwa kama uamuzi wako, na idhini hii inatolewa.',
   'nyc.somethingElse': 'Au sema unachoamua badala yake',

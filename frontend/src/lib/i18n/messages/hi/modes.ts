@@ -2,6 +2,14 @@ import type { en } from '../areas/modes';
 
 /** Hindi for `areas/modes.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "timeline.more": "क्या बदला, दिखाएँ",
+  "timeline.less": "छिपाएँ",
+  "timeline.was": "पहले:",
+  "timeline.now": "अब:",
+  "timeline.removed": "हटाया गया:",
+  "timeline.added": "जोड़ा गया:",
+  "timeline.reopened": "फिर से खोला गया:",
+  "timeline.setAside": "फिर से चुनने के लिए अलग रखा गया:",
   "think.auto": "PromptMaster को हर चरण के लिए चुनने दें (अनुशंसित)",
   "think.everyGroup": "या हर चरण पर एक ही तरह से सोचें",
   "think.customOption": "आपकी अपनी पर्सोना",
