@@ -91,3 +91,28 @@ describe('after a change: still usable, being redone, needs you (L-277, 22 Nov, 
     expect(document.querySelector('[data-group="you"]')!.textContent).toContain('nothing needs your judgment.');
   });
 });
+
+describe('the header names the work that will be checked, not "everything else stands" (26 Nov, L-292)', () => {
+  it('when finished work after a waiting stage will be checked, it says so', () => {
+    const label = (id: string) => ({ timeline: 'Delivery timeline', staffing: 'Staffing schedule', budget: 'Budget', commitment: 'Customer commitment', plan: 'Operations plan' })[id] ?? id;
+    const change = { type: 'brief_changed', stage_id: 'plan', actor: 'user', created_at: '2026-11-26T22:20:00Z', payload: { field: 'facts', kind: 'fact', affected: [{ stage_id: 'timeline', reason: 'r' }, { stage_id: 'staffing', reason: 'r' }, { stage_id: 'plan', reason: 'r' }] } } as never;
+    render(
+      <BriefChangeNotice
+        change={{ event: change, stageIds: ['timeline', 'staffing', 'plan'] }}
+        stageLabel={label}
+        onKeep={() => undefined}
+        summary={{
+          usable: [{ stageId: 'brief' }],
+          redoing: [
+            { stageId: 'timeline', state: 'waiting' }, { stageId: 'staffing', state: 'waiting' },
+            { stageId: 'budget', state: 'to_check', after: 'timeline' }, { stageId: 'commitment', state: 'to_check', after: 'timeline' },
+            { stageId: 'plan', state: 'waiting' },
+          ],
+          needsYou: [],
+        }}
+      />
+    );
+    expect(screen.getByText(/Budget and Customer commitment will be checked once Delivery timeline is updated; everything else stands\./)).toBeTruthy();
+    expect(screen.queryByText(/^Everything else stands\.$/)).toBeNull();
+  });
+});

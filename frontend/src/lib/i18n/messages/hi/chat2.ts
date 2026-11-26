@@ -2,6 +2,7 @@ import type { en } from '../areas/chat2';
 
 /** Hindi for `areas/chat2.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "bcn.restToCheck": "{after} अपडेट होने पर {names} जाँचे जाएँगे; बाकी सब बना रहता है।",
   "slv.label": "आपकी पिछली विज़िट के बाद से",
   "slv.title": "आपकी पिछली विज़िट ({when}) के बाद से",
   "slv.titleAll": "इस प्रोजेक्ट के सभी बदलाव",
