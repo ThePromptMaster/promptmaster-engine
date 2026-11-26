@@ -77,6 +77,21 @@ export function lastSent(records: readonly SharedRecord[] | undefined): SharedRe
   return sent.length ? sent.reduce((a, b) => (b.versionNumber > a.versionNumber || (b.versionNumber === a.versionNumber && b.at > a.at) ? b : a)) : null;
 }
 
+/** Longest a change line is shown beside who has which version. */
+export const CHANGE_LINE_MAX = 220;
+
+/**
+ * A version's change note as one line: the change itself, without the notes kept
+ * out of the document for the user (26 Nov production pass: a commitment's line ran
+ * to a paragraph of "Kept out of the document, for you: …").
+ */
+export function changeLine(summary: string | null | undefined): string {
+  let text = (summary ?? '').replace(/\s+/g, ' ').trim();
+  const cut = text.search(/\s*[—-]+\s*Kept out of the document|\s*Notes? for you\b/i);
+  if (cut > 0) text = text.slice(0, cut).trim();
+  return text.length > CHANGE_LINE_MAX ? `${text.slice(0, CHANGE_LINE_MAX - 1).trimEnd()}…` : text;
+}
+
 export interface SentBehind {
   stageId: string;
   sent: SharedRecord;
@@ -109,7 +124,7 @@ export function sentSuperseded(input: {
     const changes = list
       .filter((v) => v.version_number > sent.versionNumber)
       .sort((a, b) => a.version_number - b.version_number)
-      .map((v) => ({ version: v.version_number, summary: (v.change_summary ?? '').trim() }))
+      .map((v) => ({ version: v.version_number, summary: changeLine(v.change_summary) }))
       .filter((c) => c.summary);
     out.push({ stageId, sent, current, changes });
   }

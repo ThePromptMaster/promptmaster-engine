@@ -107,7 +107,8 @@ export function SentRecord({
           </p>
           {behind.changes.length > 0 && (
             <ul className="list-disc ps-10">
-              {behind.changes.map((c) => (
+              {/* The latest few; the timeline has every one. */}
+              {behind.changes.slice(-3).map((c) => (
                 <li key={c.version}>{t('sent.changedIn', { n: c.version, what: c.summary })}</li>
               ))}
             </ul>
