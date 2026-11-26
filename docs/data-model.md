@@ -25,7 +25,7 @@ future change does not undo a guarantee without noticing.
 | `project_tasks` | Unresolved work items. |
 | `jobs` | The background queue. See [`jobs.md`](jobs.md). |
 | `section_records` | Per-section continuity records (summary, glossary, decisions, TODOs). |
-| `project_folders` | A user's folders for projects, nested at most three deep (a trigger refuses cycles and deeper trees). `projects.folder_id` files a project in one; deleting a folder sets its projects' `folder_id` and its subfolders' `parent_id` to null, never deleting work. Owner-only RLS. |
+| `project_folders` | A user's folders for projects, nested at most five deep (a trigger refuses cycles and deeper trees). `kind` (workspace / client / search / folder) and a workspace's `layout` (blank / executive_search, 20261212) are wording only: nothing that carries down reads them. `projects.folder_id` files a project in one; deleting a folder sets its projects' `folder_id` and its subfolders' `parent_id` to null, never deleting work. Owner-only RLS. |
 | `project_references` | Another of the user's projects a project draws on (at most five). Composite `(id, user_id)` FKs on both sides, so only the owner's own projects. The browser reads the referenced project's deliverable and facts and sends them as `PMInput.references`; `project_context.references_block` puts them last in every prompt's context, cited [R1]…. Since 31 Oct the row holds `snapshot` (that material as it was when the reference was added) and `snapshot_at`; prompts read the snapshot, and "Update from the original" refreshes it (L-133). |
 | `copy_project(src)` | Not a table: a `security definer` function (31 Oct) that copies a project the caller owns, with new ids throughout — versions, events, facts, sources, files and references — in one transaction. Four triggers that judge a row against the present (Go-run authorization, fact supersede, version numbering, step label honesty) are skipped only while it runs, as their owner (`promptmaster.copying`); the browser then copies the stored files. L-133. |
 | `beta_feedback` | FR-22 feedback capture. Users see only their own rows; the product owner reads all of them on `/admin` (Beta feedback), through `/api/admin/overview`. |
@@ -42,6 +42,7 @@ Migration `20260927000000_stage_statuses` widened `we_type_chk`:
 | `stage_blocked` / `stage_unblocked` | `blocked` with `{kind, reason}` (`we_block_reason_chk`: reason required, kind ∈ tool_missing / data_missing / needs_decision) / back to `in_progress` |
 | `project_finalized` / `project_reopened` | `WorkflowState.project_status`; `projects.status` is the denormalised copy |
 | `template_upgraded` | re-pin to a newer workflow version; payload records from/to |
+| `version_shared` | nothing: the user's record of which version went to whom (20261213, `we_shared_chk`: actor user, no run, payload names `version_id`); a later one with `undoes` takes one back |
 | `stage_completed` (legacy) | `complete` — kept so every existing log replays unchanged; new code does not write it |
 
 Finish is gated on the **deliverable** (`deliverableStage`: the manuscript on the first
