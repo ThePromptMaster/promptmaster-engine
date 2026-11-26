@@ -5673,3 +5673,52 @@ Limits:
   decision. "Carry on with other work first" is offered only when another stage holds work Go can do itself (a
   recheck after a change, or a check's findings).
 - "Comes after" is by stage order, not by what each stage uses.
+
+### L-300 — Moving a project into a folder says where it went (2026-11-26)
+Sean, 26 Nov: "It says you're allowed to drag the projects into the folders, But I don't think it's working." On
+production the drop saved, but nothing on screen changed: in "All projects" the card stayed where it was, it did not
+name its folder, and no message showed. An empty folder said "Drag a project here" with no cards on screen to drag,
+and a workspace whose projects sit in its subfolders read "Nothing in … yet". Now:
+- A move says so: "Moved "Board note" to CFO search", with Undo; the folder row lights for a moment.
+- In "All projects", each card names the folder it is in.
+- An empty folder offers **Move projects here**: a list of the user's projects to file there, with a search box. It
+  works with a mouse, a keyboard and a finger. A folder with projects has the same button beside "New project".
+- A folder whose projects are all in folders inside it says "Nothing is filed directly in X" and lists those folders
+  with their counts.
+- A drop counts anywhere on a folder row, its action icons included (they used to swallow it), and the icons stay
+  hidden while a card is dragged. The sidebar says "Drop "…" on a folder to file it" during a drag.
+- The project's id is kept for the length of the drag as well as in the drag data, so a browser that hides custom drag
+  types until the drop still lets the row accept it.
+- A card is draggable only when the folders are beside the list (a mouse and a window at least 768 px wide). Below
+  that the folders are in a sheet over the list, so the card's folder button is the way.
+
+Limits:
+- Dragging was checked by hand in Chrome only. Safari and Firefox are covered by the id kept for the drag and by unit
+  tests that fire the events, not by a hand pass.
+- "Move projects here" lists the 200 most recently changed projects; the search narrows those, not the whole account.
+- The count beside a folder is still the projects filed directly in it.
+
+### L-301 — The side chat reads the project's cost and Go's live step (2026-11-26)
+Sean, 26 Nov: "The side chat doesn't appear to keep up with the progress of the workspace. The side chat lags behind.
+It reads the cost way less than what the piggy bank says." The chat was given only the latest Go run's cost (its last
+few windows, tallied in the browser), while the cost line under the stage (the piggy bank) sums every model call on
+the project: every Go run, the side chat, setup, drafting, checks and chapters written in the background. And the run
+it was given came from the record cut to 400 characters a step with no stage names, without the step Go was on.
+Now:
+- Every message carries the project's spend, read by the same function as the piggy bank (`projectSpent`), as
+  `context.project_cost`. The chat answers a cost question with it, names a run's figure only as that run's part, and
+  says an unpriced call is unknown, never $0.
+- Go's steps reach the chat the same way from the record and from the tab: 1,200 characters, the stage each worked
+  on, and the step still running (with how long), plus what the tab driving Go says it is doing ("4 of 12 sections
+  written") and on which stage.
+- Every stage's status goes with each message, not only the one on screen.
+- While Go waits on chapters written in the background, the project reloads as they land (at most every 20 s), so
+  the chapters on screen and in the chat keep up.
+- A side-chat message sent while Go is mid-step is no longer charged to Go's step and run (`SIDE_CHAT_ROUTES`).
+
+Limits:
+- The chat reads the cost when a message is sent; an answer is as fresh as that moment. The piggy bank still updates
+  when the stage or the project reloads, not while a call runs.
+- The project figure is summed over its latest 10,000 calls, as the piggy bank's is.
+- "What Go is doing now" comes from the tab driving Go. With that tab closed, the chat has only the record, which
+  says how long ago anything happened.

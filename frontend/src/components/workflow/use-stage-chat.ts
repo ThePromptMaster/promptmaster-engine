@@ -2,7 +2,8 @@
 
 import { strayWorkingText } from '@/lib/workflow/working-text';
 import { withinMessage, type MessageAttachment } from '@/lib/data/attachments';
-import { withRunRecord } from '@/lib/workflow/chat-run-record';
+import { withProjectCost, withRunRecord } from '@/lib/workflow/chat-run-record';
+import { projectSpent } from '@/lib/supabase/project-cost';
 import { accountSearchOf, keepAccountItems } from '@/lib/connections/account-found';
 import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { savedNumbers } from '@/lib/workflow/sources';
@@ -179,6 +180,8 @@ interface Options {
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   /** Where the user is: stage, workflow, outline, chapters, buttons (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** A stage's name as the page shows it, so Go's recorded steps name their stage (26 Nov). */
+  stageName?: (stageId: string) => string | undefined;
   /** What was attached, until a message carries it (5 Nov). */
   nextMessageAttachments?: { current: MessageAttachment[] };
   /** After facts were updated with a revision, so the project reloads them. */
@@ -250,6 +253,7 @@ export function useStageChat({
   appendStageVersion,
   restoreStageVersion,
   getChatContext,
+  stageName,
   nextMessageAttachments,
   onFactsChanged,
   onPatchSetup,
@@ -363,9 +367,13 @@ export function useStageChat({
       try {
         const priorHistory = asHistory(messages);
         await persist('user', message, 'discuss');
-        // The run as recorded now, not as this tab last saw it (5 Nov).
+        // The run as recorded now, not as this tab last saw it (5 Nov), and what the whole
+        // project has cost, read as the piggy bank reads it (26 Nov).
         const built = getChatContext?.();
-        const sentContext = built ? await withRunRecord(built, project.id) : built;
+        const [withRun, spentNow] = built
+          ? await Promise.all([withRunRecord(built, project.id, Date.now(), stageName), projectSpent(project.id)])
+          : [built, null];
+        const sentContext = withRun ? withProjectCost(withRun, spentNow) : withRun;
         const attachments = withinMessage(nextMessageAttachments?.current ?? []);
 
         const response = await api.chatMessage({
@@ -415,7 +423,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged, onAnswered, thinking]
+    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged, onAnswered, thinking, stageName]
   );
 
   /**

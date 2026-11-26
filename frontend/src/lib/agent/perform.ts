@@ -119,6 +119,9 @@ import { describeVersionChange, versionChange } from '@/lib/workflow/version-cha
 import { splitUserNote, userNoteLine } from '@/lib/workflow/user-note';
 import { onlyRemoves } from '@/lib/workflow/only-removes';
 
+/** How often a section wait reloads the project while sections are being written. */
+const SECTION_REFRESH_MS = 20_000;
+
 export interface PerformContext {
   project: Project;
   template: WorkflowTemplate;
@@ -234,10 +237,22 @@ async function waitForSections(
   if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
   const title = (id: string) => m.outline.find((s) => s.id === id)?.title || id;
   const waitStage = opts.stageId ?? ctx.stage.id;
+  // Sections reach the page as they are written, at most every 20 s, not only when the wait
+  // ends: the chapters on screen and the side chat kept to the old text for minutes (26 Nov,
+  // Sean: "the side chat lags behind").
+  let shownComplete = 0;
+  let refreshedAt = 0;
   const r: WaitResult = await awaitSectionJobs({
     projectId: ctx.project.id, artifactId: m.artifactId, sectionIds: ids, signal: ctx.signal,
     ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
-    onProgress: (s) => ctx.onProgress?.(`${s.complete} of ${s.total} sections written`),
+    onProgress: (s) => {
+      ctx.onProgress?.(`${s.complete} of ${s.total} sections written`);
+      if (s.complete > shownComplete && Date.now() - refreshedAt >= SECTION_REFRESH_MS) {
+        shownComplete = s.complete;
+        refreshedAt = Date.now();
+        void Promise.resolve(ctx.refresh?.()).catch(() => undefined);
+      }
+    },
   });
   ctx.refresh?.();
   await countSectionCost(ctx, m.artifactId, ids);
