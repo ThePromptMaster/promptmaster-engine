@@ -48,6 +48,7 @@ import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
+import { useOutreachContext } from './use-outreach-context';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
@@ -1713,6 +1714,8 @@ export function WorkflowWorkspace({
     [stage, assessFor, headVersion?.content, t]
   );
   const assessRunKey = stage?.renderer === 'assess' ? assessKey(project.id, stage.id) : null;
+  // The Outreach parts and their save, for an outreach stage's renderer (26 Nov).
+  const outreachContext = useOutreachContext({ template, bundles: stageBundles, project, appendStageVersion });
   const assessRun = useAssessRun(assessRunKey);
   const stopAssessRun = useCallback(() => {
     if (assessRunKey) stopAssess(assessRunKey);
@@ -3627,7 +3630,7 @@ export function WorkflowWorkspace({
             <RefusedRevisions refused={refusedSince(events ?? [], stage.id, headVersion)} head={headVersion} />
             {!outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
             {explicitOutlineHere ? null : !stageDrafts(stage) &&
-              stage.renderer !== 'long_form' && stage.renderer !== 'assess' ? (
+              stage.renderer !== 'long_form' && stage.renderer !== 'assess' && stage.renderer !== 'outreach' ? (
               <CheckpointPanel />
             ) : (
               <div
@@ -3649,6 +3652,7 @@ export function WorkflowWorkspace({
                 onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
                 onProposeStatuses={(itemSchemaFor(stage).statuses ?? []).some((s) => s.modelMayPropose) ? proposeItems : undefined}
                 onAssessBatch={stage.renderer === 'assess' && appendStageVersion ? assessBatch : undefined}
+                outreach={stage.renderer === 'outreach' ? outreachContext ?? undefined : undefined}
                 assessRun={assessRun}
                 assessRunKey={assessRunKey}
                 onStopAssess={stopAssessRun}

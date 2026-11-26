@@ -83,3 +83,81 @@ class TestFindKey:
     def test_empty_values_are_passed_over(self):
         assert find_key({"mail": "", "nested": {"mail": "m@x.co"}}, ("mail",)) == "m@x.co"
         assert find_key({"a": None}, ("mail",)) is None
+
+
+class TestSentCheck:
+    """'Check whether I've already contacted them … show when I've reached somebody else at the same company.'"""
+
+    def test_finds_people_written_to_and_colleagues_at_the_same_company(self, fake):
+        fake.add("acct_gmail", "gmail")
+        r = client.post("/api/outreach/sent-check", json={
+            "addresses": ["Jamie.Park@northwind-holdings.example", "new.person@elsewhere.example"],
+            "domains": ["harbourline-supply.example", "elsewhere.example"],
+        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["checked"] is True
+        assert [s["address"] for s in body["sent"]] == ["jamie.park@northwind-holdings.example"]
+        assert body["sent"][0]["subject"] == "A quick look at PromptMaster"
+        assert body["sent"][0]["thread_url"] == "https://mail.google.com/mail/?authuser=you%40example.com#all/t-jamie"
+        assert {c["domain"] for c in body["colleagues"]} == {"harbourline-supply.example"}
+        # It searched Sent only, by the addresses and domains asked about.
+        queries = [args[1]["query"] for kind, args in fake.calls if kind == "execute" and args[0] == "GMAIL_FETCH_EMAILS"]
+        assert queries and all(q.startswith("in:sent to:(") for q in queries)
+
+    def test_without_gmail_it_says_nothing_was_checked(self, fake):
+        r = client.post("/api/outreach/sent-check", json={"addresses": ["a@b.co"]})
+        assert r.json() == {"checked": False, "sent": [], "colleagues": []}
+
+    def test_a_failed_search_reads_nothing_and_says_so(self, fake):
+        fake.add("acct_gmail", "gmail")
+        fake.fail_tools.add("GMAIL_FETCH_EMAILS")
+        r = client.post("/api/outreach/sent-check", json={"addresses": ["jamie.park@northwind-holdings.example"]})
+        # One search failing is logged and skipped; nothing found is reported as found.
+        assert r.status_code == 200 and r.json()["sent"] == []
+
+
+class TestDraftMessage:
+    """'Save the standard message and let me edit individual drafts.'"""
+
+    def _client(self, reply):
+        from unittest.mock import AsyncMock
+
+        from deps import get_client
+
+        stub = AsyncMock()
+        stub.generate_json = AsyncMock(return_value=(reply, {}))
+        app.dependency_overrides[get_client] = lambda: stub
+        return stub
+
+    def teardown_method(self):
+        from deps import get_client
+
+        app.dependency_overrides.pop(get_client, None)
+
+    def test_keeps_the_known_tokens_the_users_link_and_no_sign_off(self):
+        stub = self._client({
+            "subject": "{{company}} and PromptMaster",
+            "body": "Hi {{first_name}},\n\n{{personal_line}}\n\nWe built {{offer}}: see {{link}} or https://evil.example/x. {{discount_code}}\n\nBest,\nSean",
+            "followup_body": "Hi {{first_name}}, a quick nudge: {{link}}",
+            "offer": "a beta of PromptMaster",
+            "link": "https://promptmasterv1.com",
+        })
+        r = client.post("/api/outreach/draft-message", json={
+            "inputs": {"objective": "Show the PromptMaster beta to heads of operations. Use https://promptmasterv1.com", "audience": "", "mode": "clarity"},
+            "brief": "Reach the head of operations. Offer: the beta.",
+        })
+        assert r.status_code == 200, r.text
+        m = r.json()
+        assert m["link"] == "https://promptmasterv1.com"
+        assert "https://evil.example" not in m["body"] and "{{discount_code}}" not in m["body"]
+        assert "{{personal_line}}" in m["body"] and "{{offer}}" in m["body"]
+        assert not m["body"].rstrip().endswith("Sean")
+        prompt = stub.generate_json.await_args.kwargs["prompt"]
+        assert "Reach the head of operations." in prompt
+        assert "No sign-off with a name" in prompt and "{{personal_line}}" in prompt
+
+    def test_a_link_the_user_never_gave_is_not_the_link(self):
+        self._client({"subject": "Hi", "body": "Hi {{first_name}}", "followup_body": "", "offer": "x", "link": "https://made-up.example"})
+        r = client.post("/api/outreach/draft-message", json={"inputs": {"objective": "Reach people.", "audience": "", "mode": "clarity"}, "brief": ""})
+        assert r.json()["link"] == ""

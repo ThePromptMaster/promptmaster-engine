@@ -59,6 +59,21 @@ export interface LongFormContext {
 }
 
 /**
+ * What an Outreach stage needs beyond the common props (26 Nov). Like the drafting renderer's
+ * block: each part reads the others (the drafts are made from the contacts and the message),
+ * and saves its own data as a version, through the store, without the fact offers a hand edit
+ * of prose gets: this content is a list and a message, not the user's prose.
+ */
+export interface OutreachContext {
+  project: Project;
+  /** The latest saved content of each outreach part in the workflow, by part. */
+  parts: Partial<Record<'contacts' | 'message' | 'drafts', { stageId: string; content: string | null }>>;
+  /** The text of the stage before the first outreach part (the brief), for writing the message. */
+  briefText: string;
+  save: (stageId: string, content: string, operation: string, summary: string) => Promise<void>;
+}
+
+/**
  * The contract every stage renderer implements.
  *
  * Deliberately says nothing about which workflow the stage came from. A
@@ -125,6 +140,8 @@ export interface StageRendererProps {
   assessRunKey?: string | null;
   /** Stops the page's run; what was saved stays. */
   onStopAssess?: () => void;
+  /** Outreach stages: the other parts and a save (26 Nov). */
+  outreach?: OutreachContext;
   /** A finished Assess stage: open it again for another batch (15 Nov). */
   onReopenForBatch?: () => void;
   /** "Done — summarize": the stage's own Continue, from the table (15 Nov). */

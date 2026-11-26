@@ -50,6 +50,13 @@ const OPERATION_LABEL: Record<string, string> = {
   carried_from_quick: 'Your quick answer',
   // The first stage of a curated example; no model wrote it.
   example_prewritten: 'Prepared for this example',
+  // Outreach (26 Nov): the list as brought in, the user's changes, the Sent-mail check,
+  // the message PromptMaster wrote, and the drafts made from it.
+  outreach_import: 'Imported contacts',
+  outreach_edit: 'Your edit',
+  outreach_check: 'Checked against your Sent mail',
+  outreach_message: 'AI draft',
+  outreach_drafts: 'Emails made from the message',
 };
 
 /**
@@ -63,6 +70,7 @@ const SAVED_OPERATIONS = new Set([
   'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
   'chat_save', 'chat_rows', 'literature_lookup', 'literature_search', 'sandbox_result', 'long_form_complete', 'manuscript_snapshot', 'finished_version',
   'assess_batch', 'carried_from_quick', 'example_prewritten',
+  'outreach_import', 'outreach_edit', 'outreach_check',
 ]);
 
 export function isSaved(operation: string | null | undefined): boolean {

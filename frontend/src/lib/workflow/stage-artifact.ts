@@ -580,6 +580,40 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'gaps', label: 'Not stated', long: true, max: 400 },
     ],
   },
+  // Outreach (Sean, 26 Nov). A contact is ready to write to, waits on the user's decision,
+  // or is skipped with a reason; nothing else counts as decided.
+  outreach_contacts: {
+    itemLabel: 'contact',
+    minItems: 0,
+    maxItems: 2000,
+    fields: [
+      { key: 'company', label: 'Company', max: 160 },
+      { key: 'name', label: 'Person', max: 160 },
+      { key: 'role', label: 'Role', max: 160 },
+      { key: 'email', label: 'Email', max: 320 },
+      { key: 'detail', label: 'About their work', long: true, max: 600 },
+    ],
+    statuses: [
+      { value: 'ready', label: 'Ready', tone: 'done' },
+      { value: 'decide', label: 'Needs you', tone: 'warn', decided: false },
+      { value: 'skip', label: 'Skipped', tone: 'neutral', requiresReason: true },
+    ],
+  },
+  // One email per contact: approved by the user (the exact version), or set aside with a reason.
+  outreach_drafts: {
+    itemLabel: 'email',
+    minItems: 0,
+    maxItems: 2000,
+    fields: [
+      { key: 'to', label: 'To', max: 320 },
+      { key: 'subject', label: 'Subject', max: 200 },
+      { key: 'body', label: 'Email', long: true, max: 8000 },
+    ],
+    statuses: [
+      { value: 'approved', label: 'Approved', tone: 'done' },
+      { value: 'set_aside', label: 'Set aside', tone: 'neutral', requiresReason: true },
+    ],
+  },
 };
 
 /** The primary artifact kind a stage produces, if it declares one. */
@@ -976,13 +1010,14 @@ export function stageContentForChat(schema: StageItemSchema, content: string | n
 
 export function stageDrafts(stage: StageDefinition): boolean {
   // An Assess stage is filled by what the user pastes, a batch at a time.
-  if (stage.renderer === 'outline' || stage.renderer === 'long_form' || stage.renderer === 'assess') return false;
+  // An Outreach stage is filled from the list the user brings and its own buttons, never by a stage draft.
+  if (stage.renderer === 'outline' || stage.renderer === 'long_form' || stage.renderer === 'assess' || stage.renderer === 'outreach') return false;
   return stage.expected_artifacts.length > 0;
 }
 
 /** Which renderers store their artifact as items rather than as prose. */
 export function rendererHoldsItems(renderer: StageRenderer): boolean {
-  return renderer === 'list' || renderer === 'review' || renderer === 'assess';
+  return renderer === 'list' || renderer === 'review' || renderer === 'assess' || renderer === 'outreach';
 }
 
 // 25 Oct (Sean: "Reproduced" in the dropdown, "not reproduced" in the text):

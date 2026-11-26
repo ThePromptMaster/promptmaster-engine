@@ -12,7 +12,7 @@ import { ITEM_SCHEMAS, rendererHoldsItems } from './stage-artifact';
 import { SCALE_LIMITS, presetScale, validScale } from './assess';
 import type { StageRenderer, WorkflowTemplate } from './types';
 
-const RENDERERS: readonly StageRenderer[] = ['prose', 'list', 'outline', 'long_form', 'review', 'assess'];
+const RENDERERS: readonly StageRenderer[] = ['prose', 'list', 'outline', 'long_form', 'review', 'assess', 'outreach'];
 const GROUPS = ['planning', 'outlining', 'drafting', 'expansion', 'evaluation', 'revision', 'final_review'];
 
 /**
@@ -68,6 +68,15 @@ export function validateTemplate(
       const scale = s.assess?.scale;
       if (typeof scale === 'string' ? !presetScale(scale) : scale && !validScale({ id: 'custom', levels: scale })) {
         errors.push(`"${s.label}" has a scale that cannot be used: name a preset, or give ${SCALE_LIMITS.minLevels} to ${SCALE_LIMITS.maxLevels} levels.`);
+      }
+    }
+    // An Outreach stage says which part it holds; the drafts are written from the contacts and the message before them (26 Nov).
+    if (s.renderer === 'outreach') {
+      const part = s.outreach?.part;
+      if (part !== 'contacts' && part !== 'message' && part !== 'drafts') errors.push(`"${s.label}" is an outreach stage but does not say which part it holds.`);
+      if (part === 'drafts') {
+        const before = stages.slice(0, stages.indexOf(s)).map((x) => x.outreach?.part);
+        if (!before.includes('contacts') || !before.includes('message')) errors.push(`"${s.label}" writes drafts, so the contacts and the message must come before it.`);
       }
     }
     if (rendererHoldsItems(s.renderer) && s.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status')) {

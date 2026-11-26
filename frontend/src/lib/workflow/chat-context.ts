@@ -16,6 +16,7 @@ import { stageContentForChat, itemSchemaFor } from './stage-artifact';
 import { parseOutlineDocument } from '@/lib/outline/model';
 import { PLACE_WORDS, type StageControl } from './stage-controls';
 import { madeBy } from './chat-changes';
+import { outreachText } from '@/lib/outreach/digest-text';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import type { ChatContext, OutlineSection } from '@/types';
 import type { Project } from '@/types/project';
@@ -62,6 +63,7 @@ export function chatContentFor(
   versionContent: string
 ): string {
   if (stage.renderer === 'outline') return outlineLines(parseOutlineDocument(versionContent).items);
+  if (stage.renderer === 'outreach') return outreachText(stage.outreach?.part, versionContent);
   if (stage.renderer === 'long_form') {
     const written = formatManuscript(sectionsOf(template, bundles), CHAT_MANUSCRIPT_MAX);
     return written || versionContent;
