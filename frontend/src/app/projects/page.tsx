@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, moveProject, softDeleteProject } from '@/lib/supabase/projects';
-import { createFolder, deleteFolder, folderCounts, kindUnder, listFolders, renameFolder } from '@/lib/supabase/folders';
+import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, createFolder, deleteFolder, folderCounts, kindUnder, layoutOf, listFolders, renameFolder, workspaceOf } from '@/lib/supabase/folders';
 import { FolderRulesPanel } from '@/components/projects/folder-rules-panel';
 import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
 import { MoveToMenu } from '@/components/projects/move-to-menu';
@@ -14,7 +14,7 @@ import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
 import { ProjectCardMenu } from '@/components/projects/project-card-menu';
 import { pausedProjectIds, templateNamesById } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
-import type { FolderKind, ProjectFolder, ProjectSummary } from '@/types/project';
+import type { FolderKind, ProjectFolder, ProjectSummary, WorkspaceLayout } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
@@ -193,13 +193,18 @@ export default function ProjectsPage() {
     }
   }
 
-  const createAndShow = async (name: string, parentId: string | null, kind: FolderKind | null) => {
+  const createAndShow = async (name: string, parentId: string | null, kind: FolderKind | null, layout: WorkspaceLayout | null = null) => {
     if (!user) return;
-    // A workspace from "New workspace", then a client under it and a search under a client
-    // (Sean, 23–24 Nov: `kindUnder`, in the sidebar); the folder's panel changes it.
-    await createFolder(user.id, name, parentId, kind);
+    // A workspace from "New workspace", blank or executive search; then under it folders, or a
+    // client and a search under a client (Sean, 23–26 Nov: `kindUnder`); the folder's panel changes it.
+    const made = await createFolder(user.id, name, parentId, kind, layout);
     loadFolders();
+    // A new workspace opens at once, ready for a project or a folder (26 Nov: "start a project right away").
+    if (kind === 'workspace') select(made.id);
   };
+  // Adding a folder from an empty folder's own card (26 Nov).
+  const [addingInside, setAddingInside] = useState<string | null>(null);
+  const [insideName, setInsideName] = useState('');
   const rename = async (id: string, name: string) => {
     await renameFolder(id, name);
     loadFolders();
@@ -211,6 +216,15 @@ export default function ProjectsPage() {
   };
 
   const selectedFolder = selection === 'all' || selection === 'unfiled' ? null : folders.find((f) => f.id === selection) ?? null;
+  const depthOf = (folder: ProjectFolder) => {
+    let depth = 0;
+    for (let at = folder; at.parent_id && depth < MAX_FOLDER_DEPTH; depth += 1) {
+      const up = folders.find((f) => f.id === at.parent_id);
+      if (!up) break;
+      at = up;
+    }
+    return depth;
+  };
   const selectedLabel =
     selection === 'all' ? null : selection === 'unfiled' ? t('folders.unfiled') : selectedFolder?.name ?? null;
 
@@ -305,7 +319,7 @@ export default function ProjectsPage() {
 
       <GuestBanner />
 
-      {selectedFolder && <FolderRulesPanel key={selectedFolder.id} folder={selectedFolder} onKindChanged={loadFolders} projects={(projects ?? []).map((p) => ({ id: p.id, title: p.title }))} />}
+      {selectedFolder && <FolderRulesPanel key={selectedFolder.id} folder={selectedFolder} layout={layoutOf(workspaceOf(selectedFolder, folders))} onKindChanged={loadFolders} projects={(projects ?? []).map((p) => ({ id: p.id, title: p.title }))} />}
 
       {error && (
         <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
@@ -338,10 +352,68 @@ export default function ProjectsPage() {
       )}
 
       {projects?.length === 0 && selection !== 'all' && (
-        <div className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
+        <div data-empty-folder className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[32px] opacity-50">folder_open</span>
           <p className="mt-3">{t('list.emptyFolder', { name: selectedLabel ?? t('list.thisFolder') })}</p>
-          <button type="button" onClick={() => select('all')} className="mt-4 text-label text-[var(--pm-primary)] hover:underline">
+          {/* An empty folder says what to do in it (26 Nov, Sean: "someone should be able to
+              start a project right away or organize projects by whatever makes sense"). */}
+          {selectedFolder && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href={`/projects/new?folder=${selectedFolder.id}`}
+                data-start-here
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">add</span>
+                {t('list.startHere')}
+              </Link>
+              {depthOf(selectedFolder) + 1 < MAX_FOLDER_DEPTH && addingInside !== selectedFolder.id && (
+                <button
+                  type="button"
+                  data-add-inside
+                  onClick={() => {
+                    setAddingInside(selectedFolder.id);
+                    setInsideName('');
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
+                >
+                  <span aria-hidden className="material-symbols-outlined text-[18px]">create_new_folder</span>
+                  {t('list.addInside')}
+                </button>
+              )}
+            </div>
+          )}
+          {selectedFolder && addingInside === selectedFolder.id && (
+            <form
+              className="mx-auto mt-3 flex max-w-[420px] gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = insideName.trim();
+                if (!name) return;
+                setAddingInside(null);
+                void createAndShow(name, selectedFolder.id, kindUnder(selectedFolder, folders)).catch((err) =>
+                  setError(err instanceof Error ? err.message : t('folders.saveError'))
+                );
+              }}
+            >
+              <input
+                autoFocus
+                value={insideName}
+                maxLength={FOLDER_NAME_MAX}
+                onChange={(e) => setInsideName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setAddingInside(null);
+                }}
+                aria-label={t('folders.name')}
+                placeholder={t('folders.name')}
+                className="min-w-0 flex-1 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+              />
+              <button type="submit" className="rounded-lg bg-[var(--pm-primary)] px-3 py-2 text-label font-semibold text-[var(--on-primary)]">
+                {t('list.addInsideSave')}
+              </button>
+            </form>
+          )}
+          <button type="button" onClick={() => select('all')} className="mt-4 block w-full text-label text-[var(--pm-primary)] hover:underline">
             {t('list.showAll')}
           </button>
         </div>

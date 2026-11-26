@@ -66,3 +66,28 @@ describe('folders for projects (client, 21 Oct, email 5)', () => {
     expect([...descendantsOf(all, 'a')].sort()).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('a workspace\'s layout decides what a new folder inside it is called (Sean, 26 Nov)', () => {
+  it('under an executive search workspace, a client then a search; under a blank one, folders all the way down', async () => {
+    const { kindUnder, layoutOf, workspaceOf } = await import('./folders');
+    const tree = [
+      { id: 'es', parent_id: null, kind: 'workspace' as const, layout: 'executive_search' as const },
+      { id: 'cl', parent_id: 'es', kind: 'client' as const },
+      { id: 'old', parent_id: null, kind: 'workspace' as const, layout: null },
+      { id: 'bl', parent_id: null, kind: 'workspace' as const, layout: 'blank' as const },
+      { id: 'ldn', parent_id: 'bl', kind: 'folder' as const },
+      { id: 'plain', parent_id: null, kind: null },
+    ];
+    const at = (id: string) => tree.find((f) => f.id === id)!;
+    expect(kindUnder(at('es'), tree)).toBe('client');
+    expect(kindUnder(at('cl'), tree)).toBe('search');
+    expect(kindUnder(at('old'), tree)).toBe('client');
+    expect(kindUnder(at('bl'), tree)).toBe('folder');
+    expect(kindUnder(at('ldn'), tree)).toBe('folder');
+    expect(kindUnder(at('plain'), tree)).toBeNull();
+    expect(workspaceOf(at('ldn'), tree)?.id).toBe('bl');
+    expect(workspaceOf(at('plain'), tree)).toBeNull();
+    expect(layoutOf(at('old'))).toBe('executive_search');
+    expect(layoutOf(at('bl'))).toBe('blank');
+  });
+});

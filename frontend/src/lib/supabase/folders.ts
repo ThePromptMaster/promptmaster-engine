@@ -1,5 +1,5 @@
 import { createClient } from './client';
-import type { FolderKind, ProjectFolder } from '@/types/project';
+import type { FolderKind, ProjectFolder, WorkspaceLayout } from '@/types/project';
 
 /**
  * A user's folders for projects (client, 21 Oct, email 5: "organizing
@@ -8,18 +8,44 @@ import type { FolderKind, ProjectFolder } from '@/types/project';
  * Nov); the database refuses deeper or circular trees.
  */
 
-const COLUMNS = 'id, user_id, parent_id, name, position, kind, created_at, updated_at';
+const COLUMNS = 'id, user_id, parent_id, name, position, kind, layout, created_at, updated_at';
 
 /** How deep folders go; the database refuses a sixth level. */
 export const MAX_FOLDER_DEPTH = 5;
 
+/** The workspace a folder is in: its top-level ancestor, when that is a workspace. */
+export function workspaceOf(
+  folder: Pick<ProjectFolder, 'id' | 'parent_id' | 'kind'> | null | undefined,
+  folders: readonly Pick<ProjectFolder, 'id' | 'parent_id' | 'kind' | 'layout'>[]
+): Pick<ProjectFolder, 'id' | 'kind' | 'layout'> | null {
+  let at = folder ? folders.find((f) => f.id === folder.id) ?? folder : null;
+  for (let hops = 0; at?.parent_id && hops < MAX_FOLDER_DEPTH; hops += 1) {
+    const up = folders.find((f) => f.id === at!.parent_id);
+    if (!up) break;
+    at = up;
+  }
+  return at && at.kind === 'workspace' ? (at as Pick<ProjectFolder, 'id' | 'kind' | 'layout'>) : null;
+}
+
+/** A workspace's layout: one made before 26 Nov is executive search, as it was made. */
+export function layoutOf(workspace: Pick<ProjectFolder, 'layout'> | null | undefined): WorkspaceLayout | null {
+  if (!workspace) return null;
+  return workspace.layout === 'blank' ? 'blank' : 'executive_search';
+}
+
 /**
- * The kind a new folder takes under its parent: a client under a workspace, a
- * search under a client. A top-level folder is a plain folder until its owner
- * calls it a workspace; nobody filing projects is made to think in workspaces.
+ * The kind a new folder takes under its parent. In an executive search workspace
+ * a client under the workspace and a search under a client (Sean, 23 Nov); in a
+ * blank workspace a folder at every level (26 Nov: "organize projects by whatever
+ * makes sense for them, like location or department"). A top-level folder is a
+ * plain folder until its owner calls it a workspace.
  */
-export function kindUnder(parent: Pick<ProjectFolder, 'kind'> | null | undefined): FolderKind | null {
+export function kindUnder(
+  parent: Pick<ProjectFolder, 'id' | 'parent_id' | 'kind'> | null | undefined,
+  folders: readonly Pick<ProjectFolder, 'id' | 'parent_id' | 'kind' | 'layout'>[] = []
+): FolderKind | null {
   if (!parent) return null;
+  if (layoutOf(workspaceOf(parent, folders)) === 'blank') return 'folder';
   if (parent.kind === 'workspace') return 'client';
   if (parent.kind === 'client') return 'search';
   return parent.kind ? 'folder' : null;
@@ -37,10 +63,22 @@ export async function listFolders(): Promise<ProjectFolder[]> {
   return (data ?? []) as ProjectFolder[];
 }
 
-export async function createFolder(userId: string, name: string, parentId: string | null = null, kind: FolderKind | null = null): Promise<ProjectFolder> {
+export async function createFolder(
+  userId: string,
+  name: string,
+  parentId: string | null = null,
+  kind: FolderKind | null = null,
+  layout: WorkspaceLayout | null = null
+): Promise<ProjectFolder> {
   const { data, error } = await createClient()
     .from('project_folders')
-    .insert({ user_id: userId, name: name.trim().slice(0, FOLDER_NAME_MAX), parent_id: parentId, ...(kind ? { kind } : {}) })
+    .insert({
+      user_id: userId,
+      name: name.trim().slice(0, FOLDER_NAME_MAX),
+      parent_id: parentId,
+      ...(kind ? { kind } : {}),
+      ...(kind === 'workspace' && layout ? { layout } : {}),
+    })
     .select(COLUMNS)
     .single();
   if (error || !data) throw error ?? new Error('The folder could not be made.');

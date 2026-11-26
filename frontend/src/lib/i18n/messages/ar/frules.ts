@@ -37,6 +37,7 @@ export const ar: Record<keyof typeof en, string> = {
   "frules.nowRequired": "«{statement}» لم تعد سارية: القيمة الافتراضية التي كانت تستبدلها أصبحت إلزامية.",
   "frules.addLabel": "حقيقة أو متطلب لكل ما في هذا المجلد",
   "frules.addHint": "مثال: العميل يتولى فحص المراجع.",
+  "frules.addHintBlank": "مثال: تُرسل التقارير إلى المدير الإقليمي قبل يوم الجمعة.",
   "frules.add": "إضافة",
   "frules.saving": "جارٍ الحفظ…",
   "frules.documents": "المستندات",

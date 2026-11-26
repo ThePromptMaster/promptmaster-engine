@@ -275,3 +275,40 @@ describe('scoped exceptions and mismatches (Sean, 23 Nov)', () => {
     expect(factsForRequest([own], inh)[0]).toMatchObject({ unresolved_with: 'The client handles reference checks. (set in the client folder "Acme")' });
   });
 });
+
+describe('a blank workspace carries down exactly as an executive search one (Sean, 26 Nov)', () => {
+  // "The same rules for what carries down from a parent folder should work in both setups."
+  const BLANK = [
+    { ...folder('hq', 'Harbor Foods', null, 'workspace'), layout: 'blank' as const },
+    folder('london', 'London', 'hq', 'folder'),
+    folder('finance', 'Finance', 'london', 'folder'),
+    folder('leeds', 'Leeds', 'hq', 'folder'),
+  ];
+  const brand = rule('brand', 'hq', 'Every report uses the company template.', { required: true });
+  const sends = rule('sends', 'london', 'Reports go to the London office manager.');
+  const fin = rule('fin', 'finance', 'Figures are in GBP.');
+  const exception = (id: string, ruleId: string, folderId: string, statement: string): FolderException => ({
+    id, user_id: 'u', folder_id: folderId, project_id: null, rule_id: ruleId, statement,
+    authorised_by: 'Sam Lee, finance director', how_confirmed: 'meeting of 20 Nov', reason: 'the auditors want their own format',
+    from_note: {}, retired_at: null, retired_reason: null, created_at: '2026-11-26T05:00:00Z',
+  });
+
+  it('hands every rule down from the workspace and the folders above, and keeps a sibling\'s out', () => {
+    const finance = resolveInherited({ folders: BLANK, folderId: 'finance', facts: [brand, sends, fin] });
+    expect(finance.inForce.map((r) => [r.fact.id, r.level.name])).toEqual([['brand', 'Harbor Foods'], ['sends', 'London'], ['fin', 'Finance']]);
+    const leeds = resolveInherited({ folders: BLANK, folderId: 'leeds', facts: [brand, sends, fin] });
+    expect(leeds.inForce.map((r) => r.fact.id)).toEqual(['brand']);
+  });
+
+  it('a required rule is set aside only by a recorded exception, and only there and below', () => {
+    const override = rule('own', 'finance', 'Reports use the auditors\' template.', { overrides: 'brand' });
+    const tried = resolveInherited({ folders: BLANK, folderId: 'finance', facts: [brand, override] });
+    expect(tried.inForce.map((r) => r.fact.id)).toContain('brand');
+    const ex = exception('e1', 'brand', 'finance', 'Finance reports use the auditors\' template.');
+    const finance = resolveInherited({ folders: BLANK, folderId: 'finance', facts: [brand], exceptions: [ex] });
+    expect(finance.inForce.map((r) => r.fact.id)).not.toContain('brand');
+    expect(finance.exceptions.map((e) => e.exception.id)).toEqual(['e1']);
+    const leeds = resolveInherited({ folders: BLANK, folderId: 'leeds', facts: [brand], exceptions: [ex] });
+    expect(leeds.inForce.map((r) => r.fact.id)).toEqual(['brand']);
+  });
+});

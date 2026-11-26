@@ -5565,3 +5565,26 @@ Limits:
 - A mode is chosen for the whole project or left to each step. One stage cannot be given its own mode by hand; the
   mode cards on a system stage still set it for every step.
 - The designer's reason is in English, like the rest of a designed workflow.
+
+### L-287 — A workspace is blank or executive search; Client and Search are labels, not levels (2026-11-26)
+26 Nov, Sean: "could Executive Search be a workspace template, alongside a blank workspace with regular folders and
+subfolders? … Are Client and Search already labels on the same folder structure, or are they required levels right
+now?" They were already labels. The database enforces no order. Nothing that carries down (rules, required rules,
+exceptions, held work, workflows offered, what a run used) reads a folder's kind. A project can start in any
+folder. Only the name a new folder got was fixed: under a workspace a client, under a client a search. Now:
+- **"New workspace" asks which kind** (`project_folders.layout`, migration 20261212):
+  - **Blank workspace:** folders and subfolders you name, by location, department or anything else.
+  - **Executive search:** Client › Search, as before.
+  - A workspace made before 26 Nov, including the sample, reads as executive search, which is how it was made.
+- **In a blank workspace every new folder is a plain folder** (`kindUnder` reads the workspace's layout). The
+  "This folder is" picker in a folder's panel still lets any folder be labelled.
+- **A new workspace opens at once.** An empty folder offers "Start a project here" and "Add a folder inside".
+- **The wording follows the layout:** the folder list's hint, and the example under "Add a rule". The rest of the
+  wording already followed each folder's own kind ("Apply exception to this folder").
+- The Go panel's "Use my mode on every stage" box is gone. The stage's own line now says how it thinks, and
+  changes it (L-286).
+
+Limits:
+- The layout is wording only. It cannot be changed after the workspace is made, and the folders already inside keep
+  their kinds.
+- The example placeholder in the exception form ("e.g. the client's HR director") is the same in both layouts.
