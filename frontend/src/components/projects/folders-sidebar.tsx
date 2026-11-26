@@ -45,8 +45,10 @@ interface Props {
   /** Make the sample search-firm workspace (24 Nov). */
   onSample?: () => Promise<void>;
   /**
-   * The title of the project card being dragged, while one is (26 Nov): the rows say
-   * where it can go, and their action icons stay out of the way of the drop.
+   * The title of the project card being dragged, while one is (26 Nov): the rows are
+   * outlined as places to drop, and their action icons stay out of the way. Nothing is
+   * added above the rows during a drag: a hint there pushed every folder down mid-drag,
+   * so a card aimed at one folder landed in the one above it (26 Nov pass).
    */
   dragging?: string | null;
 }
@@ -247,11 +249,6 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
 
   return (
     <nav aria-label={t('folders.label')} className="space-y-1">
-      {dragging && (
-        <p role="status" data-drop-hint className="rounded-lg bg-[color-mix(in_srgb,var(--pm-primary)_12%,transparent)] px-2 py-1.5 text-label text-[var(--on-surface)]">
-          {t('folders.dropHint', { name: dragging })}
-        </p>
-      )}
       {row('all', t('folders.all'), 'workspaces', total, null)}
       {row('unfiled', t('folders.unfiled'), 'inbox', counts[''] ?? 0, null)}
       <div className="flex items-center justify-between pt-4 pb-1 ps-2">
