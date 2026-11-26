@@ -5555,6 +5555,9 @@ default) had no stage modes, so the one picked applied to every stage. Now:
   architect and Finalise is clarity.
 - **The side chat, the stage tools, Go's planner and the chapter plan think the way their stage is worked.** Before,
   they used the project's mode. Each saved version records the mode it was really written in.
+  The production pass found two writers still on the project's mode: applying findings (the review panel and Go's
+  revisions) and chapter jobs. A designed Analyst step had its findings applied as Critic. Both now take the stage's.
+  Checks and judgments (a criterion check, a conflict check, a screen) keep the project's mode.
 - **Every stage says how it is worked:** "Thinking as Critic, chosen for this step: It checks the draft", "your
   choice for every step" or "the project's default". On the current stage, Change opens the same select.
 

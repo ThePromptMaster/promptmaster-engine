@@ -10,6 +10,7 @@
  * Everything here that does not touch the database is pure and tested.
  */
 
+import type { PMInput } from '@/types';
 import { enqueueSectionJob, isStoppedJob, revisionToEnqueue, type ProjectJob } from '@/lib/supabase/jobs';
 import type { NewVersion } from '@/lib/supabase/versions';
 import { formatManuscript } from '@/lib/workflow/digest';
@@ -73,6 +74,8 @@ export function revisedCount(outline: readonly OutlineSection[], jobs: readonly 
 
 export interface DraftJobsArgs {
   project: Project;
+  /** The stage's way of thinking; the project's when absent. */
+  mode?: PMInput['mode'];
   artifactId: string;
   stageId: string;
   outline: readonly OutlineSection[];
@@ -98,6 +101,7 @@ export async function enqueueDraftJobs(args: DraftJobsArgs): Promise<string[]> {
   for (const { section, index } of unwrittenSections(outline)) {
     if (wanted && !wanted.has(section.id)) continue;
     await enqueueSectionJob({
+      ...(args.mode ? { mode: args.mode } : {}),
       project,
       artifactId,
       stageHint,
@@ -133,6 +137,8 @@ export function manuscriptSnapshot(
 
 export interface RevisionJobsArgs {
   project: Project;
+  /** The stage's way of thinking; the project's when absent. */
+  mode?: PMInput['mode'];
   artifactId: string;
   stageId: string;
   outline: readonly OutlineSection[];
@@ -174,6 +180,7 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
     // the section as written (8 Nov, production).
     const retry = (args.jobs ?? []).filter((j) => j.payload?.section_id === section.id && j.payload?.revision === revision && isStoppedJob(j)).length;
     await enqueueSectionJob({
+      ...(args.mode ? { mode: args.mode } : {}),
       project,
       artifactId,
       stageHint,
@@ -193,6 +200,8 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
 
 export interface ContinueJobsArgs {
   project: Project;
+  /** The stage's way of thinking; the project's when absent. */
+  mode?: PMInput['mode'];
   artifactId: string;
   stageId: string;
   approvedOutlineVersionId: string | null;
@@ -214,6 +223,7 @@ export async function enqueueContinueJobs(args: ContinueJobsArgs): Promise<strin
     const revision = (own ?? 0) + 1;
     const retry = (args.jobs ?? []).filter((j) => j.payload?.section_id === id && j.payload?.revision === revision && isStoppedJob(j)).length;
     await enqueueSectionJob({
+      ...(args.mode ? { mode: args.mode } : {}),
       project, artifactId, stageHint, stageId,
       outlineVersionId: approvedOutlineVersionId,
       sectionId: id, sectionIndex: index, revision,

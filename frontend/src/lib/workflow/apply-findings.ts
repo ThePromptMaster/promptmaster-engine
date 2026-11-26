@@ -18,7 +18,7 @@ import type { NewVersion } from '@/lib/supabase/versions';
 import { generationContent, inputsFrom } from '@/lib/workflow/stage-requests';
 import { itemSchemaFor, parseItems, saysNotReproduced, serializeItems, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import type { StageDefinition } from '@/lib/workflow/types';
-import type { AuditFinding, GenerateStageArtifactRequest } from '@/types';
+import type { AuditFinding, GenerateStageArtifactRequest, PMInput } from '@/types';
 import type { Project } from '@/types/project';
 import { keepFound, webAccessOf, withWebLine, type WebFound } from '@/lib/workflow/web-found';
 import { headingOutline, joinParts, needsParts, partInstruction, partThatReads, splitIntoParts } from '@/lib/workflow/long-prose';
@@ -131,8 +131,11 @@ export async function reviseWithFindings(args: {
   /** Where a web search's sources are saved from: the stage, and Go's run. */
   stageId?: string | null;
   agentRunId?: string | null;
+  /** The stage's way of thinking (`modeForStage`); the project's when absent (26 Nov). */
+  mode?: PMInput['mode'];
 }): Promise<PendingRevision> {
   const { project, content, findings, source, signal, table } = args;
+  const inputs = { ...inputsFrom(project), ...(args.mode ? { mode: args.mode } : {}) };
   const where = { stageId: args.stageId ?? table?.stage.id ?? null, agentRunId: args.agentRunId ?? null };
   if (table) {
     const instruction = findingsInstruction(findings);
@@ -158,9 +161,9 @@ export async function reviseWithFindings(args: {
   }
   // A table must never reach the prose revision: what comes back is not rows.
   if (parseItems(content)) throw new Error('This stage is a table and cannot be revised as text');
-  if (needsParts(content)) return reviseInParts({ project, content, findings, source, signal, where });
+  if (needsParts(content)) return reviseInParts({ project, content, findings, source, signal, where, inputs });
   const res = await api.applyRecommendations(
-    { inputs: inputsFrom(project), content, findings, model: project.model, web_access: webAccessOf(project) },
+    { inputs, content, findings, model: project.model, web_access: webAccessOf(project) },
     signal
   );
   const web = await keepFound(project, res, where);
@@ -198,8 +201,9 @@ async function reviseInParts(args: {
   source: string;
   signal?: AbortSignal;
   where: { stageId: string | null; agentRunId: string | null };
+  inputs: PMInput;
 }): Promise<PendingRevision> {
-  const { project, content, findings, source, signal, where } = args;
+  const { project, content, findings, source, signal, where, inputs } = args;
   const chunks = splitIntoParts(content);
   const outline = headingOutline(content);
   const results: { text: string; kept: boolean; instruction: string; web: WebFound | null; note: string }[] = new Array(chunks.length);
@@ -209,7 +213,7 @@ async function reviseInParts(args: {
   const revisePart = async (i: number, whole = '') => {
     const scope: AuditFinding = { id: 'part', category: 'Scope', summary: `Part ${i + 1} of ${chunks.length}`, suggested_change: partInstruction(i, chunks.length, outline).trim() };
     const res = await api.applyRecommendations(
-      { inputs: inputsFrom(project), content: chunks[i], findings: [...findings, scope], model: project.model, web_access: i === first ? webAccessOf(project) : 'off', ...(whole ? { whole_text: whole } : {}) },
+      { inputs, content: chunks[i], findings: [...findings, scope], model: project.model, web_access: i === first ? webAccessOf(project) : 'off', ...(whole ? { whole_text: whole } : {}) },
       signal
     );
     const web = i === first ? await keepFound(project, res, where) : null;

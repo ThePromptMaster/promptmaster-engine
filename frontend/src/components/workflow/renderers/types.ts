@@ -6,7 +6,7 @@ import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
 import type { AssessScale } from '@/lib/workflow/assess';
 import type { Evaluation, ArtifactVersion, Project } from '@/types/project';
 import type { NewVersion } from '@/lib/supabase/versions';
-import type { LongFormState } from '@/types';
+import type { LongFormState, PMInput } from '@/types';
 
 /**
  * What the drafting renderer needs beyond the common props.
@@ -40,6 +40,8 @@ export interface LongFormContext {
    * written. Carried into every section job so the chapter prompt sees it.
    */
   stageHint?: string;
+  /** The stage's way of thinking, for its chapter jobs. */
+  mode?: PMInput['mode'];
   /**
    * Set on Revision and Editing: the stage rewrites the manuscript drafting
    * wrote, applying the findings accepted in the review stages before it.

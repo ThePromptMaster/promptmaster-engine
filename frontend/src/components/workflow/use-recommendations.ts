@@ -57,6 +57,7 @@ import type { StageDefinition, StageEvaluation, WorkflowTemplate } from '@/lib/w
 import type { ArtifactVersion, Evaluation, Project } from '@/types/project';
 import type { StageRecommendation } from '@/types';
 import type { PanelRecommendation, TriageStatus } from './recommendations-panel';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 
 interface Options {
   project: Project;
@@ -450,6 +451,7 @@ export function useRecommendations({
       // table came back as text and was saved as an empty v3.
       const rev = await reviseWithFindings({
         project,
+        ...(stage ? { mode: modeForStage(project, stage) } : {}),
         content,
         // PM-24: which fix controls where two pull against each other.
         findings: [

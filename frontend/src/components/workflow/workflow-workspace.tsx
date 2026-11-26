@@ -2887,6 +2887,7 @@ export function WorkflowWorkspace({
           onRefresh: () => onReload?.(),
           revise: revisionBrief(template, stage.id, stageBundles, state),
           stageHint: stage.entry_prompt_hint,
+          mode: modeForStage(project, stage),
           onPanelStep: reportPanelStep,
           // Snapshots go on the artifact that holds the manuscript — Drafting's,
           // for Revision and Editing — through the store.

@@ -142,3 +142,14 @@ describe('a note to the user is never part of the applied text (20 Nov, Sean, wa
     expect(rev.note).toContain('One line on a conflict');
   });
 });
+
+describe('findings are applied as the stage thinks (26 Nov hand pass: Compare was revised as Critic)', () => {
+  it('sends the stage mode, and the project mode when none is given', async () => {
+    vi.mocked(api.applyRecommendations).mockClear();
+    vi.mocked(api.applyRecommendations).mockResolvedValue({ content: 'Revised.', finish_reason: 'stop', model_used: 'm' } as never);
+    await reviseWithFindings({ project, content: 'Some prose.', findings, source: 's', mode: 'analyst' });
+    await reviseWithFindings({ project, content: 'Some prose.', findings, source: 's' });
+    const sent = vi.mocked(api.applyRecommendations).mock.calls.map((c) => (c[0] as { inputs: { mode: string } }).inputs.mode);
+    expect(sent).toEqual(['analyst', 'architect']);
+  });
+});
