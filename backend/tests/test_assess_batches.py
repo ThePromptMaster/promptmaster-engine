@@ -27,3 +27,17 @@ def test_names_already_in_the_table_are_left_out_and_counted():
     assert "do not skip these" not in user
     out = parse_assessment({"items": [], "not_assessed": 0, "already_in_table": 1}, SCALE, PASTE)
     assert out.already_in_table == 1
+
+
+def test_a_reply_cut_off_before_its_tail_says_so():
+    """26 Nov (L-284): items with neither `not_assessed` nor `next_from` were cut off and
+    closed by the repair; the page must keep the rest of the paste, not take it as done."""
+    row = {"subject": "Candidate 1", "verdict": "Green", "rationale": "- ok"}
+    cut = parse_assessment({"items": [row]}, SCALE, PASTE)
+    assert cut.finish_reason == "length"
+    whole = parse_assessment({"items": [row], "not_assessed": 0, "next_from": ""}, SCALE, PASTE)
+    assert whole.finish_reason == "stop"
+    counted = parse_assessment({"items": [row], "not_assessed": 2}, SCALE, PASTE)
+    assert counted.finish_reason == "stop"
+    nothing = parse_assessment({"items": [], "already_in_table": 3}, SCALE, PASTE)
+    assert nothing.finish_reason == "stop"

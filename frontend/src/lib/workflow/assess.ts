@@ -135,6 +135,11 @@ export interface AssessPending {
   text: string;
   /** How many items the last call said were left, when it said. */
   count: number;
+  /**
+   * The batch the paste was given (26 Nov, Sean: one LinkedIn results page is one
+   * batch). What is left joins it when it is judged, by the page or by Go.
+   */
+  batch?: string;
 }
 
 /** The scale and rows a version holds; null when it is not an assessment. */
@@ -145,7 +150,11 @@ export function parseAssessment(content: string | null | undefined): { scale: As
     if (doc?.kind !== 'stage_items' || !Array.isArray(doc.items)) return null;
     const scale = doc.scale && Array.isArray(doc.scale.levels) ? (doc.scale as AssessScale) : null;
     const pending = doc.pending && typeof doc.pending.text === 'string' && doc.pending.text.trim()
-      ? { text: doc.pending.text, count: Number(doc.pending.count) || 0 }
+      ? {
+          text: doc.pending.text,
+          count: Number(doc.pending.count) || 0,
+          ...(typeof doc.pending.batch === 'string' && doc.pending.batch ? { batch: doc.pending.batch } : {}),
+        }
       : null;
     return { scale: validScale(scale) ? scale : null, items: doc.items.filter((i): i is StageItem => Boolean(i && typeof i.id === 'string')), pending };
   } catch {
@@ -197,11 +206,11 @@ export function restAfter(rest: string, chunk: string, res: { not_assessed?: num
 export function batchAwaited(
   stage: { renderer: string; assess?: { offered_batch?: string; item_noun?: string } },
   head: string | null | undefined
-): { offered: boolean; noun: string | null } | null {
+): { offered: boolean; noun: string | null; left?: boolean } | null {
   if (stage.renderer !== 'assess') return null;
   const doc = parseAssessment(head);
   // Items a paste left unjudged are the user's own, given already: Go judges them (15 Nov).
-  if (doc?.pending?.text.trim()) return { offered: true, noun: stage.assess?.item_noun?.trim() || null };
+  if (doc?.pending?.text.trim()) return { offered: true, noun: stage.assess?.item_noun?.trim() || null, left: true };
   if (doc?.items.length) return null;
   return { offered: Boolean(stage.assess?.offered_batch?.trim()), noun: stage.assess?.item_noun?.trim() || null };
 }
@@ -260,8 +269,13 @@ export function profileSlices(source: string, subjects: readonly string[]): Map<
   return out;
 }
 
-export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string, source?: string): StageItem[] {
-  const batch = String(nextBatch(existing));
+/**
+ * The rows a call judged, added to the table. `batch` is the paste's number:
+ * every call of one paste shares it (26 Nov, Sean: "Latest batch" is the
+ * LinkedIn page just pasted; 21 profiles had become Batch 1 and Batch 2).
+ */
+export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string, source?: string, batchOf?: string): StageItem[] {
+  const batch = batchOf || String(nextBatch(existing));
   // A name already in the table is not added twice (15 Nov: carrying a paste on,
   // or pasting the same profiles again, duplicated rows).
   const seen = new Set(existing.map((i) => subjectKey(i.subject)).filter(Boolean));
@@ -309,6 +323,40 @@ export function verdictCounts(scale: AssessScale, items: StageItem[]): { label: 
   const counts = scale.levels.map((l) => ({ label: l.label, tone: l.tone, count: items.filter((i) => i.verdict === l.label).length }));
   const ungraded = items.filter((i) => !levelOf(scale, i.verdict)).length;
   return ungraded ? [...counts, { label: '', tone: 'neutral' as const, count: ungraded }] : counts;
+}
+
+/** Which rows the table shows (26 Nov, Sean): every batch, the latest, or one. */
+export type BatchView = { kind: 'all' } | { kind: 'latest' } | { kind: 'batch'; batch: string };
+
+export interface BatchInfo {
+  batch: string;
+  count: number;
+  /** When its first row was judged. */
+  at: string;
+}
+
+/** The table's batches, oldest first. Rows with no batch are left out. */
+export function batchesOf(items: StageItem[]): BatchInfo[] {
+  const seen = new Map<string, BatchInfo>();
+  for (const i of items) {
+    if (!i.batch) continue;
+    const b = seen.get(i.batch);
+    if (!b) seen.set(i.batch, { batch: i.batch, count: 1, at: i.assessed_at ?? '' });
+    else {
+      b.count += 1;
+      if (i.assessed_at && (!b.at || i.assessed_at < b.at)) b.at = i.assessed_at;
+    }
+  }
+  return [...seen.values()].sort((a, b) => (Number(a.batch) || 0) - (Number(b.batch) || 0));
+}
+
+/** The rows a view shows. A batch that is gone (a restored version) shows every row. */
+export function rowsInView(items: StageItem[], view: BatchView): StageItem[] {
+  if (view.kind === 'all') return items;
+  const batches = batchesOf(items);
+  const wanted = view.kind === 'latest' ? batches.at(-1)?.batch : view.batch;
+  if (!wanted || !batches.some((b) => b.batch === wanted)) return items;
+  return items.filter((i) => i.batch === wanted);
 }
 
 /** Rows best first, then by batch, newest batch first within a level. */
@@ -360,9 +408,9 @@ export function scaleFromSpec(spec: { scale: string | ScaleLevel[] } | undefined
 export function leftToAssess(
   renderer: string,
   head: string | null | undefined
-): { text: string; scale: AssessScale; items: StageItem[] } | null {
+): { text: string; scale: AssessScale; items: StageItem[]; batch?: string } | null {
   if (renderer !== 'assess') return null;
   const doc = parseAssessment(head);
   if (!doc?.scale || !doc.pending?.text?.trim()) return null;
-  return { text: doc.pending.text, scale: doc.scale, items: doc.items };
+  return { text: doc.pending.text, scale: doc.scale, items: doc.items, ...(doc.pending.batch ? { batch: doc.pending.batch } : {}) };
 }

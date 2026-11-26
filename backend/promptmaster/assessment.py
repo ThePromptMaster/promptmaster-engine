@@ -208,7 +208,19 @@ def parse_assessment(raw: object, scale: AssessScale, text: str = "") -> AssessB
     next_from = start[:300] if not_assessed and start and start in flat else ""
     seen = raw.get("already_in_table") if isinstance(raw, dict) else 0
     already_in_table = seen if isinstance(seen, int) and seen > 0 else 0
-    return AssessBatchResult(items=items, ungraded=ungraded, not_assessed=not_assessed, next_from=next_from, already_in_table=already_in_table)
+    # The shape puts `not_assessed` and `next_from` after the items. A reply with
+    # items and neither was cut off and closed by the repair: how many were left is
+    # not known, so the page keeps the rest of the paste instead of dropping it
+    # (26 Nov, L-284).
+    tail_missing = isinstance(raw, dict) and bool(items) and "not_assessed" not in raw and "next_from" not in raw
+    return AssessBatchResult(
+        items=items,
+        ungraded=ungraded,
+        not_assessed=not_assessed,
+        next_from=next_from,
+        already_in_table=already_in_table,
+        finish_reason="length" if tail_missing else "stop",
+    )
 
 
 async def assess_batch(

@@ -5501,3 +5501,42 @@ Also from the 24 Nov production passes:
   whose master added a sentence at the end showed the same first 200 characters on both sides), and the upgrade
   banner says "instructions reworded" for a wording-only change rather than "requirements or layout updated".
   The folder flag says "some of its work", since drafts in progress are rechecked too.
+
+### L-284 — An Assess run says what it is doing, stops on request, and loses nothing (2026-11-26)
+22 Nov, Sean: "it won't finish assessing". The 21 profiles were all judged and saved, the last nine about a
+minute after the first twelve. During that wait the screen said "9 more from your last paste are not judged yet"
+beside a greyed "Assess the remaining 9", and the button said "Assessed 12 so far…", so it looked stuck. Now:
+- **While a run is going, the screen says what it is doing.** It shows "12 judged, judging the next 9…",
+  "Judging the remaining 9 now", how long it has been running, and "about a minute for every twelve". Go's run on
+  the same stage shows as Go's.
+- **Stop.** It ends the run between calls or during one. What was saved stays, and the rest is kept behind
+  "Assess the remaining N". A stop before anything was saved leaves the paste in the box.
+- **One judge at a time** (`lib/workflow/assess-lock.ts`). While the page judges a stage's paste, Go's judging
+  move waits for it and judges nothing itself. While Go judges, the page's button says so. The lock and the run's
+  progress are kept outside the stage's view, so leaving the stage and coming back still shows the run. Leaving
+  the project stops the page's run.
+- **Nothing is dropped:**
+  - A reply cut off before it said what was left, or one that could not be read, keeps the rest of the paste to
+    assess. Before, its silence was taken as "nothing left". Names already in the table are skipped when they are
+    sent again.
+  - Changing a verdict or removing a row keeps what was left. Both are locked while a run is going.
+
+Limits:
+- The lock is per tab. A run in another tab still meets the save guard, which refuses the second save, as before.
+- A reply is treated as cut off when it has items but neither count field. A model that leaves those fields out of
+  a complete answer makes the page offer "Assess the rest", and pressing it judges nothing new.
+
+### L-285 — An assessment shows one batch or all of them, sorted either way (2026-11-26)
+26 Nov, Sean: we "copy profiles from LinkedIn one results page at a time and paste each page into Assessments as a
+batch … then find the green candidates and add them to Salesforce". Now:
+- **A paste is one batch, however many calls it takes.** Before, 21 profiles became Batch 1 (12) and Batch 2 (9).
+  What a paste leaves to judge keeps its batch number when the page or Go judges it later.
+- **Above the table, "Which batches"** offers All batches, "Latest batch: Batch N (count)", or any batch by number,
+  time and count. Best first / Newest first, and the level chips and their counts, apply within the batches chosen.
+- The choice is remembered in this browser for that stage (`pm.assessView.<project>:<stage>`). "Latest batch"
+  moves to a new paste once it is judged.
+
+Limits:
+- Rows judged before 26 Nov keep their per-call numbers, so an earlier paste of more than twelve shows as two
+  batches.
+- The CSV and Excel downloads still hold every row.

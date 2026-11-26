@@ -112,9 +112,17 @@ export interface StageRendererProps {
   /**
    * Assess stages: judge a pasted batch on the scale and save the table with
    * the new rows appended, as one version. Resolves to a sentence saying what
-   * was added; rejects with the reason it was not.
+   * was added (and whether the paste should stay in the box, when a stop saved
+   * nothing); rejects with the reason it was not. `batch` continues a paste's
+   * leftovers in its own batch (26 Nov).
    */
-  onAssessBatch?: (input: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (assessed: number) => void }) => Promise<string>;
+  onAssessBatch?: (input: { text: string; scale: AssessScale; existing: StageItem[]; batch?: string }) => Promise<{ said: string; keepText: boolean }>;
+  /** Who is judging this stage's paste now, and how far it has got (L-284); null when nobody. */
+  assessRun?: import('@/lib/workflow/assess-lock').AssessRun | null;
+  /** Remembers this viewer's batch view and sort for the stage (26 Nov). */
+  assessRunKey?: string | null;
+  /** Stops the page's run; what was saved stays. */
+  onStopAssess?: () => void;
   /** A finished Assess stage: open it again for another batch (15 Nov). */
   onReopenForBatch?: () => void;
   /** "Done — summarize": the stage's own Continue, from the table (15 Nov). */
