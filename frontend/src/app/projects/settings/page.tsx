@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { ConnectedAccounts } from '@/components/personalize/connected-accounts';
 import { GoAutostartSetting } from '@/components/projects/go-autostart-setting';
+import { OutreachSettings } from '@/components/outreach/outreach-settings';
 import { useT } from '@/lib/i18n/i18n-provider';
 
 /** Connected accounts (the client's call, 7 Nov): what each reads, and connecting or disconnecting it. */
@@ -25,6 +26,8 @@ export default function SettingsPage() {
         <span aria-hidden className="material-symbols-outlined text-[18px] rtl:-scale-x-100">arrow_forward</span>
       </Link>
       <GoAutostartSetting />
+      {/* Who outreach email goes out as (Sean, 26 Nov): sender, signatures with logo, limits. */}
+      <OutreachSettings />
     </main>
   );
 }

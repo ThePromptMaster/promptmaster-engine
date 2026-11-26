@@ -313,3 +313,19 @@ current unresolved state is recorded in [`known-limitations.md`](known-limitatio
   (evaluations before C1, and the iteration pipeline), which is never read as "needed".
   `stage_evaluation._further_pass` overrides a "not needed" that contradicts the evaluation's
   own scores: Low alignment, High drift, incomplete, or any findings.
+
+
+## Outreach email: who it goes out as (26 Nov, migration `20261220000000_outreach_identity.sql`)
+
+Per user, owner-only under RLS. Nothing here is project data.
+
+| Table | What it holds | Writes |
+|---|---|---|
+| `outreach_settings` | One row: `daily_cap` (1–400, default 50), `spacing_seconds` (30–3600, default 45), `paused`, `timezone` | Owner select, insert, update |
+| `outreach_senders` | A sending identity: `toolkit` (gmail/outlook), `from_address` (the connected mailbox, lower case), `from_name`, `reply_to`, `postal_address`, `opt_out_line`, `commercial` | Owner select, insert, update, delete |
+| `outreach_signatures` | A sender's signature: `kind` (first/reply), name, title, company, `website` (https), `links` (at most 4), `logo_id`, `logo_width` (40–300) | Owner select, insert, update, delete |
+| `outreach_logos` | An uploaded logo: random `path` `l/<uuid>.<png\|jpg\|gif>`, `mime`, size, `bytes` (≤ 300 KB) | Owner select and insert only: never changed or removed, because sent email shows it |
+
+Storage: bucket `email-logos`, **public** (a recipient's mail program loads the logo with no sign-in), 300 KB, PNG,
+JPEG or GIF. An upload is allowed only to a path the uploader registered in `outreach_logos` first. There is no
+update or delete policy.

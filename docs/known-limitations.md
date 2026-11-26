@@ -5725,3 +5725,26 @@ Limits:
 - The project figure is summed over its latest 10,000 calls, as the piggy bank's is.
 - "What Go is doing now" comes from the tab driving Go. With that tab closed, the chat has only the record, which
   says how long ago anything happened.
+
+### L-302 — Who outreach email goes out as: sender, signatures, logo (2026-11-26)
+Sean, 26 Nov: "Save reusable signatures by sender or brand … with the company logo underneath the signature. Let me
+upload the logo, size it, and preview it on desktop and mobile. The contact details should still be readable if the
+recipient's email app hides images." Settings now has an **Outreach email** section:
+- It shows which connected Gmail or Outlook sends, by its own address (`GET /api/outreach/mailbox`).
+- One sender per mailbox: From name, Reply-To, and, for commercial outreach, the postal address and the opt-out line
+  printed under every email.
+- A first-email signature and a reply signature: name, title, company, website, up to four links, and a logo
+  underneath, sized 40 to 300 px.
+- A preview of the whole email at desktop and phone width, with images on or off and every header (From, Reply-To,
+  To, Cc, Bcc, subject, links, attachments, signature). It says when the text already carries the signature, or
+  when a commercial email has no postal address or opt-out line.
+- Sending limits: emails a day (50), seconds between them (45), and "Pause all my outreach".
+
+Limits:
+- A logo is public at a random address (`email-logos/l/<uuid>.png`) so a recipient's mail program can load it
+  without signing in. It is kept for good, because sent emails point at it. PNG, JPEG or GIF only, up to 300 KB;
+  no SVG (Gmail does not show it). Outlook and some company mail hide images until the reader allows them, so the
+  details above the logo are text.
+- The logo is a linked image, not embedded in the message: Composio's send tools take no inline images.
+- One sender per connected mailbox, and one connected Gmail and one Outlook per person (L-201).
+- Nothing is sent from Settings. Sending, and the approval that comes before it, are later entries.

@@ -13,6 +13,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
+#: What the mock mailboxes send as (outreach).
+MOCK_GMAIL_ADDRESS = "you@example.com"
+MOCK_OUTLOOK_ADDRESS = "you@example.org"
+
+
 def _b64(text: str) -> str:
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
@@ -179,6 +184,11 @@ def result(tool: str, arguments: dict[str, Any]) -> Any:
         return _hubspot_found(_HUBSPOT_TOOLS[tool], arguments)
     if tool == "HUBSPOT_RETRIEVE_ALL_PIPELINES_FOR_SPECIFIED_OBJECT_TYPE":
         return HUBSPOT_PIPELINES if arguments.get("objectType") == "deals" else {"results": []}
+    # The mailbox's own address (26 Nov, outreach): Composio wraps it under `data`.
+    if tool == "GMAIL_GET_PROFILE":
+        return {"emailAddress": MOCK_GMAIL_ADDRESS, "messagesTotal": len(MESSAGES), "threadsTotal": len(MESSAGES), "historyId": "1"}
+    if tool == "OUTLOOK_GET_PROFILE":
+        return {"displayName": "You", "mail": MOCK_OUTLOOK_ADDRESS, "userPrincipalName": MOCK_OUTLOOK_ADDRESS}
     if tool == "GMAIL_FETCH_EMAILS":
         query = str(arguments.get("query") or "")
         return {"messages": [
