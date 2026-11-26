@@ -45,6 +45,7 @@ import { en as assessArea } from './areas/assess';
 import { en as quickArea } from './areas/quick';
 import { en as examplesArea } from './areas/examples';
 import { en as connArea } from './areas/conn';
+import { en as outreachArea } from './areas/outreach';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -374,6 +375,7 @@ export const en = {
   ...quickArea,
   ...examplesArea,
   ...connArea,
+  ...outreachArea,
 } as const;
 
 /** A key as the dictionaries hold it. */

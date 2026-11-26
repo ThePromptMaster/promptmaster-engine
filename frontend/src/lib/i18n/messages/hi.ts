@@ -35,6 +35,7 @@ import { hi as assessArea } from './hi/assess';
 import { hi as quickArea } from './hi/quick';
 import { hi as examplesArea } from './hi/examples';
 import { hi as connArea } from './hi/conn';
+import { hi as outreachArea } from './hi/outreach';
 
 export const hi: Messages = {
   'header.account': 'खाता',
@@ -358,4 +359,5 @@ export const hi: Messages = {
   ...quickArea,
   ...examplesArea,
   ...connArea,
+  ...outreachArea,
 };

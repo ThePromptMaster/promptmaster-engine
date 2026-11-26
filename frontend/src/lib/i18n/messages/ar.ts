@@ -34,6 +34,7 @@ import { ar as assessArea } from './ar/assess';
 import { ar as quickArea } from './ar/quick';
 import { ar as examplesArea } from './ar/examples';
 import { ar as connArea } from './ar/conn';
+import { ar as outreachArea } from './ar/outreach';
 
 /** Arabic (Sean, 24 Oct: "Arabic and Swahili"). Shown right-to-left. */
 export const ar: Messages = {
@@ -351,4 +352,5 @@ export const ar: Messages = {
   ...quickArea,
   ...examplesArea,
   ...connArea,
+  ...outreachArea,
 };

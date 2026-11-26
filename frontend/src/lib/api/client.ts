@@ -72,6 +72,7 @@ import type {
   ToolkitSlug,
   toPicked,
 } from '@/lib/connections/items';
+import type { OutreachMailbox } from '@/types/outreach';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -722,6 +723,11 @@ export const api = {
    */
   async listConnections(): Promise<{ accounts: Connection[]; toolkits: { slug: ToolkitSlug; label: string; reads: string }[] }> {
     return apiFetch('/api/connections');
+  },
+
+  /** The connected Gmail and Outlook accounts that can send, each with the address it sends as (26 Nov). */
+  outreachMailbox(): Promise<{ mailboxes: OutreachMailbox[] }> {
+    return apiFetch('/api/outreach/mailbox');
   },
 
   /** Composio's consent link for one account; the person approves on Google's or Microsoft's own screen. */

@@ -98,6 +98,7 @@ Side chat:
 | POST | `/api/connections/link` | `linkConnection` | `connections.py` | **Live** — Composio's consent link for one of `gmail`, `googlecalendar`, `googledrive`, `outlook`, `one_drive`, `salesforce`, `hubspot` (the last two since 13 Nov, L-241). `callback_url` must be an `ALLOWED_ORIGINS` origin plus `/projects/connect`; 409 when that account is already connected. |
 | POST | `/api/connections/confirm` | `confirmConnection` | `connections.py` | **Live** — after the consent screen: 404 unless the connection is the caller's, else its status. |
 | DELETE | `/api/connections/{id}` | `disconnect` | `connections.py` | **Live** — ownership checked first; deletes with `revoke_on_delete=true`. |
+| GET | `/api/outreach/mailbox` | `outreachMailbox` | `outreach.py` | **Live (26 Nov)**: the caller's connected Gmail and Outlook accounts that can send, each with the address it sends as (`GMAIL_GET_PROFILE` / `OUTLOOK_GET_PROFILE`; `address` is `""` when the mailbox did not say). Guests and workers get 403. Sends nothing. |
 | POST | `/api/connections/preview` | `previewConnections` | `connections.py` | **Live** — the newest 25 of each kind and the next meetings; metadata only (senders, subjects, dates, meeting titles, file names), no bodies, descriptions or file text. Only the meetings list and an empty search use it. |
 | POST | `/api/connections/search` | `searchConnections` | `connections.py`, `promptmaster/account_search.py` | **Live (8 Nov, L-203)** — `words` (a project's title and objective for Add from my accounts, or empty for what is going on now, sent when the page opens) or a `meeting` with `people`. Searches the whole of every connected account, opens at most 8, cleaned and capped at 8,000 characters; PDFs and Office files come back as `files` for the browser. Two small model calls. Returns `query`, `matches`, `items`, `files`, `skipped`, `problems`. `chat-message` and `generate-stage-artifact` take `account_search` (`on`/`off`, default off) and return `account_query`, `account_items`, `account_note`. |
 | POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
@@ -207,3 +208,26 @@ user header is present — a worker credential with no user attached is rejected
 **`WORKER_SHARED_SECRET` must be identical in both Vercel projects.** A mismatch
 presents as every drafting job failing with a 401 from the backend while the UI and
 saving work perfectly.
+
+
+## Composio tools for outreach email (read 26 Nov from docs.composio.dev/toolkits/gmail and /outlook)
+
+The Composio key on production is a Sensitive variable, so the live tool schemas could not be fetched from a
+workstation. These are what Composio's public toolkit pages document. Every tool's output is documented only as
+`data` (plus `error`, `successful`), so `promptmaster/outreach_mail.py::find_key` reads values by key wherever they
+sit, and the first production call of each tool is the check on its real shape.
+
+| Tool | Inputs used | Notes |
+|---|---|---|
+| `GMAIL_GET_PROFILE` | `user_id: "me"` | Returns the email address, `messagesTotal`, `threadsTotal`, `historyId`, "may be wrapped under a top-level data field". |
+| `GMAIL_SEND_EMAIL` | `recipient_email`, `extra_recipients`, `cc`, `bcc`, `subject`, `body`, `is_html`, `from_email`, `attachment`, `include_signature` | Sends at once. `include_signature: false` keeps Gmail's own signature from doubling ours. No custom headers (so no List-Unsubscribe), no separate text/plain part. A timeout can come after Gmail accepted the message. |
+| `GMAIL_CREATE_EMAIL_DRAFT` | same recipients, `subject`, `body`, `is_html`, `thread_id`, `attachment`, `include_signature` | Returns a draft id (implied by `GMAIL_DELETE_DRAFT`). |
+| `GMAIL_SEND_DRAFT` | `draft_id` (required) | Sends a draft that already has recipients. Draft-then-send gives an id to look for before any retry. |
+| `GMAIL_REPLY_TO_THREAD` | `thread_id` (required), `message_body`, `is_html`, `recipient_email`, `cc`, `bcc`, `attachment`, `include_signature` | "Re:" subject; quotes the latest message. For follow-ups. |
+| `GMAIL_FETCH_MESSAGE_BY_THREAD_ID` | `thread_id` (required), `page_token` | A `messages` array, order not guaranteed: use `messageTimestamp` and `labelIds`. |
+| `GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID` | `message_id` (required), `format` | |
+| `GMAIL_FETCH_EMAILS` | `query`, `max_results`, `verbose`, `include_payload`, `label_ids`, `ids_only` | With `verbose: false` only subject, sender, recipient, time and labels are guaranteed. |
+| `OUTLOOK_GET_PROFILE` | `user_id: "me"` | The signed-in address (`mail`, `userPrincipalName`). |
+| `OUTLOOK_SEND_EMAIL` | `to`, `subject`, `body` (all required), `is_html`, `cc_emails`, `bcc_emails`, `attachment` | Returns 202 with no ids, so draft-then-send is the route that gives ids. |
+| `OUTLOOK_CREATE_DRAFT` / `OUTLOOK_SEND_DRAFT` | `subject`, `body`, `to_recipients`, … / `message_id` | |
+| `OUTLOOK_QUERY_EMAILS` | `filter` (OData; `conversationId` exact match), `folder`, `select` | For replies in a thread. |
