@@ -216,6 +216,9 @@ export default function ProjectsPage() {
     try {
       await moveProject(id, folderId);
       loadFolders();
+      // A card brought in from another folder is read again with its workflow's name
+      // (26 Nov pass: it showed its template key).
+      if (known && !projects?.some((p) => p.id === id)) load();
       if (quiet) return;
       const title = card?.title || t('list.aProject');
       const folderName = folderId ? folders.find((f) => f.id === folderId)?.name ?? t('list.thisFolder') : null;
@@ -399,7 +402,10 @@ export default function ProjectsPage() {
       {projects?.length === 0 && selection !== 'all' && (
         <div data-empty-folder className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[32px] opacity-50">folder_open</span>
-          <p className="mt-3">{t('list.emptyFolder', { name: selectedLabel ?? t('list.thisFolder') })}</p>
+          {/* Said once: a folder whose projects sit in folders inside it is not "empty" (26 Nov pass). */}
+          {!(selectedFolder && foldersHolding(selectedFolder.id, folders, counts).length > 0) && (
+            <p className="mt-3">{t('list.emptyFolder', { name: selectedLabel ?? t('list.thisFolder') })}</p>
+          )}
           {/* A folder whose projects are all in folders inside it is not empty (26 Nov: the
               sample workspace read "Nothing in … yet" over two levels of projects). */}
           {selectedFolder && foldersHolding(selectedFolder.id, folders, counts).length > 0 && (
