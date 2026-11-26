@@ -33,3 +33,21 @@ describe('everything since the last visit (26 Nov, L-290: "pick up where they le
     expect(anythingSince(changesSince(events, at(30)))).toBe(false);
   });
 });
+
+describe('read from the versions themselves (26 Nov production pass)', () => {
+  it('names the last stage redone though no save event named it, and a stage kept then redone only as redone', () => {
+    const events = [
+      { type: 'brief_changed', stage_id: 'plan', actor: 'user', created_at: at(10), payload: { field: 'facts', changed_facts: ['a'], before: '- a', after: '- b', affected: [{ stage_id: 'plan', reason: 'x' }] } },
+      { type: 'stage_marked_complete', stage_id: 'budget', actor: 'system', created_at: at(13), payload: { checked_unchanged: true } },
+      { type: 'brief_changed', stage_id: 'plan', actor: 'user', created_at: at(20), payload: { field: 'facts', changed_facts: ['c'], before: '- c', after: '- d', affected: [{ stage_id: 'budget', reason: 'y' }] } },
+    ] as unknown as WorkflowEvent[];
+    const versions = {
+      timeline: [{ version_number: 1, created_at: at(1), source_operation: 'agent_draft' }],
+      budget: [{ version_number: 2, created_at: at(2), source_operation: 'agent_draft' }, { version_number: 5, created_at: at(22), source_operation: 'agent_revise' }],
+      plan: [{ version_number: 6, created_at: at(3), source_operation: 'agent_draft' }, { version_number: 9, created_at: at(25), source_operation: 'agent_apply' }],
+    };
+    const s = changesSince(events, at(5), versions);
+    expect(s.redone).toEqual([{ stageId: 'budget', version: 5, by: 'go' }, { stageId: 'plan', version: 9, by: 'go' }]);
+    expect(s.kept).toEqual([]);
+  });
+});

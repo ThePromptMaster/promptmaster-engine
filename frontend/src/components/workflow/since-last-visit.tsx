@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { readLastSeen, writeLastSeen } from '@/lib/projects/last-seen';
 import type { ChangeSummary } from '@/lib/workflow/change-summary';
-import { anythingSince, changesSince } from '@/lib/workflow/since-summary';
+import { anythingSince, changesSince, type StageVersions } from '@/lib/workflow/since-summary';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import { ChangeGroups } from './brief-change-notice';
 
@@ -27,9 +27,12 @@ export function SinceLastVisit({
   summarise,
   onOpenStage,
   latestChangeShown,
+  versions,
 }: {
   projectId: string;
   events: readonly WorkflowEvent[];
+  /** Each stage's versions, in stage order: what was redone, read from the versions themselves. */
+  versions?: StageVersions;
   stageLabel: (id: string) => string;
   /** The work as it stands, from `since` over the stages these changes touched. */
   summarise: (since: string, touched: string[]) => ChangeSummary | null;
@@ -58,8 +61,9 @@ export function SinceLastVisit({
     };
   }, [projectId]);
 
-  const fromVisit = useMemo(() => (since ? changesSince(events, since) : null), [events, since]);
-  const shown = useMemo(() => (range === 'all' ? changesSince(events, '') : fromVisit), [range, events, fromVisit]);
+  const fromVisit = useMemo(() => (since ? changesSince(events, since, versions) : null), [events, since, versions]);
+  const shown = useMemo(() => (range === 'all' ? changesSince(events, '', versions) : fromVisit), [range, events, fromVisit, versions]);
+  const clip = (text: string) => (text.length > 220 ? `${text.slice(0, 219).trimEnd()}…` : text);
   const start = range === 'all' ? '' : since ?? '';
   const now = useMemo(() => (shown && shown.touched.length ? summarise(start, shown.touched) : null), [shown, start, summarise]);
 
@@ -106,11 +110,11 @@ export function SinceLastVisit({
               </p>
               {c.detail.pairs.map((p, i) => (
                 <p key={`p${i}`}>
-                  {t('slv.pair', { from: p.from, to: p.to })}
+                  {t('slv.pair', { from: clip(p.from), to: clip(p.to) })}
                 </p>
               ))}
-              {c.detail.removed.map((r, i) => <p key={`r${i}`}>{t('slv.removed', { what: r })}</p>)}
-              {c.detail.added.map((a, i) => <p key={`a${i}`}>{t('slv.added', { what: a })}</p>)}
+              {c.detail.removed.map((r, i) => <p key={`r${i}`}>{t('slv.removed', { what: clip(r) })}</p>)}
+              {c.detail.added.map((a, i) => <p key={`a${i}`}>{t('slv.added', { what: clip(a) })}</p>)}
               {c.detail.reopened.length > 0 && <p>{t('slv.reopened', { list: c.detail.reopened.map((r) => stageLabel(r.stageId)).join(', ') })}</p>}
               {c.detail.setAside.length > 0 && <p>{t('slv.setAside', { list: c.detail.setAside.join('; ') })}</p>}
             </li>

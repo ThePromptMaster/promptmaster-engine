@@ -24,7 +24,9 @@ export interface SinceSummary {
   touched: string[];
 }
 
-export function changesSince(events: readonly WorkflowEvent[], since: string): SinceSummary {
+export type StageVersions = Readonly<Record<string, readonly { version_number: number; created_at: string; source_operation: string }[]>>;
+
+export function changesSince(events: readonly WorkflowEvent[], since: string, versions?: StageVersions): SinceSummary {
   const after = events.filter((e) => e.created_at > since);
   const changes: SinceSummary['changes'] = [];
   const redone = new Map<string, SinceSummary['redone'][number]>();
@@ -50,7 +52,25 @@ export function changesSince(events: readonly WorkflowEvent[], since: string): S
     } else if (e.type === 'project_finalized') finished = true;
     else if (e.type === 'project_reopened') finished = false;
   }
-  return { changes, redone: [...redone.values()], kept: [...kept], sent, finished, touched: [...touched] };
+  // The versions themselves, when given, are the record of what was redone (26 Nov
+  // production pass: the last stage's saves reopen nothing, so no save event named them,
+  // and the plan's v9 was missing).
+  if (versions) {
+    redone.clear();
+    for (const [stageId, list] of Object.entries(versions)) {
+      const newest = [...list].filter((v) => v.created_at > since).sort((a, b) => b.version_number - a.version_number)[0];
+      if (newest && newest.source_operation !== 'example_prewritten') {
+        redone.set(stageId, { stageId, version: newest.version_number, by: newest.source_operation.startsWith('agent_') ? 'go' : 'you' });
+      }
+    }
+  }
+  // Checked and kept, and not redone after: over several changes, a stage kept on the
+  // first and rewritten on the second was listed as both.
+  const keptAt = new Map(after.filter((e) => e.type === 'stage_marked_complete' && e.payload?.checked_unchanged).map((e) => [e.stage_id, e.created_at]));
+  const stillKept = [...kept].filter((id) => !(versions?.[id] ?? []).some((v) => v.created_at > (keptAt.get(id) ?? '')));
+  const order = Object.keys(versions ?? {});
+  const redoneList = [...redone.values()].sort((a, b) => (order.indexOf(a.stageId) - order.indexOf(b.stageId)) || 0);
+  return { changes, redone: redoneList, kept: versions ? stillKept : [...kept], sent, finished, touched: [...touched] };
 }
 
 /** Whether anything worth telling happened since. */

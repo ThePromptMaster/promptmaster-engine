@@ -2260,6 +2260,11 @@ export function WorkflowWorkspace({
       sentBehind,
     });
   }, [briefChange, settled, awaitedDecision, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow, sentBehind]);
+  // Each stage's versions in stage order, for "since your last visit" to read what was redone.
+  const sinceVersions = useMemo(
+    () => Object.fromEntries(template.stages.map((st) => [st.id, (stageBundles[st.id]?.versions ?? []).map((v) => ({ version_number: v.version_number, created_at: v.created_at, source_operation: v.source_operation }))])),
+    [template.stages, stageBundles]
+  );
   // The work as it stands over a span of changes, for "since your last visit" (26 Nov, L-290).
   const summariseSince = useCallback(
     (since: string, touched: string[]) => {
@@ -3457,6 +3462,7 @@ export function WorkflowWorkspace({
               summarise={summariseSince}
               onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
               latestChangeShown={Boolean(briefChange || changeSummaryNow)}
+              versions={sinceVersions}
             />
             <BriefChangeNotice
               change={briefChange}
