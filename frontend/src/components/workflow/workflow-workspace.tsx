@@ -99,6 +99,7 @@ import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
 import { batchAwaited, leftToAssess, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { assessPaste } from '@/lib/workflow/assess-run';
+import { assessKey, assessRunFor, claimAssess, releaseAssess, reportAssess, stopAssess, useAssessRun } from '@/lib/workflow/assess-lock';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, latestObjectiveAssessment, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { listProjectFacts, recordFacts, retireFact, supersedeFact } from '@/lib/supabase/facts';
@@ -330,6 +331,17 @@ export function WorkflowWorkspace({
   // A narrow screen always starts closed, and its toggles are not remembered:
   // the stored choice is the wide screen's.
   const [chatOpen, setChatOpenState] = useState(true);
+  // 26 Nov (Sean: "Should the side chat button be moving so you don't have to
+  // scroll up all the way"): while the button at the top is scrolled away, a copy
+  // stays in the corner.
+  const [chatToggleEl, chatToggleRef] = useState<HTMLButtonElement | null>(null);
+  const [chatToggleInView, setChatToggleInView] = useState(true);
+  useEffect(() => {
+    if (!chatToggleEl || typeof IntersectionObserver === 'undefined') return;
+    const seen = new IntersectionObserver(([entry]) => setChatToggleInView(entry.isIntersecting), { threshold: 0 });
+    seen.observe(chatToggleEl);
+    return () => seen.disconnect();
+  }, [chatToggleEl]);
   const chatWide = useRef(true);
   useEffect(() => {
     let remembered: string | null = null;
@@ -1578,69 +1590,101 @@ export function WorkflowWorkspace({
   // saved as it lands, and what could not be reached is kept for "Assess the remaining N".
   // Any Assess stage's paste, judged and saved on that stage: the one on screen,
   // or a reopened one Apply and continue is about to close (16 Nov).
+  // 26 Nov (L-284): one judge per stage at a time, the page or Go, and the run's
+  // progress kept outside the renderer (`assess-lock`). Stopped when the page goes.
+  const pageAssessKeys = useRef(new Set<string>());
+  useEffect(() => {
+    const keys = pageAssessKeys.current;
+    return () => {
+      for (const key of keys) stopAssess(key);
+    };
+  }, []);
   const assessFor = useCallback(
     async (
       target: StageDefinition,
       startHead: string,
-      { text, scale, existing, onProgress }: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }
+      { text, scale, existing, batch }: { text: string; scale: AssessScale; existing: StageItem[]; batch?: string }
     ) => {
       if (!appendStageVersion) throw new Error(t('assess.failedUnknown'));
+      const key = assessKey(project.id, target.id);
+      const controller = new AbortController();
+      if (!claimAssess(key, 'page', controller)) {
+        throw new Error(assessRunFor(key)?.by === 'go' ? t('assess.busyGo') : t('assess.busyPage'));
+      }
+      pageAssessKeys.current.add(key);
       let head = startHead;
       let model = project.model;
       let lastId: string | undefined;
-      const run = await assessPaste({
-        text,
-        existing,
-        onProgress,
-        call: async (chunk, already) => {
-          const res = await api.assessBatch({
-            inputs: inputsFrom(project),
-            digest: buildStageDigest(template, state, project, stageBundles, target.id),
-            scale: scaleForRequest(scale),
-            text: chunk,
-            stage_hint: target.entry_prompt_hint ?? '',
-            already,
-            model: project.model,
-            web_access: webAccessOf(project),
-          });
-          await keepFound(project, res, { stageId: target.id });
-          model = res.model_used || model;
-          return res;
-        },
-        save: async (items, pending, added) => {
-          const content = serializeAssessment(scale, items, pending);
-          if (content === head) return;
-          const created = await appendStageVersion(target.id, target.label, {
-            content,
-            source_operation: 'assess_batch',
-            model,
-            mode: project.mode,
-            change_summary: `Assessed ${added} item${added === 1 ? '' : 's'}.${pending ? ` ${pending.count || 'Some'} more kept to assess.` : ''}`,
-            base_content: head,
-          });
-          if (created && typeof created === 'object' && 'id' in created) lastId = String((created as { id: unknown }).id);
-          head = content;
-        },
-      });
-      return { run, lastId };
+      try {
+        const run = await assessPaste({
+          text,
+          existing,
+          batch,
+          signal: controller.signal,
+          onProgress: (judged, left) => reportAssess(key, 'page', judged, left),
+          call: async (chunk, already) => {
+            const res = await api.assessBatch(
+              {
+                inputs: inputsFrom(project),
+                digest: buildStageDigest(template, state, project, stageBundles, target.id),
+                scale: scaleForRequest(scale),
+                text: chunk,
+                stage_hint: target.entry_prompt_hint ?? '',
+                already,
+                model: project.model,
+                web_access: webAccessOf(project),
+              },
+              controller.signal
+            );
+            await keepFound(project, res, { stageId: target.id });
+            model = res.model_used || model;
+            return res;
+          },
+          save: async (items, pending, added) => {
+            const content = serializeAssessment(scale, items, pending);
+            if (content === head) return;
+            const created = await appendStageVersion(target.id, target.label, {
+              content,
+              source_operation: 'assess_batch',
+              model,
+              mode: project.mode,
+              change_summary: `Assessed ${added} item${added === 1 ? '' : 's'}.${pending ? ` ${pending.count || 'Some'} more kept to assess.` : ''}`,
+              base_content: head,
+            });
+            if (created && typeof created === 'object' && 'id' in created) lastId = String((created as { id: unknown }).id);
+            head = content;
+          },
+        });
+        return { run, lastId };
+      } finally {
+        releaseAssess(key, 'page');
+        pageAssessKeys.current.delete(key);
+      }
     },
     [appendStageVersion, project, template, state, stageBundles, t]
   );
 
   const assessBatch = useCallback(
-    async (args: { text: string; scale: AssessScale; existing: StageItem[]; onProgress?: (n: number) => void }) => {
+    async (args: { text: string; scale: AssessScale; existing: StageItem[]; batch?: string }) => {
       if (!stage) throw new Error(t('assess.failedUnknown'));
       const { run } = await assessFor(stage, headVersion?.content ?? '', args);
       setActiveVersionId(null);
       const said: string[] = run.webQueries.map((query) => t('assess.searched', { query }));
-      said.unshift(run.added ? t('assess.added', { n: run.added }) : t('assess.none'));
+      if (run.stopped) said.unshift(run.added ? t('assess.stoppedSaved', { n: run.added }) : t('assess.stoppedNone'));
+      else said.unshift(run.added ? t('assess.added', { n: run.added }) : t('assess.none'));
       if (run.alreadyIn) said.push(t('assess.alreadyIn', { n: run.alreadyIn }));
       if (run.ungraded) said.push(t('assess.ungraded', { n: run.ungraded }));
-      if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { n: run.pending.count }) : t('assess.pendingKeptSome'));
-      return said.join(' ');
+      if (run.cut && run.pending) said.push(t('assess.cutKept'));
+      else if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { n: run.pending.count }) : t('assess.pendingKeptSome'));
+      return { said: said.join(' '), keepText: run.stopped && !run.added && !run.pending };
     },
     [stage, assessFor, headVersion?.content, t]
   );
+  const assessRunKey = stage?.renderer === 'assess' ? assessKey(project.id, stage.id) : null;
+  const assessRun = useAssessRun(assessRunKey);
+  const stopAssessRun = useCallback(() => {
+    if (assessRunKey) stopAssess(assessRunKey);
+  }, [assessRunKey]);
 
   const restore = useCallback(
     async (versionId: string) => {
@@ -1826,7 +1870,7 @@ export function WorkflowWorkspace({
         const head = stageBundles[s.id]?.versions.at(-1)?.content ?? '';
         const left = leftToAssess(s.renderer, head);
         if (left) {
-          const { run, lastId } = await assessFor(s, head, { text: left.text, scale: left.scale, existing: left.items });
+          const { run, lastId } = await assessFor(s, head, { text: left.text, scale: left.scale, existing: left.items, batch: left.batch });
           if (run.pending) continue;
           assessedId = lastId;
         }
@@ -3009,6 +3053,7 @@ export function WorkflowWorkspace({
               {reader.id ? t('ws.otherProject') : t('ws.openAnother')}
             </button>
             <button
+              ref={chatToggleRef}
               onClick={() => setChatOpen((open) => !open)}
               aria-expanded={chatOpen}
               aria-controls="stage-side-chat"
@@ -3500,6 +3545,9 @@ export function WorkflowWorkspace({
                 onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
                 onProposeStatuses={(itemSchemaFor(stage).statuses ?? []).some((s) => s.modelMayPropose) ? proposeItems : undefined}
                 onAssessBatch={stage.renderer === 'assess' && appendStageVersion ? assessBatch : undefined}
+                assessRun={assessRun}
+                assessRunKey={assessRunKey}
+                onStopAssess={stopAssessRun}
                 onReopenForBatch={stage.renderer === 'assess' && canReopen ? () => void reopenStage() : undefined}
                 onFinishAssessing={stage.renderer === 'assess' && isCurrent && transitions.some((o) => o.kind === 'advance' && !o.requiresNote)
                   ? () => {
@@ -3830,6 +3878,20 @@ export function WorkflowWorkspace({
           One mount, two positions: a rail beside the work on a wide screen, a
           sheet over it on a narrow one. Mounting it twice would give the stage
           two threads and two histories of the same conversation. */}
+      {!chatOpen && !chatToggleInView && (
+        <button
+          type="button"
+          data-chat-float
+          onClick={() => setChatOpen(true)}
+          aria-expanded={false}
+          aria-controls="stage-side-chat"
+          style={{ bottom: 'max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem))' }}
+          className="fixed end-4 z-30 inline-flex items-center gap-2 rounded-full bg-[var(--pm-primary)] px-4 py-3 text-label font-semibold text-[var(--on-primary)] shadow-lg hover:opacity-90 sm:end-6"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[20px]">forum</span>
+          {t('ws.sideChat')}
+        </button>
+      )}
       {chatOpen && (
         <aside
           id="stage-side-chat"
@@ -3859,9 +3921,11 @@ export function WorkflowWorkspace({
           >
             <span className="h-10 w-1 rounded-full bg-[var(--surface-container-highest)] group-hover:bg-[var(--pm-primary)] group-focus-visible:bg-[var(--pm-primary)]" />
           </div>
+          {/* Its own close, on every width (26 Nov): the button at the top may be scrolled away. */}
           <button
+            data-chat-close
             onClick={() => setChatOpen(false)}
-            className="mb-2 ms-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
+            className="mb-2 ms-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)]"
           >
             <span aria-hidden className="material-symbols-outlined text-[18px]">
               close

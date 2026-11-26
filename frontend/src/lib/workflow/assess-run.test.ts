@@ -65,9 +65,9 @@ describe('a paste of any size is judged a batch at a time (15 Nov, Sean: 25 past
         saved = serializeAssessment(DEFAULT_SCALE, items, pending);
       },
     });
-    expect(run.pending).toEqual({ text: paste, count: 24 });
+    expect(run.pending).toEqual({ text: paste, count: 24, batch: '1' });
     expect(parseAssessment(saved)?.pending?.count).toBe(24);
-    expect(batchAwaited({ renderer: 'assess' }, saved)).toEqual({ offered: true, noun: null });
+    expect(batchAwaited({ renderer: 'assess' }, saved)).toEqual({ offered: true, noun: null, left: true });
   });
 
   it('never adds a name twice, whether carried on or pasted again', () => {
@@ -92,5 +92,67 @@ describe('a paste of any size is judged a batch at a time (15 Nov, Sean: 25 past
     const items = appendBatch([], [{ id: 'a', subject: 'Jane Doe', verdict: 'Green', rationale: '- Ran a 40M P&L\n- Plant manager', evidence: '', gaps: 'No ERP' }], 'now');
     const text = documentText({ renderer: 'assess', id: 's', label: 'Score', expected_artifacts: [] } as never, serializeAssessment(DEFAULT_SCALE, items));
     expect(text).toBe('1 assessed:\n1. Jane Doe — Green (batch 1)\n   Why: Ran a 40M P&L; Plant manager\n   Gaps: No ERP');
+  });
+});
+
+describe('one paste is one batch, a stop keeps what was saved, and an incomplete answer loses nothing (26 Nov)', () => {
+  it('gives every call of one paste the same batch, and the next paste the next number', async () => {
+    const first = await assessPaste({ text: paste, existing: [], call: fakeServer(), save: async () => {}, now: () => 'now' });
+    expect(new Set(first.items.map((i) => i.batch))).toEqual(new Set(['1']));
+    expect(first.batch).toBe('1');
+    const more = `Candidate 26\nCOO, Beta\n\nCandidate 27\nCOO, Gamma`;
+    const second = await assessPaste({ text: more, existing: first.items, call: fakeServer(), save: async () => {}, now: () => 'later' });
+    expect(second.items.filter((i) => i.subject?.startsWith('Candidate 2') && Number(i.subject.split(' ')[1]) > 25).map((i) => i.batch)).toEqual(['2', '2']);
+  });
+
+  it('carries a paste\'s leftovers in its own batch', async () => {
+    const lost = vi.fn(async (): Promise<BatchReply> => ({
+      items: [{ id: 'x', subject: 'Candidate 1', verdict: 'Green', rationale: '', evidence: '', gaps: '' }],
+      ungraded: 0, not_assessed: 24, next_from: 'Somebody not in the paste',
+    }));
+    const run = await assessPaste({ text: paste, existing: [], call: lost, save: async () => {} });
+    expect(run.pending?.batch).toBe('1');
+    const later = await assessPaste({ text: run.pending!.text, existing: run.items, call: fakeServer(), save: async () => {}, batch: run.pending!.batch });
+    expect(new Set(later.items.map((i) => i.batch))).toEqual(new Set(['1']));
+  });
+
+  it('stops between calls when asked: the first call\'s rows are saved, the rest kept to assess', async () => {
+    const controller = new AbortController();
+    const call = fakeServer();
+    let saved = '';
+    const run = await assessPaste({
+      text: paste, existing: [], call, signal: controller.signal,
+      save: async (items, pending) => {
+        saved = serializeAssessment(DEFAULT_SCALE, items, pending);
+        controller.abort();
+      },
+    });
+    expect(run.stopped).toBe(true);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(run.added).toBe(12);
+    expect(parseAssessment(saved)?.pending?.text.startsWith('Candidate 13')).toBe(true);
+  });
+
+  it('a stop during a call ends the run without throwing', async () => {
+    const controller = new AbortController();
+    const call = vi.fn(async (): Promise<BatchReply> => {
+      controller.abort();
+      throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    });
+    const run = await assessPaste({ text: paste, existing: [], call, save: async () => {}, signal: controller.signal });
+    expect(run).toMatchObject({ stopped: true, added: 0, pending: null });
+  });
+
+  it('keeps the rest of the paste when an answer came back cut off or unreadable', async () => {
+    for (const finish_reason of ['length', 'error']) {
+      const call = vi.fn(async (): Promise<BatchReply> => ({
+        items: finish_reason === 'length' ? [{ id: 'x', subject: 'Candidate 1', verdict: 'Green', rationale: '', evidence: '', gaps: '' }] : [],
+        ungraded: 0, not_assessed: 0, finish_reason,
+      }));
+      const run = await assessPaste({ text: paste, existing: [], call, save: async () => {} });
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(run.cut).toBe(true);
+      expect(run.pending?.text).toBe(paste.trim());
+    }
   });
 });

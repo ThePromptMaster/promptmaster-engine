@@ -18,9 +18,11 @@ import {
   SCALE_PRESETS,
   assessmentCsv,
   assessmentRows,
+  batchesOf,
   customScale,
   levelOf,
   parseAssessment,
+  rowsInView,
   scaleFromSpec,
   serializeAssessment,
   setVerdict,
@@ -28,6 +30,7 @@ import {
   validScale,
   verdictCounts,
   type AssessScale,
+  type BatchView,
 } from '@/lib/workflow/assess';
 import type { StageItem } from '@/lib/workflow/stage-artifact';
 import { downloadBlob, downloadFile } from '@/lib/utils';
@@ -43,6 +46,36 @@ import type { StageRendererProps } from './types';
 
 type Filter = { kind: 'all' } | { kind: 'level'; label: string };
 
+/** This viewer's batch view and sort for one stage (26 Nov); browser storage, a convenience only. */
+type TableChoice = { view: BatchView; bestFirst: boolean };
+const DEFAULT_CHOICE: TableChoice = { view: { kind: 'all' }, bestFirst: true };
+
+function readChoice(key: string | null | undefined): TableChoice {
+  if (!key) return DEFAULT_CHOICE;
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(`pm.assessView.${key}`) ?? 'null') as Partial<TableChoice> | null;
+    const v = raw?.view;
+    const view: BatchView =
+      v?.kind === 'latest' ? { kind: 'latest' } : v?.kind === 'batch' && typeof v.batch === 'string' ? { kind: 'batch', batch: v.batch } : { kind: 'all' };
+    return { view, bestFirst: raw?.bestFirst !== false };
+  } catch {
+    return DEFAULT_CHOICE;
+  }
+}
+
+function writeChoice(key: string | null | undefined, choice: TableChoice) {
+  if (!key) return;
+  try {
+    window.localStorage.setItem(`pm.assessView.${key}`, JSON.stringify(choice));
+  } catch {
+    // Storage blocked: the choice lasts while the page is open.
+  }
+}
+
+const viewValue = (v: BatchView) => (v.kind === 'batch' ? `b:${v.batch}` : v.kind);
+const viewFrom = (value: string): BatchView =>
+  value === 'latest' ? { kind: 'latest' } : value.startsWith('b:') ? { kind: 'batch', batch: value.slice(2) } : { kind: 'all' };
+
 export function AssessRenderer({
   stage,
   templateKey,
@@ -54,6 +87,9 @@ export function AssessRenderer({
   onRestore,
   onSaveContent,
   onAssessBatch,
+  assessRun,
+  assessRunKey,
+  onStopAssess,
   onReopenForBatch,
   onFinishAssessing,
   nextStageLabel,
@@ -82,12 +118,22 @@ export function AssessRenderer({
   const scale: AssessScale = (locked ? doc?.scale : null) ?? doc?.scale ?? picked;
 
   const [text, setText] = useState('');
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+  // Who is judging, and how far (26 Nov, L-284): kept outside this view, so it
+  // survives leaving the stage, and Go's run shows here too.
+  const running = Boolean(assessRun);
+  const goJudging = assessRun?.by === 'go';
   const pending = doc?.pending ?? null;
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
   const [filter, setFilter] = useState<Filter>({ kind: 'all' });
-  const [bestFirst, setBestFirst] = useState(true);
+  const storedChoice = useMemo(() => readChoice(assessRunKey), [assessRunKey]);
+  const [ownChoice, setOwnChoice] = useState<{ key: string | null | undefined; choice: TableChoice } | null>(null);
+  const choice = ownChoice && ownChoice.key === assessRunKey ? ownChoice.choice : storedChoice;
+  const { view, bestFirst } = choice;
+  const choose = (next: Partial<TableChoice>) => {
+    const merged = { ...choice, ...next };
+    setOwnChoice({ key: assessRunKey, choice: merged });
+    writeChoice(assessRunKey, merged);
+  };
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
@@ -98,39 +144,58 @@ export function AssessRenderer({
   }, [activeId]);
 
   const editable = !readOnly && isHead;
-  const counts = verdictCounts(scale, items);
+  // Which rows, then how they are sorted (26 Nov, Sean: "Latest batch + Best first
+  // would show the greens first … for just the LinkedIn page we're working on").
+  const batches = useMemo(() => batchesOf(items), [items]);
+  const inView = useMemo(() => rowsInView(items, view), [items, view]);
+  const counts = verdictCounts(scale, inView);
   const shown = useMemo(() => {
-    const kept = filter.kind === 'all' ? items : items.filter((i) => (filter.label ? i.verdict === filter.label : !levelOf(scale, i.verdict)));
+    const kept = filter.kind === 'all' ? inView : inView.filter((i) => (filter.label ? i.verdict === filter.label : !levelOf(scale, i.verdict)));
     return bestFirst ? sortByVerdict(scale, kept) : [...kept].reverse();
-  }, [items, filter, bestFirst, scale]);
+  }, [inView, filter, bestFirst, scale]);
+  const when = (at: string) => {
+    const d = new Date(at);
+    if (!at || Number.isNaN(d.getTime())) return '';
+    try {
+      return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+    } catch {
+      return d.toISOString().slice(0, 16).replace('T', ' ');
+    }
+  };
+  const latest = batches.at(-1);
+  const viewOptions = [
+    { value: 'all', label: t('assess.viewAll', { n: items.length }) },
+    ...(latest ? [{ value: 'latest', label: t('assess.viewLatest', { n: latest.batch, count: latest.count }) }] : []),
+    ...[...batches].reverse().map((b) => ({
+      value: `b:${b.batch}`,
+      label: when(b.at) ? t('assess.viewBatchAt', { n: b.batch, when: when(b.at), count: b.count }) : t('assess.viewBatch', { n: b.batch, count: b.count }),
+    })),
+  ];
   const stageName = stageText(locale, templateKey, stage, 'label');
   const noun = stage.assess?.item_noun?.trim();
   // A sample to offer: it fills the box, and only pressing Assess runs anything.
   const sampleBatch = stage.assess?.offered_batch?.trim();
 
-  async function run(given?: string) {
+  async function run(given?: string, batch?: string) {
     const input = (given ?? text).trim();
     if (!onAssessBatch || !input || running || !validScale(scale)) return;
-    setRunning(true);
     setNote(null);
-    setProgress(0);
     try {
-      const said = await onAssessBatch({ text: input, scale, existing: items, onProgress: setProgress });
-      if (!given) setText('');
-      setNote({ text: said });
+      const out = await onAssessBatch({ text: input, scale, existing: items, ...(batch ? { batch } : {}) });
+      if (!given && !out.keepText) setText('');
+      setNote({ text: out.said });
     } catch (e) {
       setNote({ text: t('assess.failed', { why: e instanceof Error && e.message ? e.message : t('assess.failedUnknown') }), error: true });
-    } finally {
-      setRunning(false);
-      setProgress(null);
     }
   }
 
   async function save(next: StageItem[]) {
-    if (!onSaveContent || saving) return;
+    if (!onSaveContent || saving || running) return;
     setSaving(true);
     try {
-      await onSaveContent(serializeAssessment(scale, next));
+      // What a paste left to judge stays with the table (26 Nov, L-284: a verdict
+      // changed here used to drop it).
+      await onSaveContent(serializeAssessment(scale, next, pending));
     } finally {
       setSaving(false);
     }
@@ -165,14 +230,24 @@ export function AssessRenderer({
       />
 
       {/* What a paste left unjudged (15 Nov): kept with the table, one press away. */}
-      {editable && onAssessBatch && pending && (
+      {editable && onAssessBatch && pending && running && (
+        <section data-assess-pending data-judging className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3">
+          <span aria-hidden className="material-symbols-outlined animate-spin text-[20px] text-[var(--pm-primary)]">progress_activity</span>
+          <p className="me-auto text-body text-[var(--on-surface)]">
+            {goJudging
+              ? pending.count ? t('assess.goJudgingLeft', { n: pending.count }) : t('assess.goJudgingSome')
+              : pending.count ? t('assess.judgingLeft', { n: pending.count }) : t('assess.judgingSome')}
+          </p>
+        </section>
+      )}
+      {editable && onAssessBatch && pending && !running && (
         <section data-assess-pending className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3">
           <p className="me-auto text-body text-[var(--on-surface)]">
             {pending.count ? t('assess.pendingTitle', { n: pending.count }) : t('assess.pendingTitleSome')}
           </p>
           <button
             type="button"
-            onClick={() => void run(pending.text)}
+            onClick={() => void run(pending.text, pending.batch)}
             disabled={running || !validScale(scale)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-40"
           >
@@ -239,9 +314,34 @@ export function AssessRenderer({
               disabled={running || !text.trim() || !validScale(scale)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-40"
             >
-              <span aria-hidden className="material-symbols-outlined text-[18px]">fact_check</span>
-              {running ? (progress ? t('assess.progress', { n: progress }) : t('assess.running')) : t('assess.run')}
+              <span aria-hidden className={`material-symbols-outlined text-[18px] ${running ? 'animate-spin' : ''}`}>{running ? 'progress_activity' : 'fact_check'}</span>
+              {assessRun
+                ? assessRun.by === 'go'
+                  ? t('assess.goRunning')
+                  : !assessRun.judged && assessRun.left === null
+                    ? t('assess.runningFirst')
+                    : assessRun.left
+                      ? t('assess.progressLeft', { n: assessRun.judged, left: assessRun.left })
+                      : t('assess.progress', { n: assessRun.judged })
+                : t('assess.run')}
             </button>
+            {assessRun && (
+              <span data-assess-clock className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+                <RunClock since={assessRun.startedAt} />
+                <span>{t('assess.aboutAMinute')}</span>
+                {assessRun.by === 'page' && onStopAssess && (
+                  <button
+                    type="button"
+                    data-assess-stop
+                    onClick={onStopAssess}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold text-[var(--pm-error)] hover:bg-[var(--surface-container-high)]"
+                  >
+                    <span aria-hidden className="material-symbols-outlined text-[16px]">stop_circle</span>
+                    {t('assess.stop')}
+                  </button>
+                )}
+              </span>
+            )}
             {items.length > 0 && onFinishAssessing && nextStageLabel && !running && (
               <button
                 type="button"
@@ -277,7 +377,7 @@ export function AssessRenderer({
           <div className="flex flex-wrap items-center gap-2">
             <div role="group" aria-label={t('assess.filter')} className="flex flex-wrap gap-1.5">
               <FilterButton active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })}>
-                {t('assess.all', { n: items.length })}
+                {t('assess.all', { n: inView.length })}
               </FilterButton>
               {counts.map((c) => (
                 <FilterButton
@@ -289,10 +389,21 @@ export function AssessRenderer({
                 </FilterButton>
               ))}
             </div>
-            <div className="ms-auto flex items-center gap-2">
+            <div className="ms-auto flex flex-wrap items-center gap-2">
+              {batches.length > 1 && (
+                <div data-assess-view className="w-56">
+                  <CustomSelect
+                    value={viewValue(view)}
+                    options={viewOptions}
+                    ariaLabel={t('assess.view')}
+                    onChange={(v) => choose({ view: viewFrom(v) })}
+                  />
+                </div>
+              )}
               <button
                 type="button"
-                onClick={() => setBestFirst((b) => !b)}
+                data-assess-sort
+                onClick={() => choose({ bestFirst: !bestFirst })}
                 className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
               >
                 <span aria-hidden className="material-symbols-outlined text-[16px]">sort</span>
@@ -345,7 +456,7 @@ export function AssessRenderer({
                               options={verdictOptions}
                               placeholder={t('assess.setVerdict')}
                               ariaLabel={t('assess.verdictFor', { item: row.subject || '' })}
-                              disabled={saving}
+                              disabled={saving || running}
                               onChange={(v) => void save(setVerdict(items, row.id, v))}
                             />
                           </div>
@@ -391,7 +502,7 @@ export function AssessRenderer({
                         {editable && onSaveContent && (
                           <button
                             type="button"
-                            disabled={saving}
+                            disabled={saving || running}
                             onClick={() => void save(items.filter((i) => i.id !== row.id))}
                             aria-label={t('assess.remove', { item: row.subject || '' })}
                             title={t('assess.remove', { item: row.subject || '' })}
@@ -411,6 +522,18 @@ export function AssessRenderer({
       )}
     </div>
   );
+}
+
+/** Seconds since the run began, ticking: a run that is working shows it is. */
+function RunClock({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const secs = Math.max(0, Math.floor((now - since) / 1000));
+  const shown = secs < 60 ? `0:${String(secs).padStart(2, '0')}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  return <span aria-hidden className="tabular-nums">{shown}</span>;
 }
 
 function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

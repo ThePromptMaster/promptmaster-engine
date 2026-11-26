@@ -14,6 +14,7 @@
 
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { batchAwaited } from '@/lib/workflow/assess';
+import { assessKey, assessRunFor } from '@/lib/workflow/assess-lock';
 import { codeToCheck, type CodeToCheck } from './code-check';
 import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
@@ -157,8 +158,8 @@ export interface StageFacts {
   review?: ReviewFacts;
   /** Python in this stage's draft that the objective asks to have checked (M3). */
   code?: CodeToCheck;
-  /** An Assess stage with nothing judged yet (`batchAwaited`). */
-  batch?: { offered: boolean; noun: string | null };
+  /** An Assess stage with nothing judged yet, or items left from a paste (`batchAwaited`). */
+  batch?: { offered: boolean; noun: string | null; left?: boolean };
   /** The stage still holds what a curated example prepared for the reader to approve. */
   prepared?: boolean;
 }
@@ -245,6 +246,11 @@ export async function readStageFacts(input: {
 
   const awaited = batchAwaited(stage, bundles[stage.id]?.versions.at(-1)?.content);
   if (awaited) facts.batch = awaited;
+  // The page is judging a paste here (26 Nov, L-284): its first save may not have
+  // landed yet, so Go's judging move waits on it rather than asking for a paste.
+  if (stage.renderer === 'assess' && assessRunFor(assessKey(project.id, stage.id))?.by === 'page') {
+    facts.batch = { offered: true, noun: stage.assess?.item_noun?.trim() || null, left: true };
+  }
   if (bundles[stage.id]?.versions.at(-1)?.source_operation === PREPARED_OPERATION) facts.prepared = true;
 
   if (effectiveRenderer(stage) === 'review') {

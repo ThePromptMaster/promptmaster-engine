@@ -800,7 +800,9 @@ export function requiredWork(input: {
   if (facts.batch?.offered && can('assess_batch')) {
     return {
       key: 'assess_batch',
-      rationale: `${stage.label} was given a sample batch and has judged nothing yet.`,
+      rationale: facts.batch.left
+        ? `${stage.label} has items left from your paste that are not judged yet.`
+        : `${stage.label} was given a sample batch and has judged nothing yet.`,
       expected: 'Each item in the batch judged against the earlier stages, in a table on this stage.',
     };
   }

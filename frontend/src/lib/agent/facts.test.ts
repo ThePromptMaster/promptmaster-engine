@@ -27,3 +27,29 @@ describe('Go stops continuing a draft that stays cut off (31 Oct)', () => {
     expect(draftFacts(head, null, [v('continuation', 'length'), v('continuation', null), v('agent_apply', 'length')]).truncated).toBe(true);
   });
 });
+
+describe('Go and the page never judge one paste at once (26 Nov, L-284)', () => {
+  const stage = {
+    id: 'screen', label: 'Screen', short_label: 'Screen', group: 'evaluation', required: true, renderer: 'assess',
+    entry_guidance: '', exit_criteria: [], expected_artifacts: [], recommended_modes: [], skip_reasons: [],
+    transitions: { default_next: null, allow_skip: false, allow_return_to: [] },
+    assess: { scale: 'traffic', item_noun: 'profiles' },
+  } as unknown as import('@/lib/workflow/types').StageDefinition;
+  const template = { key: 't', stages: [stage] } as unknown as import('@/lib/workflow/types').WorkflowTemplate;
+  const project = { id: 'p-facts', user_id: 'u1', objective: '' } as unknown as import('@/types/project').Project;
+
+  it('while the page judges a first paste, Go is offered the judging move, which waits, not a "paste a batch" stop', async () => {
+    const { readStageFacts } = await import('./facts');
+    const { assessKey, claimAssess, releaseAssess } = await import('@/lib/workflow/assess-lock');
+    const idle = await readStageFacts({ project, template, stage, bundles: {}, events: [] });
+    expect(idle.batch).toEqual({ offered: false, noun: 'profiles' });
+    const key = assessKey('p-facts', 'screen');
+    claimAssess(key, 'page', new AbortController());
+    try {
+      const busy = await readStageFacts({ project, template, stage, bundles: {}, events: [] });
+      expect(busy.batch).toEqual({ offered: true, noun: 'profiles', left: true });
+    } finally {
+      releaseAssess(key, 'page');
+    }
+  });
+});
