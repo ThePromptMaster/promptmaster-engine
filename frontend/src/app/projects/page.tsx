@@ -8,8 +8,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { listProjects, moveProject, softDeleteProject } from '@/lib/supabase/projects';
 import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, createFolder, deleteFolder, folderCounts, kindUnder, layoutOf, listFolders, renameFolder, workspaceOf } from '@/lib/supabase/folders';
 import { FolderRulesPanel } from '@/components/projects/folder-rules-panel';
-import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
+import { FoldersSidebar, type FolderSelection } from '@/components/projects/folders-sidebar';
 import { MoveToMenu } from '@/components/projects/move-to-menu';
+import { MoveHereMenu } from '@/components/projects/move-here-menu';
+import { beginProjectDrag, endProjectDrag } from '@/lib/projects/project-drag';
+import { foldersHolding } from '@/lib/projects/folder-totals';
 import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
 import { ProjectCardMenu } from '@/components/projects/project-card-menu';
 import { pausedProjectIds, templateNamesById } from '@/lib/supabase/workflow';
@@ -46,14 +49,15 @@ function storedSelection(): FolderSelection {
 }
 
 /**
- * Whether the pointer is a mouse. Only then is a card draggable onto a folder:
- * on a phone a tap is for opening the project, and filing goes through the
- * card's menu (Sean, 24 Oct).
+ * Whether the pointer is a mouse and the folders are beside the list. Only then is a
+ * card draggable onto a folder: on a phone a tap is for opening the project, and
+ * filing goes through the card's menu (Sean, 24 Oct); in a narrow window the folders
+ * are in a sheet that covers the list, so there is nowhere to drop (26 Nov).
  */
 function useFinePointer(): boolean {
   const [fine, setFine] = useState(false);
   useEffect(() => {
-    const q = window.matchMedia('(pointer: fine)');
+    const q = window.matchMedia('(pointer: fine) and (min-width: 768px)');
     const update = () => setFine(q.matches);
     update();
     q.addEventListener('change', update);
@@ -94,6 +98,15 @@ export default function ProjectsPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [selection, setSelection] = useState<FolderSelection>(() => (typeof window === 'undefined' ? 'all' : storedSelection()));
   const [foldersOpen, setFoldersOpen] = useState(false);
+  // The card being dragged, and what the last move did (26 Nov, Sean: a drop looked like
+  // nothing happened, so it read as not working).
+  const [dragging, setDragging] = useState<{ id: string; title: string } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; undo?: () => void } | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 9000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const loadFolders = useCallback(() => {
     Promise.all([listFolders(), folderCounts()])
@@ -180,13 +193,38 @@ export default function ProjectsPage() {
     }
   }
 
-  async function handleMove(id: string, folderId: string | null) {
+  /**
+   * File a project, and say so: where it went, with Undo (26 Nov). `known` is the card when
+   * it is not in the list on screen (moved in from "Move projects here").
+   */
+  async function handleMove(id: string, folderId: string | null, known?: ProjectSummary, quiet = false) {
     const previous = projects;
+    const card = known ?? projects?.find((p) => p.id === id);
+    const from = card ? card.folder_id ?? null : undefined;
+    if (card && (card.folder_id ?? null) === folderId) return;
     const shown = (fid: string | null) => selection === 'all' || (selection === 'unfiled' ? fid === null : fid === selection);
-    setProjects((rows) => (rows ?? []).map((p) => (p.id === id ? { ...p, folder_id: folderId } : p)).filter((p) => p.id !== id || shown(folderId)));
+    setProjects((rows) => {
+      const list = rows ?? [];
+      const moved = list.some((p) => p.id === id)
+        ? list.map((p) => (p.id === id ? { ...p, folder_id: folderId } : p))
+        : card && shown(folderId)
+        ? [{ ...card, folder_id: folderId }, ...list]
+        : list;
+      return moved.filter((p) => p.id !== id || shown(folderId));
+    });
     try {
       await moveProject(id, folderId);
       loadFolders();
+      if (quiet) return;
+      const title = card?.title || t('list.aProject');
+      const folderName = folderId ? folders.find((f) => f.id === folderId)?.name ?? t('list.thisFolder') : null;
+      setNotice({
+        text: folderName ? t('list.movedTo', { title, folder: folderName }) : t('list.movedOut', { title }),
+        undo: from === undefined ? undefined : () => {
+          setNotice(null);
+          void handleMove(id, from, card ? { ...card, folder_id: folderId } : undefined, true);
+        },
+      });
     } catch (e) {
       setProjects(previous);
       setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? t('list.moveError')));
@@ -238,6 +276,7 @@ export default function ProjectsPage() {
       onRename={rename}
       onDelete={remove}
       onDropProject={(id, folderId) => void handleMove(id, folderId)}
+      dragging={dragging?.title ?? null}
       onSample={async () => {
         if (!user) return;
         // The sample search-firm workspace (24 Nov): made in the user's own account, then shown.
@@ -307,6 +346,10 @@ export default function ProjectsPage() {
           <h1 className="text-display text-[var(--on-surface)]">{selectedLabel ?? t('list.title')}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">{t('list.subtitle')}</p>
         </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {selectedFolder && (projects?.length ?? 0) > 0 && (
+          <MoveHereMenu folder={selectedFolder} onMove={(p) => handleMove(p.id, selectedFolder.id, p)} />
+        )}
         <Link
           // Started in a folder, a project is filed there and follows its rules from the start (Sean, 23 Nov).
           href={selectedFolder ? `/projects/new?folder=${selectedFolder.id}` : '/projects/new'}
@@ -315,6 +358,7 @@ export default function ProjectsPage() {
           <span className="material-symbols-outlined text-[20px]">add</span>
           {t('list.newProject')}
         </Link>
+        </div>
       </header>
 
       <GuestBanner />
@@ -355,10 +399,36 @@ export default function ProjectsPage() {
         <div data-empty-folder className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[32px] opacity-50">folder_open</span>
           <p className="mt-3">{t('list.emptyFolder', { name: selectedLabel ?? t('list.thisFolder') })}</p>
+          {/* A folder whose projects are all in folders inside it is not empty (26 Nov: the
+              sample workspace read "Nothing in … yet" over two levels of projects). */}
+          {selectedFolder && foldersHolding(selectedFolder.id, folders, counts).length > 0 && (
+            <div data-nested-projects className="mt-3">
+              <p>{t('list.nested', { name: selectedFolder.name })}</p>
+              <div className="mt-2 flex flex-wrap justify-center gap-2">
+                {foldersHolding(selectedFolder.id, folders, counts).map(({ folder, total }) => (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => select(folder.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
+                  >
+                    <span aria-hidden className="material-symbols-outlined text-[16px]">{'folder'}</span>
+                    {folder.name}
+                    <span className="tabular-nums text-[var(--on-surface-variant)]">{total}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* An empty folder says what to do in it (26 Nov, Sean: "someone should be able to
               start a project right away or organize projects by whatever makes sense"). */}
           {selectedFolder && (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {/* Filing from here: an empty folder has no cards on screen to drag (26 Nov). */}
+              <MoveHereMenu
+                folder={selectedFolder}
+                onMove={(p) => handleMove(p.id, selectedFolder.id, p)}
+              />
               <Link
                 href={`/projects/new?folder=${selectedFolder.id}`}
                 data-start-here
@@ -463,9 +533,15 @@ export default function ProjectsPage() {
                   key={p.id}
                   draggable={finePointer}
                   onDragStart={(e) => {
-                    e.dataTransfer.setData(PROJECT_DRAG_TYPE, p.id);
-                    e.dataTransfer.effectAllowed = 'move';
+                    if (!finePointer) return;
+                    beginProjectDrag(e.dataTransfer, p.id);
+                    setDragging({ id: p.id, title: p.title || t('list.aProject') });
                   }}
+                  onDragEnd={() => {
+                    endProjectDrag();
+                    setDragging(null);
+                  }}
+                  className={dragging?.id === p.id ? 'opacity-60' : undefined}
                 >
                   <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-1 rounded-2xl bg-[var(--surface-container-low)] sm:gap-4 transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
                     {/* The project's own colour, as a bar and a tinted icon: the icon alone was easy to miss (21 Oct). */}
@@ -499,6 +575,14 @@ export default function ProjectsPage() {
                         {p.example_key && (
                           <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-primary)]">
                             {t('ex.chip')}
+                          </span>
+                        )}
+                        {/* Where it is filed, in the list of everything (26 Nov): a drop there
+                            changed nothing on the card, so it looked as if it had not worked. */}
+                        {selection === 'all' && p.folder_id && folders.some((f) => f.id === p.folder_id) && (
+                          <span data-card-folder className="inline-flex max-w-[160px] items-center gap-1 rounded-md bg-[var(--surface-container-high)] px-2 py-1" title={t('list.inFolder', { name: folders.find((f) => f.id === p.folder_id)!.name })}>
+                            <span aria-hidden className="material-symbols-outlined text-[14px]">{'folder'}</span>
+                            <span className="truncate">{folders.find((f) => f.id === p.folder_id)!.name}</span>
                           </span>
                         )}
                         <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
@@ -586,6 +670,22 @@ export default function ProjectsPage() {
           go looking for, not something that competes with the work. */}
       {projects !== null && <DeletedProjects onRestored={load} />}
       </div>
+      {notice && (
+        <div role="status" data-move-notice className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div className="flex max-w-[560px] items-center gap-3 rounded-xl bg-[var(--inverse-surface,#2e3133)] px-4 py-3 text-body text-[var(--inverse-on-surface,#eff1f3)] shadow-[0_8px_24px_-8px_rgba(25,28,30,0.45)]">
+            <span aria-hidden className="material-symbols-outlined text-[18px]">drive_file_move</span>
+            <span className="min-w-0">{notice.text}</span>
+            {notice.undo && (
+              <button type="button" onClick={notice.undo} className="shrink-0 rounded-lg px-2 py-1 font-semibold text-[var(--inverse-primary,#9ecfd0)] hover:underline">
+                {t('list.undo')}
+              </button>
+            )}
+            <button type="button" onClick={() => setNotice(null)} aria-label={t('list.closeNotice')} className="shrink-0 rounded-lg p-1 opacity-80 hover:opacity-100">
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -6,12 +6,13 @@ import { useT } from '@/lib/i18n/i18n-provider';
 import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, kindUnder, type FolderNode } from '@/lib/supabase/folders';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import type { FolderKind, ProjectFolder, WorkspaceLayout } from '@/types/project';
+import { PROJECT_DRAG_TYPE, draggedProjectId, isProjectDrag } from '@/lib/projects/project-drag';
 
 /** What the list shows: everything, the Unfiled projects, or one folder. */
 export type FolderSelection = 'all' | 'unfiled' | string;
 
 /** The drag type a project card sets, so a folder row accepts only projects. */
-export const PROJECT_DRAG_TYPE = 'application/x-pm-project';
+export { PROJECT_DRAG_TYPE };
 
 const MAX_DEPTH = MAX_FOLDER_DEPTH;
 
@@ -43,6 +44,11 @@ interface Props {
   onDropProject: (projectId: string, folderId: string | null) => void;
   /** Make the sample search-firm workspace (24 Nov). */
   onSample?: () => Promise<void>;
+  /**
+   * The title of the project card being dragged, while one is (26 Nov): the rows say
+   * where it can go, and their action icons stay out of the way of the drop.
+   */
+  dragging?: string | null;
 }
 
 /**
@@ -51,7 +57,7 @@ interface Props {
  * projects"). A project can be dragged onto a folder on a computer; the card's
  * folder button does the same everywhere, keyboard and touch included.
  */
-export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, onRename, onDelete, onDropProject, onSample }: Props) {
+export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, onRename, onDelete, onDropProject, onSample, dragging = null }: Props) {
   const t = useT();
   const tree = flattenTree(folderTree(folders));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -64,6 +70,9 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   const [name, setName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  // The row a project was just dropped on, lit for a moment so the drop is seen (26 Nov).
+  const [dropped, setDropped] = useState<string | null>(null);
+  const droppedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [makingSample, setMakingSample] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,22 +121,36 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     }
   };
 
-  const dropProps = (key: string, folderId: string | null) => ({
-    onDragOver: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes(PROJECT_DRAG_TYPE)) return;
+  // On the whole row, its action icons included: a drop on the icons at the row's end
+  // was refused (26 Nov). `dragenter` is accepted too, which some browsers need.
+  const dropProps = (key: string, folderId: string | null) => {
+    const accept = (e: React.DragEvent) => {
+      if (!isProjectDrag(e.dataTransfer)) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       setDropTarget(key);
-    },
-    onDragLeave: () => setDropTarget((t) => (t === key ? null : t)),
-    onDrop: (e: React.DragEvent) => {
-      const id = e.dataTransfer.getData(PROJECT_DRAG_TYPE);
-      setDropTarget(null);
-      if (!id) return;
-      e.preventDefault();
-      onDropProject(id, folderId);
-    },
-  });
+    };
+    return {
+      'data-drop-target': key,
+      onDragEnter: accept,
+      onDragOver: accept,
+      onDragLeave: (e: React.DragEvent) => {
+        // Moving onto the row's own icon or label is not leaving it.
+        if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
+        setDropTarget((t) => (t === key ? null : t));
+      },
+      onDrop: (e: React.DragEvent) => {
+        const id = draggedProjectId(e.dataTransfer);
+        setDropTarget(null);
+        if (!id) return;
+        e.preventDefault();
+        if (droppedTimer.current) clearTimeout(droppedTimer.current);
+        setDropped(key);
+        droppedTimer.current = setTimeout(() => setDropped(null), 1600);
+        onDropProject(id, folderId);
+      },
+    };
+  };
 
   const nameInput = (indent: number, kind: FolderKind | null | undefined) => (
     <form
@@ -155,17 +178,21 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     </form>
   );
 
-  const row = (key: FolderSelection, label: string, icon: string, count: number | undefined, folderId: string | null, indent = 0) => {
+  // `droppable`: the row takes a drop itself. A folder row's drop sits on its wrapper,
+  // which holds the action icons too, so the drop is not taken twice.
+  const row = (key: FolderSelection, label: string, icon: string, count: number | undefined, folderId: string | null, indent = 0, droppable = key !== 'all') => {
     const active = selected === key;
     return (
       <button
         type="button"
         onClick={() => onSelect(key)}
         aria-current={active ? 'true' : undefined}
-        {...(key === 'all' ? {} : dropProps(String(key), folderId))}
+        {...(droppable ? dropProps(String(key), folderId) : {})}
         className={`flex w-full min-w-0 items-center gap-2 rounded-lg py-1.5 pe-2 text-start text-body transition-colors ${
-          dropTarget === key
+          dropTarget === key || dropped === key
             ? 'bg-[color-mix(in_srgb,var(--pm-primary)_16%,transparent)] text-[var(--on-surface)]'
+            : dragging && key !== 'all'
+            ? 'text-[var(--on-surface)] outline-dashed outline-1 -outline-offset-1 outline-[color-mix(in_srgb,var(--pm-primary)_35%,transparent)]'
             : active
             ? 'bg-[var(--surface-container-high)] font-medium text-[var(--on-surface)]'
             : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container)]'
@@ -187,9 +214,9 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         // The actions sit over the row's end while it is hovered or focused, so
         // at rest the name has the whole width (23 Oct pass: "Prod ..." for a
         // short name). On a touch screen, with no hover, they stay in the row.
-        <div className="group relative flex items-center">
-          <div className="min-w-0 flex-1">{row(f.id, f.name, f.kind && f.kind !== 'folder' ? KIND_ICON[f.kind] : selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
-          <div className="absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
+        <div className="group relative flex items-center" {...dropProps(f.id, f.id)}>
+          <div className="min-w-0 flex-1">{row(f.id, f.name, f.kind && f.kind !== 'folder' ? KIND_ICON[f.kind] : selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth, false)}</div>
+          <div className={`absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] [@media(hover:none)]:static [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent ${dragging ? '' : 'group-focus-within:flex group-hover:flex [@media(hover:none)]:flex'}`}>
             {f.depth + 1 < MAX_DEPTH && (
               <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id, folderKind: kindUnder(f, folders) })} aria-label={t(NEW_IN_KEY[kindUnder(f, folders) ?? 'folder']?.[0] ?? 'folders.newIn', { name: f.name })} title={t(NEW_IN_KEY[kindUnder(f, folders) ?? 'folder']?.[1] ?? 'folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
@@ -220,6 +247,11 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
 
   return (
     <nav aria-label={t('folders.label')} className="space-y-1">
+      {dragging && (
+        <p role="status" data-drop-hint className="rounded-lg bg-[color-mix(in_srgb,var(--pm-primary)_12%,transparent)] px-2 py-1.5 text-label text-[var(--on-surface)]">
+          {t('folders.dropHint', { name: dragging })}
+        </p>
+      )}
       {row('all', t('folders.all'), 'workspaces', total, null)}
       {row('unfiled', t('folders.unfiled'), 'inbox', counts[''] ?? 0, null)}
       <div className="flex items-center justify-between pt-4 pb-1 ps-2">

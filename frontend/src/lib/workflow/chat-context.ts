@@ -70,7 +70,40 @@ export function chatContentFor(
 }
 
 /** Go steps the chat is shown: enough to answer "why did it stop?". */
-const GO_STEPS_MAX = 12;
+export const GO_STEPS_MAX = 12;
+/**
+ * How much of a step's output the chat reads (17 Nov: a cut at 400 dropped "still being
+ * written when the wait ran out", and the chat misread the run).
+ */
+export const STEP_OUTPUT_SENT = 1_200;
+
+type ChatStep = NonNullable<ChatContext['go_run']>['steps'][number];
+
+/**
+ * One Go step as the chat reads it, live or from the record (26 Nov, Sean: "the side chat
+ * lags behind"). The record's copy cut each step to 400 characters with no stage, so the
+ * chat read less than the page did; one formatter now serves both. A step still running
+ * is sent too, as running, so the chat knows what Go is doing now.
+ */
+export function chatStep(
+  s: { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output?: string | null; stage_id?: string | null; params?: Record<string, unknown> | null; started_at?: string | null },
+  stageName: (stageId: string) => string | undefined,
+  now = Date.now()
+): ChatStep {
+  const stageId = String(s.params?.stage_id ?? '') || s.stage_id || '';
+  const stage = stageId ? stageName(stageId) : undefined;
+  const started = Date.parse(s.started_at ?? '');
+  const runningFor = s.status === 'running' && Number.isFinite(started) ? Math.max(0, Math.round((now - started) / 60_000)) : null;
+  return {
+    action: s.action_key,
+    status: s.status,
+    execution_label: s.execution_label,
+    block_kind: s.block_kind ?? null,
+    output: (s.output ?? '').slice(0, STEP_OUTPUT_SENT),
+    ...(stage ? { stage: stage.slice(0, 200) } : {}),
+    ...(runningFor !== null ? { running_minutes: runningFor } : {}),
+  };
+}
 const FILES_MAX = 40;
 /** Versions the chat is shown: the latest, which is what it is asked about. */
 const VERSIONS_MAX = 8;
@@ -102,8 +135,12 @@ export function buildChatContext(input: {
   /** The latest Go run and its steps, so the chat answers "why did it stop?" from the record. */
   goRun?: {
     run: { status: string; policy: string; stop_reason: string | null; questions?: readonly string[] } | null;
-    steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string; stage_id?: string; params?: Record<string, unknown> }[];
+    steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string; stage_id?: string; params?: Record<string, unknown>; started_at?: string | null }[];
     objective?: string;
+    /** What Go says it is doing now, as the page shows it ("4 of 12 sections written"). */
+    progress?: string | null;
+    /** The stage Go is working on now. */
+    currentStageId?: string | null;
   };
   /** The version on screen; the latest when not given. */
   shownVersionId?: string | null;
@@ -118,6 +155,10 @@ export function buildChatContext(input: {
   const versions = bundles[stage.id]?.versions ?? [];
   const shown = (shownVersionId && versions.find((v) => v.id === shownVersionId)) || versions.at(-1);
   const nameOf = display?.stageName ?? ((s: StageDefinition) => s.label);
+  const stageNameOf = (id: string) => {
+    const found = template.stages.find((x) => x.id === id);
+    return found ? nameOf(found) : undefined;
+  };
   const digest = buildStageDigest(template, state, project, bundles, stage.id);
   // A chapter stage's own text already is the manuscript; sending it twice
   // would double the cost of every message.
@@ -129,6 +170,9 @@ export function buildChatContext(input: {
     stage_instruction: (stage.entry_prompt_hint ?? '').slice(0, 4_000),
     workflow_label: display?.workflowName ?? template.name,
     workflow_stages: template.stages.map(nameOf),
+    // Every stage's status, not only this one's (26 Nov: the chat lagged behind what Go had finished
+    // while the user looked at an earlier stage).
+    workflow_stage_status: template.stages.map((s) => stageStatusLine(state.stages[s.id]).slice(0, 300)),
     prior_stages: digest.prior_stages,
     outline: stage.renderer === 'outline' ? '' : outlineOf(template, bundles),
     manuscript,
@@ -141,20 +185,10 @@ export function buildChatContext(input: {
           status: goRun.run.status,
           policy: goRun.run.policy,
           stop_reason: (goRun.run.stop_reason ?? '').slice(0, 2_000),
-          steps: goRun.steps
-            .filter((s) => s.status !== 'running')
-            .slice(-GO_STEPS_MAX)
-            .map((s) => ({
-              action: s.action_key,
-              status: s.status,
-              execution_label: s.execution_label,
-              block_kind: s.block_kind ?? null,
-              // Whole enough to read, and on which stage (17 Nov: a cut at 400 dropped
-              // "still being written when the wait ran out", and the chat misread the run).
-              output: s.output.slice(0, 1_200),
-              ...(s.stage_id ? { stage: nameOf(template.stages.find((x) => x.id === (String(s.params?.stage_id ?? '') || s.stage_id)) ?? stage).slice(0, 200) } : {}),
-            })),
+          steps: goRun.steps.slice(-GO_STEPS_MAX).map((s) => chatStep(s, stageNameOf)),
           objective: (goRun.objective ?? '').slice(0, 2_000),
+          ...(goRun.progress?.trim() ? { progress: goRun.progress.trim().slice(0, 600) } : {}),
+          ...(goRun.currentStageId && stageNameOf(goRun.currentStageId) ? { current_stage: stageNameOf(goRun.currentStageId)!.slice(0, 200) } : {}),
           ...(goRun.run.questions?.length ? { questions: goRun.run.questions.slice(0, 8).map((q) => q.slice(0, 600)) } : {}),
         }
       : null,

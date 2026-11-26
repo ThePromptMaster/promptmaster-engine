@@ -114,3 +114,57 @@ describe('Move to, from a project card', () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 });
+
+// 26 Nov, Sean: "It says you're allowed to drag the projects into the folders, but I don't think it's working."
+describe('dropping a project on a folder (26 Nov)', () => {
+  const transfer = (types: string[], data: Record<string, string> = {}) => ({
+    types,
+    getData: (k: string) => data[k] ?? '',
+    setData: () => undefined,
+    dropEffect: 'none',
+    effectAllowed: 'all',
+  });
+
+  it('takes a drop anywhere on the folder row, its action icons included, once', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const { PROJECT_DRAG_TYPE } = await import('@/lib/projects/project-drag');
+    const props = sidebar();
+    const rowWrapper = document.querySelector('[data-drop-target="b"]') as HTMLElement;
+    const icon = screen.getByRole('button', { name: 'Rename Acme' });
+    const dt = transfer([PROJECT_DRAG_TYPE], { [PROJECT_DRAG_TYPE]: 'p1' });
+    fireEvent.dragOver(icon, { dataTransfer: dt });
+    fireEvent.drop(icon, { dataTransfer: dt });
+    expect(rowWrapper.contains(icon)).toBe(true);
+    expect(props.onDropProject).toHaveBeenCalledTimes(1);
+    expect(props.onDropProject).toHaveBeenCalledWith('p1', 'b');
+  });
+
+  it('takes the drop when the browser hides the custom type during the drag', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const { beginProjectDrag, endProjectDrag } = await import('@/lib/projects/project-drag');
+    const props = sidebar();
+    beginProjectDrag(null, 'p2');
+    const dt = transfer(['text/uri-list']);
+    const unfiled = screen.getByRole('button', { name: /Unfiled/ });
+    const over = fireEvent.dragOver(unfiled, { dataTransfer: dt });
+    expect(over).toBe(false); // preventDefault: the drop is allowed
+    fireEvent.drop(unfiled, { dataTransfer: dt });
+    endProjectDrag();
+    expect(props.onDropProject).toHaveBeenCalledWith('p2', null);
+  });
+
+  it('refuses anything that is not a project card', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const props = sidebar();
+    const unfiled = screen.getByRole('button', { name: /Unfiled/ });
+    const over = fireEvent.dragOver(unfiled, { dataTransfer: transfer(['Files']) });
+    expect(over).toBe(true);
+    fireEvent.drop(unfiled, { dataTransfer: transfer(['Files']) });
+    expect(props.onDropProject).not.toHaveBeenCalled();
+  });
+
+  it('says where to drop while a card is dragged, and hides the folder actions', () => {
+    sidebar({ dragging: 'Board note' });
+    expect(screen.getByRole('status').textContent).toContain('Drop “Board note” on a folder');
+  });
+});

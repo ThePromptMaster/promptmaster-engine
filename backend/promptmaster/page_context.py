@@ -45,6 +45,8 @@ class GoStepTrace(BaseModel):
     output: str = Field(default="", max_length=1_200)
     #: The stage the step worked on (17 Nov: the chat called a manuscript repair "rechecking downstream stages").
     stage: str = Field(default="", max_length=200)
+    #: For the step still running, how long it has been going (26 Nov).
+    running_minutes: int | None = Field(default=None, ge=0)
 
 
 class GoRunTrace(BaseModel):
@@ -65,6 +67,23 @@ class GoRunTrace(BaseModel):
     moves: int | None = Field(default=None, ge=0)
     cost_usd: float | None = None
     last_activity_minutes: int | None = Field(default=None, ge=0)
+    #: What the tab driving Go says it is doing now, and on which stage (26 Nov, Sean:
+    #: "The side chat doesn't appear to keep up with the progress of the workspace").
+    progress: str = Field(default="", max_length=600)
+    current_stage: str = Field(default="", max_length=200)
+
+
+class ProjectCost(BaseModel):
+    """What the whole project has cost, read the way the page's cost line (the piggy
+    bank) reads it: every model call on the project, Go's runs, the side chat, drafting,
+    checks and chapters written in the background (26 Nov, Sean: "It reads the cost way
+    less than what the piggy bank says" — the chat was given one Go run's cost)."""
+
+    #: The sum over calls whose price was known; None when none was (never "free").
+    usd: float | None = None
+    calls: int = Field(default=0, ge=0)
+    #: Calls whose price was not known, so not in `usd`.
+    unpriced: int = Field(default=0, ge=0)
 
 
 class ChatAttachment(BaseModel):
@@ -109,6 +128,9 @@ class ChatContext(BaseModel):
     workflow_label: str = Field(default="", max_length=200)
     #: Stage labels in order; the current one is `stage_label`.
     workflow_stages: list[str] = Field(default_factory=list, max_length=40)
+    #: Each stage's status in words, in the same order (26 Nov: the chat lagged behind what Go
+    #: had finished while the user looked at an earlier stage).
+    workflow_stage_status: list[str] = Field(default_factory=list, max_length=40)
     prior_stages: list[StageDigestEntry] = Field(default_factory=list, max_length=40)
     #: The outline as readable lines ("1. Title — what it covers").
     outline: str = Field(default="", max_length=40_000)
@@ -120,6 +142,8 @@ class ChatContext(BaseModel):
     go_run: GoRunTrace | None = None
     #: False when the run record could not be read for this reply: then None says nothing.
     go_run_read: bool = True
+    #: What the whole project has cost so far; None when it could not be read.
+    project_cost: ProjectCost | None = None
     #: The files in the project's Data panel (5 Nov: the chat said there were none).
     files: list[ProjectFileBrief] = Field(default_factory=list, max_length=MAX_FILES_LISTED)
     #: The stage's status as the page shows it ("complete", "reopened: …", "stuck: …").
@@ -187,7 +211,7 @@ def _how_far(run: GoRunTrace) -> list[str]:
         return []
     said = [
         *([f"{run.moves} moves"] if run.moves is not None else []),
-        *([f"${run.cost_usd:.2f} so far"] if run.cost_usd is not None else []),
+        *([f"${run.cost_usd:.2f} spent by this run so far (only part of the project's cost)"] if run.cost_usd is not None else []),
         *([f"last activity {run.last_activity_minutes} minutes ago"] if run.last_activity_minutes is not None else []),
     ]
     lines = [f"Read from the run record just now: {'; '.join(said)}."] if said else []
@@ -207,6 +231,10 @@ def format_go_run(run: GoRunTrace | None, read: bool = True) -> str:
         return "GO: the run record could not be read for this reply. Say you cannot tell what Go has done; do not say it has not run."
     lines = [f"GO'S LATEST RUN: {run.status}" + (f" ({run.policy})" if run.policy else "")]
     lines += _how_far(run)
+    now = " ".join(run.progress.split())
+    if now or run.current_stage.strip():
+        where = f" on {run.current_stage.strip()}" if run.current_stage.strip() else ""
+        lines.append(f"What Go is doing this moment{where}: {now or 'working'}.")
     if run.stop_reason.strip():
         lines.append(f"Recorded stop reason: {run.stop_reason.strip()}")
     if run.objective.strip():
@@ -221,6 +249,10 @@ def format_go_run(run: GoRunTrace | None, read: bool = True) -> str:
             extra = f", blocked: {s.block_kind}" if s.block_kind else ""
             out = f" — {' '.join(s.output.split())[:900]}" if s.output.strip() else ""
             on = f" on {s.stage}" if s.stage.strip() else ""
+            if s.status == "running":
+                since = f" for {s.running_minutes} minutes" if s.running_minutes is not None else ""
+                lines.append(f"- {s.action}{on} [RUNNING NOW{since}; not finished, no result yet]{out}")
+                continue
             lines.append(f"- {s.action}{on} [{s.status}; {label}{extra}]{out}")
     lines.append(
         "When asked why Go stopped or what it did, answer from this record only. If the record does "
@@ -230,6 +262,36 @@ def format_go_run(run: GoRunTrace | None, read: bool = True) -> str:
 
 
 MADE_BY_WORDS = {"user": "you", "go": "Go", "chat": "the side chat", "system": "PromptMaster"}
+
+
+def _money(usd: float) -> str:
+    """Dollars as the page shows them (`shownCost`): small sums keep their digits."""
+    if usd <= 0:
+        return "$0.00"
+    if usd < 0.0001:
+        return "< $0.0001"
+    if usd < 0.01:
+        return f"${usd:.4f}"
+    return f"${usd:.2f}"
+
+
+def format_project_cost(cost: ProjectCost | None) -> str:
+    """The project's spend, as the cost line under the stage shows it, with the rule for
+    answering a question about cost. '' when it was not sent."""
+    if cost is None or cost.calls == 0:
+        return ""
+    if cost.usd is None:
+        figure = f"not known: none of its {cost.calls} model calls had a known price"
+    else:
+        figure = f"{_money(cost.usd)} over {cost.calls} model calls"
+        if cost.unpriced:
+            figure += f" ({cost.unpriced} more had no known price and are not in that figure)"
+    return (
+        f"SPENT ON THIS PROJECT SO FAR (the same figure as the cost line under the stage): {figure}.\n"
+        "Asked what the project, the work or PromptMaster has cost, answer with this figure. Go's run "
+        "figure is only the part one run spent: name it only as that part, never as the project's cost. "
+        "A call with no known price is unknown, never $0."
+    )
 
 
 def format_versions(versions: list[VersionTrace]) -> str:
@@ -306,6 +368,9 @@ def format_chat_context(ctx: ChatContext | None) -> str:
         here = ctx.stage_label
         marked = [f"[{s}]" if s == here else s for s in ctx.workflow_stages]
         lines.append(f"Workflow: {ctx.workflow_label or 'project'} — " + " › ".join(marked))
+        if len(ctx.workflow_stage_status) == len(ctx.workflow_stages):
+            lines.append("Every stage's status now (this outranks anything said earlier in the conversation):")
+            lines += [f"- {name}: {status}" for name, status in zip(ctx.workflow_stages, ctx.workflow_stage_status)]
     if ctx.stage_label:
         lines.append(f"Current stage: {ctx.stage_label}")
     if ctx.stage_status.strip():
@@ -335,7 +400,11 @@ def format_chat_context(ctx: ChatContext | None) -> str:
     files = format_files(ctx.files)
     if files:
         lines += ["", files]
-    lines += ["", format_go_run(ctx.go_run, ctx.go_run_read), "", WHAT_CHAT_CAN_CHANGE]
+    lines += ["", format_go_run(ctx.go_run, ctx.go_run_read)]
+    cost = format_project_cost(ctx.project_cost)
+    if cost:
+        lines += ["", cost]
+    lines += ["", WHAT_CHAT_CAN_CHANGE]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
     changes = format_changes(ctx.changes)
     if changes:

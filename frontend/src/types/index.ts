@@ -273,6 +273,8 @@ export interface ChatContext {
   stage_instruction: string;
   workflow_label: string;
   workflow_stages: string[];
+  /** Each stage's status in words, in the same order as `workflow_stages` (26 Nov). */
+  workflow_stage_status?: string[];
   prior_stages: StageDigestEntry[];
   outline: string;
   manuscript: string;
@@ -283,7 +285,7 @@ export interface ChatContext {
     status: string;
     policy: string;
     stop_reason: string;
-    steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string; stage?: string }[];
+    steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string; stage?: string; running_minutes?: number }[];
     objective: string;
     /** What Go is asking, one item per question (31 Oct). */
     questions?: string[];
@@ -292,7 +294,15 @@ export interface ChatContext {
     moves?: number;
     cost_usd?: number | null;
     last_activity_minutes?: number | null;
+    /** What Go says it is doing now, and on which stage, from the tab driving it (26 Nov). */
+    progress?: string;
+    current_stage?: string;
   } | null;
+  /**
+   * What the whole project has cost, read the way the piggy bank reads it (26 Nov, Sean:
+   * "It reads the cost way less than what the piggy bank says"). Null when it could not be read.
+   */
+  project_cost?: { usd: number | null; calls: number; unpriced: number } | null;
   /** False when the run record could not be read for this reply, so `go_run: null` does not mean no run. */
   go_run_read?: boolean;
   /** The files in the project's Data panel (5 Nov: the chat said there were none). */

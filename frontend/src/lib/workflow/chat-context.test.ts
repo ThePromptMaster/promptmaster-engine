@@ -83,6 +83,29 @@ describe('the side chat sees the project (3 Oct call)', () => {
     expect(ctx.go_run?.steps[0].output).toContain('still being written when the wait ran out');
   });
 
+  // 26 Nov, Sean: "The side chat doesn't appear to keep up with the progress of the workspace."
+  it("tells the chat what Go is doing now, and every stage's status, not only this one's", () => {
+    const ctx = buildChatContext({
+      template: BOOK_V1,
+      state: { ...state, stages: { ...state.stages, [BOOK_V1.stages[0].id]: { status: 'complete' } } } as never,
+      project: PROJECT, stage: stage('continuity'), bundles, controls: null,
+      goRun: {
+        run: { status: 'running', policy: 'autonomous', stop_reason: '' } as never,
+        steps: [
+          { action_key: 'evaluate_stage', status: 'succeeded', execution_label: null, output: 'Checked.', stage_id: 'continuity' },
+          { action_key: 'draft_sections', status: 'running', execution_label: null, output: '', stage_id: 'drafting', started_at: new Date(Date.now() - 4 * 60_000).toISOString() },
+        ],
+        progress: '4 of 12 sections written',
+        currentStageId: 'drafting',
+      },
+    });
+    expect(ctx.go_run?.steps).toHaveLength(2);
+    expect(ctx.go_run?.steps[1]).toMatchObject({ status: 'running', stage: stage('drafting').label, running_minutes: 4 });
+    expect(ctx.go_run).toMatchObject({ progress: '4 of 12 sections written', current_stage: stage('drafting').label });
+    expect(ctx.workflow_stage_status).toHaveLength(BOOK_V1.stages.length);
+    expect(ctx.workflow_stage_status?.[0]).toBe('complete');
+  });
+
   it('falls back to the Outline stage when nothing is drafted yet', () => {
     const json = JSON.stringify({ items: [{ id: 'a', title: 'Habitat', abstract: 'Where lions live' }] });
     const ctx = buildChatContext({

@@ -4138,6 +4138,10 @@ export function WorkflowWorkspace({
               // Built when a message is sent, not on every render: it carries the chapters.
               // It carries what changed since the chat's last reply too (31 Oct).
               nextMessageAttachments={forNextMessage}
+              stageName={(id) => {
+                const named = template.stages.find((x) => x.id === id);
+                return named ? stageText(locale, template.key, named, 'label') : undefined;
+              }}
               getChatContext={() => {
                 const built = buildChatContext({
                   template, state, project, stage, bundles: stageBundles, controls: pageControls,
@@ -4146,6 +4150,12 @@ export function WorkflowWorkspace({
                   goRun: {
                     run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null, questions: go.run.needs?.kind === 'answer_question' ? go.run.needs.questions : undefined } : null,
                     steps: go.steps,
+                    // What Go is doing this moment, so the chat keeps up with the page (26 Nov, Sean).
+                    progress: go.active ? go.progress : null,
+                    currentStageId: go.active ? (() => {
+                      const now = go.steps.find((s) => s.status === 'running');
+                      return now ? String(now.params?.stage_id ?? '') || now.stage_id : null;
+                    })() : null,
                     objective: objectiveAssessment
                       ? `${objectiveAssessment.outcome.replace('_', ' ')} — ${objectiveAssessment.reason}${objectiveAssessment.blockers.length ? ` Waiting for: ${objectiveAssessment.blockers.map((b) => b.need).join('; ')}.` : ''}`
                       : '',

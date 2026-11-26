@@ -155,6 +155,18 @@ export function takeOutsideCost(): { cost: number; unpriced: number } {
   return out;
 }
 
+/**
+ * Routes only the side chat calls. A message sent while Go was mid-step was tagged with
+ * Go's step and added to its run's cost (26 Nov, Sean: the chat's figure and the piggy
+ * bank's disagreed); the chat's calls are the user's own, whatever Go is doing.
+ */
+export const SIDE_CHAT_ROUTES: ReadonlySet<string> = new Set([
+  '/api/chat-message',
+  '/api/suggest-actions',
+  '/api/apply-to-answer',
+  '/api/save-as-new-version',
+]);
+
 export async function recordModelUsage(
   events: UsageEvent[],
   context: UsageWriteContext
@@ -163,8 +175,9 @@ export async function recordModelUsage(
 
   // Before the first await: the response that carried these events reaches its
   // caller right after this, and a Go step totals its cost when it finishes.
-  const op = currentOperation;
-  if (runMeter) {
+  const chat = SIDE_CHAT_ROUTES.has(context.route);
+  const op = chat ? null : currentOperation;
+  if (runMeter && !chat) {
     runMeter.calls += events.length;
     if (!op?.agentStepId) {
       for (const e of events) {

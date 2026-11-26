@@ -158,6 +158,8 @@ interface Props {
   changeAsRows?: boolean;
   /** Where the user is, sent with every question (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** A stage's name as the page shows it, for Go's recorded steps (26 Nov). */
+  stageName?: (stageId: string) => string | undefined;
   /** What was attached, until the next message carries it (5 Nov). */
   nextMessageAttachments?: { current: MessageAttachment[] };
   /** Questions offered before the user types, from the stage's state (3 Oct call). */
@@ -245,6 +247,7 @@ export function ChatPanel({
   isTable = false,
   changeAsRows = false,
   getChatContext,
+  stageName,
   nextMessageAttachments,
   starters = [],
   attach,
@@ -275,6 +278,7 @@ export function ChatPanel({
     appendStageVersion,
     restoreStageVersion,
     getChatContext,
+    stageName,
     nextMessageAttachments,
     onFactsChanged,
     onPatchSetup,

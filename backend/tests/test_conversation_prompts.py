@@ -5,7 +5,15 @@ from promptmaster.conversation import (
     build_chat_reply_prompt,
     build_save_as_new_version_prompt,
 )
-from promptmaster.page_context import ChatContext, GoRunTrace, format_chat_context, format_go_run
+from promptmaster.page_context import (
+    ChatContext,
+    GoRunTrace,
+    GoStepTrace,
+    ProjectCost,
+    format_chat_context,
+    format_go_run,
+    format_project_cost,
+)
 from promptmaster.schemas import ChatMessage
 
 
@@ -163,7 +171,10 @@ class TestChatReadsTheRunRecord:
     def test_says_how_far_along_it_is(self):
         run = GoRunTrace(status="blocked", policy="autonomous", from_record=True, moves=24, cost_usd=12.16, last_activity_minutes=3)
         said = format_go_run(run)
-        assert "Read from the run record just now: 24 moves; $12.16 so far; last activity 3 minutes ago." in said
+        assert (
+            "Read from the run record just now: 24 moves; $12.16 spent by this run so far "
+            "(only part of the project's cost); last activity 3 minutes ago."
+        ) in said
 
     def test_running_with_nothing_happening_is_not_said_to_be_working(self):
         said = format_go_run(GoRunTrace(status="running", from_record=True, last_activity_minutes=40))
@@ -179,6 +190,61 @@ class TestChatReadsTheRunRecord:
         said = format_go_run(None, read=False)
         assert "could not be read" in said and "do not say it has not run" in said
         assert "could not be read" in format_chat_context(ChatContext(stage_label="Final", go_run_read=False))
+
+
+class TestChatKeepsUpWithTheWorkspace:
+    """26 Nov, Sean: "The side chat doesn't appear to keep up with the progress of the
+    workspace. The side chat lags behind. It reads the cost way less than what the piggy
+    bank says." It was given one Go run's cost, and nothing of the step Go was on."""
+
+    def test_the_project_cost_is_the_piggy_banks_figure_and_is_how_cost_is_answered(self):
+        ctx = ChatContext(
+            stage_label="Chapters",
+            go_run=GoRunTrace(status="running", from_record=True, moves=6, cost_usd=1.01),
+            project_cost=ProjectCost(usd=41.27, calls=812, unpriced=3),
+        )
+        said = format_chat_context(ctx)
+        assert "SPENT ON THIS PROJECT SO FAR (the same figure as the cost line under the stage): $41.27 over 812 model calls (3 more had no known price" in said
+        assert "answer with this figure" in said
+        assert "never as the project's cost" in said
+        assert "$1.01 spent by this run so far (only part of the project's cost)" in said
+
+    def test_an_unknown_total_is_never_said_as_zero(self):
+        said = format_project_cost(ProjectCost(usd=None, calls=4, unpriced=4))
+        assert "not known" in said and "$0.00" not in said
+        assert format_project_cost(None) == "" and format_project_cost(ProjectCost(usd=0, calls=0)) == ""
+
+    def test_small_sums_keep_their_digits(self):
+        assert "$0.0042 over 2 model calls" in format_project_cost(ProjectCost(usd=0.0042, calls=2))
+
+    def test_the_step_running_now_and_what_go_is_doing(self):
+        run = GoRunTrace(
+            status="running",
+            progress="4 of 12 sections written",
+            current_stage="Chapters",
+            steps=[
+                GoStepTrace(action="evaluate_stage", status="succeeded", output="Checked."),
+                GoStepTrace(action="draft_sections", status="running", stage="Chapters", running_minutes=6),
+            ],
+        )
+        said = format_go_run(run)
+        assert "What Go is doing this moment on Chapters: 4 of 12 sections written." in said
+        assert "- draft_sections on Chapters [RUNNING NOW for 6 minutes; not finished, no result yet]" in said
+
+    def test_every_stages_status_is_given(self):
+        ctx = ChatContext(
+            stage_label="Outline",
+            workflow_label="Book",
+            workflow_stages=["Outline", "Chapters", "Review"],
+            workflow_stage_status=["complete", "complete", "in progress"],
+        )
+        said = format_chat_context(ctx)
+        assert "Every stage's status now" in said
+        assert "- Chapters: complete" in said and "- Review: in progress" in said
+
+    def test_statuses_that_do_not_line_up_are_left_out(self):
+        ctx = ChatContext(stage_label="Outline", workflow_stages=["Outline", "Chapters"], workflow_stage_status=["complete"])
+        assert "Every stage's status now" not in format_chat_context(ctx)
 
 
 class TestChatAttachments:
