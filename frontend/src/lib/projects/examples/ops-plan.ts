@@ -102,7 +102,7 @@ export const OPS_PLAN: Example = {
         kind: 'write',
         purpose: 'The note to the customer: the day their orders move to the new room, and what they need to do before it.',
         instruction:
-          'Write a short note to Bayview Grocers: the date their chilled orders move to the new room, and what they must do before then (update the delivery address on their orders, confirm a receiving contact). Give them that one date only: no delivery, installation or commissioning dates.',
+          'Write a short note to Bayview Grocers: the date their chilled orders move to the new room, and what they must do before then (confirm a receiving contact for that day; their delivery address does not change, since the room is in our existing warehouse). Give them that one date only: no delivery, installation or commissioning dates.',
         required: true,
         approval: 'I approve this commitment to send to Bayview Grocers',
         approval_kind: 'decision',
@@ -144,7 +144,7 @@ Harbor Crew Hire installs the units: 4 people for 6 working days, starting the f
 
 Coldline Services commissions the room: 2 working days, starting the first working day after installation ends, at $950 a day.
 
-Bayview Grocers, our largest chilled customer, moves its chilled orders to the new room on the first working day after commissioning.
+Bayview Grocers, our largest chilled customer, moves its chilled orders to the new room on the first working day after commissioning. The room is in our existing warehouse, so Bayview's delivery address does not change.
 
 The finance director approved a total of $55,000, contingency included.`,
   },

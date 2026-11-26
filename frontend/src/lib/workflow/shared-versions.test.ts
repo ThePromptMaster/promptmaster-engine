@@ -54,3 +54,13 @@ describe('which version people already received (25 Nov, Sean; L-289)', () => {
     expect(undoPayload({ recordId: 'r', versionId: 'v' })).toEqual({ undoes: 'r', version_id: 'v' });
   });
 });
+
+describe('a change line beside who has which version is the change itself (26 Nov production pass)', () => {
+  it('drops the notes kept out of the document, and clips a long line', async () => {
+    const { changeLine, CHANGE_LINE_MAX } = await import('./shared-versions');
+    const note = 'Repaired after a change: the switch date is now Tuesday, March 30, 2027. — Kept out of the document, for you: - **Your approval and the new date.** You approved the version that gave March 16.';
+    expect(changeLine(note)).toBe('Repaired after a change: the switch date is now Tuesday, March 30, 2027.');
+    expect(changeLine('x'.repeat(400)).length).toBe(CHANGE_LINE_MAX);
+    expect(changeLine(null)).toBe('');
+  });
+});
