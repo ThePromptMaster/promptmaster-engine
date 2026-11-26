@@ -37,6 +37,7 @@ export const hi: Record<keyof typeof en, string> = {
   "frules.nowRequired": "“{statement}” अब लागू नहीं: जिस डिफ़ॉल्ट को यह बदलता था, वह अब अनिवार्य है।",
   "frules.addLabel": "इस फ़ोल्डर की हर चीज़ के लिए एक तथ्य या आवश्यकता",
   "frules.addHint": "उदाहरण: रेफ़रेंस जाँच क्लाइंट करता है।",
+  "frules.addHintBlank": "उदाहरण: रिपोर्टें शुक्रवार तक क्षेत्रीय प्रबंधक को जाती हैं।",
   "frules.add": "जोड़ें",
   "frules.saving": "सहेजा जा रहा है…",
   "frules.documents": "दस्तावेज़",

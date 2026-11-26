@@ -37,6 +37,7 @@ export const sw: Record<keyof typeof en, string> = {
   "frules.nowRequired": "“{statement}” haitumiki tena: chaguo-msingi ililobadilisha sasa ni la lazima.",
   "frules.addLabel": "Ukweli au hitaji kwa kila kitu katika folda hii",
   "frules.addHint": "Kwa mfano: Mteja hushughulikia ukaguzi wa marejeo.",
+  "frules.addHintBlank": "Kwa mfano: Ripoti zinaenda kwa meneja wa kanda kabla ya Ijumaa.",
   "frules.add": "Ongeza",
   "frules.saving": "Inahifadhi…",
   "frules.documents": "Hati",

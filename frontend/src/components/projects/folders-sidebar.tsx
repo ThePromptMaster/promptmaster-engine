@@ -5,7 +5,7 @@ import { useT } from '@/lib/i18n/i18n-provider';
 
 import { FOLDER_NAME_MAX, MAX_FOLDER_DEPTH, flattenTree, folderTree, kindUnder, type FolderNode } from '@/lib/supabase/folders';
 import type { MessageKey } from '@/lib/i18n/messages/en';
-import type { FolderKind, ProjectFolder } from '@/types/project';
+import type { FolderKind, ProjectFolder, WorkspaceLayout } from '@/types/project';
 
 /** What the list shows: everything, the Unfiled projects, or one folder. */
 export type FolderSelection = 'all' | 'unfiled' | string;
@@ -31,8 +31,12 @@ interface Props {
   counts: Record<string, number>;
   selected: FolderSelection;
   onSelect: (selection: FolderSelection) => void;
-  /** `kind` is what the new folder stands for: a workspace at the top, and under one a client, then a search. */
-  onCreate: (name: string, parentId: string | null, kind: FolderKind | null) => Promise<void>;
+  /**
+   * `kind` is what the new folder stands for: a workspace at the top, and under one a
+   * client, then a search, or plain folders in a blank workspace; `layout` is a new
+   * workspace's template (26 Nov).
+   */
+  onCreate: (name: string, parentId: string | null, kind: FolderKind | null, layout?: WorkspaceLayout | null) => Promise<void>;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   /** A project dropped on a folder row (desktop), or on Unfiled (null). */
@@ -52,7 +56,11 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   const tree = flattenTree(folderTree(folders));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   // Which row is being named: a new folder (under a parent, or at the top), or a rename.
-  const [naming, setNaming] = useState<{ kind: 'new'; parentId: string | null; folderKind: FolderKind | null } | { kind: 'rename'; id: string } | null>(null);
+  const [naming, setNaming] = useState<
+    { kind: 'new'; parentId: string | null; folderKind: FolderKind | null; layout?: WorkspaceLayout } | { kind: 'rename'; id: string } | null
+  >(null);
+  // "New workspace" asks which kind first (26 Nov, Sean: Executive Search as a template "alongside a blank workspace").
+  const [choosingLayout, setChoosingLayout] = useState(false);
   const [name, setName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -79,7 +87,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     setBusy(true);
     setError(null);
     try {
-      if (naming.kind === 'new') await onCreate(name, naming.parentId, naming.folderKind);
+      if (naming.kind === 'new') await onCreate(name, naming.parentId, naming.folderKind, naming.layout ?? null);
       else await onRename(naming.id, name);
       setNaming(null);
     } catch (e) {
@@ -183,7 +191,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
           <div className="min-w-0 flex-1">{row(f.id, f.name, f.kind && f.kind !== 'folder' ? KIND_ICON[f.kind] : selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
           <div className="absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
-              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id, folderKind: kindUnder(f) })} aria-label={t(NEW_IN_KEY[kindUnder(f) ?? 'folder']?.[0] ?? 'folders.newIn', { name: f.name })} title={t(NEW_IN_KEY[kindUnder(f) ?? 'folder']?.[1] ?? 'folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id, folderKind: kindUnder(f, folders) })} aria-label={t(NEW_IN_KEY[kindUnder(f, folders) ?? 'folder']?.[0] ?? 'folders.newIn', { name: f.name })} title={t(NEW_IN_KEY[kindUnder(f, folders) ?? 'folder']?.[1] ?? 'folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
               </button>
             )}
@@ -234,12 +242,40 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
           client, and under a client a search, each with its own rules (24 Nov, Sean). */}
       <button
         type="button"
-        onClick={() => startNaming({ kind: 'new', parentId: null, folderKind: 'workspace' })}
+        data-new-workspace
+        aria-expanded={choosingLayout}
+        onClick={() => {
+          setNaming(null);
+          setChoosingLayout((open) => !open);
+        }}
         className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[16px]">add</span>
         {t('folders.newWorkspace')}
       </button>
+      {choosingLayout && (
+        <div role="group" aria-label={t('folders.layoutTitle')} data-workspace-layouts className="space-y-1 rounded-lg bg-[var(--surface-container)] p-2">
+          <p className="px-1 text-label text-[var(--on-surface-variant)]">{t('folders.layoutTitle')}</p>
+          {(['blank', 'executive_search'] as const).map((layout) => (
+            <button
+              key={layout}
+              type="button"
+              data-layout={layout}
+              onClick={() => {
+                setChoosingLayout(false);
+                startNaming({ kind: 'new', parentId: null, folderKind: 'workspace', layout });
+              }}
+              className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-start hover:bg-[var(--surface-container-high)]"
+            >
+              <span aria-hidden className="material-symbols-outlined mt-0.5 text-[18px] text-[var(--on-surface-variant)]">{layout === 'blank' ? 'folder' : 'person_search'}</span>
+              <span className="min-w-0">
+                <span className="block text-label font-semibold text-[var(--on-surface)]">{t(layout === 'blank' ? 'folders.layoutBlank' : 'folders.layoutSearch')}</span>
+                <span className="block text-label leading-snug text-[var(--on-surface-variant)]">{t(layout === 'blank' ? 'folders.layoutBlankHint' : 'folders.layoutSearchHint')}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {tree.length === 0 && naming === null && (
         <p className="px-2 text-label leading-snug text-[var(--on-surface-variant)]">
           {t('folders.emptyHint')}

@@ -274,6 +274,13 @@ export interface ReferenceSnapshot {
 /** What a folder stands for, used only in wording ("Apply exception to this search"). */
 export type FolderKind = 'workspace' | 'client' | 'search' | 'folder';
 
+/**
+ * How a workspace lays out its folders (Sean, 26 Nov): `blank`, folders the user
+ * names (by location, department, anything); `executive_search`, client › search.
+ * Wording only, like `kind`; what carries down never reads it.
+ */
+export type WorkspaceLayout = 'blank' | 'executive_search';
+
 export interface ProjectFolder {
   id: string;
   user_id: string;
@@ -282,6 +289,8 @@ export interface ProjectFolder {
   position: number;
   /** Null on folders made before kinds existed: read as a plain folder. */
   kind?: FolderKind | null;
+  /** On a workspace: its template. Null on one made before 26 Nov, read as executive search. */
+  layout?: WorkspaceLayout | null;
   created_at: string;
   updated_at: string;
 }

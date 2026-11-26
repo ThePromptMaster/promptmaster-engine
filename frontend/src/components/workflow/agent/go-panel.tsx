@@ -3,9 +3,6 @@
 import { levelFor } from '@/lib/agent/policy';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
-import { shownModeName } from '@/lib/i18n/stage';
-import { MODE_DISPLAY } from '@/lib/constants';
-import type { ModeType } from '@/types';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -605,16 +602,7 @@ export function GoPanel({
           {queue && showsQueue({ entries: queue.entries.length, active: go.active, pendingStep: Boolean(go.pendingStep), need: Boolean(need), canResume: canResume || Boolean(recorded) }) && (
             <QuestionQueue entries={queue.entries} offers={queue.offers} onAnswer={queue.onAnswer} />
           )}
-          {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
-            <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
-              <input
-                type="checkbox"
-                checked={stageModes.value === 'project'}
-                onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
-              />
-              {t('go.useMyMode', { mode: shownModeName(mode, MODE_DISPLAY[mode as ModeType]?.display_name ?? mode) })}
-            </label>
-          )}
+          {/* "Use my mode on every stage" was here; how PromptMaster thinks is now chosen on the stage itself (26 Nov). */}
           <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} choosing={choosesOnCard} left={leftForGo ? { forGo: leftForGo, forYou: queue?.entries.length ?? 0 } : undefined} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel

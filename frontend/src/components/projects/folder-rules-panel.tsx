@@ -20,12 +20,11 @@ import { api } from '@/lib/api/client';
 import { levelWords, type Inherited } from '@/lib/folders/inheritance';
 import { MismatchChoice } from '@/components/folders/mismatch-choice';
 import { FolderTemplates } from '@/components/folders/folder-templates';
-import type { FolderFact } from '@/types/project';
+import type { FolderFact, FolderKind, ProjectFolder, WorkspaceLayout } from '@/types/project';
 import { setFolderKind } from '@/lib/supabase/folders';
 import { folderKey } from '@/lib/folders/inputs-used';
 import { projectsNeedingAnotherLook } from '@/lib/supabase/folder-rules';
 import Link from 'next/link';
-import type { FolderKind, ProjectFolder } from '@/types/project';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { useLevelName } from '@/components/folders/level-name';
 
@@ -44,9 +43,12 @@ export function FolderRulesPanel({
   folder,
   onKindChanged,
   projects = [],
+  layout = null,
 }: {
   folder: ProjectFolder;
   onKindChanged: () => void;
+  /** The layout of the workspace it is in, for its example wording (26 Nov); null outside a workspace. */
+  layout?: WorkspaceLayout | null;
   /** The projects listed in this folder: those with work made under earlier rules are named (L-281). */
   projects?: readonly { id: string; title: string }[];
 }) {
@@ -318,7 +320,7 @@ export function FolderRulesPanel({
               <p key={i.id} className="mt-2 text-label text-[var(--on-surface-variant)]">{t('frules.nowRequired', { statement: i.statement })}</p>
             ))}
             <div className="mt-3 flex flex-col gap-2">
-              <textarea value={adding} rows={2} aria-label={t('frules.addLabel')} placeholder={t('frules.addHint')} className={field}
+              <textarea value={adding} rows={2} aria-label={t('frules.addLabel')} placeholder={t(layout === 'executive_search' ? 'frules.addHint' : 'frules.addHintBlank')} className={field}
                 onChange={(e) => setAdding(e.target.value.slice(0, 2_000))} />
               <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-1.5 text-label text-[var(--on-surface-variant)]">

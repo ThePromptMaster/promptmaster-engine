@@ -37,6 +37,7 @@ export const zh: Record<keyof typeof en, string> = {
   "frules.nowRequired": "“{statement}”已不再适用：它所替换的默认规则现在是必需的。",
   "frules.addLabel": "适用于此文件夹中所有内容的事实或要求",
   "frules.addHint": "例如：客户负责背景调查。",
+  "frules.addHintBlank": "例如：报告在周五前交给区域经理。",
   "frules.add": "添加",
   "frules.saving": "保存中…",
   "frules.documents": "文档",

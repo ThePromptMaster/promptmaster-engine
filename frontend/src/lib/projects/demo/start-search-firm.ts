@@ -25,7 +25,7 @@ import {
  * Nothing is drafted here. Returns the workspace folder and the project.
  */
 export async function startSearchFirmSample(userId: string, language?: string): Promise<{ workspaceId: string; projectId: string }> {
-  const ws = await createFolder(userId, SAMPLE_NAMES.workspace, null, 'workspace');
+  const ws = await createFolder(userId, SAMPLE_NAMES.workspace, null, 'workspace', 'executive_search');
   await addFolderFact(ws, { statement: SAMPLE_RULES.workspace });
 
   const client = await createFolder(userId, SAMPLE_NAMES.client, ws.id, 'client');

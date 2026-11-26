@@ -40,7 +40,7 @@ describe('the folders sidebar (client, 21 Oct, email 5)', () => {
     const props = sidebar();
     await userEvent.click(screen.getByRole('button', { name: 'New folder' }));
     await userEvent.type(screen.getByLabelText('Folder name'), 'Research{Enter}');
-    expect(props.onCreate).toHaveBeenCalledWith('Research', null, null);
+    expect(props.onCreate).toHaveBeenCalledWith('Research', null, null, null);
   });
 
   // 24 Nov, Sean: "how do I make the workspace folders?" Only the sample could.
@@ -51,16 +51,39 @@ describe('the folders sidebar (client, 21 Oct, email 5)', () => {
     ];
     const props = sidebar({ folders: tree, counts: {} });
     await userEvent.click(screen.getByRole('button', { name: 'New workspace' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Executive search/ }));
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Northgate{Enter}');
-    expect(props.onCreate).toHaveBeenLastCalledWith('Northgate', null, 'workspace');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Northgate', null, 'workspace', 'executive_search');
 
     await userEvent.click(screen.getByRole('button', { name: 'New client in Larchmere' }));
     await userEvent.type(screen.getByLabelText('Client name'), 'Acme{Enter}');
-    expect(props.onCreate).toHaveBeenLastCalledWith('Acme', 'w', 'client');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Acme', 'w', 'client', null);
 
     await userEvent.click(screen.getByRole('button', { name: 'New search in Quillfield' }));
     await userEvent.type(screen.getByLabelText('Search name'), 'CFO search{Enter}');
-    expect(props.onCreate).toHaveBeenLastCalledWith('CFO search', 'c', 'search');
+    expect(props.onCreate).toHaveBeenLastCalledWith('CFO search', 'c', 'search', null);
+  });
+
+  // 26 Nov, Sean: "a blank workspace with regular folders and subfolders … like location or department".
+  it('makes a blank workspace, with plain folders inside it at every level', async () => {
+    const tree: ProjectFolder[] = [
+      { ...folder('b', 'Harbor Foods'), kind: 'workspace', layout: 'blank' },
+      { ...folder('l', 'London', 'b'), kind: 'folder' },
+    ];
+    const props = sidebar({ folders: tree, counts: {} });
+    await userEvent.click(screen.getByRole('button', { name: 'New workspace' }));
+    expect(screen.getByRole('group', { name: 'What kind of workspace?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Blank workspace/ }));
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Retail{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Retail', null, 'workspace', 'blank');
+
+    await userEvent.click(screen.getByRole('button', { name: 'New folder in Harbor Foods' }));
+    await userEvent.type(screen.getByLabelText('Folder name'), 'Leeds{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Leeds', 'b', 'folder', null);
+
+    await userEvent.click(screen.getByRole('button', { name: 'New folder in London' }));
+    await userEvent.type(screen.getByLabelText('Folder name'), 'Finance{Enter}');
+    expect(props.onCreate).toHaveBeenLastCalledWith('Finance', 'l', 'folder', null);
   });
 
   it('asks before deleting, and says the projects are kept', async () => {
