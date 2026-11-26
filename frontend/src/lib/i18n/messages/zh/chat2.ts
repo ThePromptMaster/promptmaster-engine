@@ -2,6 +2,7 @@ import type { en } from '../areas/chat2';
 
 /** Chinese for `areas/chat2.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "bcn.restToCheck": "{after} 更新后将检查{names}；其余保持不变。",
   "slv.label": "自你上次访问以来",
   "slv.title": "自你上次访问以来（{when}）",
   "slv.titleAll": "本项目的所有改动",

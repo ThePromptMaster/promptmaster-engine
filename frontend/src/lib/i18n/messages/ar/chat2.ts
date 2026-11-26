@@ -2,6 +2,7 @@ import type { en } from '../areas/chat2';
 
 /** Arabic for `areas/chat2.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "bcn.restToCheck": "ستُراجَع {names} بعد تحديث {after}؛ وكل ما عدا ذلك قائم.",
   "slv.label": "منذ زيارتك الأخيرة",
   "slv.title": "منذ زيارتك الأخيرة ({when})",
   "slv.titleAll": "كل التغييرات في هذا المشروع",

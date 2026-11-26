@@ -1,5 +1,6 @@
 /** Around the side chat: reply actions, the apply preview, fact changes, tool results, the conflict question, pending and brief-change notices. */
 export const en = {
+  "bcn.restToCheck": "{names} will be checked once {after} is updated; everything else stands.",
   "slv.label": "Since your last visit",
   "slv.title": "Since your last visit ({when})",
   "slv.titleAll": "Every change in this project",
@@ -227,6 +228,7 @@ export const en = {
 type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
+  "bcn.restToCheck": "{names} se revisarán cuando {after} esté actualizado; todo lo demás sigue en pie.",
   "slv.label": "Desde tu última visita",
   "slv.title": "Desde tu última visita ({when})",
   "slv.titleAll": "Todos los cambios de este proyecto",
@@ -452,6 +454,7 @@ export const es: Keys = {
 };
 
 export const fr: Keys = {
+  "bcn.restToCheck": "{names} seront vérifiés une fois {after} mis à jour ; tout le reste tient.",
   "slv.label": "Depuis votre dernière visite",
   "slv.title": "Depuis votre dernière visite ({when})",
   "slv.titleAll": "Tous les changements de ce projet",
@@ -677,6 +680,7 @@ export const fr: Keys = {
 };
 
 export const pt: Keys = {
+  "bcn.restToCheck": "{names} serão verificados quando {after} for atualizado; todo o resto se mantém.",
   "slv.label": "Desde a sua última visita",
   "slv.title": "Desde a sua última visita ({when})",
   "slv.titleAll": "Todas as mudanças deste projeto",

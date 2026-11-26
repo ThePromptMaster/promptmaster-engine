@@ -178,6 +178,7 @@ export function BriefChangeNotice({
   const affected = (event.payload?.affected as { stage_id: string; reason: string }[] | undefined) ?? [];
   const names = stageIds.map(stageLabel);
   const list = listOf(names);
+  const toCheck = summary?.redoing.filter((r) => r.state === 'to_check') ?? [];
   // Only where something was computed: on a project with no calculations the
   // sentence would describe nothing (production, 6 Oct).
   const holds = event.payload?.calculations_hold !== false && event.payload?.kind === 'intent' && event.payload?.had_computed === true;
@@ -188,7 +189,8 @@ export function BriefChangeNotice({
         <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
         {t('bcn.fieldChange', { count: stageIds.length, field, names: list })}{' '}
         {holds ? `${t('bcn.holds')} ` : ''}
-        {t('bcn.rest')}
+        {/* 26 Nov (L-292): work after a stage still waiting is checked once it is updated, so not "everything else stands". */}
+        {toCheck.length ? t('bcn.restToCheck', { names: listOf(toCheck.map((r) => stageLabel(r.stageId))), after: stageLabel(toCheck[0].after ?? '') }) : t('bcn.rest')}
       </p>
       {partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel) && (
         <p className="mt-1 text-label text-[var(--on-surface)]">{partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel)}</p>

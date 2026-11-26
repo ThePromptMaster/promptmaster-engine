@@ -2,6 +2,7 @@ import type { en } from '../areas/chat2';
 
 /** Swahili for `areas/chat2.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "bcn.restToCheck": "{names} zitakaguliwa {after} ikishasasishwa; kila kitu kingine kinabaki.",
   "slv.label": "Tangu ulipotembelea mara ya mwisho",
   "slv.title": "Tangu ulipotembelea mara ya mwisho ({when})",
   "slv.titleAll": "Mabadiliko yote katika mradi huu",
