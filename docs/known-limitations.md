@@ -5588,3 +5588,51 @@ Limits:
 - The layout is wording only. It cannot be changed after the workspace is made, and the folders already inside keep
   their kinds.
 - The example placeholder in the exception form ("e.g. the client's HR director") is the same in both layouts.
+
+### L-288 — A sample where one date feeds several deliverables (2026-11-26)
+Sean, 25 Nov: "Say a supplier changes a delivery date after the plan has gone out. That might affect the staffing
+schedule and one customer commitment. Other parts of the plan are still good." The new example "Operations plan
+with a change midway" (`ops_plan`, `lib/projects/examples/ops-plan.ts`) is that case. An invented distributor
+opens a chilled room. The supplier's delivery date is its own fact, and six stages use it:
+- the Timeline works every date out from it;
+- the Staffing schedule opens with it;
+- the Budget holds no date;
+- the Customer commitment gives Bayview Grocers only the switch date, worked out from it;
+- the Operations plan's key-dates table quotes it.
+
+The demo change moves March 3, 2027 to March 17. That should play out as follows:
+- The Timeline, Staffing and Plan quote the date, so they reopen at once, each with the sentence that used it.
+- Saving the Timeline's update reopens the Budget and the Commitment. Each is then checked against that change: the
+  Budget should be kept and the Commitment redone.
+- Both the Commitment and the Plan are approvals the user gives to send something, so they come back to the user.
+
+Limits:
+- Finding the Commitment depends on one model call judging that it relied on the Timeline. Nothing in it quotes the
+  old date, so the text match cannot find it.
+- The Budget is reopened by position and checked, at the cost of one small call, rather than never reopened. A
+  change is followed by stage order, not by a map of what each stage used.
+
+### L-289 — Who already has which version (2026-11-26)
+Sean, 25 Nov: "The user should be able to see … which version people already received." Nothing recorded it. Now:
+- Every stage with a version offers "Sent v2 to someone? Record it". The form takes to whom, on which day, how and a
+  note, saved as a `version_shared` event (migration 20261213; only the user writes one).
+- After a document export, the stage the document came from offers the same form.
+- Once a newer version exists, the stage says "v1 went to Bayview Grocers on 26 Nov. Current is v2, changed
+  since:", followed by each later version's change note. It offers "Record v2 as sent" and "Keep v1 with them",
+  and the change summary lists it under Needs you. It is merged with a re-approval when the stage has one.
+- Finishing the project records each stage's version at that moment (`project_finalized.payload.versions`).
+
+Limits:
+- A record is the user's word. PromptMaster sends nothing and checks nothing.
+- The list of open work (`outstandingWork`) does not include a newer version that has not been sent. Only the stage
+  and the change summary say so.
+
+### L-292 — A stage that still states a replaced value is always rewritten, and work after one still waiting is not "usable" yet (2026-11-26)
+Two gaps found while designing L-288:
+- **Rewriting.** A repair saved on an earlier stage reopens every finished stage after it. Go then checks each one
+  against that earlier stage's change before rewriting it (`keptAfterCheck`). A stage the fact match had also
+  reopened could be closed by that check while it still stated the old date, because the check saw only the
+  earlier stage's diff. It is now always rewritten (`leftoverValues` on its text).
+- **The summary.** Right after a change, a finished stage after the first stage still waiting read "Still usable".
+  The first update reopens it to be checked. It now reads "will be checked once Timeline is updated", but not after
+  "Keep them as they are".

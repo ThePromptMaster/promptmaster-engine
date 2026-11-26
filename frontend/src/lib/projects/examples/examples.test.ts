@@ -84,7 +84,8 @@ describe('the examples', () => {
  * from the hand pass on production after the deploy, in the follow-up the same day,
  * which takes the key out of this list. Never filled with an invented result.
  */
-const AWAITING_FIRST_RUN = new Set<string>([]);
+// ops_plan (26 Nov): its result is recorded from the production walkthrough.
+const AWAITING_FIRST_RUN = new Set<string>(['ops_plan']);
 
 describe('what a real run produced (6 Nov, production)', () => {
   it.each(EXAMPLES.filter((e) => !AWAITING_FIRST_RUN.has(e.key)).map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
@@ -316,3 +317,69 @@ describe('vendor choice: a decision that changes halfway (L-277, 22 Nov, Sean)',
   });
 });
 
+
+describe('ops plan: one date several pieces of work rely on (L-288, 25 Nov, Sean)', () => {
+  const example = EXAMPLES.find((e) => e.key === 'ops_plan')!;
+  const template = exampleWorkflow(example, 'ops0000001');
+  const fact = (start: string) => example.facts!.find((f) => f.statement.startsWith(start))!.statement;
+  const DELIVERY = fact('Northwind Refrigeration delivers');
+
+  /** The next `n` working days (Monday to Friday) after `from`. */
+  const workingDaysAfter = (from: Date, n: number) => {
+    const out: Date[] = [];
+    const d = new Date(from);
+    while (out.length < n) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) out.push(new Date(d));
+    }
+    return out;
+  };
+  const plan = (delivery: Date) => {
+    const install = workingDaysAfter(delivery, 6);
+    const commission = workingDaysAfter(install.at(-1)!, 2);
+    const [moves] = workingDaysAfter(commission.at(-1)!, 1);
+    const day = (d: Date) => `${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+    return { install: [day(install[0]), day(install.at(-1)!)], commission: commission.map(day), moves: day(moves) };
+  };
+
+  it('the dates follow from the delivery date, and moving it two weeks moves every one of them', () => {
+    expect(new Date(Date.UTC(2027, 2, 3)).getUTCDay()).toBe(3); // Wednesday
+    expect(new Date(Date.UTC(2027, 2, 17)).getUTCDay()).toBe(3);
+    expect(plan(new Date(Date.UTC(2027, 2, 3)))).toEqual({ install: ['3-4', '3-11'], commission: ['3-12', '3-15'], moves: '3-16' });
+    expect(plan(new Date(Date.UTC(2027, 2, 17)))).toEqual({ install: ['3-18', '3-25'], commission: ['3-26', '3-29'], moves: '3-30' });
+    expect(example.prepared).not.toMatch(/March|\b2027\b/);
+    expect(example.project.context).not.toMatch(/March 3/);
+  });
+
+  it('the budget is within the cap and does not depend on the date', () => {
+    const units = 38_400;
+    const crew = 4 * 6 * 360;
+    const commissioning = 2 * 950;
+    const total = units + crew + commissioning;
+    expect([crew, commissioning, total, Math.round(total * 1.1)]).toEqual([8_640, 1_900, 48_940, 53_834]);
+    expect(Math.round(total * 1.1)).toBeLessThanOrEqual(55_000);
+    expect(DELIVERY).not.toMatch(/\$/);
+    expect(fact("Northwind Refrigeration's price")).not.toMatch(/March/);
+  });
+
+  it('a change to the date reopens what quotes it, and not the budget or the customer note', async () => {
+    const { stagesUsingFacts } = await import('@/lib/workflow/fact-dependencies');
+    const stages = [
+      { stage_id: 'delivery_timeline', label: 'Delivery timeline', text: 'Northwind delivers the units on Wednesday, March 3, 2027. Installation runs March 4 to March 11.' },
+      { stage_id: 'staffing_schedule', label: 'Staffing schedule', text: 'The units arrive on March 3; the crew of four starts on Thursday, March 4.' },
+      { stage_id: 'budget', label: 'Budget', text: 'Units $38,400. Crew 4 × 6 × $360 = $8,640. Commissioning 2 × $950 = $1,900. Total $48,940; with 10% contingency $53,834, within the $55,000 cap.' },
+      { stage_id: 'customer_commitment', label: 'Customer commitment', text: 'Your chilled orders move to our new room on Tuesday, March 16, 2027. Please update the delivery address on your orders by then.' },
+      { stage_id: 'operations_plan', label: 'Operations plan', text: '| Delivery | Wednesday, March 3, 2027 |\n| Customer switch | Tuesday, March 16, 2027 |' },
+    ];
+    expect(stagesUsingFacts([DELIVERY], stages).map((s) => s.stage_id)).toEqual(['delivery_timeline', 'staffing_schedule', 'operations_plan']);
+  });
+
+  it('the customer commitment and the plan are the user\'s to approve, never Go\'s', () => {
+    for (const id of ['customer_commitment', 'operations_plan']) {
+      const approval = template.stages.find((s) => s.id === id)!.exit_criteria.find((c) => c.check === 'manual')!;
+      expect(approval.authority).toBe('reserved');
+      expect(approval.label).toMatch(/to send to/);
+    }
+    expect(template.stages.map((s) => s.recommended_modes[0]?.mode)).toEqual(['architect', 'analyst', 'architect', 'analyst', 'clarity', 'clarity']);
+  });
+});

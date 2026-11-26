@@ -17,6 +17,7 @@
 import type { QueueItem } from '@/lib/agent/user-queue';
 import type { ChangeOutcome } from './change-outcomes';
 import { plainReason } from './plain-reason';
+import type { SentBehind } from './shared-versions';
 import { isDone, type WorkflowEvent, type WorkflowState, type WorkflowTemplate } from './types';
 
 export type KeptHow = 'checked' | 'by_you' | 'as_was';
@@ -24,15 +25,29 @@ export type KeptHow = 'checked' | 'by_you' | 'as_was';
 export interface ChangeSummary {
   /** Finished, and either untouched by the change or checked against it and kept. */
   usable: { stageId: string; kept?: KeptHow }[];
-  /** Reopened by the change: waiting for an update, being redone, or redone. */
-  redoing: { stageId: string; state: 'waiting' | 'open' | 'updated'; reason?: string; version?: number | null; by?: 'go' | 'you' | null }[];
+  /**
+   * Reopened by the change: waiting for an update, being redone, or redone; or, `to_check`,
+   * finished work after a stage still waiting, which its update will reopen to be checked
+   * (26 Nov, L-292: a customer commitment that relied on the delivery date read "Still
+   * usable" until the timeline before it was redone). `after` names that stage.
+   */
+  redoing: {
+    stageId: string;
+    state: 'waiting' | 'open' | 'updated' | 'to_check';
+    reason?: string;
+    version?: number | null;
+    by?: 'go' | 'you' | null;
+    after?: string;
+  }[];
   /** What only the user can settle, from the change point on. */
   needsYou: NeedsYouItem[];
 }
 
 export type NeedsYouItem =
   | { kind: 'decision'; stageId: string; choice: string; because: string; waitingOn: string[] }
-  | { kind: 'reapprove'; stageId: string; version: number; current: number }
+  | { kind: 'reapprove'; stageId: string; version: number; current: number; sent?: { to: string; version: number } }
+  /** Its readers have an older version than the current one (L-289): send it, or say they keep theirs. */
+  | { kind: 'resend'; stageId: string; to: string; version: number; current: number }
   | { kind: 'approval' | 'question'; stageId: string; text: string };
 
 export interface ChangeSummaryInput {
@@ -50,6 +65,8 @@ export interface ChangeSummaryInput {
   /** What waits on the user (`userQueue`). */
   queue: readonly QueueItem[];
   manualChecks: Record<string, boolean> | null | undefined;
+  /** Stages whose readers have an older version (`sentSuperseded`, L-289). */
+  sentBehind?: readonly SentBehind[];
 }
 
 interface SetAside {
@@ -100,12 +117,18 @@ export function changeSummary(input: ChangeSummaryInput): ChangeSummary {
 
   const usable: ChangeSummary['usable'] = [];
   const redoing: ChangeSummary['redoing'] = [];
+  // The first stage the change left waiting: saving its update reopens every finished
+  // stage after it to be checked, so none of those is usable yet.
+  const firstWaiting = keptAll ? undefined : order.find((id) => touched.has(id) && statusOf(id) === 'stale');
+  const firstWaitingAt = firstWaiting ? order.indexOf(firstWaiting) : -1;
   for (const id of order) {
     const status = statusOf(id);
     if (!status || status === 'not_started' || status === 'skipped') continue;
     if (asideStages.has(id)) continue;
     if (!touched.has(id)) {
-      if (isDone(status)) usable.push({ stageId: id });
+      if (isDone(status) && firstWaiting && order.indexOf(id) > firstWaitingAt && !keptByYou.has(id)) {
+        redoing.push({ stageId: id, state: 'to_check', after: firstWaiting });
+      } else if (isDone(status)) usable.push({ stageId: id });
       continue;
     }
     if (status === 'stale') {
@@ -131,9 +154,16 @@ export function changeSummary(input: ChangeSummaryInput): ChangeSummary {
     needsYou.push({ kind: 'decision', stageId: d.stageId, choice: d.choice, because: d.because, waitingOn });
   }
   const from = Math.min(...[...touched].map((id) => order.indexOf(id)).filter((i) => i >= 0), order.length);
+  const behindBy = new Map((input.sentBehind ?? []).map((b) => [b.stageId, b]));
   for (const [stageId, r] of Object.entries(reapprove)) {
     if (order.indexOf(stageId) < from) continue;
-    needsYou.push({ kind: 'reapprove', stageId, version: r.version, current: r.current });
+    const b = behindBy.get(stageId);
+    needsYou.push({ kind: 'reapprove', stageId, version: r.version, current: r.current, ...(b ? { sent: { to: b.sent.to, version: b.sent.versionNumber } } : {}) });
+  }
+  // Readers with an older version, where no re-approval already says so: the update is theirs to send.
+  for (const b of input.sentBehind ?? []) {
+    if (reapprove[b.stageId] || order.indexOf(b.stageId) < from) continue;
+    needsYou.push({ kind: 'resend', stageId: b.stageId, to: b.sent.to, version: b.sent.versionNumber, current: b.current });
   }
   const asideCriteria = new Set(aside.map((d) => d.criterionId));
   for (const q of queue) {

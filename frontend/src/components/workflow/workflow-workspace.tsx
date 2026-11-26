@@ -15,6 +15,8 @@ import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
 import { modeForStage, thinkingFor } from '@/lib/workflow/stage-mode';
+import { newRecordId, sentSuperseded, sharedPayload, sharedVersions, undoPayload } from '@/lib/workflow/shared-versions';
+import { SentRecord } from './sent-record';
 import { thinkingPatch, thinkingValue } from './thinking-select';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -72,6 +74,7 @@ import { TasksPanel } from './tasks-panel';
 import { ApplyPreview } from './apply-preview';
 import { useRecommendations } from './use-recommendations';
 import {
+  deliverableStage,
   availableTransitions,
   approvalPending,
   evaluateStage,
@@ -779,6 +782,30 @@ export function WorkflowWorkspace({
     [stage, stageBundles]
   );
   const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
+  // Which version people already received (26 Nov, L-289).
+  const sharedByStage = useMemo(() => sharedVersions(events ?? []), [events]);
+  const sentBehind = useMemo(
+    () =>
+      sentSuperseded({
+        events: events ?? [],
+        stageOrder: template.stages.map((st) => st.id),
+        versions: Object.fromEntries(Object.entries(stageBundles).map(([id, b]) => [id, b?.versions ?? []])),
+      }),
+    [events, template.stages, stageBundles]
+  );
+  // Each stage's version as the project is finished, kept on the finish (L-289).
+  const finishedVersions = useCallback(
+    () =>
+      Object.fromEntries(
+        template.stages.flatMap((st) => {
+          const v = stageBundles[st.id]?.versions.at(-1);
+          return v ? [[st.id, { id: v.id, number: v.version_number }]] : [];
+        })
+      ),
+    [template.stages, stageBundles]
+  );
+  // After an export: "Sent this? Record it", on the stage the document comes from.
+  const [askSentOn, setAskSentOn] = useState<string | null>(null);
   // 25 Oct (Sean: "It would help if the screen automatically brought the user
   // to newly generated content"): a new version on the stage on screen is
   // brought into view — not while the user is typing, and not on opening.
@@ -864,7 +891,7 @@ export function WorkflowWorkspace({
             type: 'project_finalized',
             stage_id: stage.id,
             reason: note || 'Finished early with what I had.',
-            payload: { early: true, caveats: caveats ?? [] },
+            payload: { early: true, caveats: caveats ?? [], versions: finishedVersions() },
           });
           recorded = true;
           setViewingStageId(null);
@@ -937,18 +964,20 @@ export function WorkflowWorkspace({
             reason: note,
             // What the deliverable scored against the objective when the user
             // finished, if they asked. The record of "finished" says how well.
-            ...(checked
-              ? {
-                  payload: {
+            payload: {
+              // Which version of each stage the finished work is (26 Nov, L-289).
+              versions: finishedVersions(),
+              ...(checked
+                ? {
                     objective_check: {
                       alignment: checked.alignment.score,
                       clarity: checked.clarity.score,
                       drift: checked.drift.score,
                       completeness: checked.completeness?.status ?? null,
                     },
-                  },
-                }
-              : {}),
+                  }
+                : {}),
+            },
           });
         }
 
@@ -983,7 +1012,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload, t]
+    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload, t, finishedVersions]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -2226,8 +2255,9 @@ export function WorkflowWorkspace({
       template, state, events: events ?? [], since: shown.since, touched: shown.touched, outcomes, reapprove,
       queue: project.status === 'finalized' ? [] : userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
       manualChecks: project.manual_checks,
+      sentBehind,
     });
-  }, [briefChange, settled, awaitedDecision, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow]);
+  }, [briefChange, settled, awaitedDecision, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow, sentBehind]);
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
@@ -3183,6 +3213,13 @@ export function WorkflowWorkspace({
               bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
             />
             <ExportMenu
+              onExported={() => {
+                // The document goes out from the stage that writes it: offer to record that it went.
+                const from = deliverableStage(template);
+                if (!from || !stageBundles[from.id]?.versions.length) return;
+                if (from.id !== stage.id) setViewingStageId(from.id === state.current_stage_id ? null : from.id);
+                setAskSentOn(from.id);
+              }}
               bundle={{
                 project,
                 template,
@@ -3229,6 +3266,25 @@ export function WorkflowWorkspace({
             hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
           <WebFoundNotice projectId={project.id} stageId={stage.id} />
+          <SentRecord
+            head={headVersion ? { id: headVersion.id, version_number: headVersion.version_number } : null}
+            records={sharedByStage[stage.id] ?? []}
+            behind={sentBehind.find((b) => b.stageId === stage.id) ?? null}
+            canRecord={Boolean(appendStageVersion)}
+            askOpen={askSentOn === stage.id}
+            onAsked={() => setAskSentOn(null)}
+            onRecord={async (input) => {
+              await appendEvent({
+                type: 'version_shared',
+                stage_id: stage.id,
+                actor: 'user',
+                payload: sharedPayload({ recordId: newRecordId(), ...input }),
+              });
+            }}
+            onUndo={async (record) => {
+              await appendEvent({ type: 'version_shared', stage_id: stage.id, actor: 'user', payload: undoPayload(record) });
+            }}
+          />
           <FinalCheckNote state={finalCheck} />
           {/* Sean, 26 Oct: the quick answer, taken into the full process in place. */}
           {isQuickAnswer(template) && isCurrent && project.status !== 'finalized' && headVersion?.content?.trim() && (
