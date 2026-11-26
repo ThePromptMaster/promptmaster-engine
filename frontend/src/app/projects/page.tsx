@@ -104,7 +104,8 @@ export default function ProjectsPage() {
   const [notice, setNotice] = useState<{ text: string; undo?: () => void } | null>(null);
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(null), 9000);
+    // Long enough to read and press Undo: at 9 s it had gone before the press (26 Nov pass).
+    const timer = setTimeout(() => setNotice(null), 15_000);
     return () => clearTimeout(timer);
   }, [notice]);
 
@@ -670,7 +671,15 @@ export default function ProjectsPage() {
           go looking for, not something that competes with the work. */}
       {projects !== null && <DeletedProjects onRestored={load} />}
       </div>
-      {notice && (
+      {/* Where to drop, while a card is dragged: over the page, so nothing moves under the pointer. */}
+      {dragging && (
+        <div role="status" data-drop-hint className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div className="max-w-[560px] rounded-xl bg-[var(--inverse-surface,#2e3133)] px-4 py-3 text-body text-[var(--inverse-on-surface,#eff1f3)] shadow-[0_8px_24px_-8px_rgba(25,28,30,0.45)]">
+            {t('folders.dropHint', { name: dragging.title })}
+          </div>
+        </div>
+      )}
+      {notice && !dragging && (
         <div role="status" data-move-notice className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <div className="flex max-w-[560px] items-center gap-3 rounded-xl bg-[var(--inverse-surface,#2e3133)] px-4 py-3 text-body text-[var(--inverse-on-surface,#eff1f3)] shadow-[0_8px_24px_-8px_rgba(25,28,30,0.45)]">
             <span aria-hidden className="material-symbols-outlined text-[18px]">drive_file_move</span>

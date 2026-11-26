@@ -163,8 +163,13 @@ describe('dropping a project on a folder (26 Nov)', () => {
     expect(props.onDropProject).not.toHaveBeenCalled();
   });
 
-  it('says where to drop while a card is dragged, and hides the folder actions', () => {
+  // 26 Nov pass: a hint above the rows pushed them down mid-drag, and a card aimed at one
+  // folder landed in the one above it.
+  it('adds nothing above the rows while a card is dragged, and hides the folder actions', () => {
     sidebar({ dragging: 'Board note' });
-    expect(screen.getByRole('status').textContent).toContain('Drop “Board note” on a folder');
+    expect(screen.queryByRole('status')).toBeNull();
+    const nav = screen.getByRole('navigation');
+    expect(nav.firstElementChild?.textContent).toMatch(/All projects/);
+    expect(screen.queryByRole('button', { name: 'Rename Acme' })?.parentElement?.className).not.toMatch(/group-hover:flex/);
   });
 });
