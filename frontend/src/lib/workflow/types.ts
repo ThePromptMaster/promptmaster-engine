@@ -32,13 +32,24 @@ export type StageGroup =
  * the same component with different columns, which is the sharpest evidence
  * that the engine is genuinely shared.
  */
-export type StageRenderer = 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess';
+export type StageRenderer = 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess' | 'outreach';
 
 /**
  * An Assess stage (25 Oct, client: screening pasted profiles in batches): the
  * user pastes items, each is judged against what the earlier stages
  * established, on a scale. Data, so a designed workflow carries its own.
  */
+/**
+ * An Outreach stage (Sean, 26 Nov: "PromptMaster email workflow from a rough list to sent
+ * messages"). One renderer, three parts, each data on the stage:
+ * - contacts: the imported list, what was filled in and from where, earlier contact;
+ * - message: the standard message with its variables, and an optional follow-up;
+ * - drafts: one email per contact, editable, previewed exactly as it goes out.
+ */
+export interface OutreachSpec {
+  part: 'contacts' | 'message' | 'drafts';
+}
+
 export interface AssessSpec {
   /** The scale offered before the first batch: a preset id (`lib/workflow/assess.ts`), or levels best first. */
   scale: string | { label: string; tone: 'good' | 'caution' | 'bad' | 'neutral'; meaning?: string }[];
@@ -160,6 +171,8 @@ export interface StageDefinition {
   transitions: StageTransitions;
   /** Present on `assess` stages. */
   assess?: AssessSpec;
+  /** Present on `outreach` stages: which part of an email campaign the stage holds (26 Nov). */
+  outreach?: OutreachSpec;
   /** Added while the project ran (`stage_added`), not part of the pinned template. */
   added?: boolean;
 }
@@ -264,6 +277,11 @@ export interface WorkflowTemplate {
    * user generates gets the same moves (3 Oct call).
    */
   inquiry?: boolean;
+  /**
+   * The start uses this workflow as it stands rather than designing one for the request
+   * (Outreach, 26 Nov): its stages hold data a designed workflow could not.
+   */
+  used_as_is?: boolean;
   /**
    * Whether the work ends after one pass or goes on, and what counts as done
    * (7 Oct; Sean, 6 Oct: "Reaching the final stage should not by itself mean

@@ -95,6 +95,28 @@ def _hits(words: str, *fields: Any) -> bool:
     return all(w in hay for w in wanted)
 
 
+# What the mock mailbox has sent (outreach, 26 Nov): two people written to before, and one
+# general inbox at a company, so a Sent-mail check has something to find.
+SENT = {
+    "s-jamie": {
+        "messageId": "s-jamie", "threadId": "t-jamie", "sender": MOCK_GMAIL_ADDRESS,
+        "to": "Jamie Park <jamie.park@northwind-holdings.example>", "subject": "A quick look at PromptMaster",
+        "messageTimestamp": _day(-30, 9),
+    },
+    "s-morgan": {
+        "messageId": "s-morgan", "threadId": "t-morgan", "sender": MOCK_GMAIL_ADDRESS,
+        "to": "morgan@harbourline-supply.example", "cc": "desk@harbourline-supply.example", "subject": "Following up",
+        "messageTimestamp": _day(-12, 14),
+    },
+}
+
+
+def _sent_matches(query: str, m: dict[str, Any]) -> bool:
+    terms = [t.strip().lower() for t in re.findall(r"to:\(([^)]*)\)", query)[0].split(" OR ")] if "to:(" in query else []
+    to = (m.get("to", "") + " " + m.get("cc", "")).lower()
+    return any(t and t in to for t in terms)
+
+
 def _mail_matches(query: str, m: dict[str, Any]) -> bool:
     senders = re.findall(r"from:\(([^)]*)\)", query)
     words = re.sub(r"from:\([^)]*\)|(?:after|before):\S+|-in:chats", " ", query)
@@ -189,6 +211,8 @@ def result(tool: str, arguments: dict[str, Any]) -> Any:
         return {"emailAddress": MOCK_GMAIL_ADDRESS, "messagesTotal": len(MESSAGES), "threadsTotal": len(MESSAGES), "historyId": "1"}
     if tool == "OUTLOOK_GET_PROFILE":
         return {"displayName": "You", "mail": MOCK_OUTLOOK_ADDRESS, "userPrincipalName": MOCK_OUTLOOK_ADDRESS}
+    if tool == "GMAIL_FETCH_EMAILS" and "in:sent" in str(arguments.get("query") or ""):
+        return {"messages": [m for m in SENT.values() if _sent_matches(str(arguments.get("query")), m)]}
     if tool == "GMAIL_FETCH_EMAILS":
         query = str(arguments.get("query") or "")
         return {"messages": [

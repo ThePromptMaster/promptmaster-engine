@@ -139,7 +139,12 @@ describe('renderers are workflow-agnostic', () => {
     // drafting, and the rule is that routing on `outline_stage` happens in the
     // workspace, on a field, never in a renderer, on a name.
     const dir = join(process.cwd(), 'src', 'components', 'workflow', 'renderers');
-    const files = readdirSync(dir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.'));
+    // The Outreach renderer's parts live in components/outreach (26 Nov): held to the same rule.
+    const outreachDir = join(process.cwd(), 'src', 'components', 'outreach');
+    const files = [
+      ...readdirSync(dir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.')).map((f) => join(dir, f)),
+      ...readdirSync(outreachDir).filter((f) => /\.tsx?$/.test(f) && !f.includes('.test.')).map((f) => join(outreachDir, f)),
+    ];
     expect(files.length).toBeGreaterThan(0);
 
     // What a branch would actually look like, rather than any mention of the
@@ -147,13 +152,13 @@ describe('renderers are workflow-agnostic', () => {
     // fields only the workspace is allowed to route on. A prose comment saying
     // "research claims" is not a branch.
     const banned: Array<[RegExp, string]> = [
-      [/['"`](book|research|single_output|exploration|assessment)['"`]/, 'a workflow key as a string literal'],
-      [/\b(BOOK_V1|RESEARCH_V1|SINGLE_OUTPUT_V1|EXPLORATION_V1|ASSESSMENT_V1|QUICK_V1)\b/, 'a template import'],
+      [/['"`](book|research|single_output|exploration|assessment|email_outreach)['"`]/, 'a workflow key as a string literal'],
+      [/\b(BOOK_V1|RESEARCH_V1|SINGLE_OUTPUT_V1|EXPLORATION_V1|ASSESSMENT_V1|QUICK_V1|EMAIL_OUTREACH_V1)\b/, 'a template import'],
       [/\b(template|workflow)\s*[.?]\s*(key|outline_stage|derived_outline)\b/, 'the workflow identity'],
     ];
 
     for (const file of files) {
-      const source = readFileSync(join(dir, file), 'utf8');
+      const source = readFileSync(file, 'utf8');
       for (const [pattern, what] of banned) {
         expect(source, `${file} branches on ${what}`).not.toMatch(pattern);
       }

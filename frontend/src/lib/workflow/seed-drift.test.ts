@@ -52,6 +52,7 @@ describe('generated seed matches the templates', () => {
             ...(template.derived_outline ? { derived_outline: template.derived_outline } : {}),
             ...(template.nouns ? { nouns: template.nouns } : {}),
             ...(template.inquiry ? { inquiry: true } : {}),
+            ...(template.used_as_is ? { used_as_is: true } : {}),
             stages: template.stages,
           })
         )

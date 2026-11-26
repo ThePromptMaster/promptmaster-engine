@@ -5751,3 +5751,48 @@ Limits:
 - The logo is a linked image, not embedded in the message: Composio's send tools take no inline images.
 - One sender per connected mailbox, and one connected Gmail and one Outlook per person (L-201).
 - Nothing is sent from Settings. Sending, and the approval that comes before it, are later entries.
+
+### L-304 — The Outreach workflow: contacts, the message and the drafts (2026-11-26)
+Sean, 26 Nov: "Let me paste a list, upload a CSV from Clay, or start with company names and websites. Keep the
+original data so I can see what came from the list and what PromptMaster added … Check the project history and, if
+I've connected the mailbox for that purpose, Sent mail … Save the standard message and let me edit individual
+drafts … Hold anything with an unresolved placeholder." A system workflow, `email_outreach` (Outreach brief →
+Contacts → Message → Drafts & send), with one new renderer, `outreach`, that draws each part from the stage's own
+data (`stage.outreach.part`):
+- **Contacts.**
+  - Paste a list with a header row, upload a CSV or Excel file, or give one company and website per line.
+  - Clay's column names are recognised, and the mapping is shown before anything is added.
+  - Every row keeps the line it came from, exactly (`given`). What PromptMaster added is listed apart, with the
+    source of each value.
+  - A repeated person (same address, Gmail dots and +tags ignored, or same name at the same company) is skipped and
+    points at the first row.
+  - Each row is checked against the person's own record of earlier contact and the do-not-contact list, both kept
+    per person and outside any project, so a new import or a deleted project never forgets them. When Gmail is
+    connected, Sent mail is checked too (`/api/outreach/sent-check`: dates, subjects and thread links, never text).
+    A person written to before waits for a decision; someone else at the same company is named on the row.
+  - A named address with a name is ready. A general inbox (info@), or an address with no name, needs the user. A row
+    with no address waits.
+  - "I already contacted them" records it; "Do not contact" adds the address to the list.
+- **Message.**
+  - "Write it for me" drafts the subject, body and an optional follow-up from the brief
+    (`/api/outreach/draft-message`).
+  - Only `{{first_name}}`, `{{company}}`, `{{personal_line}}`, `{{offer}}` and `{{link}}` survive. A link the user
+    never gave is removed, and so is a sign-off naming the sender.
+  - The offer and the link are values for the whole batch.
+- **Drafts.**
+  - "Make the emails" makes one per ready contact. When the contacts or the message change, it says how many emails
+    are new, changed or removed.
+  - An email the user edited keeps their words, and "Use the message again" undoes that.
+  - An email with anything left to fill in is held.
+  - Each opens to the exact email with every header, at desktop or phone width.
+
+Limits:
+- Not on the start screen yet (seeded with `listed = false`); approval and sending are the next entries.
+- Finding a person, an address and a detail for each company is not built yet. A row with no address waits for one
+  typed in.
+- The Sent-mail check is Gmail only, and reads at most 50 addresses and 20 companies at a time.
+- Two people with the same name at one company are read as one person; the second is shown as a duplicate the user
+  can bring back.
+- A reason on a row is stored in English; the known ones are shown translated.
+- Nested data on a row (the imported line, earlier contact, candidates) is kept as a JSON string, because a stage's
+  rows hold strings.

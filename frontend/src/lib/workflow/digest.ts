@@ -35,6 +35,7 @@ import type { StageItem } from './stage-artifact';
 import { carriesForward, isDone } from './types';
 import { supersededFactValues } from './facts';
 import { leftoverValues, type SupersededValue } from './fact-values';
+import { outreachText } from '@/lib/outreach/digest-text';
 
 /** Per-stage budget for a summary, used only where no saved text is sent. */
 export const SUMMARY_MAX = 320;
@@ -264,6 +265,8 @@ export function assessmentText(items: readonly StageItem[]): string {
  */
 export function documentText(stage: StageDefinition, content: string | null | undefined): string {
   if (!content?.trim() || stage.renderer === 'long_form') return '';
+  // An Outreach stage's data, read as text (26 Nov): never the raw rows.
+  if (stage.renderer === 'outreach') return outreachText(stage.outreach?.part, content);
   if (!rendererHoldsItems(stage.renderer)) return content.trim();
   const items = parseItems(content);
   if (!items) return content.trim();

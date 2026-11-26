@@ -72,7 +72,7 @@ import type {
   ToolkitSlug,
   toPicked,
 } from '@/lib/connections/items';
-import type { OutreachMailbox } from '@/types/outreach';
+import type { OutreachDraftedMessage, OutreachMailbox, OutreachSentCheck } from '@/types/outreach';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -728,6 +728,16 @@ export const api = {
   /** The connected Gmail and Outlook accounts that can send, each with the address it sends as (26 Nov). */
   outreachMailbox(): Promise<{ mailboxes: OutreachMailbox[] }> {
     return apiFetch('/api/outreach/mailbox');
+  },
+
+  /** Who the person's Gmail has already written to among these addresses and companies: dates, subjects, thread links (26 Nov). */
+  outreachSentCheck(req: { addresses: string[]; domains: string[] }): Promise<OutreachSentCheck> {
+    return apiFetch('/api/outreach/sent-check', { method: 'POST', body: JSON.stringify(req) });
+  },
+
+  /** The standard outreach message and its follow-up, from the brief (26 Nov). A writer: may search the web. */
+  draftOutreachMessage(req: { inputs: PMInput; brief: string; model?: string; web_access?: 'on' | 'off' }): Promise<OutreachDraftedMessage> {
+    return apiFetch('/api/outreach/draft-message', { method: 'POST', body: JSON.stringify(req) });
   },
 
   /** Composio's consent link for one account; the person approves on Google's or Microsoft's own screen. */

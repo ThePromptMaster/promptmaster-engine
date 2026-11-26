@@ -560,7 +560,7 @@ export interface StageDigestRequest {
 export interface StageDescriptorRequest {
   id: string;
   label: string;
-  renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess';
+  renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess' | 'outreach';
   entry_prompt_hint: string;
   artifact_kind: string;
   /**

@@ -17,6 +17,7 @@ interface TemplateRow {
     inquiry?: boolean;
     execution?: WorkflowTemplate['execution'];
     fixed_stages?: boolean;
+    used_as_is?: boolean;
     stages: StageDefinition[];
   };
 }
@@ -34,6 +35,7 @@ export function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } 
     ...(row.definition.inquiry ? { inquiry: true } : {}),
     ...(row.definition.execution ? { execution: row.definition.execution } : {}),
     ...(row.definition.fixed_stages ? { fixed_stages: true } : {}),
+    ...(row.definition.used_as_is ? { used_as_is: true } : {}),
     stages: row.definition.stages,
   };
 }
@@ -53,6 +55,7 @@ export function definitionOf(template: WorkflowTemplate): TemplateRow['definitio
     ...(template.inquiry ? { inquiry: true } : {}),
     ...(template.execution ? { execution: template.execution } : {}),
     ...(template.fixed_stages ? { fixed_stages: true } : {}),
+    ...(template.used_as_is ? { used_as_is: true } : {}),
     stages: template.stages,
   };
 }

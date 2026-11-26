@@ -32,7 +32,7 @@ import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { setRequestLanguage } from '@/lib/api/language';
 import { LANGUAGES, resolveLanguage, startLanguage, type LanguageCode } from '@/lib/workflow/languages';
-import { appendWorkflowEvent, listRemovedTemplates, listTemplates, publishUserTemplate, setTemplateRemoved } from '@/lib/supabase/workflow';
+import { appendWorkflowEvent, getLatestTemplate, listRemovedTemplates, listTemplates, publishUserTemplate, setTemplateRemoved } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
@@ -105,6 +105,13 @@ const DESIGN_BRIEF_MAX = 8_000;
  */
 function whyText(e: unknown): string {
   return e instanceof Error && e.message ? `: ${e.message.replace(/[.\s]+$/, '')}` : '';
+}
+
+/** The workflow key named in the address, if any (`?workflow=…`): only a key's own characters. */
+function askedWorkflowKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  const key = new URLSearchParams(window.location.search).get('workflow')?.trim() ?? '';
+  return /^[a-z][a-z0-9_]{1,60}$/.test(key) ? key : null;
 }
 
 export default function NewProjectPage() {
@@ -241,7 +248,11 @@ export default function NewProjectPage() {
   const loadTemplates = useCallback(() => {
     setLoadingTemplates(true);
     setTemplatesError(null);
-    listTemplates()
+    // A workflow named in the address (`?workflow=email_outreach`) is offered even before it is
+    // listed (26 Nov: Outreach ships over several releases and is tried this way first).
+    const asked = askedWorkflowKey();
+    Promise.all([listTemplates(), asked ? getLatestTemplate(asked).catch(() => null) : Promise.resolve(null)])
+      .then(([list, extra]) => [...list, ...(extra && !list.some((x) => x.key === extra.key) ? [extra] : [])])
       // A workflow designed for this project is not in the list yet: it stays.
       .then((list) => setTemplates((prior) => [...prior.filter((x) => x.id.startsWith(DESIGNED)), ...list]))
       .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : tr('start.loadWorkflowsFailed')))
@@ -556,7 +567,7 @@ export default function NewProjectPage() {
   }
 
   function chooseYourself() {
-    setTemplateId(templateFor('book')?.id ?? templates[0]?.id ?? null);
+    setTemplateId(templateFor(askedWorkflowKey() ?? 'book')?.id ?? templateFor('book')?.id ?? templates[0]?.id ?? null);
     setRecommendedKey(null);
     setWorkflowReason('');
     setRationale(null);

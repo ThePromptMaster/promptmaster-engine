@@ -71,7 +71,7 @@ export function pageChanges(before: PageSnapshot | null | undefined, now: PageSn
 /** Who made a version, in the words the chat uses. */
 export function madeBy(operation: string | null | undefined): 'user' | 'go' | 'chat' | 'system' {
   const op = operation ?? '';
-  if (op === 'stage_edit' || op === 'restore' || op === 'outline_edit') return 'user';
+  if (op === 'stage_edit' || op === 'restore' || op === 'outline_edit' || op === 'outreach_edit' || op === 'outreach_import') return 'user';
   if (op.startsWith('agent_')) return 'go';
   if (op.startsWith('chat_')) return 'chat';
   return 'system';

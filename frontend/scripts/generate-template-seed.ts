@@ -19,8 +19,15 @@ import { SINGLE_OUTPUT_V1 } from '../src/lib/workflow/templates/single-output.v1
 import { EXPLORATION_V1 } from '../src/lib/workflow/templates/exploration.v1.ts';
 import { ASSESSMENT_V1 } from '../src/lib/workflow/templates/assessment.v1.ts';
 import { QUICK_V1 } from '../src/lib/workflow/templates/quick.v1.ts';
+import { EMAIL_OUTREACH_V1 } from '../src/lib/workflow/templates/email-outreach.v1.ts';
 
-const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1, QUICK_V1];
+const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1, QUICK_V1, EMAIL_OUTREACH_V1];
+
+/**
+ * Seeded but not offered on the start screen yet (26 Nov): Outreach is built over several
+ * releases, and its sending arrives after its first. A later migration lists it.
+ */
+const UNLISTED = new Set(['email_outreach']);
 
 const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
@@ -35,9 +42,10 @@ const rows = TEMPLATES.map((t) => {
     ...(t.derived_outline ? { derived_outline: t.derived_outline } : {}),
     ...(t.nouns ? { nouns: t.nouns } : {}),
     ...(t.inquiry ? { inquiry: true } : {}),
+    ...(t.used_as_is ? { used_as_is: true } : {}),
     stages: t.stages,
   });
-  return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb)`;
+  return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb, ${UNLISTED.has(t.key) ? 'false' : 'true'})`;
 }).join(',\n');
 
 process.stdout.write(`-- GENERATED FILE — do not edit by hand.
@@ -48,11 +56,11 @@ process.stdout.write(`-- GENERATED FILE — do not edit by hand.
 -- into a NEW migration with a bumped version: published templates are
 -- immutable, because projects pin the version they started on.
 
-insert into public.workflow_templates (key, version, name, description, definition, status, is_system, published_at)
-select v.key, v.version, v.name, v.description, v.definition, 'published', true, now()
+insert into public.workflow_templates (key, version, name, description, definition, status, is_system, published_at, listed)
+select v.key, v.version, v.name, v.description, v.definition, 'published', true, now(), v.listed
 from (values
 ${rows}
-) as v(key, version, name, description, definition)
+) as v(key, version, name, description, definition, listed)
 on conflict (key, version) do nothing;
 
 -- Point migrated projects at the single_output template they were imported as.

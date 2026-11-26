@@ -70,3 +70,56 @@ export interface OutreachLogo {
   /** The public address a recipient's mail program loads it from. */
   url: string;
 }
+
+/** `POST /api/outreach/sent-check`. */
+export interface OutreachSentHit {
+  address: string;
+  on: string;
+  subject: string;
+  thread_url: string;
+}
+export interface OutreachSentCheck {
+  /** False when no Gmail is connected: nothing was searched. */
+  checked: boolean;
+  sent: OutreachSentHit[];
+  colleagues: (OutreachSentHit & { domain: string })[];
+}
+
+/** `POST /api/outreach/draft-message`, with the web fields every writer returns. */
+export interface OutreachDraftedMessage {
+  subject: string;
+  body: string;
+  followup_body: string;
+  offer: string;
+  link: string;
+  web_query?: string;
+  web_sources?: { url: string; title: string; excerpt: string }[];
+  web_note?: string;
+  model_used?: string;
+}
+
+/** One earlier touch on record (`outreach_history`). */
+export interface OutreachHistoryRow {
+  id: string;
+  address: string;
+  domain: string;
+  person_name: string;
+  company: string;
+  occurred_on: string | null;
+  channel: string;
+  source: 'manual' | 'mailbox' | 'promptmaster';
+  project_id: string | null;
+  subject: string;
+  thread_url: string;
+  note: string;
+}
+
+/** An address or a whole domain not to write to (`outreach_suppressions`). */
+export interface OutreachSuppression {
+  id: string;
+  address: string | null;
+  domain: string | null;
+  reason: 'opted_out' | 'bounced' | 'complained' | 'company_replied' | 'manual';
+  note: string;
+  created_at: string;
+}

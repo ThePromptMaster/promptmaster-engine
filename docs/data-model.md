@@ -329,3 +329,16 @@ Per user, owner-only under RLS. Nothing here is project data.
 Storage: bucket `email-logos`, **public** (a recipient's mail program loads the logo with no sign-in), 300 KB, PNG,
 JPEG or GIF. An upload is allowed only to a path the uploader registered in `outreach_logos` first. There is no
 update or delete policy.
+
+
+## Outreach email: who was contacted, and who must not be (26 Nov, migration `20261221000000_outreach_contacts.sql`)
+
+Per user, kept apart from any project, so deleting a project or importing the same list again never forgets them.
+
+| Table | What it holds | Writes |
+|---|---|---|
+| `outreach_history` | An earlier touch: `address`, `domain`, name, company, `occurred_on`, `channel`, `source` (`manual` the user's own record, `mailbox` what their Sent mail showed, `promptmaster` an email PromptMaster sent), `project_id` (no foreign key), subject, `thread_url` | The user inserts `manual` and `mailbox` rows; a row can only be retired (trigger) |
+| `outreach_suppressions` | An address or a whole domain not to write to, with `reason` (`opted_out`, `bounced`, `complained`, `company_replied`, `manual`) | The user inserts `manual` and `opted_out`; only `lifted_at` may change, and an opt-out or complaint can never be lifted (trigger) |
+
+The Outreach workflow's stage data lives in its stage versions like any stage's: Contacts and Drafts as `stage_items`
+documents (`lib/outreach/contacts.ts`, `drafts.ts`), the Message as `{kind:'outreach_message', …}`.
