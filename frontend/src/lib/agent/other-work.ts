@@ -11,7 +11,12 @@
  */
 import type { OutstandingItem } from '@/lib/workflow/engine';
 
-const GO_CAN_DO: ReadonlySet<OutstandingItem['kind']> = new Set(['stale_stage', 'check_says']);
+export const GO_CAN_DO: ReadonlySet<OutstandingItem['kind']> = new Set(['stale_stage', 'check_says']);
+
+/** Whether everything still open is work Go does itself: no item waits on the user (26 Nov). */
+export function onlyGoWorkLeft(open: readonly OutstandingItem[]): boolean {
+  return open.length > 0 && open.every((i) => GO_CAN_DO.has(i.kind));
+}
 
 export function otherWorkFor(outstanding: readonly OutstandingItem[], stageId: string): boolean {
   return outstanding.some((i) => 'stageId' in i && i.stageId !== stageId && GO_CAN_DO.has(i.kind));

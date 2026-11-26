@@ -120,3 +120,39 @@ describe('moving on is written once (15 Nov, three "moved on" events for Email)'
     expect(await waitForStageChange(() => 'email', 'email', 300)).toBe(false);
   });
 });
+
+describe('only rechecks Go does itself are open: under "handle them for me" it carries on (26 Nov, ops plan pass)', () => {
+  const last = T.stages.at(-1)!;
+  const middle = T.stages[2];
+  function done(policy: 'autonomous' | 'checkpoint', routine: 'handle' | 'ask', recent: unknown[] = []) {
+    const c = ctx(policy, routine);
+    c.stage = last;
+    c.deliverableDone = true;
+    c.state = {
+      current_stage_id: last.id,
+      stages: Object.fromEntries(T.stages.map((s) => [s.id, s.id === middle.id
+        ? { status: 'stale', stale: { reason: 'The work went back to Budget after this stage used it.', since: '2026-11-26T23:00:00Z', was: 'completed_with_artifact' } }
+        : { status: 'completed_with_artifact' }])),
+    } as never;
+    c.context = { ...c.context, artifactNonEmpty: Object.fromEntries(T.stages.map((s) => [s.id, true])), manualChecks: Object.fromEntries(T.stages.flatMap((s) => s.exit_criteria.filter((x) => x.check === 'manual').map((x) => [x.id, true]))) } as never;
+    c.digest = { recent_steps: recent } as never;
+    return c;
+  }
+
+  it('says what is open and goes on to it, rather than asking whether to carry on', async () => {
+    const out = await performStep(done('autonomous', 'handle'));
+    expect(out.stop).toBeUndefined();
+    expect(out.output).toMatch(/needs a recheck.*It is all work I do myself, so I carry on with it/);
+  });
+
+  it('a second time straight after, it stops as before', async () => {
+    const recent = [{ action_key: 'declare_objective_complete', status: 'succeeded', execution_label: null, output: 'The deliverable is written, but the work is not finished: x.' }];
+    const out = await performStep(done('autonomous', 'handle', recent));
+    expect(out.needs).toMatchObject({ kind: 'objective_check', finding: 'work_open' });
+  });
+
+  it('under "ask me" it stops as before', async () => {
+    const out = await performStep(done('autonomous', 'ask'));
+    expect(out.needs).toMatchObject({ kind: 'objective_check', finding: 'work_open' });
+  });
+});

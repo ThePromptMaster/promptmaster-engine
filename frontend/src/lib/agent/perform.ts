@@ -11,6 +11,7 @@
 import { mismatchOutstanding } from '@/lib/folders/holds';
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { assessKey, claimAssess, releaseAssess, reportAssess, whenAssessFree } from '@/lib/workflow/assess-lock';
+import { onlyGoWorkLeft } from './other-work';
 import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
@@ -2487,6 +2488,19 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (ctx.deliverableDone && open.length > 0) {
         const list = open.map(describeOutstanding).join('; ');
         const reason = `The deliverable is written, but the work is not finished: ${list}.`;
+        // 26 Nov, production pass (ops plan, after the crew rate changed): under "Handle them
+        // for me" the run stopped to ask "Carry on with the open work?" when all that was open
+        // was two rechecks Go does itself. Routine work is not the user's to start; it is said,
+        // and the run goes on to it.
+        // Once: the same check again straight after means carrying on did not reach the work.
+        const last = ctx.digest?.recent_steps?.at(-1);
+        const triedOnce = last?.action_key === 'declare_objective_complete' && (last.output ?? '').startsWith('The deliverable is written, but the work is not finished');
+        if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle' && onlyGoWorkLeft(open) && !triedOnce) {
+          return done(key, {
+            status: 'succeeded', toolsUsed: [], changes: {},
+            output: `${reason} It is all work I do myself, so I carry on with it under your routine-decision policy before calling the objective met.`,
+          });
+        }
         return done(key, {
           status: 'succeeded', toolsUsed: [], changes: {},
           output: `${reason} I will not call the objective met while any of it is open.`,
