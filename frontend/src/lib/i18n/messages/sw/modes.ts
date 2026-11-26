@@ -2,6 +2,19 @@ import type { en } from '../areas/modes';
 
 /** Swahili for `areas/modes.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "think.auto": "Acha PromptMaster ichague kwa kila hatua (inapendekezwa)",
+  "think.everyGroup": "Au fikiri kwa njia moja katika kila hatua",
+  "think.customOption": "Haiba yako mwenyewe",
+  "think.autoHint": "Kila hatua inafanywa kwa njia inayoifaa. Hatua isiyo na njia yake inatumia {mode}.",
+  "think.preview": "Katika mtiririko huu: {list}",
+  "think.step": "Inafikiri kama {mode}, imechaguliwa kwa hatua hii",
+  "think.stepWhy": "Inafikiri kama {mode}, imechaguliwa kwa hatua hii: {reason}",
+  "think.yours": "Inafikiri kama {mode}, chaguo lako kwa kila hatua",
+  "think.default": "Inafikiri kama {mode}, chaguo-msingi la mradi",
+  "think.custom": "Inafikiri kwa haiba yako mwenyewe",
+  "think.change": "Badilisha",
+  "think.label": "Jinsi PromptMaster inavyofikiri",
+  "think.done": "Imekamilika",
   'mode.architect': 'Msanifu',
   'mode.critic': 'Mkosoaji',
   'mode.clarity': 'Uwazi',

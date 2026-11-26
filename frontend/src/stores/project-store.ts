@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
 import { readInherited, type InheritedSource } from '@/lib/supabase/folder-rules';
@@ -812,7 +813,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     // What the user removed stays out of every version the user did not write
     // themselves (28 Oct, HarborDesk: a removed sentence came back). Here, the
     // one place every stage version is saved, so no path can bring it back.
-    const version = withoutModelSourcesList(keptOut(get().stages, rawVersion));
+    const kept = withoutModelSourcesList(keptOut(get().stages, rawVersion));
+    // The version records the mode the stage is worked in (26 Nov): callers passed
+    // the project's, which was wrong whenever PromptMaster chose per step. A stage
+    // the pinned template does not hold (one added while running) keeps the caller's.
+    const { project: owner, template: pinned } = get();
+    const ofStage = pinned?.stages.find((s) => s.id === stageId);
+    const version = owner && ofStage ? { ...kept, mode: modeForStage(owner, ofStage) } : kept;
     // Read the artifact back out of the store rather than reusing the one
     // above: version_count and revision move with every append, and a stale
     // copy would write version 2 twice.

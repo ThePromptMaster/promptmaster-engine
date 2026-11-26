@@ -2,6 +2,19 @@ import type { en } from '../areas/modes';
 
 /** Arabic for `areas/modes.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "think.auto": "دع PromptMaster يختار لكل خطوة (موصى به)",
+  "think.everyGroup": "أو فكّر بطريقة واحدة في كل خطوة",
+  "think.customOption": "شخصيتك الخاصة",
+  "think.autoHint": "تُعالَج كل خطوة بالطريقة التي تناسبها. والخطوة التي ليست لها طريقة خاصة تستخدم {mode}.",
+  "think.preview": "في سير العمل هذا: {list}",
+  "think.step": "يفكر بأسلوب {mode}، اختير لهذه الخطوة",
+  "think.stepWhy": "يفكر بأسلوب {mode}، اختير لهذه الخطوة: {reason}",
+  "think.yours": "يفكر بأسلوب {mode}، اختيارك لكل خطوة",
+  "think.default": "يفكر بأسلوب {mode}، الافتراضي للمشروع",
+  "think.custom": "يفكر بشخصيتك الخاصة",
+  "think.change": "تغيير",
+  "think.label": "كيف يفكر PromptMaster",
+  "think.done": "تم",
   'mode.architect': 'المعماري',
   'mode.critic': 'الناقد',
   'mode.clarity': 'الوضوح',

@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .limits import MAX_INSTRUCTION_CHARS
 from .llm_client import OpenRouterClient
+from .modes import MODES
 from .self_model import PROMPTMASTER_SELF_MODEL
 
 MIN_STAGES = 3
@@ -57,6 +58,17 @@ SCALES = ("traffic", "score5", "pass_fail", "grade", "fit")
 MAX_SCALE_LEVELS = 7
 
 
+#: The modes a design may give a stage: every mode but the user's own persona.
+THINKING_MODES = tuple(k for k in MODES if k != "custom")
+#: `validate.ts` refuses a longer reason, and a refused design is dropped whole.
+MODE_REASON_MAX = 80
+
+
+def thinking_mode(value: object) -> str:
+    said = re.sub(r"[\s-]+", "_", str(value or "").strip().lower())
+    return said if said in THINKING_MODES else ""
+
+
 class DesignedStage(BaseModel):
     label: str = Field(max_length=60)
     short_label: str = Field(max_length=24)
@@ -83,6 +95,23 @@ class DesignedStage(BaseModel):
     scale_levels: list[str] = Field(default_factory=list, max_length=MAX_SCALE_LEVELS)
     #: Assess stages: what is pasted, plural ("profiles").
     item_noun: str = Field(default="", max_length=40)
+    #: How PromptMaster thinks on this stage (26 Nov, Sean: "an option to choose
+    #: what way to think or have PromptMaster whatever it thinks best"): one of
+    #: the modes, or "" when the design gave none. Anything else is blanked, not
+    #: refused, so one stage cannot spoil a revision (`thinking_mode`).
+    mode: str = Field(default="", max_length=20)
+    #: Why that mode, in a few words, shown beside it.
+    mode_reason: str = Field(default="", max_length=MODE_REASON_MAX)
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _known_mode(cls, value: object) -> str:
+        return thinking_mode(value)
+
+    @field_validator("mode_reason", mode="before")
+    @classmethod
+    def _short_reason(cls, value: object) -> str:
+        return _clip(value, MODE_REASON_MAX)
 
 
 class Execution(BaseModel):
@@ -185,6 +214,15 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "otherwise say what the work must contain and leave its structure to the writer — a "
         "check enforces what an instruction names\n"
         "- required: false only for a stage an expert would often skip\n"
+        # 26 Nov (Sean): "have PromptMaster whatever it thinks best". The stage is worked in
+        # this mode unless the user picks one way of thinking for every step.
+        "- mode: how PromptMaster should think on this stage, one of "
+        + ", ".join(f'"{k}" ({MODES[k]["tagline"].lower()})' for k in THINKING_MODES)
+        + ". A stage that checks or challenges work is \"critic\" (\"cold_critic\" when the user wants it "
+        "blunt); one that weighs evidence, figures or options is \"analyst\"; one that plans or structures "
+        "is \"architect\"; one that writes the finished work for its reader is \"clarity\". Use \"coach\" or "
+        "\"therapist\" only when the work itself is personal. And mode_reason: why, in under ten words "
+        "(\"It checks the draft against the brief\")\n"
         "- approval: the user's sign-off in the first person (\"I approve this angle\"), "
         "or \"\" when none is needed. On a check stage it is about what the check concludes, "
         "never \"I have accepted or rejected each finding\" — every finding having a decision "
@@ -266,7 +304,8 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         'finished thing, e.g. article", "inquiry": false, "stages": [{"label": "...", '
         '"short_label": "...", "kind": "write|list|check|assess|chapters", "purpose": "...", '
         '"instruction": "...", "required": true, "approval": "", "approval_kind": "decision", '
-        '"decision": "", "loop_back_to": "", "scale": "", "scale_levels": [], "item_noun": ""}], "execution": {"kind": "finite|ongoing", '
+        '"decision": "", "loop_back_to": "", "scale": "", "scale_levels": [], "item_noun": "", "mode": "", "mode_reason": ""}], '
+        '"execution": {"kind": "finite|ongoing", '
         '"success_criterion": "...", "stop_conditions": ["..."]}}'
     )
     return _SYSTEM, user
@@ -319,6 +358,8 @@ def parse_workflow(result: object) -> DesignedWorkflow:
                 approval_kind="routine" if str(raw.get("approval_kind") or "").strip().lower() == "routine" else "decision",
                 decision=_clip(raw.get("decision"), 120),
                 loop_back_to=_clip(raw.get("loop_back_to"), 60),
+                mode=raw.get("mode"),
+                mode_reason=raw.get("mode_reason"),
                 **(_assess_fields(raw) if kind == "assess" else {}),
             )
         )
@@ -442,6 +483,8 @@ def finalise_stage(after: str) -> DesignedStage:
         required=True,
         approval="I approve the finished deliverables.",
         approval_kind="decision",
+        mode="clarity",
+        mode_reason="It writes the finished work for its reader",
     )
 
 

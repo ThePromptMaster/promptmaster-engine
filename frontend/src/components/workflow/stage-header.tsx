@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { MODE_DISPLAY } from '@/lib/constants';
 import { shownModeName } from '@/lib/i18n/stage';
 import type { StageDefinition, StageStatus } from '@/lib/workflow/types';
+import type { Thinking } from '@/lib/workflow/stage-mode';
+import { ThinkingSelect } from './thinking-select';
 
 const STATUS_LABEL: Partial<Record<StageStatus, MessageKey>> = {
   complete: 'stageHead.complete',
@@ -36,11 +38,28 @@ interface Props {
    */
   approvalPending?: boolean;
   hasDraft?: boolean;
+  /** How this stage is worked, and where that came from (26 Nov). */
+  thinking?: Thinking;
+  /** The select's value for the project: 'auto' when PromptMaster chooses. */
+  thinkingChoice?: string;
+  /** Change how PromptMaster thinks; only on the current stage. */
+  onPickThinking?: (value: string) => void;
 }
 
-export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true, approvalPending = false, hasDraft = false }: Props) {
+export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true, approvalPending = false, hasDraft = false, thinking, thinkingChoice, onPickThinking }: Props) {
   const t = useT();
   const [showGuidance, setShowGuidance] = useState(true);
+  const [changingThinking, setChangingThinking] = useState(false);
+  const modeName = thinking ? shownModeName(thinking.mode, MODE_DISPLAY[thinking.mode]?.display_name ?? thinking.mode) : '';
+  const thinkingLine = !thinking
+    ? null
+    : thinking.source === 'custom'
+      ? t('think.custom')
+      : thinking.source === 'yours'
+        ? t('think.yours', { mode: modeName })
+        : thinking.source === 'step'
+          ? thinking.reason ? t('think.stepWhy', { mode: modeName, reason: thinking.reason }) : t('think.step', { mode: modeName })
+          : t('think.default', { mode: modeName });
   // The header said nothing for an open stage, so the rail's "open" tag was
   // the only place a left-open stage was named (1 Oct, item 1).
   const statusLabel =
@@ -142,6 +161,46 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Every stage says how it is worked, and the current one can change it (26 Nov, Sean:
+          "an option to choose what way to think or have PromptMaster whatever it thinks best"). */}
+      {thinkingLine && (
+        <div data-thinking className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">psychology</span>
+          <span>{thinkingLine}</span>
+          {onPickThinking && !changingThinking && (
+            <button
+              type="button"
+              data-thinking-change
+              onClick={() => setChangingThinking(true)}
+              className="rounded-md px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-low)]"
+            >
+              {t('think.change')}
+            </button>
+          )}
+          {onPickThinking && changingThinking && (
+            <span className="flex w-full flex-wrap items-center gap-2">
+              <ThinkingSelect
+                value={thinkingChoice ?? 'auto'}
+                withCustom={thinking?.source === 'custom'}
+                ariaLabel={t('think.label')}
+                onChange={(v) => {
+                  onPickThinking(v);
+                  setChangingThinking(false);
+                }}
+                className="min-w-0 max-w-full flex-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+              />
+              <button
+                type="button"
+                onClick={() => setChangingThinking(false)}
+                className="rounded-md px-2 py-1 font-semibold text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
+              >
+                {t('think.done')}
+              </button>
+            </span>
+          )}
         </div>
       )}
     </header>

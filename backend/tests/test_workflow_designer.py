@@ -211,3 +211,28 @@ def test_a_purchase_authorisation_is_never_a_sign_off_the_last_one_approves_the_
     # A label that starts with a name keeps its capital.
     wf = parse_workflow({"name": "X", "stages": [_stage("Brief"), _stage("Draft"), _stage("PINE pack", approval="I authorize the purchase.")]})
     assert wf.stages[-1].approval == "I approve the PINE pack as final."
+
+
+def test_each_stage_says_how_promptmaster_thinks_on_it():
+    """26 Nov (Sean): "an option to choose what way to think or have PromptMaster whatever
+    it thinks best". The design names a mode per stage, from the user-facing ones only."""
+    _system, user = build_workflow_prompt("a board paper", "Recommend a supplier")
+    assert '"analyst"' in user and '"critic"' in user and '"clarity"' in user
+    assert '"custom"' not in user
+    assert '"mode": ""' in user and '"mode_reason": ""' in user
+    wf = parse_workflow({"name": "X", "stages": [
+        _stage("Brief", mode="Architect", mode_reason="It sets out the structure of the work"),
+        _stage("Options", mode="analyst", mode_reason="x" * 200),
+        _stage("Check", "check", mode="custom"),
+        _stage("Paper", mode="poet"),
+    ]})
+    by = {s.label: s for s in wf.stages}
+    assert by["Brief"].mode == "architect" and by["Brief"].mode_reason == "It sets out the structure of the work"
+    assert by["Options"].mode == "analyst" and len(by["Options"].mode_reason) == 80
+    assert by["Check"].mode == "" and by["Paper"].mode == ""
+
+
+def test_the_finalise_stage_writes_for_the_reader():
+    wf = parse_workflow({"stages": [_stage("Brief"), _stage("Draft"), _stage("Review", "check")]})
+    assert wf.stages[-1].label == "Finalise"
+    assert wf.stages[-1].mode == "clarity" and wf.stages[-1].mode_reason

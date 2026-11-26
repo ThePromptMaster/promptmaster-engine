@@ -2,6 +2,19 @@ import type { en } from '../areas/modes';
 
 /** Hindi for `areas/modes.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "think.auto": "PromptMaster को हर चरण के लिए चुनने दें (अनुशंसित)",
+  "think.everyGroup": "या हर चरण पर एक ही तरह से सोचें",
+  "think.customOption": "आपकी अपनी पर्सोना",
+  "think.autoHint": "हर चरण उस तरह से किया जाता है जो उसके लिए ठीक है। जिस चरण का अपना तरीका नहीं है, वह {mode} का उपयोग करता है।",
+  "think.preview": "इस वर्कफ़्लो में: {list}",
+  "think.step": "{mode} की तरह सोच रहा है, इस चरण के लिए चुना गया",
+  "think.stepWhy": "{mode} की तरह सोच रहा है, इस चरण के लिए चुना गया: {reason}",
+  "think.yours": "{mode} की तरह सोच रहा है, हर चरण के लिए आपकी पसंद",
+  "think.default": "{mode} की तरह सोच रहा है, प्रोजेक्ट का डिफ़ॉल्ट",
+  "think.custom": "आपकी अपनी पर्सोना की तरह सोच रहा है",
+  "think.change": "बदलें",
+  "think.label": "PromptMaster कैसे सोचता है",
+  "think.done": "हो गया",
   'mode.architect': 'वास्तुकार',
   'mode.critic': 'आलोचक',
   'mode.clarity': 'स्पष्टता',

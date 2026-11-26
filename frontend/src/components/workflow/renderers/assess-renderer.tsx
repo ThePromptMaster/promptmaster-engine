@@ -243,7 +243,7 @@ export function AssessRenderer({
       {editable && onAssessBatch && pending && !running && (
         <section data-assess-pending className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3">
           <p className="me-auto text-body text-[var(--on-surface)]">
-            {pending.count ? t('assess.pendingTitle', { n: pending.count }) : t('assess.pendingTitleSome')}
+            {pending.count ? t('assess.pendingTitle', { count: pending.count }) : t('assess.pendingTitleSome')}
           </p>
           <button
             type="button"
@@ -319,7 +319,7 @@ export function AssessRenderer({
                 ? assessRun.by === 'go'
                   ? t('assess.goRunning')
                   : !assessRun.judged && assessRun.left === null
-                    ? t('assess.runningFirst')
+                    ? pending ? t('assess.running') : t('assess.runningFirst')
                     : assessRun.left
                       ? t('assess.progressLeft', { n: assessRun.judged, left: assessRun.left })
                       : t('assess.progress', { n: assessRun.judged })

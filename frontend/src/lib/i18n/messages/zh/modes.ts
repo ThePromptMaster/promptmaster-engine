@@ -2,6 +2,19 @@ import type { en } from '../areas/modes';
 
 /** Chinese for `areas/modes.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "think.auto": "让 PromptMaster 为每一步选择（推荐）",
+  "think.everyGroup": "或者每一步都用同一种思考方式",
+  "think.customOption": "你自己的角色",
+  "think.autoHint": "每一步都用适合它的方式完成。没有自己方式的步骤使用{mode}。",
+  "think.preview": "在此工作流中：{list}",
+  "think.step": "以{mode}方式思考，为这一步选择",
+  "think.stepWhy": "以{mode}方式思考，为这一步选择：{reason}",
+  "think.yours": "以{mode}方式思考，你为每一步的选择",
+  "think.default": "以{mode}方式思考，项目的默认方式",
+  "think.custom": "以你自己的角色思考",
+  "think.change": "更改",
+  "think.label": "PromptMaster 如何思考",
+  "think.done": "完成",
   'mode.architect': '架构师',
   'mode.critic': '评论者',
   'mode.clarity': '清晰',

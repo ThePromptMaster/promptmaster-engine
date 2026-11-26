@@ -73,3 +73,44 @@ describe('SetupCard, simple', () => {
     expect(screen.getByLabelText('How PromptMaster should think')).toBeVisible();
   });
 });
+
+describe('how PromptMaster should think: let it choose, or one way on every step (26 Nov, Sean)', () => {
+  function withSpy(draft: SetupDraft) {
+    const changes: Partial<SetupDraft>[] = [];
+    const view = render(
+      <SetupCard
+        templates={TEMPLATES}
+        templateId="t-so"
+        onSelectTemplate={() => undefined}
+        workflowReason=""
+        recommendedKey="single_output"
+        draft={draft}
+        rationale={null}
+        onChange={(patch) => changes.push(patch)}
+      />
+    );
+    return { changes, select: screen.getByLabelText('How PromptMaster should think') as HTMLSelectElement, ...view };
+  }
+
+  it('lets PromptMaster choose by default, and says what a step with no way of its own uses', () => {
+    const { select } = withSpy(DRAFT);
+    expect(select.value).toBe('auto');
+    expect(select.options[0].text).toBe('Let PromptMaster choose for each step (recommended)');
+    expect(screen.getByText(/A step with none of its own uses Clarity/)).toBeInTheDocument();
+  });
+
+  it('a mode picked is used on every step, and PromptMaster\'s pick is kept to go back to', async () => {
+    const { changes, select } = withSpy(DRAFT);
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(select, { target: { value: 'critic' } });
+    expect(changes.at(-1)).toEqual({ auto_mode: 'clarity', mode: 'critic', stage_modes: 'project' });
+  });
+
+  it('going back to "PromptMaster chooses" restores its pick as the fallback', async () => {
+    const { changes, select } = withSpy({ ...DRAFT, mode: 'critic', stage_modes: 'project', auto_mode: 'clarity' });
+    expect(select.value).toBe('critic');
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(select, { target: { value: 'auto' } });
+    expect(changes.at(-1)).toEqual({ mode: 'clarity', stage_modes: 'stage' });
+  });
+});

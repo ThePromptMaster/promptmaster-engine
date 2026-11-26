@@ -91,6 +91,7 @@ export async function createProject(
       workflow: input.workflow ?? 'single_output',
       ...(input.language && input.language !== 'en' ? { language: input.language } : {}),
       ...(input.folder_id ? { folder_id: input.folder_id } : {}),
+      ...(input.stage_modes === 'project' ? { stage_modes: 'project' } : {}),
     }))
     .select(FULL_COLUMNS)
     .single();

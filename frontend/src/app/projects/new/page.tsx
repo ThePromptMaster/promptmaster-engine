@@ -396,7 +396,9 @@ export default function NewProjectPage() {
       audience: from?.audience?.trim() || suggestion.audience || 'General',
       constraints: suggestion.constraints,
       output_format: suggestion.output_format,
-      mode: suggestion.mode,
+      // The suggester's pick is the fallback when PromptMaster chooses per step; a way
+      // of thinking the user already picked for every step stays theirs (26 Nov).
+      ...(draft.stage_modes === 'project' ? { mode: draft.mode, stage_modes: 'project' as const, auto_mode: suggestion.mode } : { mode: suggestion.mode, auto_mode: suggestion.mode }),
       // What the user pasted as a sample stays theirs, whichever way in they took.
       ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output } : {}),
     };
@@ -607,6 +609,7 @@ export default function NewProjectPage() {
           // Not when the objective names another form (13 Oct): a screenplay is not a book manuscript.
           output_format: draft.output_format.trim() || (selected.key === 'book' && !formOf({ objective: draft.objective, constraints: draft.constraints }) ? BOOK_OUTPUT_FORMAT : ''),
           mode: draft.mode,
+          ...(draft.stage_modes === 'project' ? { stage_modes: 'project' as const } : {}),
           workflow: selected.key,
           language,
           // Started from a folder: filed there, under its rules from the first stage (Sean, 23 Nov).
