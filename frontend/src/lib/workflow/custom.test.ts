@@ -195,3 +195,43 @@ describe('a Check stage whose approval only restates the triage (2 Nov, Sean)', 
     expect(c[0].blocking).toBe(false);
   });
 });
+
+describe('a designed stage carries how PromptMaster thinks on it (26 Nov)', () => {
+  const withModes: DesignedWorkflow = {
+    ...design,
+    stages: [
+      { ...design.stages[0], mode: 'Architect', mode_reason: 'It sets the structure of the piece' },
+      { ...design.stages[1], mode: 'analyst', mode_reason: 'x'.repeat(120) },
+      { ...design.stages[2], mode: 'custom' },
+      { ...design.stages[3], mode: 'clarity', mode_reason: 'It writes the finished piece for its reader' },
+    ],
+  };
+  const t = templateFromDesign(withModes, 'modes1');
+
+  it('becomes the stage\'s recommended mode, and a long reason is clipped so the template validates', () => {
+    expect(t.stages.map((s) => s.recommended_modes[0]?.mode ?? null)).toEqual(['architect', 'analyst', null, 'clarity']);
+    expect(t.stages[1].recommended_modes[0].reason.length).toBeLessThanOrEqual(80);
+    expect(validateTemplate(t)).toEqual([]);
+  });
+
+  it('survives a round trip back to a design, to edit a copy', () => {
+    const back = designFromTemplate(t);
+    expect(back.stages.map((s) => s.mode ?? null)).toEqual(['architect', 'analyst', null, 'clarity']);
+    expect(back.stages[0].mode_reason).toBe('It sets the structure of the piece');
+  });
+
+  it('a stage with no mode is left to the project\'s, as before', () => {
+    expect(templateFromDesign(design, 'plain').stages.every((s) => s.recommended_modes.length === 0)).toBe(true);
+  });
+
+  it('a chapter plan is worked as structure', () => {
+    const book = templateFromDesign({
+      ...design,
+      stages: [design.stages[0], { label: 'Chapters', short_label: 'Chapters', kind: 'chapters', purpose: 'p', instruction: 'Write each chapter.', required: true, approval: '', mode: 'clarity' }, design.stages[3]],
+    }, 'book1');
+    const plan = book.stages.find((s) => s.renderer === 'outline');
+    expect(plan?.recommended_modes[0]?.mode).toBe('architect');
+    expect(book.stages.find((s) => s.renderer === 'long_form')?.recommended_modes[0]?.mode).toBe('clarity');
+    expect(validateTemplate(book)).toEqual([]);
+  });
+});

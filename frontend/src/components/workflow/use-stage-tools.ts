@@ -23,6 +23,7 @@ import type { NewVersion } from '@/lib/supabase/versions';
 import type { FlowTriggerType } from '@/types';
 import type { ArtifactVersion, Project } from '@/types/project';
 import { inputsFrom } from './use-stage-generation';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 
 /** Rewrites: the result becomes a new version. */
 export const REWRITE_TOOLS = [
@@ -114,6 +115,8 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
       if (!stage || guard.current) return;
       const content = headVersion?.content.trim() ? headVersion.content : fallbackContent;
       if (!content.trim()) return;
+      // The way this stage is worked (26 Nov): a tool thinks the way its draft was written.
+      const thinking = modeForStage(project, stage);
 
       guard.current = true;
       setRunning(kind);
@@ -123,8 +126,8 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
       try {
         if (kind === 'continue') {
           const res = await api.continueDocument({
-            inputs: inputsFrom(project, content),
-            incomplete_iteration: asIteration(content, headVersion?.version_number ?? 1, project.mode),
+            inputs: { ...inputsFrom(project, content), mode: thinking },
+            incomplete_iteration: asIteration(content, headVersion?.version_number ?? 1, thinking),
             iteration_number: next,
             model: project.model,
             web_access: webAccessOf(project),
@@ -145,7 +148,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
         }
 
         const res = await api.flowTrigger({
-          inputs: inputsFrom(project, content),
+          inputs: { ...inputsFrom(project, content), mode: thinking },
           current_output: content,
           trigger: kind,
           iteration_number: next,

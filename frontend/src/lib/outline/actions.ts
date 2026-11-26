@@ -15,7 +15,7 @@ import { coerceOutlineDocument, mergeRegeneratedOutline } from '@/lib/outline/mo
 import { longFormFromOutline } from '@/lib/outline/long-form';
 import { approveOutlineVersion, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import { getArtifact, listVersions, saveLongForm } from '@/lib/supabase/versions';
-import { inputsFrom } from '@/lib/workflow/stage-requests';
+import { inputsForStage } from '@/lib/workflow/stage-requests';
 import { draftingStageId } from '@/lib/workflow/derived-outline';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineDocument, OutlineItem, SectionDraftBinding } from '@/types/outline';
@@ -100,8 +100,10 @@ export async function generateOutlineDraft(args: GenerateOutlineArgs): Promise<O
   const { project, doc, drafts = [], derive } = args;
   const keep = drafts.filter((d) => d.word_count > 0).map((d) => d.item_id);
   if (derive) return mergeRegeneratedOutline(doc, derive(), keep);
+  const planStage = args.template?.stages.find((s) => s.id === args.stageId) ?? null;
   const res = await api.generateOutline({
-    inputs: inputsFrom(project),
+    // A chapter plan is worked in its stage's mode (26 Nov).
+    inputs: inputsForStage(project, planStage),
     suggested_section_count: Math.max(args.sectionCount ?? 0, doc.items.length, 3),
     model: project.model,
     web_access: webAccessOf(project),

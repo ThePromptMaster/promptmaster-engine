@@ -9,7 +9,8 @@
  */
 
 import { restatesTriage } from './triage-approval';
-import type { AssessSpec, ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
+import type { AssessSpec, ExitCriterion, RecommendedMode, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
+import type { ModeType } from '@/types';
 import { presetScale, toneAt } from './assess';
 
 /**
@@ -44,6 +45,25 @@ export interface DesignedStage {
   item_noun?: string;
   /** Assess stages: a batch to offer in the paste box (a curated example's sample). */
   offered_batch?: string;
+  /**
+   * How PromptMaster thinks on this stage, chosen by the designer (26 Nov, Sean:
+   * "have PromptMaster whatever it thinks best"), and why in a few words.
+   * Becomes the stage's `recommended_modes`; '' or missing for none.
+   */
+  mode?: string;
+  mode_reason?: string;
+}
+
+/** The modes a design may give a stage: every mode but the user's own persona. */
+const DESIGN_MODES: readonly ModeType[] = ['architect', 'critic', 'clarity', 'coach', 'therapist', 'cold_critic', 'analyst'];
+const MODE_REASON_MAX = 80;
+
+/** A designed stage's mode as the template holds it; nothing for an unknown mode (`validate.ts` refuses a long reason). */
+function modesOf(s: DesignedStage): RecommendedMode[] {
+  const mode = (s.mode ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_') as ModeType;
+  if (!DESIGN_MODES.includes(mode)) return [];
+  const reason = (s.mode_reason ?? '').replace(/\s+/g, ' ').trim();
+  return [{ mode, reason: reason.length > MODE_REASON_MAX ? `${reason.slice(0, MODE_REASON_MAX - 1).trimEnd()}…` : reason }];
 }
 
 export interface DesignedWorkflow {
@@ -143,7 +163,7 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
         cardinality: 'one',
         primary: true,
       }],
-      recommended_modes: [],
+      recommended_modes: modesOf(s),
       skip_reasons: !skippable ? [] : ['Not needed for this piece'],
       // Ongoing work (7 Oct): the stage that closes a round starts the next
       // from an earlier stage. Only in an ongoing workflow, only backwards.
@@ -168,7 +188,8 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
         { id: `${planId}.approved`, label: 'A chapter plan is approved', check: 'auto', rule: { type: 'outline_approved' }, blocking: true },
       ],
       expected_artifacts: [{ kind: 'outline', cardinality: 'one', primary: true }],
-      recommended_modes: [],
+      // The plan is structure, whatever the chapters are worked in (26 Nov).
+      recommended_modes: [{ mode: 'architect', reason: 'Structure is the whole job at this stage' }],
       skip_reasons: [],
       transitions: transitionsAt(planId, {}, false),
     };
@@ -241,6 +262,7 @@ export function designFromTemplate(template: WorkflowTemplate): DesignedWorkflow
         approval_kind: approval?.authority === 'delegable' ? 'routine' : 'decision',
         decision: decision?.label ?? '',
         loop_back_to: s.transitions.loop_to ? (byId.get(s.transitions.loop_to) ?? '') : '',
+        ...(s.recommended_modes[0] ? { mode: s.recommended_modes[0].mode, mode_reason: s.recommended_modes[0].reason } : {}),
         ...(s.assess
           ? typeof s.assess.scale === 'string'
             ? { scale: s.assess.scale, item_noun: s.assess.item_noun ?? '' }

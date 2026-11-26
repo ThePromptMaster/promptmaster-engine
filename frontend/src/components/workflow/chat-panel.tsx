@@ -88,6 +88,8 @@ function modeText(t: ReturnType<typeof useT>, key: Mode) {
 
 interface Props {
   project: Project;
+  /** The mode this stage is worked in (26 Nov). */
+  stageMode?: Project['mode'];
   stageId: string;
   stageLabel: string;
   /** The stage's name as the page shows it (the interface's language); `stageLabel` is what prompts and records use. */
@@ -218,6 +220,7 @@ function writeOfferActions(on: boolean) {
 
 export function ChatPanel({
   project,
+  stageMode,
   stageId,
   stageLabel,
   stageTitle,
@@ -262,6 +265,7 @@ export function ChatPanel({
   useEffect(() => setOfferActions(readOfferActions()), []);
   const chat = useStageChat({
     project,
+    stageMode,
     stageId,
     stageLabel,
     content,

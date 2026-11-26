@@ -137,3 +137,39 @@ def test_a_final_verification_is_kept_with_a_finalise_stage_after_it():
     assert labels[-2:] == ["Final verification", "Finalise"]
     assert revised.workflow.stages[-1].kind == "write"
     assert any("Added “Finalise” after “Final verification”" in c for c in revised.changes)
+
+
+def test_a_revision_keeps_each_stage_s_mode_and_blanks_an_unknown_one():
+    """26 Nov: the mode a design gave a stage survives a revision; a bad one is blanked, never a 422."""
+    design = DesignedWorkflow(name="Paper", stages=[
+        _s("Objective", mode="architect", mode_reason="It structures the work"),
+        _s("Claims", "list", mode="analyst"), _s("Analysis"), _s("Final", mode="clarity"),
+    ])
+    out = apply_operations(design, {"operations": [
+        {"op": "edit_stage", "stage": 3, "fields": {"mode": "Cold Critic", "mode_reason": "y" * 120}},
+        {"op": "edit_stage", "stage": 2, "fields": {"mode": "wizard"}},
+        {"op": "add_stage", "after": 3, "stage": {"label": "Verification", "kind": "check", "purpose": "p",
+                                                  "instruction": "Check each claim.", "mode": "critic", "mode_reason": "It checks"}},
+    ]})
+    by = {s.label: s for s in out.workflow.stages}
+    assert by["Objective"].mode == "architect" and by["Objective"].mode_reason == "It structures the work"
+    assert by["Analysis"].mode == "cold_critic" and len(by["Analysis"].mode_reason) == 80
+    assert by["Claims"].mode == ""
+    assert by["Verification"].mode == "critic"
+    assert by["Final"].mode == "clarity"
+    _system, user = build_revision_prompt(design, "add a check")
+    assert "mode: architect (It structures the work)" in user
+
+
+def test_a_revise_request_with_a_bad_mode_is_not_refused():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"operations": [], "unsupported": [], "note": ""}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        body = DESIGN.model_dump()
+        body["stages"][0]["mode"] = "not-a-mode"
+        r = TestClient(app).post("/api/revise-workflow", json={"workflow": body, "request": "make it shorter"})
+        assert r.status_code == 200, r.text
+        assert r.json()["workflow"]["stages"][0]["mode"] == ""
+    finally:
+        app.dependency_overrides.pop(get_client, None)

@@ -4,6 +4,19 @@
  * is sent to the model stays the template's own English.
  */
 export const en = {
+  "think.auto": "Let PromptMaster choose for each step (recommended)",
+  "think.everyGroup": "Or think one way on every step",
+  "think.customOption": "Your own persona",
+  "think.autoHint": "Each step is worked in the way that suits it. A step with none of its own uses {mode}.",
+  "think.preview": "In this workflow: {list}",
+  "think.step": "Thinking as {mode}, chosen for this step",
+  "think.stepWhy": "Thinking as {mode}, chosen for this step: {reason}",
+  "think.yours": "Thinking as {mode}, your choice for every step",
+  "think.default": "Thinking as {mode}, the project's default",
+  "think.custom": "Thinking as your own persona",
+  "think.change": "Change",
+  "think.label": "How PromptMaster thinks",
+  "think.done": "Done",
   'mode.architect': 'Architect',
   'mode.critic': 'Critic',
   'mode.clarity': 'Clarity',
@@ -62,6 +75,19 @@ export const en = {
 type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
+  "think.auto": "Dejar que PromptMaster elija en cada paso (recomendado)",
+  "think.everyGroup": "O pensar de una sola forma en todos los pasos",
+  "think.customOption": "Tu propio personaje",
+  "think.autoHint": "Cada paso se trabaja de la forma que le conviene. Un paso sin forma propia usa {mode}.",
+  "think.preview": "En este flujo: {list}",
+  "think.step": "Pensando como {mode}, elegido para este paso",
+  "think.stepWhy": "Pensando como {mode}, elegido para este paso: {reason}",
+  "think.yours": "Pensando como {mode}, tu elección para todos los pasos",
+  "think.default": "Pensando como {mode}, el predeterminado del proyecto",
+  "think.custom": "Pensando como tu propio personaje",
+  "think.change": "Cambiar",
+  "think.label": "Cómo piensa PromptMaster",
+  "think.done": "Listo",
   'mode.architect': 'Arquitecto',
   'mode.critic': 'Crítico',
   'mode.clarity': 'Claridad',
@@ -118,6 +144,19 @@ export const es: Keys = {
 };
 
 export const fr: Keys = {
+  "think.auto": "Laisser PromptMaster choisir à chaque étape (recommandé)",
+  "think.everyGroup": "Ou penser d’une seule façon à chaque étape",
+  "think.customOption": "Votre propre persona",
+  "think.autoHint": "Chaque étape est travaillée de la façon qui lui convient. Une étape sans façon propre utilise {mode}.",
+  "think.preview": "Dans ce workflow : {list}",
+  "think.step": "Pense en {mode}, choisi pour cette étape",
+  "think.stepWhy": "Pense en {mode}, choisi pour cette étape : {reason}",
+  "think.yours": "Pense en {mode}, votre choix pour toutes les étapes",
+  "think.default": "Pense en {mode}, la façon par défaut du projet",
+  "think.custom": "Pense avec votre propre persona",
+  "think.change": "Changer",
+  "think.label": "Comment PromptMaster réfléchit",
+  "think.done": "Terminé",
   'mode.architect': 'Architecte',
   'mode.critic': 'Critique',
   'mode.clarity': 'Clarté',
@@ -174,6 +213,19 @@ export const fr: Keys = {
 };
 
 export const pt: Keys = {
+  "think.auto": "Deixar o PromptMaster escolher em cada etapa (recomendado)",
+  "think.everyGroup": "Ou pensar de um só jeito em todas as etapas",
+  "think.customOption": "Sua própria persona",
+  "think.autoHint": "Cada etapa é trabalhada do jeito que lhe convém. Uma etapa sem jeito próprio usa {mode}.",
+  "think.preview": "Neste fluxo: {list}",
+  "think.step": "Pensando como {mode}, escolhido para esta etapa",
+  "think.stepWhy": "Pensando como {mode}, escolhido para esta etapa: {reason}",
+  "think.yours": "Pensando como {mode}, sua escolha para todas as etapas",
+  "think.default": "Pensando como {mode}, o padrão do projeto",
+  "think.custom": "Pensando com sua própria persona",
+  "think.change": "Mudar",
+  "think.label": "Como o PromptMaster pensa",
+  "think.done": "Pronto",
   'mode.architect': 'Arquiteto',
   'mode.critic': 'Crítico',
   'mode.clarity': 'Clareza',

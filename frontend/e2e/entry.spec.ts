@@ -29,7 +29,8 @@ test('"I know what I want to do": the setup is recommended, editable, and carrie
   await expect(page.getByRole('radio', { name: /^Magazine feature.*Designed for this project/ })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: /^Book/ }).click();
   // Mode, audience, constraints and format are pre-filled and editable.
-  await expect(page.getByLabel('How PromptMaster should think')).toHaveValue('architect');
+  // 26 Nov: PromptMaster chooses the way of thinking for each step unless one is picked.
+  await expect(page.getByLabel('How PromptMaster should think')).toHaveValue('auto');
   await expect(page.getByLabel('Constraints')).toHaveValue(/giraffes/);
   await page.getByLabel('Audience').fill('Curious ten-year-olds');
   await page.getByLabel('How PromptMaster should think').selectOption('clarity');

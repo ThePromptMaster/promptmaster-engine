@@ -17,7 +17,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .workflow_designer import FINALISE_LABEL, KINDS, fix_chapters, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution, with_closing_stage
+from .workflow_designer import FINALISE_LABEL, KINDS, MODE_REASON_MAX, THINKING_MODES, fix_chapters, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution, thinking_mode, with_closing_stage
 
 #: What the engine can and cannot walk, told to the model so it can say which.
 CAPABILITIES = (
@@ -39,6 +39,9 @@ CAPABILITIES = (
     "stage (loop_back_to); a new round is started by the user, or by Go when it runs Autonomous with "
     "routine decisions handled.\n"
     "- The workflow says whether it is finite or ongoing, its success criterion and its stop conditions.\n"
+    "- Each stage may name how PromptMaster thinks on it (mode: "
+    + ", ".join(f'"{k}"' for k in THINKING_MODES)
+    + ") with a short mode_reason; a stage added or changed in purpose gets the mode that fits it.\n"
     "WHAT IT CANNOT DO (say so in \"unsupported\"): branches that run in parallel; routing that skips "
     "or chooses stages by a condition; more than one loop, or a loop that repeats only part of a round "
     "on its own; running on a schedule or a timer; sending email or acting outside the project; more "
@@ -53,7 +56,7 @@ _INSTRUCTION = (
     "nearest thing it can only if the request allows it — saying so in \"note\".\n\n" + CAPABILITIES
 )
 
-EDITABLE = ("label", "short_label", "kind", "purpose", "instruction", "required", "approval", "approval_kind", "decision", "loop_back_to")
+EDITABLE = ("label", "short_label", "kind", "purpose", "instruction", "required", "approval", "approval_kind", "decision", "loop_back_to", "mode", "mode_reason")
 
 
 class Unsupported(BaseModel):
@@ -78,6 +81,7 @@ def build_revision_prompt(design: DesignedWorkflow, request: str) -> tuple[str, 
             + f"\n   purpose: {s.purpose}\n   instruction: {s.instruction[:600]}"
             + (f"\n   approval ({s.approval_kind}): {s.approval}" if s.approval else "")
             + (f"\n   decision: {s.decision}" if s.decision else "")
+            + (f"\n   mode: {s.mode}" + (f" ({s.mode_reason})" if s.mode_reason else "") if s.mode else "")
         )
     ex = design.execution
     user = (
@@ -88,7 +92,8 @@ def build_revision_prompt(design: DesignedWorkflow, request: str) -> tuple[str, 
         "Return JSON only:\n"
         '{"operations": [\n'
         '  {"op": "add_stage", "after": 3, "stage": {"label": "...", "short_label": "...", "kind": "write|list|check|chapters", '
-        '"purpose": "...", "instruction": "...", "required": true, "approval": "", "approval_kind": "decision", "decision": ""}},\n'
+        '"purpose": "...", "instruction": "...", "required": true, "approval": "", "approval_kind": "decision", "decision": "", '
+        '"mode": "critic", "mode_reason": "..."}},\n'
         '  {"op": "edit_stage", "stage": 2, "fields": {"instruction": "..."}},\n'
         '  {"op": "remove_stage", "stage": 4},\n'
         '  {"op": "move_stage", "stage": 4, "to": 2},\n'
@@ -115,6 +120,8 @@ def _stage_from(raw: dict) -> DesignedStage | None:
         approval_kind="routine" if str(raw.get("approval_kind") or "").strip().lower() == "routine" else "decision",
         decision=_clip(raw.get("decision"), 120),
         loop_back_to=_clip(raw.get("loop_back_to"), 60),
+        mode=raw.get("mode"),
+        mode_reason=raw.get("mode_reason"),
     )
 
 
@@ -172,6 +179,11 @@ def apply_operations(design: DesignedWorkflow, result: object) -> RevisedWorkflo
                     patch["approval_kind"] = "routine" if str(value).lower() == "routine" else "decision"
                 elif key == "instruction":
                     patch["instruction"] = str(value or "").strip()[:20_000]
+                elif key == "mode":
+                    # `model_copy` skips the validators: an unknown mode is blanked here.
+                    patch["mode"] = thinking_mode(value)
+                elif key == "mode_reason":
+                    patch["mode_reason"] = _clip(value, MODE_REASON_MAX)
                 else:
                     limit = {"label": 60, "short_label": 24, "purpose": 2_000, "approval": 120, "decision": 120, "loop_back_to": 60}[key]
                     patch[key] = _clip(value, limit)

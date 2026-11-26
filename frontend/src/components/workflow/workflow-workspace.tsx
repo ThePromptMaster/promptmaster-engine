@@ -14,7 +14,8 @@ import { shownCheckText } from '@/lib/i18n/check-text';
 import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
-import { modeForStage } from '@/lib/workflow/stage-mode';
+import { modeForStage, thinkingFor } from '@/lib/workflow/stage-mode';
+import { thinkingPatch, thinkingValue } from './thinking-select';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageHeader } from './stage-header';
@@ -1675,7 +1676,7 @@ export function WorkflowWorkspace({
       if (run.alreadyIn) said.push(t('assess.alreadyIn', { n: run.alreadyIn }));
       if (run.ungraded) said.push(t('assess.ungraded', { n: run.ungraded }));
       if (run.cut && run.pending) said.push(t('assess.cutKept'));
-      else if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { n: run.pending.count }) : t('assess.pendingKeptSome'));
+      else if (run.pending) said.push(run.pending.count ? t('assess.pendingKept', { count: run.pending.count }) : t('assess.pendingKeptSome'));
       return { said: said.join(' '), keepText: run.stopped && !run.added && !run.pending };
     },
     [stage, assessFor, headVersion?.content, t]
@@ -3219,6 +3220,9 @@ export function WorkflowWorkspace({
             // Picking a mode is the user's override: it is used on every stage (13 Oct).
             onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'], stage_modes: 'project' }) : undefined}
             currentMode={modeForStage(project, stage)}
+            thinking={thinkingFor(project, { recommended_modes: stage.recommended_modes.map((r) => ({ ...r, reason: shownModeReason(template.key, stage.id, r.mode, r.reason) })) })}
+            thinkingChoice={thinkingValue(project)}
+            onPickThinking={isCurrent && project.status !== 'finalized' ? (v) => onPatchProject(thinkingPatch(v, project.mode)) : undefined}
             leftOpen={Boolean(state.stages[stage.id]?.left_open)}
             isCurrent={isCurrent}
             approvalPending={approvalPendingIds.has(stage.id)}
@@ -3987,6 +3991,7 @@ export function WorkflowWorkspace({
           <div ref={chatZone} data-testid="chat-slot" className={readingTab ? 'hidden' : 'min-h-0 flex-1'}>
             <ChatPanel
               project={project}
+              stageMode={modeForStage(project, stage)}
               stageId={stage.id}
               stageLabel={stage.label}
               stageTitle={stageText(locale, template.key, stage, 'label')}

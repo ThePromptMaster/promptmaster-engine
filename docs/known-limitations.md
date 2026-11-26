@@ -5540,3 +5540,28 @@ Limits:
 - Rows judged before 26 Nov keep their per-call numbers, so an earlier paste of more than twelve shows as two
   batches.
 - The CSV and Excel downloads still hold every row.
+
+### L-286 — "How PromptMaster should think": it chooses for each step, or one way on every step (2026-11-26)
+26 Nov, Sean: "The way it thinks should have an option to choose what way to think or have PromptMaster whatever it
+thinks best". The select showed Architect and nothing else meant anything, because a designed workflow (the
+default) had no stage modes, so the one picked applied to every stage. Now:
+- **The first option, and the default on every way in, is "Let PromptMaster choose for each step
+  (recommended)".** That is `stage_modes = 'stage'`: each stage is worked in its own mode. Below it, under "Or
+  think one way on every step", picking a mode sets `{mode, stage_modes: 'project'}`. Nothing new reaches the
+  backend; every request is sent the mode its stage resolves to (`thinkingFor` / `modeForStage`).
+- **The workflow designer gives every stage a mode and a short reason.** Checks are critic, evidence and options
+  are analyst, structure is architect, and finished work for a reader is clarity (`workflow_designer.py`). An
+  unknown mode is blanked, never refused, and the mode survives a revision and "edit a copy". A chapter plan is
+  architect and Finalise is clarity.
+- **The side chat, the stage tools, Go's planner and the chapter plan think the way their stage is worked.** Before,
+  they used the project's mode. Each saved version records the mode it was really written in.
+- **Every stage says how it is worked:** "Thinking as Critic, chosen for this step: It checks the draft", "your
+  choice for every step" or "the project's default". On the current stage, Change opens the same select.
+
+Limits:
+- A stage with no mode of its own falls back to the project's mode: the setup suggester's pick, or Architect, or the
+  last mode chosen for every step before going back to "PromptMaster chooses". This applies to workflows designed
+  before 26 Nov, Quick and some Single output stages. Quick stays on Architect.
+- A mode is chosen for the whole project or left to each step. One stage cannot be given its own mode by hand; the
+  mode cards on a system stage still set it for every step.
+- The designer's reason is in English, like the rest of a designed workflow.

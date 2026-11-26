@@ -101,7 +101,7 @@ import { heldStages, lowerPlace, lowerStatement, mismatchLines, mismatchOutstand
 import { levelWords } from '@/lib/folders/inheritance';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { modeForStage } from '@/lib/workflow/stage-mode';
-import { inputsFrom } from '@/lib/workflow/stage-requests';
+import { inputsForStage, inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
@@ -1405,7 +1405,8 @@ export function useGoLoop(opts: Options) {
         }));
         const planNext = () => planning(() => api.agentNextAction(
               {
-                inputs: inputsFrom(o.project),
+                // The planner thinks the way the stage it plans for is worked (26 Nov).
+                inputs: inputsForStage(o.project, o.stage),
                 state: buildAgentState({
                   template: o.template, state: o.state, stage: o.stage!, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],

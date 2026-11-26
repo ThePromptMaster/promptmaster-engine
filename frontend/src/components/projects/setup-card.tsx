@@ -3,6 +3,7 @@
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { MODE_DISPLAY } from '@/lib/constants';
+import { ThinkingSelect, thinkingPatch, thinkingValue } from '@/components/workflow/thinking-select';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { ModeType, SetupRationale } from '@/types';
 import { LimitCounter } from '@/components/shared/limit-counter';
@@ -27,7 +28,16 @@ export interface SetupDraft {
   context: string;
   /** A sample of what good looks like (4 Nov): a standard for depth and style, never a source. */
   sample_output?: string;
+  /** The fallback mode when PromptMaster chooses; the one way of thinking when `stage_modes` is 'project'. */
   mode: ModeType;
+  /**
+   * 26 Nov (Sean: "or have PromptMaster whatever it thinks best"): 'stage', or
+   * missing, when PromptMaster chooses for each step; 'project' for one way on
+   * every step.
+   */
+  stage_modes?: 'stage' | 'project';
+  /** The setup suggester's pick, kept for when the user goes back to "PromptMaster chooses". */
+  auto_mode?: ModeType;
 }
 
 interface Props {
@@ -60,7 +70,6 @@ interface Props {
 /** Said beside Start, so nobody wonders whether they get a prompt to paste elsewhere (email 7). */
 export const DOES_THE_WORK = 'PromptMaster writes the result itself; you review and approve.';
 
-const SELECTABLE_MODES = (Object.keys(MODE_DISPLAY) as ModeType[]).filter((m) => m !== 'custom');
 
 /**
  * PM-09: the recommended setup, every part of it editable before anything is
@@ -91,6 +100,16 @@ export function SetupCard({
     text ? <p className="mt-1 text-label text-[var(--on-surface-variant)]">{text}</p> : null;
 
   const recommended = templates.find((t) => t.key === recommendedKey) ?? templates.find((t) => t.id === templateId);
+  // What "PromptMaster chooses" means for the workflow picked: each stage's own way of thinking.
+  const picked = templates.find((tp) => tp.id === templateId);
+  const plan = picked
+    ? (picked.stages ?? [])
+        .map((s) => {
+          const mode = s.recommended_modes?.[0]?.mode ?? draft.mode;
+          return `${s.short_label || s.label}: ${shownModeName(mode, MODE_DISPLAY[mode]?.display_name ?? mode)}`;
+        })
+        .join(' · ')
+    : '';
   const recommendedTemplate = templates.find((t) => t.key === recommendedKey);
 
   const full = (
@@ -123,19 +142,24 @@ export function SetupCard({
         <label htmlFor="setup-mode" className={label}>
           {t('setup.mode')}
         </label>
-        <select
+        <ThinkingSelect
           id="setup-mode"
-          value={draft.mode}
-          onChange={(e) => onChange({ mode: e.target.value as ModeType })}
+          value={thinkingValue(draft)}
+          onChange={(v) => {
+            // Leaving "PromptMaster chooses" keeps its fallback, to come back to.
+            const keep = draft.stage_modes !== 'project' ? { auto_mode: draft.auto_mode ?? draft.mode } : {};
+            onChange({ ...keep, ...thinkingPatch(v, draft.mode, draft.auto_mode) });
+          }}
           className={field}
-        >
-          {SELECTABLE_MODES.map((m) => (
-            <option key={m} value={m}>
-              {shownModeName(m, MODE_DISPLAY[m].display_name)} — {templateWord(locale, MODE_DISPLAY[m].tagline)}
-            </option>
-          ))}
-        </select>
-        {why(rationale?.mode)}
+        />
+        {draft.stage_modes === 'project' ? (
+          why(rationale?.mode)
+        ) : (
+          <>
+            {why(t('think.autoHint', { mode: shownModeName(draft.mode, MODE_DISPLAY[draft.mode]?.display_name ?? draft.mode) }))}
+            {plan && why(t('think.preview', { list: plan }))}
+          </>
+        )}
       </section>
 
       <section>

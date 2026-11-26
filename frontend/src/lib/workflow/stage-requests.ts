@@ -90,6 +90,21 @@ export function inputsFrom(project: Project, citing = '', focus: { user?: string
   };
 }
 
+/**
+ * What a request about one stage is given: the project's inputs, worked in the
+ * mode that stage is worked in (26 Nov). The chat, the stage tools and Go's
+ * moves on a stage all think the way its draft was written; a request about
+ * the whole project keeps `inputsFrom`.
+ */
+export function inputsForStage(
+  project: Project,
+  stage: Pick<StageDefinition, 'recommended_modes'> | null | undefined,
+  citing = '',
+  focus: { user?: string; step?: string } = {}
+): PMInput {
+  return { ...inputsFrom(project, citing, focus), mode: modeForStage(project, stage) };
+}
+
 export function generationRequest(
   project: Project,
   template: WorkflowTemplate,
@@ -101,7 +116,7 @@ export function generationRequest(
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
-    inputs: { ...inputsFrom(project, existingContent, { user: instruction, step: [target.label, target.entry_prompt_hint ?? ''].join('\n') }), mode: modeForStage(project, target) },
+    inputs: inputsForStage(project, target, existingContent, { user: instruction, step: [target.label, target.entry_prompt_hint ?? ''].join('\n') }),
     // Every stage may search the web first, while the switch is on (22 Oct).
     web_access: webAccessOf(project),
     stage: {

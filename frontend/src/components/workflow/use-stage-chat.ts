@@ -158,6 +158,8 @@ export interface AppliedRevision {
 
 interface Options {
   project: Project;
+  /** The mode this stage is worked in (`modeForStage`, 26 Nov): the chat thinks the way its draft was written. */
+  stageMode?: Project['mode'];
   stageId: string;
   stageLabel: string;
   /** The content of the version being viewed — what a scope resolves against. */
@@ -238,6 +240,7 @@ function errorText(err: unknown, fallback: string): string {
 
 export function useStageChat({
   project,
+  stageMode,
   stageId,
   stageLabel,
   content,
@@ -254,6 +257,7 @@ export function useStageChat({
   checkRevision,
   autoApply = false,
 }: Options) {
+  const thinking = stageMode ?? project.mode;
   const [messages, setMessages] = useState<StageChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -365,8 +369,8 @@ export function useStageChat({
         const attachments = withinMessage(nextMessageAttachments?.current ?? []);
 
         const response = await api.chatMessage({
-          inputs: inputsFrom(project),
-          active_iteration: asIteration(content, versionNumber, project.mode),
+          inputs: { ...inputsFrom(project), mode: thinking },
+          active_iteration: asIteration(content, versionNumber, thinking),
           chat_history: priorHistory,
           user_message: message,
           model: project.model,
@@ -411,7 +415,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged, onAnswered]
+    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged, onAnswered, thinking]
   );
 
   /**
@@ -547,8 +551,8 @@ export function useStageChat({
         };
 
         const response = await api.applyToAnswer({
-          inputs: inputsFrom(current),
-          active_iteration: asIteration(target.text, versionNumber, project.mode),
+          inputs: { ...inputsFrom(current), mode: thinking },
+          active_iteration: asIteration(target.text, versionNumber, thinking),
           chat_history: [...priorHistory, scoped],
           iteration_number: headNumber + 1,
           model: project.model,
@@ -605,7 +609,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber, headNumber, checkedRevision, instructionFor, stageId]
+    [busy, loading, content, messages, persist, project, versionNumber, headNumber, checkedRevision, instructionFor, stageId, thinking]
   );
 
   /**
@@ -624,8 +628,8 @@ export function useStageChat({
     setError(null);
     try {
       const response = await api.saveAsNewVersion({
-        inputs: inputsFrom(project),
-        active_iteration: asIteration(content, versionNumber, project.mode),
+        inputs: { ...inputsFrom(project), mode: thinking },
+        active_iteration: asIteration(content, versionNumber, thinking),
         chat_history: asHistory(messages),
         iteration_number: headNumber + 1,
         model: project.model,
@@ -659,7 +663,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [busy, messages, content, project, versionNumber, headNumber, getChatContext, checkedRevision, stageId]);
+  }, [busy, messages, content, project, versionNumber, headNumber, getChatContext, checkedRevision, stageId, thinking]);
 
   /**
    * Accept the proposal: append it as a new version.

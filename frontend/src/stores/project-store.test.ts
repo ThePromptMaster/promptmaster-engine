@@ -668,3 +668,36 @@ describe('restoreStageVersion (H1c, 9 Oct)', () => {
     expect(appendWorkflowEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('a saved version records the mode its stage is worked in (26 Nov)', () => {
+  const TEMPLATE = {
+    key: 't', version: 1, name: 'T', stages: [
+      { id: 'output', label: 'Output', recommended_modes: [{ mode: 'critic', reason: 'It checks' }] },
+      { id: 'other', label: 'Other', recommended_modes: [] },
+    ],
+  };
+
+  async function saving(stageModes: 'stage' | 'project', callerMode: 'architect' | 'clarity' = 'architect', stageId = 'output') {
+    await loadFixture();
+    useProjectStore.setState({
+      template: TEMPLATE as never,
+      project: { ...project(), mode: 'analyst', stage_modes: stageModes } as never,
+      stages: { [stageId]: { artifact: { ...ARTIFACT, stage_id: stageId } as never, versions: [V1 as never] } },
+    });
+    appendVersionRow.mockResolvedValue({ ...V1, id: 'v2', version_number: 2 });
+    await useProjectStore.getState().appendStageVersion(stageId, 'Output', { content: 'second', source_operation: 'stage_edit', mode: callerMode });
+    return (appendVersionRow.mock.calls.at(-1) as unknown as unknown[]).find((a) => a && typeof a === 'object' && 'content' in (a as object)) as { mode?: string };
+  }
+
+  it('when PromptMaster chooses, the stage\'s own mode, whatever the caller passed', async () => {
+    expect((await saving('stage')).mode).toBe('critic');
+  });
+
+  it('when the user picked one way, theirs', async () => {
+    expect((await saving('project')).mode).toBe('analyst');
+  });
+
+  it('a stage with no mode of its own records the project\'s', async () => {
+    expect((await saving('stage', 'clarity', 'other')).mode).toBe('analyst');
+  });
+});

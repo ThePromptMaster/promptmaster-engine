@@ -495,6 +495,8 @@ export interface ProjectInput {
   language?: string;
   /** The folder it is filed in from the start, so it follows that folder's rules (Sean, 23 Nov). */
   folder_id?: string | null;
+  /** 'project' when the user picked one way of thinking for every step (26 Nov); the column defaults to 'stage'. */
+  stage_modes?: 'stage' | 'project';
 }
 
 /**
