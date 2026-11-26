@@ -5667,6 +5667,9 @@ what can keep moving in the meantime." Now:
 - Go's stop card adds "Ready to use now: Timeline v2, Budget v1" for the stages that are finished, current and
   approved, and "Comes after this decision: Operations plan".
 - "Nothing else can go ahead" now reads "Go has nothing else to do until this is decided", which is what it meant.
+- Under Autonomous with "Handle them for me", a finish check that finds only work Go does itself (stages awaiting a
+  recheck, a check's findings to apply) says so and carries on to it, instead of asking "Carry on with the open
+  work?" (production pass, after the crew rate changed). If the same check comes straight back, Go asks as before.
 
 Limits:
 - Go still stops the whole run at a reserved approval. It does not carry on with stages that do not depend on the
