@@ -2,6 +2,8 @@ import type { en } from '../areas/go';
 
 /** Hindi for `areas/go.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
+  "nyc.readyNow": "अभी उपयोग के लिए तैयार: {list}।",
+  "nyc.waitingOn": "इस निर्णय के बाद आता है: {list}।",
   "goAction.derive": "व्युत्पन्न करें",
   "goAction.prove": "सिद्ध करें",
   "goAction.simplify": "सरल करें",
@@ -164,7 +166,7 @@ export const hi: Record<keyof typeof en, string> = {
   "nyc.decideThere": "हर एक पर वहीं निर्णय लें। जब वे तय हो जाएँगे तो मुझे पता चल जाएगा; फिर ‘फिर से शुरू करें’ दबाएँ।",
   "nyc.orYourself": "या चरण पर इसे खुद करें। मुझे पता चल जाएगा, और ‘फिर से शुरू करें’ यहाँ दिखाई देगा।",
   "nyc.carryOn": "पहले दूसरे काम जारी रखें",
-  "nyc.nothingElse": "जब तक यह तय नहीं होता, कोई और काम आगे नहीं बढ़ सकता।",
+  "nyc.nothingElse": "जब तक यह तय नहीं होता, Go के पास करने को और कुछ नहीं है।",
   "nyc.optionsLoading": "इस चरण में आपके सामने रखे गए विकल्प पढ़े जा रहे हैं…",
   "nyc.chooseOne": "एक चुनें। यह आपके निर्णय के रूप में दर्ज होता है, और यह स्वीकृति दे दी जाती है।",
   "nyc.somethingElse": "या बताएँ कि इसके बजाय आप क्या तय करते हैं",

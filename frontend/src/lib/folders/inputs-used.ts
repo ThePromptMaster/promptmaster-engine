@@ -107,6 +107,21 @@ export function buildInputsUsed(input: {
 }
 
 /** What changed in the folders' rules since a version was made: by statement, as the user reads it. */
+/**
+ * The project's own facts that changed since a version was made (26 Nov, L-290): what it
+ * used that is no longer current, and what is current that it did not have. For the
+ * reader only; the recheck of folder rules reads `changedSince`.
+ */
+export function projectFactsChangedSince(
+  used: InputsUsed | null | undefined,
+  facts: readonly ProjectFact[] | undefined
+): { added: string[]; removed: string[] } | null {
+  if (!used) return null;
+  const was = new Set(used.requirements.project.map((f) => f.statement));
+  const is = new Set(currentFacts(facts).slice(-PROJECT_FACTS_MAX).map((f) => cut(f.statement)));
+  return { added: [...is].filter((x) => !was.has(x)), removed: [...was].filter((x) => !is.has(x)) };
+}
+
 export function changedSince(used: InputsUsed | null | undefined, now: Inherited | null | undefined): { added: string[]; removed: string[] } | null {
   const then = used?.requirements.inherited;
   if (!then || !now) return null;

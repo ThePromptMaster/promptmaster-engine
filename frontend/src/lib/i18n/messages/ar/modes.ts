@@ -2,6 +2,14 @@ import type { en } from '../areas/modes';
 
 /** Arabic for `areas/modes.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "timeline.more": "اعرض ما تغيّر",
+  "timeline.less": "إخفاء",
+  "timeline.was": "كان:",
+  "timeline.now": "الآن:",
+  "timeline.removed": "أُزيل:",
+  "timeline.added": "أُضيف:",
+  "timeline.reopened": "أُعيد فتحه:",
+  "timeline.setAside": "وُضع جانبًا للاختيار مجددًا:",
   "think.auto": "دع PromptMaster يختار لكل خطوة (موصى به)",
   "think.everyGroup": "أو فكّر بطريقة واحدة في كل خطوة",
   "think.customOption": "شخصيتك الخاصة",

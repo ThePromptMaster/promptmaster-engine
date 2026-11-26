@@ -92,6 +92,7 @@ export function GoPanel({
   stageName,
   stageByEnglish,
   otherWork,
+  meanwhileFor,
   decisionOffers,
   queue,
   decideByAnswer,
@@ -149,6 +150,8 @@ export function GoPanel({
   stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
   /** Whether another stage holds work Go can do while an approval here waits (`otherWorkFor`). */
   otherWork?: (stageId: string) => boolean;
+  /** What is ready and what waits on a stage's decision, in the interface's words (26 Nov, L-291). */
+  meanwhileFor?: (stageId: string) => { ready: string; waiting: string } | null;
   /** The latest version of the stage Go asks about, when it came from applied findings. */
   latestChange?: LatestChange | null;
   /** The mismatch card for a stop on a folder rule and a note (L-280), by its conflict id; null once chosen. */
@@ -493,6 +496,7 @@ export function GoPanel({
               key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={shownStage} onAction={act} context={needContext}
               onCarryOn={need.kind === 'tick_criterion' && canResume && otherWork?.(need.stageId) ? () => void go.go() : undefined}
               nothingElse={need.kind === 'tick_criterion' && canResume && !otherWork?.(need.stageId)}
+              meanwhile={need.kind === 'tick_criterion' ? meanwhileFor?.(need.stageId) ?? null : null}
               offer={need.kind === 'tick_criterion' ? decisionOffers?.[need.criterionId] ?? null : null}
               pausesAfter={cardPauses}
               onChoose={

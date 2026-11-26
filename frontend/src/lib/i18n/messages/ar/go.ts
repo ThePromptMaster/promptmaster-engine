@@ -2,6 +2,8 @@ import type { en } from '../areas/go';
 
 /** Arabic for `areas/go.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const ar: Record<keyof typeof en, string> = {
+  "nyc.readyNow": "جاهز للاستخدام الآن: {list}.",
+  "nyc.waitingOn": "يأتي بعد هذا القرار: {list}.",
   'goAction.derive': 'الاشتقاق',
   'goAction.prove': 'البرهنة',
   'goAction.simplify': 'التبسيط',
@@ -164,7 +166,7 @@ export const ar: Record<keyof typeof en, string> = {
   'nyc.decideThere': 'احسم كلًّا منها هناك. سألاحظ حين تُحسم؛ ثم اضغط «استئناف».',
   'nyc.orYourself': 'أو أنجز ذلك بنفسك في المرحلة. سألاحظ، وسيظهر «استئناف» هنا.',
   'nyc.carryOn': 'تابع عملًا آخر أولًا',
-  'nyc.nothingElse': 'لا يمكن أن يتقدم أي عمل آخر حتى يُحسم هذا.',
+  "nyc.nothingElse": "ليس لدى Go شيء آخر يفعله حتى يُحسم هذا.",
   'nyc.optionsLoading': 'جارٍ قراءة الخيارات التي تعرضها عليك هذه المرحلة…',
   'nyc.chooseOne': 'اختر واحدًا. يُسجَّل بوصفه قرارك، وتُمنح هذه الموافقة.',
   'nyc.somethingElse': 'أو اذكر ما تقرره بدلًا من ذلك',

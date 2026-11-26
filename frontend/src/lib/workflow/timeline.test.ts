@@ -39,3 +39,44 @@ describe('projectTimeline — what happened, newest first (14 Oct call)', () => 
     expect(entries[0].detail).toBe('Change the date');
   });
 });
+
+describe('what a change did, readable on reopening (26 Nov, L-290)', () => {
+  const OLD = 'Northwind Refrigeration delivers the two cooling units on March 3, 2027.';
+  const NEW = 'Northwind Refrigeration delivers the two cooling units on March 17, 2027.';
+  const change = {
+    type: 'brief_changed', stage_id: 'brief', actor: 'user', created_at: '2026-11-26T12:00:00Z',
+    payload: {
+      field: 'facts', kind: 'fact', changed_facts: [OLD],
+      before: `- ${OLD}\n- Requirement: Total cost within the approved $55,000.`,
+      after: `- ${NEW}\n- Requirement: Total cost within the approved $55,000.\n- Bayview wants a call the week before.`,
+      affected: [{ stage_id: 'draft', reason: `It states "${OLD}", which changed: "The units arrive on March 3."` }],
+    },
+  } as unknown as WorkflowEvent;
+
+  it('pairs the replaced fact with its replacement, names what was added, and what it reopened in plain words', async () => {
+    const { changeDetail } = await import('./timeline');
+    const d = changeDetail(change)!;
+    expect(d.pairs).toEqual([{ from: OLD, to: NEW }]);
+    expect(d.added).toEqual(['Bayview wants a call the week before.']);
+    expect(d.removed).toEqual([]);
+    expect(d.reopened).toEqual([{ stageId: 'draft', reason: expect.stringContaining('which has changed') }]);
+    expect(changeDetail({ ...change, payload: { ...change.payload, presentation_only: true } })).toBeNull();
+  });
+
+  it('the timeline carries it, and names records of who has a version, checks that kept a stage, and saves that reopened later ones', () => {
+    const events = [
+      change,
+      { type: 'stage_marked_complete', stage_id: 'brief', actor: 'system', created_at: '2026-11-26T12:05:00Z', payload: { checked_unchanged: true } },
+      { type: 'stage_version_saved', stage_id: 'brief', actor: 'user', created_at: '2026-11-26T12:06:00Z', payload: { version_number: 3, affected: ['draft'] } },
+      { type: 'version_shared', stage_id: 'draft', actor: 'user', created_at: '2026-11-26T12:07:00Z', payload: { record_id: 'r1', version_id: 'd2', version_number: 2, to: 'Bayview Grocers', on: '2026-11-26', how: 'email' } },
+      { type: 'version_shared', stage_id: 'draft', actor: 'user', created_at: '2026-11-26T12:08:00Z', payload: { undoes: 'r1', version_id: 'd2' } },
+    ] as unknown as WorkflowEvent[];
+    const entries = projectTimeline(template, events, {});
+    const title = (t: string) => entries.find((e) => e.title === t);
+    expect(title('The brief changed')?.change?.pairs).toHaveLength(1);
+    expect(title('Checked after a change and kept')).toBeTruthy();
+    expect(title('Your change reopened later stages')?.reopenedStages).toEqual(['draft']);
+    expect(title('Recorded who has a version')?.detail).toBe('v2 to Bayview Grocers, 2026-11-26 (email)');
+    expect(title('Took back a record of who has a version')).toBeTruthy();
+  });
+});

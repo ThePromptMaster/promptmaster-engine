@@ -33,6 +33,11 @@ type EventLike = Pick<WorkflowEvent, 'type' | 'payload'> & { seq?: number };
 /** Authorising a spend, a purchase, a payment, a signature or something going out: never Go's. */
 const AUTHORISES = /\b(?:authori[sz]\w*|purchas\w*|spend\w*|pay\w*|sign\w*|send\w*|sent|releas\w*|publish\w*|contract\w*|hire|hiring|order\w*)\b/i;
 
+/** Whether an approval sends, signs, spends or authorises something outside the project (26 Nov). */
+export function isOutgoing(label: string): boolean {
+  return AUTHORISES.test(label);
+}
+
 /** Whether this approval could ever be left to Go: reserved, not the last stage's, not a commitments sign-off. */
 export function mayBeLeftToGo(template: Pick<WorkflowTemplate, 'stages'>, stage: Pick<StageDefinition, 'id'>, c: ExitCriterion): boolean {
   const last = template.stages.at(-1)?.id;

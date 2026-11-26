@@ -21,6 +21,7 @@ export function NeedsYouCard({
   context,
   onCarryOn,
   nothingElse,
+  meanwhile,
   offer = null,
   onChoose,
   pausesAfter = false,
@@ -47,6 +48,11 @@ export function NeedsYouCard({
   onCarryOn?: () => void;
   /** An approval stop with nothing else Go can do meanwhile: said, instead of a button that comes straight back (4 Nov). */
   nothingElse?: boolean;
+  /**
+   * What can keep moving (26 Nov, L-291): the stages ready to use as they stand, and
+   * those that come after this decision, already named in the interface's words.
+   */
+  meanwhile?: { ready: string; waiting: string } | null;
   stageLabel: (stageId: string) => string;
   /** Clear the need and resume. Rejects with a message the card shows. A stuck stage says which of its options was chosen. */
   onAction: (option?: StuckOption, note?: string) => Promise<void>;
@@ -217,6 +223,12 @@ export function NeedsYouCard({
           ) : nothingElse ? (
             <span data-nothing-else className="basis-full text-label text-[var(--on-surface-variant)]">{t('nyc.nothingElse')}</span>
           ) : null}
+          {meanwhile && (meanwhile.ready || meanwhile.waiting) && (
+            <span data-meanwhile className="basis-full space-y-0.5 text-label text-[var(--on-surface-variant)]">
+              {meanwhile.ready && <span className="block">{t('nyc.readyNow', { list: meanwhile.ready })}</span>}
+              {meanwhile.waiting && <span className="block">{t('nyc.waitingOn', { list: meanwhile.waiting })}</span>}
+            </span>
+          )}
         </div>
         </>
       ) : (

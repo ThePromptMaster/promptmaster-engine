@@ -1,5 +1,7 @@
 /** Go mode's panel: its controls and policies, the steps, what it needs from you, its questions and its execution record, and Go's moves by name (lib/agent/actions.ts keeps the English the planner and the Python registry use). */
 export const en = {
+  "nyc.readyNow": "Ready to use now: {list}.",
+  "nyc.waitingOn": "Comes after this decision: {list}.",
   "goAction.derive": "Derive",
   "goAction.prove": "Prove",
   "goAction.simplify": "Simplify",
@@ -162,7 +164,7 @@ export const en = {
   "nyc.decideThere": "Decide each one there. I will notice when they are settled; then press Resume.",
   "nyc.orYourself": "Or do it yourself on the stage. I will notice, and Resume will appear here.",
   "nyc.carryOn": "Carry on with other work first",
-  "nyc.nothingElse": "Nothing else can go ahead until this is decided.",
+  "nyc.nothingElse": "Go has nothing else to do until this is decided.",
   "nyc.optionsLoading": "Reading the options this stage puts to you…",
   "nyc.chooseOne": "Choose one. It is recorded as your decision, and this approval is given.",
   "nyc.somethingElse": "Or say what you decide instead",
@@ -301,6 +303,8 @@ export const en = {
 type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
+  "nyc.readyNow": "Listo para usar ya: {list}.",
+  "nyc.waitingOn": "Viene después de esta decisión: {list}.",
   "goAction.derive": "Deducir",
   "goAction.prove": "Demostrar",
   "goAction.simplify": "Simplificar",
@@ -463,7 +467,7 @@ export const es: Keys = {
   "nyc.decideThere": "Decide cada uno allí. Me daré cuenta cuando estén resueltos; entonces pulsa Reanudar.",
   "nyc.orYourself": "O hazlo tú en la etapa. Me daré cuenta y aquí aparecerá Reanudar.",
   "nyc.carryOn": "Seguir antes con otro trabajo",
-  "nyc.nothingElse": "Nada más puede avanzar hasta que esto se decida.",
+  "nyc.nothingElse": "Go no tiene nada más que hacer hasta que esto se decida.",
   "nyc.optionsLoading": "Leyendo las opciones que esta etapa te plantea…",
   "nyc.chooseOne": "Elige una. Queda registrada como tu decisión y se da esta aprobación.",
   "nyc.somethingElse": "O di qué decides en su lugar",
@@ -600,6 +604,8 @@ export const es: Keys = {
 };
 
 export const fr: Keys = {
+  "nyc.readyNow": "Prêt à servir dès maintenant : {list}.",
+  "nyc.waitingOn": "Vient après cette décision : {list}.",
   "goAction.derive": "Déduire",
   "goAction.prove": "Démontrer",
   "goAction.simplify": "Simplifier",
@@ -762,7 +768,7 @@ export const fr: Keys = {
   "nyc.decideThere": "Tranchez chacun là-bas. Je le remarquerai quand ce sera réglé ; appuyez alors sur Reprendre.",
   "nyc.orYourself": "Ou faites-le vous-même sur l’étape. Je le remarquerai, et Reprendre apparaîtra ici.",
   "nyc.carryOn": "Avancer d’abord sur autre chose",
-  "nyc.nothingElse": "Rien d’autre ne peut avancer tant que ce n’est pas décidé.",
+  "nyc.nothingElse": "Go n’a rien d’autre à faire tant que ce n’est pas décidé.",
   "nyc.optionsLoading": "Lecture des options que cette étape vous soumet…",
   "nyc.chooseOne": "Choisissez-en une. Elle est enregistrée comme votre décision, et cette approbation est donnée.",
   "nyc.somethingElse": "Ou dites ce que vous décidez à la place",
@@ -899,6 +905,8 @@ export const fr: Keys = {
 };
 
 export const pt: Keys = {
+  "nyc.readyNow": "Pronto para usar agora: {list}.",
+  "nyc.waitingOn": "Vem depois desta decisão: {list}.",
   "goAction.derive": "Deduzir",
   "goAction.prove": "Demonstrar",
   "goAction.simplify": "Simplificar",
@@ -1061,7 +1069,7 @@ export const pt: Keys = {
   "nyc.decideThere": "Decida cada um lá. Vou perceber quando estiverem resolvidos; aí clique em Retomar.",
   "nyc.orYourself": "Ou faça você mesmo na etapa. Vou perceber, e Retomar aparecerá aqui.",
   "nyc.carryOn": "Seguir com outro trabalho antes",
-  "nyc.nothingElse": "Nada mais pode avançar até que isto seja decidido.",
+  "nyc.nothingElse": "O Go não tem mais nada a fazer até que isto seja decidido.",
   "nyc.optionsLoading": "Lendo as opções que esta etapa apresenta a você…",
   "nyc.chooseOne": "Escolha uma. Ela fica registrada como sua decisão, e esta aprovação é dada.",
   "nyc.somethingElse": "Ou diga o que você decide em vez disso",

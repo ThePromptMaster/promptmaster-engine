@@ -2,6 +2,10 @@ import type { en } from '../areas/words';
 
 /** Chinese for `areas/words.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
+  "tw:Recorded who has a version": "已记录谁拿到了哪个版本",
+  "tw:Took back a record of who has a version": "已撤销一条版本接收记录",
+  "tw:Your change reopened later stages": "你的修改重新打开了后续阶段",
+  "tw:Checked after a change and kept": "改动后已检查并保留",
   'tw:Objective is stated': '目标已写明',
   'tw:I am satisfied it says what success looks like': '我确认它说明了成功是什么样子',
   'tw:I am satisfied it says what is out of scope': '我确认它说明了哪些不在范围内',

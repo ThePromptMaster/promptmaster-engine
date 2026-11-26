@@ -797,3 +797,14 @@ describe('an approval says the version it is for (17 Nov, Sean: "with a link to 
     expect(out.message).toContain('It is for Independent critical review v6, the version on the page now.');
   });
 });
+
+
+describe('why a stop is the user\'s (26 Nov, Sean: "what decision is needed, why it\'s theirs to make")', () => {
+  it('an approval that sends something out says so', async () => {
+    const { isOutgoing } = await import('@/lib/workflow/left-to-go-approvals');
+    expect(isOutgoing('I approve this commitment to send to Bayview Grocers')).toBe(true);
+    expect(isOutgoing('I approve this analysis plan for execution')).toBe(false);
+    const need = { kind: 'tick_criterion', stageId: 'commitment', criterionId: 'commitment.approved', label: 'I approve this commitment to send to Bayview Grocers', authority: 'reserved' } as never;
+    expect(describeNeed(need, (id) => id).message).toContain('it sends something to people outside this project');
+  });
+});

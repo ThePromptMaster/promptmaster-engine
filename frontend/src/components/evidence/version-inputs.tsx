@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
-import { changedSince, type InputsUsed } from '@/lib/folders/inputs-used';
+import { changedSince, projectFactsChangedSince, type InputsUsed } from '@/lib/folders/inputs-used';
 import { resolveInherited } from '@/lib/folders/inheritance';
 import { linkQuotes, quotesIn, sourceDocs, type QuoteLink } from '@/lib/evidence/quote-links';
 import { getInputsUsed } from '@/lib/supabase/versions';
@@ -48,7 +48,12 @@ export function VersionInputs({ version }: { version: ArtifactVersion }) {
     () => linkQuotes(quotesIn(version.content ?? ''), sourceDocs(project?.context, inherited?.documents ?? [])),
     [version.content, project?.context, inherited]
   );
-  const since = changedSince(used, inherited);
+  const folderSince = changedSince(used, inherited);
+  // The project's own facts too (26 Nov, L-290): a delivery date replaced since this version was made.
+  const ownSince = projectFactsChangedSince(used, facts);
+  const since = folderSince || ownSince
+    ? { added: [...(folderSince?.added ?? []), ...(ownSince?.added ?? [])], removed: [...(folderSince?.removed ?? []), ...(ownSince?.removed ?? [])] }
+    : null;
   const when = new Date(version.created_at).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const head = 'text-label font-semibold uppercase tracking-wider text-[var(--on-surface-variant)]';
   const chip = 'me-1 rounded bg-[var(--surface-container-highest)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]';

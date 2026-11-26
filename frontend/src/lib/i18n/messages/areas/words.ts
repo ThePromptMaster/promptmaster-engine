@@ -10,6 +10,10 @@
  * translation here.
  */
 export const en = {
+  "tw:Recorded who has a version": "Recorded who has a version",
+  "tw:Took back a record of who has a version": "Took back a record of who has a version",
+  "tw:Your change reopened later stages": "Your change reopened later stages",
+  "tw:Checked after a change and kept": "Checked after a change and kept",
   "tw:Objective is stated": "Objective is stated",
   "tw:I am satisfied it says what success looks like": "I am satisfied it says what success looks like",
   "tw:I am satisfied it says what is out of scope": "I am satisfied it says what is out of scope",
@@ -267,6 +271,10 @@ export const en = {
 type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
+  "tw:Recorded who has a version": "Se registró quién tiene una versión",
+  "tw:Took back a record of who has a version": "Se retiró un registro de quién tiene una versión",
+  "tw:Your change reopened later stages": "Tu cambio reabrió etapas posteriores",
+  "tw:Checked after a change and kept": "Revisado tras un cambio y mantenido",
   "tw:Objective is stated": "El objetivo está planteado",
   "tw:I am satisfied it says what success looks like": "Estoy conforme: dice cómo se ve el éxito",
   "tw:I am satisfied it says what is out of scope": "Estoy conforme: dice qué queda fuera del alcance",
@@ -522,6 +530,10 @@ export const es: Keys = {
 };
 
 export const fr: Keys = {
+  "tw:Recorded who has a version": "Enregistré qui a une version",
+  "tw:Took back a record of who has a version": "Annulé un enregistrement de qui a une version",
+  "tw:Your change reopened later stages": "Votre modification a rouvert des étapes suivantes",
+  "tw:Checked after a change and kept": "Vérifié après un changement et conservé",
   "tw:Objective is stated": "L’objectif est énoncé",
   "tw:I am satisfied it says what success looks like": "Je suis satisfait : il dit à quoi ressemble la réussite",
   "tw:I am satisfied it says what is out of scope": "Je suis satisfait : il dit ce qui est hors du périmètre",
@@ -777,6 +789,10 @@ export const fr: Keys = {
 };
 
 export const pt: Keys = {
+  "tw:Recorded who has a version": "Registrado quem tem uma versão",
+  "tw:Took back a record of who has a version": "Desfeito um registro de quem tem uma versão",
+  "tw:Your change reopened later stages": "Sua mudança reabriu etapas posteriores",
+  "tw:Checked after a change and kept": "Verificado após uma mudança e mantido",
   "tw:Objective is stated": "O objetivo está definido",
   "tw:I am satisfied it says what success looks like": "Estou satisfeito: diz como é o sucesso",
   "tw:I am satisfied it says what is out of scope": "Estou satisfeito: diz o que fica fora do escopo",

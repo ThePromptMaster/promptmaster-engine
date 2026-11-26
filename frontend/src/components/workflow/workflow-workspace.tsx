@@ -17,6 +17,7 @@ import { formOf, inFormWords } from '@/lib/workflow/work-form';
 import { modeForStage, thinkingFor } from '@/lib/workflow/stage-mode';
 import { newRecordId, sentSuperseded, sharedPayload, sharedVersions, undoPayload } from '@/lib/workflow/shared-versions';
 import { SentRecord } from './sent-record';
+import { SinceLastVisit } from './since-last-visit';
 import { thinkingPatch, thinkingValue } from './thinking-select';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -194,6 +195,7 @@ import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
+import { meanwhile } from '@/lib/agent/meanwhile';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
 import { changeOutcomes } from '@/lib/workflow/change-outcomes';
 import { changeSummary, decisionStillAwaited } from '@/lib/workflow/change-summary';
@@ -2258,6 +2260,21 @@ export function WorkflowWorkspace({
       sentBehind,
     });
   }, [briefChange, settled, awaitedDecision, settledOutcomes, template, state, events, stageBundles, evaluations, context, reapprove, outstanding, project.manual_checks, project.routine_decisions, project.status, keptNow, sentBehind]);
+  // The work as it stands over a span of changes, for "since your last visit" (26 Nov, L-290).
+  const summariseSince = useCallback(
+    (since: string, touched: string[]) => {
+      const done = template.stages.map((st) => st.id).filter((id) => isDone(state.stages[id]?.status));
+      const systemEvidence = new Set((events ?? []).filter((e) => e.type === 'stage_marked_complete' && e.actor === 'system' && typeof e.payload?.evidence_version_id === 'string').map((e) => e.payload!.evidence_version_id as string));
+      return changeSummary({
+        template, state, events: events ?? [], since, touched, reapprove,
+        outcomes: changeOutcomes(done, since, template.stages, (id) => stageBundles[id]?.versions ?? [], evaluations, (id) => context.openRows?.[id]?.length ?? 0, systemEvidence),
+        queue: project.status === 'finalized' ? [] : userQueue({ template, state, outstanding, bundles: stageBundles, manualChecks: project.manual_checks, routine: project.routine_decisions, kept: keptNow }),
+        manualChecks: project.manual_checks,
+        sentBehind,
+      });
+    },
+    [template, state, events, reapprove, stageBundles, evaluations, context, project.status, project.manual_checks, project.routine_decisions, outstanding, keptNow, sentBehind]
+  );
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
@@ -3319,6 +3336,17 @@ export function WorkflowWorkspace({
               latestChange={goLatestChange}
               onApplyAnyway={applyAnyway}
               otherWork={(id) => otherWorkFor(outstanding, id)}
+              meanwhileFor={(id) => {
+                const m = meanwhile({ template, state, stageId: id, reapprove, versionOf: (sid) => stageBundles[sid]?.versions.at(-1)?.version_number ?? null });
+                const name = (sid: string) => {
+                  const st = template.stages.find((x) => x.id === sid);
+                  return st ? stageText(locale, template.key, st, 'label') : sid;
+                };
+                return {
+                  ready: m.ready.map((r) => (r.version ? `${name(r.stageId)} v${r.version}` : name(r.stageId))).join(', '),
+                  waiting: m.waiting.map(name).join(', '),
+                };
+              }}
               decisionOffers={decisionOffers}
               queue={{ entries: queueEntries, offers: queueOffers, onAnswer: answerFromQueue }}
               decideByAnswer={decideByAnswer}
@@ -3421,6 +3449,15 @@ export function WorkflowWorkspace({
                 updating={go.active}
               />
             )}
+            <SinceLastVisit
+              key={project.id}
+              projectId={project.id}
+              events={events ?? []}
+              stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}
+              summarise={summariseSince}
+              onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
+              latestChangeShown={Boolean(briefChange || changeSummaryNow)}
+            />
             <BriefChangeNotice
               change={briefChange}
               stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}

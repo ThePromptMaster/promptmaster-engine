@@ -2,6 +2,7 @@ import type { en } from '../areas/need';
 
 /** Swahili for `areas/need.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
 export const sw: Record<keyof typeof en, string> = {
+  "need.reservedOutgoing": "Hii ni yako peke yako: inatuma kitu kwa watu nje ya mradi huu, na wewe pekee ndiye unaamua kinachotoka.",
   'need.setObjective': 'Ninahitaji lengo kabla sijachagua hatua ya kuchukua. Weka moja hapo juu.',
   'need.stuckWhy': '{stage} imewekwa alama kuwa imekwama.',
   'need.stuckWhyReason': '{stage} imewekwa alama kuwa imekwama: {reason}.',

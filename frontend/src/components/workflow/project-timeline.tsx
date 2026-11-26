@@ -30,6 +30,8 @@ export function ProjectTimeline({
   onOpen: (stageId: string, versionId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Which entries are opened to show what their change did (26 Nov, L-290).
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const t = useT();
   const locale = useLocale();
   const tag = DATE_LOCALE[locale] ?? 'en-GB';
@@ -39,6 +41,10 @@ export function ProjectTimeline({
   const shownStage = (e: TimelineEntry) => {
     const stage = template.stages.find((s) => s.id === e.stageId);
     return stage ? stageText(locale, template.key, stage, 'label') : e.stageLabel;
+  };
+  const shownStageId = (id: string) => {
+    const stage = template.stages.find((s) => s.id === id);
+    return stage ? stageText(locale, template.key, stage, 'label') : id;
   };
 
   useEffect(() => {
@@ -100,6 +106,45 @@ export function ProjectTimeline({
                           {e.current && <span className="ms-1 text-[var(--on-surface-variant)]">{t('timeline.current')}</span>}
                         </p>
                         {e.detail && <p className="mt-0.5 line-clamp-2 text-label text-[var(--on-surface-variant)]">{e.detail}</p>}
+                        {(e.change || e.reopenedStages) && (
+                          <button
+                            type="button"
+                            data-timeline-more
+                            aria-expanded={Boolean(expanded[e.key])}
+                            onClick={() => setExpanded((x) => ({ ...x, [e.key]: !x[e.key] }))}
+                            className="mt-0.5 inline-flex items-center gap-0.5 text-label text-[var(--pm-primary)]"
+                          >
+                            <span aria-hidden className="material-symbols-outlined text-[16px]">{expanded[e.key] ? 'expand_less' : 'expand_more'}</span>
+                            {expanded[e.key] ? t('timeline.less') : t('timeline.more')}
+                          </button>
+                        )}
+                        {expanded[e.key] && (
+                          <div data-timeline-change className="mt-1 space-y-1 text-label text-[var(--on-surface-variant)]">
+                            {e.change?.pairs.map((p, k) => (
+                              <p key={`p${k}`}>
+                                <span className="text-[var(--on-surface)]">{t('timeline.was')}</span> {p.from}
+                                <br />
+                                <span className="text-[var(--on-surface)]">{t('timeline.now')}</span> {p.to}
+                              </p>
+                            ))}
+                            {e.change?.removed.map((r, k) => <p key={`r${k}`}><span className="text-[var(--on-surface)]">{t('timeline.removed')}</span> {r}</p>)}
+                            {e.change?.added.map((a, k) => <p key={`a${k}`}><span className="text-[var(--on-surface)]">{t('timeline.added')}</span> {a}</p>)}
+                            {e.change?.reopened.length ? (
+                              <div>
+                                <p className="text-[var(--on-surface)]">{t('timeline.reopened')}</p>
+                                <ul className="list-disc ps-5">
+                                  {e.change.reopened.map((r) => (
+                                    <li key={r.stageId}>{r.reason ? `${shownStageId(r.stageId)}: ${r.reason}` : shownStageId(r.stageId)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                            {e.change?.setAside.map((c, k) => <p key={`s${k}`}><span className="text-[var(--on-surface)]">{t('timeline.setAside')}</span> {c}</p>)}
+                            {e.reopenedStages?.length ? (
+                              <p><span className="text-[var(--on-surface)]">{t('timeline.reopened')}</span> {e.reopenedStages.map(shownStageId).join(', ')}</p>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                       <span className="shrink-0 text-label text-[var(--outline)]">{TIME.format(new Date(e.at))}</span>
                       {e.versionId && (
