@@ -232,7 +232,9 @@ export function ChangeGroups({
   const shown = needsYou.slice(0, NEEDS_SHOWN);
   const kept = (k: (typeof usable)[number]['kept']) => (k === 'checked' ? t('chs.keptChecked') : k === 'by_you' ? t('chs.keptByYou') : k === 'as_was' ? t('bcn.kept') : '');
   const redoLine = (r: (typeof redoing)[number]) =>
-    r.state === 'waiting'
+    r.state === 'to_check'
+      ? t('chs.toCheck', { stage: stageLabel(r.after ?? '') })
+      : r.state === 'waiting'
       ? r.reason || t('chs.waiting')
       : r.state === 'open'
         ? t('chs.openNow')
@@ -305,7 +307,11 @@ function needLine(item: NeedsYouItem, stageLabel: (id: string) => string, t: Ret
     const head = t('chs.decision', { stage, option: item.choice, because: item.because });
     return item.waitingOn.length ? `${head} ${t('chs.decisionAfter', { count: item.waitingOn.length, names: listOf(item.waitingOn.map(stageLabel)) })}` : head;
   }
-  if (item.kind === 'reapprove') return t('chs.reapprove', { stage, version: item.version, current: item.current });
+  if (item.kind === 'reapprove') {
+    const line = t('chs.reapprove', { stage, version: item.version, current: item.current });
+    return item.sent ? `${line} ${t('chs.sentHas', { to: item.sent.to, version: item.sent.version })}` : line;
+  }
+  if (item.kind === 'resend') return t('chs.resend', { stage, to: item.to, version: item.version, current: item.current });
   return t('chs.item', { stage, text: item.text });
 }
 

@@ -1443,7 +1443,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       // 17 Nov: a stage reopened only because an earlier stage was saved again
       // is checked before it is rewritten. If nothing in it relied on what
       // changed, it is kept as it is.
-      if (st?.status === 'stale' && st.stale?.since && isDone(st.stale.was) && !measuredRepair && !carriedRepair && !userNote) {
+      // 26 Nov (L-292): never for a stage that still states a value a fact replaced. Fact
+      // changes reopen the stages that quote the old value, but a repair saved before them
+      // reopens every later stage, and the check sees only that earlier stage's diff: it
+      // could close a staffing schedule that still says March 3.
+      const statesReplaced = leftoverValues(ctx.bundles[target.id]?.versions.at(-1)?.content ?? '', superseded).length > 0;
+      if (st?.status === 'stale' && st.stale?.since && isDone(st.stale.was) && !measuredRepair && !carriedRepair && !userNote && !statesReplaced) {
         const kept = await keptAfterCheck(ctx, key, target, why);
         if (kept) return kept;
       }

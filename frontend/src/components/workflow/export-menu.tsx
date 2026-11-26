@@ -30,7 +30,7 @@ import {
   type ExportBundle,
 } from '@/lib/export/project-export';
 
-export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
+export function ExportMenu({ bundle, onExported }: { bundle: ExportBundle; onExported?: () => void }) {
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
@@ -66,6 +66,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
     const { imagesForDocx } = await import('@/lib/export/images-export');
     const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project', await imagesForDocx(manuscript, bundle.project.data_files));
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.docx'));
+    onExported?.();
     setOpen(false);
   }
 
@@ -74,6 +75,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   async function exportDeck() {
     const blob = await deckToPptx(deckFromMarkdown(manuscript), bundle.project.title || 'Untitled project');
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.pptx'));
+    onExported?.();
     setOpen(false);
   }
 

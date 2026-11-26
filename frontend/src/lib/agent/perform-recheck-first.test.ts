@@ -102,6 +102,22 @@ describe('a reopened stage is checked before it is rewritten (17 Nov)', () => {
     expect(generateStageArtifact).toHaveBeenCalled();
   });
 
+  // 26 Nov (L-292): a staffing schedule that still said March 3 could be closed by a check
+  // of only the timeline before it.
+  it('a stage that still states a value a fact replaced is rewritten, whatever the check would say', async () => {
+    assessChange.mockResolvedValue({ kind: 'fact', affected: [], calculations_hold: true });
+    const b = bundles();
+    b.realign.versions = [v('r2', 2, 'The units arrive on March 3, 2027; the crew starts on March 4.', '2026-11-14T01:00:00Z')];
+    const c = ctx(b);
+    (c.project as unknown as { facts: unknown[] }).facts = [
+      { id: 'f1', statement: 'Northwind delivers the units on March 3, 2027.', kind: 'fact', retired_at: '2026-11-15T01:50:00Z', retired_reason: 'superseded', supersedes: null, created_at: '2026-11-01T00:00:00Z' },
+      { id: 'f2', statement: 'Northwind delivers the units on March 17, 2027.', kind: 'fact', retired_at: null, supersedes: 'f1', created_at: '2026-11-15T01:50:00Z' },
+    ];
+    await performStep(c);
+    expect(assessChange).not.toHaveBeenCalled();
+    expect(generateStageArtifact).toHaveBeenCalled();
+  });
+
   it('nothing earlier changed (a brief change reopened it): no check, rewritten as before', async () => {
     const same = bundles([v('o3', 3, 'Same.', '2026-11-14T00:00:00Z')]);
     await performStep(ctx(same));

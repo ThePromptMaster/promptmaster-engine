@@ -414,6 +414,8 @@ export type WorkflowEventType =
    * user released (24 Nov). payload: conflict_id, stages?, released?.
    */
   | 'inherited_hold'
+  /** The user's record that a stage's version went to someone (26 Nov, L-289). Not stage state. */
+  | 'version_shared'
   /**
    * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
    * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only

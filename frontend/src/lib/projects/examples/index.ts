@@ -7,6 +7,7 @@ import type { ExampleKey } from './cards';
 import { DEAL_SCREENING } from './deal-screening';
 import { INVESTMENT_MEMO } from './investment-memo';
 import { MEETING_BRIEFING } from './meeting-briefing';
+import { OPS_PLAN } from './ops-plan';
 import { FINISHED_RESULTS, type FinishedResult } from './results';
 import { SLIDE_DECK } from './slide-deck';
 import { VENDOR_CHOICE } from './vendor-choice';
@@ -58,7 +59,7 @@ export function resultOf(example: Pick<Example, 'key'>): FinishedResult | undefi
   return FINISHED_RESULTS[example.key];
 }
 
-export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK, MEETING_BRIEFING, VENDOR_CHOICE];
+export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK, MEETING_BRIEFING, VENDOR_CHOICE, OPS_PLAN];
 
 export function exampleBySlug(slug: string): Example | undefined {
   return EXAMPLES.find((e) => e.slug === slug);

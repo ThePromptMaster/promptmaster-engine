@@ -40,11 +40,14 @@ describe('the demo: Option B\'s card readers change after B was chosen', () => {
       touched: ['costs', 'draft', 'approve', 'final'],
       manualChecks: { 'approve.approved': false },
     }));
-    expect(s.usable.map((u) => u.stageId)).toEqual(['brief', 'check']);
-    expect(s.redoing.map((r) => [r.stageId, r.state])).toEqual([['costs', 'waiting'], ['draft', 'waiting'], ['final', 'waiting']]);
+    // 26 Nov (L-292): the check comes after the costs still waiting, so it is not usable yet:
+    // the costs' update reopens it to be checked.
+    expect(s.usable.map((u) => u.stageId)).toEqual(['brief']);
+    expect(s.redoing.map((r) => [r.stageId, r.state])).toEqual([['costs', 'waiting'], ['draft', 'waiting'], ['check', 'to_check'], ['final', 'waiting']]);
+    expect(s.redoing[2].after).toBe('costs');
     // In the user's words, never the instruction written for the model.
     expect(s.redoing[0].reason).toBe('It uses “Option B: card readers $1,975”, which has changed.');
-    expect(s.redoing[2].reason).toContain('Your choice of Option B: $20,625 all-in is set aside until you choose again.');
+    expect(s.redoing[3].reason).toContain('Your choice of Option B: $20,625 all-in is set aside until you choose again.');
     expect(s.redoing.map((r) => r.reason).join(' ')).not.toMatch(/Do not present|decision of record/);
     expect(s.needsYou).toEqual([{ kind: 'decision', stageId: 'approve', choice: B.choice, because: B.because, waitingOn: ['costs', 'draft'] }]);
   });
@@ -152,3 +155,51 @@ describe('a stage Go repaired because of the change is redone, not untouched (pr
   });
 });
 
+
+
+describe('one date several stages rely on, and who already has which version (26 Nov, L-288/L-289/L-292)', () => {
+  const OPS = ['brief', 'timeline', 'staffing', 'budget', 'commitment', 'plan'];
+  const ops = { stages: OPS.map((id) => ({ id, label: id, exit_criteria: [] })) } as never;
+  const stale = { status: 'stale', stale: { reason: 'It states "delivers on March 3, 2027", which changed: "…"', since: SINCE, was: 'completed_with_artifact' } };
+  const done = { status: 'completed_with_artifact' };
+
+  it('right after the date changed: what quotes it waits, what comes after the first of them will be checked, the brief stands', () => {
+    const s = changeSummary(input({
+      template: ops,
+      state: { stages: { brief: done, timeline: stale, staffing: stale, budget: done, commitment: done, plan: stale } } as never,
+      touched: ['timeline', 'staffing', 'plan'],
+    }));
+    expect(s.usable.map((u) => u.stageId)).toEqual(['brief']);
+    expect(s.redoing.map((r) => [r.stageId, r.state, r.after ?? null])).toEqual([
+      ['timeline', 'waiting', null], ['staffing', 'waiting', null], ['budget', 'to_check', 'timeline'], ['commitment', 'to_check', 'timeline'], ['plan', 'waiting', null],
+    ]);
+  });
+
+  it('"Keep them as they are" leaves nothing to check', () => {
+    const s = changeSummary(input({
+      template: ops,
+      state: { stages: { brief: done, timeline: done, staffing: done, budget: done, commitment: done, plan: done } } as never,
+      events: [{ type: 'brief_change_dismissed', stage_id: 'plan', created_at: later(1), payload: {} }] as never,
+      touched: ['timeline', 'staffing', 'plan'],
+    }));
+    expect(s.redoing.filter((r) => r.state === 'to_check')).toEqual([]);
+  });
+
+  it('a stage whose readers have an older version: said with its re-approval, or on its own', () => {
+    const sentBehind = [
+      { stageId: 'commitment', sent: { recordId: 'r1', stageId: 'commitment', versionId: 'c1', versionNumber: 1, to: 'Bayview Grocers', on: '2026-11-26', at: later(0) }, current: 2, changes: [] },
+      { stageId: 'staffing', sent: { recordId: 'r2', stageId: 'staffing', versionId: 's1', versionNumber: 1, to: 'Harbor Crew Hire', on: '2026-11-26', at: later(0) }, current: 2, changes: [] },
+    ];
+    const s = changeSummary(input({
+      template: ops,
+      state: { stages: { brief: done, timeline: done, staffing: done, budget: done, commitment: done, plan: done } } as never,
+      touched: ['timeline', 'staffing', 'plan'],
+      reapprove: { commitment: { approvals: ['I approve this commitment to send to Bayview Grocers'], version: 1, current: 2 } },
+      sentBehind,
+    }));
+    expect(s.needsYou).toEqual([
+      { kind: 'reapprove', stageId: 'commitment', version: 1, current: 2, sent: { to: 'Bayview Grocers', version: 1 } },
+      { kind: 'resend', stageId: 'staffing', to: 'Harbor Crew Hire', version: 1, current: 2 },
+    ]);
+  });
+});
