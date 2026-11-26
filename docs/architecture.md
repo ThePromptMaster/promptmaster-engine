@@ -212,6 +212,29 @@ it like any table. The scale is fixed once the table has rows; a verdict the use
 keeps the model's on `model_verdict`. `stageDrafts` is false for it, so neither the Draft
 button nor Go drafts it, and Go cannot paste for the user.
 
+**Assess runs and batches (2026-11-26, L-284/L-285).** A paste is judged twelve items a call
+(`assessPaste`, `lib/workflow/assess-run.ts`), each call's rows saved as they land and what is
+left kept with the table as `pending`. One paste is one batch number however many calls it
+takes, and its leftovers carry it (`pending.batch`). One judge at a time: the page's run and
+Go's `assess_batch` share a per-tab lock (`lib/workflow/assess-lock.ts`), which also holds the
+run's progress and the page's Stop, so the screen says what is being judged while it is. A reply
+that comes back cut off or unreadable keeps the rest as pending rather than dropping it. The
+table shows all batches, the latest, or one, sorted best first or newest first within it.
+
+**How a stage thinks (2026-11-26, L-286).** Each request about a stage is sent the mode that stage
+is worked in (`thinkingFor` / `modeForStage`, `lib/workflow/stage-mode.ts`; `inputsForStage` in
+`stage-requests.ts`). `projects.stage_modes = 'stage'` (the default, "Let PromptMaster choose for
+each step") uses the stage's `recommended_modes[0]`, which the workflow designer now gives every
+designed stage; `'project'` uses `projects.mode` on every step. No other mode value reaches the
+backend.
+
+**Who has which version, and what changed since (2026-11-26, L-289/L-290).** A `version_shared`
+event is the user's record that a stage's version went to someone (`lib/workflow/shared-versions.ts`);
+`projectState` never reads it. On reopening, `changesSince` (`lib/workflow/since-summary.ts`) reads
+the log from a per-browser marker and lists each change, what was redone or kept, and what was sent.
+A stage that still states a value a fact replaced is always rewritten, never closed by the
+earlier-stage check (L-292).
+
 **A chapter takes the mode as a voice, not as a scaffold (2026-10-03).** Every stage
 prompt goes through `_shared_system` (`backend/promptmaster/conversation.py`): the
 PromptMaster context, then the mode's lock, tone and `[INTERNAL SCAFFOLDING]`. Architect
