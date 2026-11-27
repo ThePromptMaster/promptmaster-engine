@@ -16,6 +16,8 @@ import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { ProjectFact } from '@/types/project';
 
 const MAX_LABELLED = 24;
+/** A sentence that asks someone to do something: it opens with what to do. */
+const ACTION = /^\s*(?:\d+[.)]\s*)?(?:run|produce|send|confirm|check|record|file|pass|pay|make|call|ship|deliver|tell|ask|book|update|prepare|submit|review|approve|obtain|collect|arrange|schedule|notify|contact|issue|complete|keep|hold|load|move|switch)\b/i;
 const MAX_FACTS = 120;
 const CURRENT_CHARS = 30_000;
 
@@ -68,9 +70,13 @@ export async function retireMovedPastTasks({ project, heads, events, tasks, sign
     if (signal?.aborted) break;
     let o: TaskOutcome = labels.get(r.task.id) ?? { outcome: r.why };
     let replacement: ProjectTask | null = null;
-    if (o.outcome === 'reworded') {
-      const now = o.now?.trim() ?? '';
-      if (!now || !statesAsCurrent(r.head.text, now)) o = { outcome: 'gone' };
+    // A replacement the work now asks for, word for word, is a task in its place at once, rather than
+    // only after the next check (27 Nov, production pass: "Run West payroll from file W4 on the new
+    // payroll system" replaced the W3 task and was on no list until then).
+    const carriesOn = o.outcome === 'reworded' ? o.now : o.outcome === 'replaced' && r.head.prose && o.quote && statesAsCurrent(r.head.text, o.quote) && ACTION.test(o.quote) ? o.quote : undefined;
+    if (carriesOn !== undefined) {
+      const now = carriesOn.trim();
+      if (!now || !statesAsCurrent(r.head.text, now)) o = o.outcome === 'reworded' ? { outcome: 'gone' } : o;
       else if (!have.has(taskKey(now))) {
         try {
           replacement = await createTask(project.id, project.user_id, {

@@ -172,3 +172,16 @@ describe('stageHeads', () => {
     expect(heads.c?.prose).toBe(false);
   });
 });
+
+describe('the change a closed task is about (27 Nov, production pass)', () => {
+  it("names South's completion report for South's run, not West's file change saved a moment later", async () => {
+    const { changeFor } = await import('./task-reconcile');
+    const changes = [
+      { seq: 40, at: '2026-11-27T19:24:30Z', what: 'OPS-02: South S4 ran successfully on the new system at 3:10 p.m. (completion report received). North and West have not run.' },
+      { seq: 41, at: '2026-11-27T19:24:40Z', what: "REC-03: West fixed its two differences in replacement file W4; W4 is now West's final file." },
+    ];
+    expect(changeFor(changes, 'Run South payroll from file S4 on the new payroll system.', 'South S4 ran successfully on the new system at 3:10 p.m.')?.seq).toBe(40);
+    expect(changeFor(changes, 'Run West payroll from file W3 on the old payroll system.', 'Run West payroll from file W4 on the new payroll system.')?.seq).toBe(41);
+    expect(changeFor(changes.slice(1), 'anything')?.seq).toBe(41);
+  });
+});
