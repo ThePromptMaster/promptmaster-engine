@@ -57,6 +57,14 @@ describe('approved emails that changed go back for review', () => {
     expect(changed[0]).toMatchObject({ movable: false, reason: expect.stringContaining('since replaced by "Go-live moved to 21 March 2027"') });
   });
 
+  // Sean's first test: "change the link on one queued email … the old-link message held for review".
+  it('a new link on one queued email sends back that email only', async () => {
+    const approvals = [approvedFor(d1, message), approvedFor(d2, message)];
+    const one = { ...d1, overrides: JSON.stringify({ link: 'https://promptmasterv1.com/demo' }) };
+    const changed = await findChanged({ drafts: [one, { ...d2 }], message, identity: { sender, signature: null, logo: null }, approvals, sends: [{ id: 's_d1', approval_id: 'a_d1', status: 'scheduled' }, { id: 's_d2', approval_id: 'a_d2', status: 'scheduled' }] as unknown as SendRecord[] });
+    expect(changed.map((c) => [c.draftId, c.reason])).toEqual([['d1', 'Changed since you approved it: the text, a link.']]);
+  });
+
   it('nothing goes back when nothing changed, or before who it goes out as is known', async () => {
     expect(await findChanged({ drafts: [d1], message, identity: { sender, signature: null, logo: null }, approvals: [approvedFor(d1, message)], sends })).toEqual([]);
     expect(await findChanged({ drafts: [d1], message: blankMessage(), identity: { sender: null, signature: null, logo: null }, approvals: [approvedFor(d1, message)], sends })).toEqual([]);

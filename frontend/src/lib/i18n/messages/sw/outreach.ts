@@ -178,6 +178,8 @@ export const sw: Record<keyof typeof en, string> = {
   "outreach.whoShouldItBe": "Awe nani?",
   "outreach.chooseThem": "Chagua {name}",
   "outreach.useStartFile": "Tumia {name}, iliyoambatishwa mwanzoni",
+  "outreach.linkForThis": "Kiungo cha barua pepe hii",
+  "outreach.editSendsBack": "Kubadilisha barua pepe iliyoidhinishwa kunairudisha kwako kukagua kabla haijatumwa.",
   "outreach.group.import_change": "{count} ambapo uingizaji mpya unasema kitu tofauti.",
   "outreach.use.import_change": "Tumia thamani mpya",
   "outreach.keepMine": "Baki na ulichokuwa nacho",

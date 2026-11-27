@@ -178,6 +178,8 @@ export const ar: Record<keyof typeof en, string> = {
   "outreach.whoShouldItBe": "من ينبغي أن يكون؟",
   "outreach.chooseThem": "اختر {name}",
   "outreach.useStartFile": "استخدم {name} المرفق في البداية",
+  "outreach.linkForThis": "رابط هذه الرسالة",
+  "outreach.editSendsBack": "تغيير رسالة معتمدة يعيدها إليك للمراجعة قبل أن تُرسل.",
   "outreach.group.import_change": "{count} تقول فيها عملية الاستيراد الجديدة شيئًا مختلفًا.",
   "outreach.use.import_change": "استخدم القيم الجديدة",
   "outreach.keepMine": "احتفظ بما كان لديك",
