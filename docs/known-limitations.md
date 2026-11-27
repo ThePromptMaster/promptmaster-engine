@@ -6357,3 +6357,20 @@ Limits:
   the change is recorded and nothing is reopened.
 - An update that changed only spacing or punctuation, or a reference made before snapshots existed (31 Oct), is
   not a change.
+
+### L-323 — A round with nothing new moves on to the write-up instead of starting another (2026-11-28)
+Found in the production passes of this round (payroll, Cedar Street and museum rebuilds): a designed workflow
+for "maintain the records; after each update bring them up to date" has a stage that closes a round and loops
+back. With nothing new to take in, Go started round after round under "Handle them for me", redoing every stage
+each time (about $1–2 a round), and never reached the final records. On the museum run it started the next round
+straight after writing "no further round is needed".
+
+Now, outside research, a round's closing stage offers the next round only when the user changed the brief or
+facts since the round began and since that stage was last written (`newSinceRoundBegan`). Otherwise Go moves on
+to the stage after the round (the records, the packet). An update afterwards reopens what it concerns, and the
+repairs take it in.
+
+Limits:
+- Research keeps its rounds: a round there finds things of its own.
+- A change Go made itself (a repair, a "made before the change" reopening) is not new input.
+
