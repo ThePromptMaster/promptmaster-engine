@@ -41,6 +41,16 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
   const [said, setSaid] = useState<string | null>(null);
   const [senders, setSenders] = useState<OutreachSender[]>([]);
   const [signatures, setSignatures] = useState<OutreachSignature[]>([]);
+  const [sentSends, setSentSends] = useState<{ approval_id: string; status: string }[]>([]);
+  useEffect(() => {
+    let live = true;
+    listSends(context.project.id)
+      .then((s) => live && setSentSends(s))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [context.project.id]);
 
   useEffect(() => {
     let live = true;
@@ -126,7 +136,8 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
 
   // What saving would change, shown before it is saved (Sean, 26 Nov).
   const drafts = parseDrafts(context.parts.drafts?.content);
-  const preview = dirty && drafts.length ? previewChange(saved, m, drafts) : null;
+  const sentApprovals = useMemo(() => new Set(sentSends.filter((s) => s.status === 'submitted' || s.status === 'confirmed').map((s) => s.approval_id)), [sentSends]);
+  const preview = dirty && drafts.length ? previewChange(saved, m, drafts, sentApprovals) : null;
   const replaceThere = async () => {
     if (!preview?.kept.length || !context.parts.drafts) return;
     setError(null);
@@ -208,6 +219,7 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
           <p className="font-semibold">{t('outreach.change.lead')}</p>
           <p>{t('outreach.change.follow', { count: preview.follow })}</p>
           {preview.approved > 0 && <p className="text-[var(--pm-tertiary)]" data-change-approved>{t('outreach.change.approved', { count: preview.approved })}</p>}
+          {preview.sent > 0 && <p className="text-[var(--on-surface-variant)]" data-change-sent>{t('outreach.change.sent', { count: preview.sent })}</p>}
           {preview.kept.length > 0 && (
             <p className="flex flex-wrap items-center gap-2" data-change-kept>
               <span>{t('outreach.change.kept', { count: preview.kept.length })}</span>

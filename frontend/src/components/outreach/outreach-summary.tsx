@@ -14,11 +14,17 @@ export function OutreachSummary({ context }: { context: OutreachContext }) {
   const draftsContent = context.parts.drafts?.content;
   useEffect(() => {
     let live = true;
-    listSends(context.project.id)
-      .then((s) => live && setSends(s))
-      .catch(() => undefined);
+    const read = () => {
+      listSends(context.project.id)
+        .then((s) => live && setSends(s))
+        .catch(() => undefined);
+    };
+    read();
+    // Sends move without the drafts changing (scheduled, sent by the job runner): read again now and then (27 Nov pass).
+    const timer = setInterval(read, 15_000);
     return () => {
       live = false;
+      clearInterval(timer);
     };
   }, [context.project.id, draftsContent]);
   const c = outreachCounts({ contacts: context.parts.contacts?.content, message: context.parts.message?.content, drafts: draftsContent, sends, facts: context.project.facts });

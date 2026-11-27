@@ -188,6 +188,7 @@ export const ar: Record<keyof typeof en, string> = {
   "outreach.change.lead": "حفظ هذا يغيّر الرسائل المصنوعة من النص:",
   "outreach.change.follow": "رسائل يتغيّر نصها: {count}",
   "outreach.change.approved": "المعتمدة منها، التي تعود إليك لاعتمادها مجددًا: {count}",
+  "outreach.change.sent": "أُرسلت بالفعل، وتبقى كما أُرسلت: {count}",
   "outreach.change.kept": "رسائل عدّلتها وتحتفظ بالنص القديم الذي كتبته: {count}",
   "outreach.change.replaceThere": "استبدل هناك أيضًا",
   "outreach.sum.decide": "جهات اتصال بانتظارك: {count}",

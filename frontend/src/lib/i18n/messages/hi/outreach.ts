@@ -188,6 +188,7 @@ export const hi: Record<keyof typeof en, string> = {
   "outreach.change.lead": "इसे सहेजने से संदेश से बने ईमेल बदलते हैं:",
   "outreach.change.follow": "ईमेल जिनका टेक्स्ट बदलता है: {count}",
   "outreach.change.approved": "इनमें स्वीकृत ईमेल, जो दोबारा स्वीकृति के लिए आपको लौटते हैं: {count}",
+  "outreach.change.sent": "पहले ही भेजे जा चुके, जो जैसे गए वैसे ही रहेंगे: {count}",
   "outreach.change.kept": "आपके संपादित ईमेल जो आपके लिखे पुराने शब्द रखते हैं: {count}",
   "outreach.change.replaceThere": "वहाँ भी बदलें",
   "outreach.sum.decide": "आपका इंतज़ार कर रहे संपर्क: {count}",
