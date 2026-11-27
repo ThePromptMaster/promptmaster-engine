@@ -41,6 +41,23 @@ export interface ReadinessRow {
   detail?: string;
 }
 
+/**
+ * What holds the deliverable's "Ready" (28 Nov, Sean, Harborlight; L-326):
+ * what holds finishing, and what the latest check of its current version says
+ * against it. "I ran Check this stage. It correctly found 36 seats and a
+ * four-seat shortfall, but the readiness panel still showed Ready." A check's
+ * verdict does not hold up "Finish project" (`blocksCompletion`), but a version
+ * its own check faults is not ready — the transition bar and Go's move-on gate
+ * already read it so.
+ */
+export function readinessBlocking(
+  outstanding: readonly OutstandingItem[],
+  checkSays: { stageId: string; label: string; says: string } | null
+): OutstandingItem[] {
+  const own: OutstandingItem[] = checkSays ? [{ kind: 'check_says', ...checkSays }] : [];
+  return [...own, ...outstanding.filter(blocksCompletion)];
+}
+
 export function deliverableReadiness(input: {
   versions: readonly { id: string; version_number: number }[];
   /** The latest objective check: what it said and which version it read. */

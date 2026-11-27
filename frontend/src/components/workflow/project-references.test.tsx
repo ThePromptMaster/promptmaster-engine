@@ -5,7 +5,9 @@ import userEvent from '@testing-library/user-event';
 const addReference = vi.fn();
 const removeReference = vi.fn();
 const setReferenceFacts = vi.fn();
+const takeSnapshot = vi.fn();
 vi.mock('@/lib/supabase/references', () => ({
+  takeSnapshot: (...a: unknown[]) => takeSnapshot(...a),
   addReference: (...a: unknown[]) => addReference(...a),
   removeReference: (...a: unknown[]) => removeReference(...a),
   setReferenceFacts: (...a: unknown[]) => setReferenceFacts(...a),
@@ -69,5 +71,23 @@ describe('Other projects, in the workspace (client, 21 Oct, email 5)', () => {
     expect(screen.getByText(/In the trash/)).toBeTruthy();
     await userEvent.click(screen.getAllByRole('button', { name: 'Stop using' })[1]);
     expect(removeReference).toHaveBeenCalledWith('r2');
+  });
+
+  it('an update from the original hands the copy before and after to the page (L-326)', async () => {
+    const before = { title: 'Harborlight source', objective: '', deliverable: 'Answer', text: '24 seats per session', facts: [], updatedAt: '' };
+    const after = { ...before, text: '18 seats per session' };
+    const row = { id: 'r1', project_id: 'self', user_id: 'u', referenced_project_id: 'p2', include_facts: true, position: 0, created_at: '', snapshot: before, snapshot_at: '' };
+    useProjectStore.setState({ references: [row] });
+    takeSnapshot.mockResolvedValue({ ...row, snapshot: after });
+    const onUpdated = vi.fn(async () => undefined);
+    render(
+      <ProjectReferences
+        project={{ id: 'self', user_id: 'u', references: [{ referenceId: 'r1', projectId: 'p2', title: 'Harborlight source', objective: '', deliverable: 'Answer', text: '24 seats per session', facts: [], deleted: false, updatedAt: '', snapshotAt: '2026-11-27T16:00:00Z' }] }}
+        onUpdated={onUpdated}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Update from the original/ }));
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(row, before, after, 0));
+    expect(reload).toHaveBeenCalled();
   });
 });

@@ -174,7 +174,11 @@ export function BriefChangeNotice({
     );
   }
   const fieldKey = (event.payload?.field as WatchedField) ?? 'objective';
-  const field = !BRIEF_FIELD_LABEL[fieldKey] ? t('bcn.brief') : locale === 'en' ? BRIEF_FIELD_LABEL[fieldKey] : t(FIELD_KEY[fieldKey]).toLowerCase();
+  // A linked project updated from its original is named as itself (L-326).
+  const reference = event.payload?.origin === 'reference' ? (event.payload?.reference as { name?: unknown } | undefined)?.name : undefined;
+  const field = typeof reference === 'string' && reference
+    ? reference
+    : !BRIEF_FIELD_LABEL[fieldKey] ? t('bcn.brief') : locale === 'en' ? BRIEF_FIELD_LABEL[fieldKey] : t(FIELD_KEY[fieldKey]).toLowerCase();
   const affected = (event.payload?.affected as { stage_id: string; reason: string }[] | undefined) ?? [];
   const names = stageIds.map(stageLabel);
   const list = listOf(names);

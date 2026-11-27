@@ -6281,3 +6281,31 @@ Limits:
   Go no longer makes a new version of approved work for wording.
 - "What it changes for the people doing the work" is a planner instruction, not checked in code.
 
+
+### L-326 — A linked project updated from its original reopens what used it; a faulted version is not "Ready" (2026-11-28)
+
+Sean, 27 Nov (Harborlight Workshop, two linked projects): "I changed the source to 18 seats per session and
+clicked Update from the original in the dependent project. The source copy refreshed, but Answer v3 still showed
+48 seats and Ready to move on. I ran Check this stage. It correctly found 36 seats and a four-seat shortfall, but
+the readiness panel still showed Ready."
+
+What happened: "Update from the original" stored the new copy on `project_references` and recorded nothing, so no
+stage was marked for a recheck. The readiness panel's Ready row read only what holds finishing the project, and a
+check's verdict on the current version deliberately does not hold that (`blocksCompletion`), so Ready stayed on
+while the transition bar and Go's move-on gate both read the same check as failing.
+
+Now:
+- **An update is a change** (`lib/workflow/reference-change.ts`, `components/workflow/use-reference-change.ts`):
+  when what the reference brings (its deliverable, and its facts when they are sent) says something new, the
+  finished stages and drafts in progress are judged against it by the same `assess-change` check a brief edit
+  gets, and one `brief_changed` is recorded (`origin: 'reference'`, `field: 'context'`, with the reference's
+  name). The stages it names show "needs recheck"; the notice names the linked project.
+- **Ready reads the check** (`readinessBlocking`, `lib/workflow/readiness.ts`): the latest check of the
+  deliverable's current version, when it faults it, holds Ready and is shown as the reason. "Finish project" is
+  unchanged.
+
+Limits:
+- Which stages relied on the reference is a model's judgment, as for a brief edit. When the check cannot be made,
+  the change is recorded and nothing is reopened.
+- An update that changed only spacing or punctuation, or a reference made before snapshots existed (31 Oct), is
+  not a change.
