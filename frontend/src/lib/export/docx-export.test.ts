@@ -66,3 +66,33 @@ describe('right-to-left lines (Sean, 24 Oct: Arabic)', () => {
     expect(rightToLeft('你好')).toBe(false);
   });
 });
+
+describe('tables are Word tables (27 Nov, production pass)', () => {
+  const md = '# Plan\n\n## 1. Key dates\n\n| Step | Date |\n|---|---|\n| Delivery | Wednesday, April 7 |\n| Switch | **Tuesday, April 20** |\n\nAfter the table.';
+
+  it('reads a header row, a rule row and the rows under it as one table', () => {
+    expect(markdownToBlocks(md)).toEqual([
+      { kind: 'title', text: 'Plan' },
+      { kind: 'h1', text: '1. Key dates' },
+      { kind: 'table', rows: [['Step', 'Date'], ['Delivery', 'Wednesday, April 7'], ['Switch', 'Tuesday, April 20']] },
+      { kind: 'paragraph', text: 'After the table.' },
+    ]);
+  });
+
+  it('a line of pipes with no rule row under it stays text', () => {
+    expect(markdownToBlocks('| not a table |\nnext line')).toEqual([{ kind: 'paragraph', text: '| not a table | next line' }]);
+  });
+
+  it('a table at the very end is kept', () => {
+    expect(markdownToBlocks('| A | B |\n|---|---|\n| 1 | 2 |').at(-1)).toEqual({ kind: 'table', rows: [['A', 'B'], ['1', '2']] });
+  });
+
+  it('the Word file holds a table, not the pipes', async () => {
+    const blob = await manuscriptToDocx(md, 'Plan');
+    const JSZip = (await import('jszip')).default;
+    const xml = await (await JSZip.loadAsync(await blob.arrayBuffer())).file('word/document.xml')!.async('string');
+    expect(xml).toContain('<w:tbl>');
+    expect(xml).not.toContain('|---|');
+    expect(xml).toContain('Tuesday, April 20');
+  });
+});

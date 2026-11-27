@@ -7,11 +7,12 @@
  * not carry a document library it uses once. The Markdown the app already
  * assembles (`toManuscriptMarkdown`) is the source; the mapping is the plain
  * one — headings, paragraphs, bullets — with code and displayed equations
- * kept verbatim in a fixed-width font (M2, 8 Oct); tables arrive as text.
- * Fidelity beyond that is a known limitation, not a promise.
+ * kept verbatim in a fixed-width font (M2, 8 Oct); a table is a Word table
+ * (27 Nov). Fidelity beyond that is a known limitation, not a promise.
  */
 
 import { normalizeMath } from '@/lib/markdown/math';
+import { cells, TABLE_ROW, TABLE_RULE } from './markdown-tables';
 
 export type DocBlock =
   | { kind: 'title' | 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet'; text: string }
@@ -24,7 +25,12 @@ export type DocBlock =
   /** A displayed equation, as its LaTeX. */
   | { kind: 'math'; text: string }
   /** An image placed on its own line as `![caption](project-file:<id>)`. */
-  | { kind: 'image'; id: string; text: string };
+  | { kind: 'image'; id: string; text: string }
+  /**
+   * A Markdown table: the header row first (27 Nov, production pass: the plan's
+   * key-dates table reached Word as one paragraph of pipes and dashes).
+   */
+  | { kind: 'table'; rows: string[][] };
 
 /** An image's bytes, ready to embed. `type` is what Word can hold; others are captioned instead. */
 export interface DocImage {
@@ -50,7 +56,17 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
   // is read line by line as before.
   let fence: { marker: string; language: string; lines: string[] } | null = null;
   let math: string[] | null = null;
-  for (const raw of normalizeMath(markdown.replace(/\r\n?/g, '\n')).split('\n')) {
+  let table: string[][] | null = null;
+  const lines = normalizeMath(markdown.replace(/\r\n?/g, '\n')).split('\n');
+  for (const [at, raw] of lines.entries()) {
+    if (table) {
+      if (TABLE_ROW.test(raw)) {
+        if (!TABLE_RULE.test(raw)) table.push(cells(raw));
+        continue;
+      }
+      blocks.push({ kind: 'table', rows: table });
+      table = null;
+    }
     if (fence) {
       if (raw.trim().startsWith(fence.marker)) {
         blocks.push({ kind: 'code', text: fence.lines.join('\n'), language: fence.language });
@@ -74,6 +90,12 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
     if (raw.trim() === '$$') {
       flush();
       math = [];
+      continue;
+    }
+    // A header row with a rule row under it starts a table.
+    if (TABLE_ROW.test(raw) && TABLE_RULE.test(lines[at + 1] ?? '') && /-/.test(lines[at + 1] ?? '')) {
+      flush();
+      table = [cells(raw)];
       continue;
     }
     const line = raw.trimEnd();
@@ -109,6 +131,7 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
     paragraph.push(line.trim());
   }
   flush();
+  if (table) blocks.push({ kind: 'table', rows: table });
   // An unclosed fence or equation is still kept, not lost.
   if (fence) blocks.push({ kind: 'code', text: fence.lines.join('\n'), language: fence.language });
   if (math) blocks.push({ kind: 'math', text: math.join('\n') });
@@ -148,13 +171,26 @@ export async function manuscriptToDocx(
   images: Record<string, DocImage> = {}
 ): Promise<Blob> {
   const docx = await import('docx');
-  const { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = docx;
+  const { Document, HeadingLevel, ImageRun, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = docx;
   const blocks = markdownToBlocks(markdown);
   // Arabic reads right to left in Word too (Sean, 24 Oct): the paragraph and its run.
   const bidi = (text: string) => (rightToLeft(text) ? { bidirectional: true } : {});
   const run = (text: string) => new TextRun({ text, ...(rightToLeft(text) ? { rightToLeft: true } : {}) });
-  const children = blocks.flatMap((b) => {
+  const children = blocks.flatMap((b): (InstanceType<typeof Paragraph> | InstanceType<typeof Table>)[] | InstanceType<typeof Paragraph> => {
     switch (b.kind) {
+      case 'table': {
+        const width = Math.max(...b.rows.map((r) => r.length));
+        const rows = b.rows.map(
+          (r, i) =>
+            new TableRow({
+              tableHeader: i === 0,
+              children: Array.from({ length: width }, (_, c) =>
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: r[c] ?? '', bold: i === 0, ...(rightToLeft(r[c] ?? '') ? { rightToLeft: true } : {}) })] })] })
+              ),
+            })
+        );
+        return [new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }), new Paragraph({ text: '', spacing: { after: 120 } })];
+      }
       case 'image': {
         const img = images[b.id];
         const caption = new Paragraph({ children: [new TextRun({ text: b.text, italics: true })], spacing: { after: 200 } });
@@ -196,7 +232,7 @@ export async function manuscriptToDocx(
       default:
         return new Paragraph({ children: [run(b.text)], spacing: { after: 200 }, ...bidi(b.text) });
     }
-  }) as InstanceType<typeof Paragraph>[];
+  });
   const doc = new Document({
     creator: 'PromptMaster',
     title,
