@@ -9,7 +9,7 @@
  */
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 import { parseContacts } from './contacts';
-import { outreachText } from './digest-text';
+import { CHECKED, earlierContact, outreachText } from './digest-text';
 import { blankMessage, changedBySync, draftText, parseDrafts, parseMessage, syncDrafts, type OutreachMessage } from './drafts';
 import { researchLeft } from './research-run';
 
@@ -107,10 +107,14 @@ export function outreachExcerpt(template: WorkflowTemplate, stage: StageDefiniti
   if (part !== 'drafts') return outreachText(part, own);
   const { parts } = outreachStages(template);
   const message = parseMessage(latest(bundles, parts.message?.id)) ?? blankMessage();
+  const contacts = new Map(parseContacts(latest(bundles, parts.contacts?.id)).items.map((r) => [r.id, r]));
   const emails = parseDrafts(own).map((d, i) => {
     const text = draftText(d, message);
     const state = d.status === 'approved' ? 'approved by the user' : d.status === 'set_aside' ? `set aside${d.reason ? `: ${d.reason}` : ''}` : 'waiting for the user';
-    return `${i + 1}. To ${d.to || '(no address)'} [${state}]\nSubject: ${text.subject}\n${text.body}`;
+    // 27 Nov pass: the objective check read these emails and asked for "your sent-mail history".
+    const row = contacts.get(d.contact_id);
+    const before = row ? `\nEarlier contact: ${earlierContact(row)}${row.contacted && row.status === 'ready' ? '; the user chose to write again' : ''}.` : '';
+    return `${i + 1}. To ${d.to || '(no address)'} [${state}]${before}\nSubject: ${text.subject}\n${text.body}`;
   });
-  return [...emails, outreachText('drafts', '{"items":[]}').trim()].join('\n\n');
+  return [...emails, outreachText('drafts', '{"items":[]}').trim(), CHECKED].join('\n\n');
 }
