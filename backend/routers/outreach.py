@@ -203,6 +203,8 @@ async def api_research(req: ResearchRequest, client: OpenRouterClient = Depends(
 # ---------------------------------------------------------------------------
 
 OFF = "Sending email is turned off on this server."
+MAILBOX_CHANGED = "The connected mailbox is not the one this email was approved from."
+MAILBOX_GONE = "Gmail is not connected, or could not be read, so nothing was sent. Reconnect it in Settings, then approve the email again."
 
 
 def _on() -> None:
@@ -275,8 +277,11 @@ def _checked(req: TicketedRequest, user: AuthUser) -> None:
 async def _mailbox_matches(composio: Composio, user: AuthUser, snapshot: dict) -> str:
     box = await mailbox_address(composio, user.id, "gmail")
     sender = str((snapshot.get("from") or {}).get("address") or "").lower()
-    if not box or box.address != sender:
-        raise HTTPException(status_code=409, detail={"code": "mailbox_changed", "message": "The connected mailbox is not the one this email was approved from."})
+    if not box:
+        # 27 Nov pass: with Gmail disconnected the hold said the mailbox had changed.
+        raise HTTPException(status_code=409, detail={"code": "mailbox_changed", "message": MAILBOX_GONE})
+    if box.address != sender:
+        raise HTTPException(status_code=409, detail={"code": "mailbox_changed", "message": MAILBOX_CHANGED})
     return box.address
 
 

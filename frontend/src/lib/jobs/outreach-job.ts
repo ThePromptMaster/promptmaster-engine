@@ -211,7 +211,8 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
     return 'held' as const;
   };
   const adopt = async (ids: Partial<Ids>) => {
-    await record({ status: 'submitted', provider_message_id: ids.message_id ?? '', provider_thread_id: ids.thread_id ?? '', thread_url: ids.thread_url ?? '' }, 'submitted');
+    // Any "Waiting: …" from an earlier try is over once the mailbox has it.
+    await record({ status: 'submitted', status_reason: '', provider_message_id: ids.message_id ?? '', provider_thread_id: ids.thread_id ?? '', thread_url: ids.thread_url ?? '' }, 'submitted');
     await save({ ...cp, step: 'confirm', message_id: ids.message_id, confirms: 0 });
   };
 
@@ -342,7 +343,7 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
     return 'done';
   } catch (e) {
     if (e instanceof OutreachCallError) {
-      if (e.code === 'mailbox_changed') return await hold('The connected mailbox is not the one this email was approved from.');
+      if (e.code === 'mailbox_changed') return await hold(e.message || 'The connected mailbox is not the one this email was approved from.');
       if (e.code === 'not_approved') return await hold('It no longer matches what was approved.');
       if (e.code === 'off') {
         await record({ status_reason: 'Waiting: sending is turned off on the server.' }, 'waiting', { why: 'off' });

@@ -144,6 +144,22 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
+ * The do-not-contact entry an address falls under, as it was saved; null when none. Addresses are
+ * compared as `normalizeEmail` reads them, so an opt-out from jane@gmail.com also stops j.ane+x@gmail.com
+ * (27 Nov pass: the job runner compared them as typed, while the import compared them like this).
+ */
+export function suppressedBy(address: string, suppressed: readonly { address?: string | null; domain?: string | null }[]): string | null {
+  const key = normalizeEmail(address);
+  if (!key) return null;
+  const domain = key.split('@')[1] ?? '';
+  for (const s of suppressed) {
+    if (s.address && normalizeEmail(s.address) === key) return s.address;
+    if (s.domain && domainOf(s.domain) === domain) return s.domain;
+  }
+  return null;
+}
+
+/**
  * The domain in a website ("https://www.Acme.com/about" is "acme.com") or an address, lower
  * case and without "www."; '' when there is none ("Acme Inc").
  */

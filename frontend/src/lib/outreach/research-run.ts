@@ -61,6 +61,8 @@ export async function runResearch(input: ResearchRunInput): Promise<ResearchRunR
       res = await input.call(rows.map(researchRow));
       await input.keep(res);
     } catch (e) {
+      // Stop pressed while a call was out: that call is dropped, and the run says it stopped (27 Nov pass).
+      if (input.signal?.aborted) return { researched, filled, left: queue.length + ids.length, stopped: true };
       return { researched, filled, left: queue.length + ids.length, stopped: false, error: e instanceof Error ? e.message : String(e) };
     }
     const at = input.now?.() ?? new Date().toISOString();

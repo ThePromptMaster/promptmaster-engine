@@ -42,8 +42,10 @@ export function useSending(input: {
   message: OutreachMessage;
   identity: SendingIdentity;
   saveDrafts: (items: DraftRow[], summary: string) => Promise<void>;
+  /** Throws when the emails were changed elsewhere since this page loaded: nothing is approved then. */
+  ensureCurrent?: () => Promise<void>;
 }) {
-  const { projectId, userId, draftsStageId, messageStageId, message, identity, saveDrafts } = input;
+  const { projectId, userId, draftsStageId, messageStageId, message, identity, saveDrafts, ensureCurrent } = input;
   const [sends, setSends] = useState<SendRecord[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
   const [inbound, setInbound] = useState<InboundRecord[]>([]);
@@ -130,6 +132,7 @@ export function useSending(input: {
 
   const approve = useCallback(
     async (drafts: DraftRow[], ids: Set<string>, withFollowup = false): Promise<ApproveResult> => {
+      await ensureCurrent?.();
       const { made, problems } = await ticketed(drafts.filter((d) => ids.has(d.id)), 'send');
       // The follow-up is approved with its email, as its own exact email (27 Nov).
       const follows = withFollowup && message.followup?.body.trim()
@@ -146,7 +149,7 @@ export function useSending(input: {
       await refresh();
       return { approved: made.length, problems };
     },
-    [ticketed, saveDrafts, refresh, message.followup]
+    [ticketed, saveDrafts, refresh, message.followup, ensureCurrent]
   );
 
   const liveSendOf = useCallback((approvalId: string | undefined) => (approvalId ? sends.find((s) => s.approval_id === approvalId) ?? null : null), [sends]);
@@ -181,6 +184,7 @@ export function useSending(input: {
   const withdraw = useCallback(
     async (drafts: DraftRow[], d: DraftRow) => {
       if (!d.approval_id) return;
+      await ensureCurrent?.();
       const s = liveSendOf(d.approval_id);
       if (s && !['scheduled', 'paused', 'held', 'failed', 'cancelled'].includes(s.status)) throw new Error('It is already in your mailbox.');
       if (s && ['scheduled', 'paused', 'held'].includes(s.status)) await moveSends([s.id], 'cancelled', 'Approval withdrawn.', true);
@@ -190,7 +194,7 @@ export function useSending(input: {
       await saveDrafts(drafts.map((x) => (x.id === d.id ? { ...x, status: '' as const, approval_id: '', followup_approval_id: '' } : x)), `Withdrew the approval of the email to ${d.to}.`);
       await refresh();
     },
-    [liveSendOf, saveDrafts, refresh]
+    [liveSendOf, saveDrafts, refresh, ensureCurrent]
   );
 
   const move = useCallback(

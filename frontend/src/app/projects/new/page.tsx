@@ -563,13 +563,23 @@ export default function NewProjectPage() {
    * or draft up front, without having to go through all the stages first").
    * A Quick answer project, made at once; its one stage is drafted as it
    * opens, and "Take this into the full process" builds on it later.
+   *
+   * Emails to a list are the Outreach workflow on this route too (27 Nov pass: "Get a first
+   * draft" made a one-stage answer of them, which can neither find nor send anyone). Only the
+   * request's words are read for that, so the answer is not held up by a model.
    */
-  function quickStart() {
+  async function quickStart() {
     const quick = templateFor('quick');
     if (!quick || !hasObjective || working !== null) return;
     setError(null);
+    setWorking('creating');
+    const outreach = templateFor('email_outreach');
+    const sized = outreach
+      ? await api.sizeRequest({ description: objective.trim().slice(0, 20_000), rule_only: true }).catch(() => null)
+      : null;
+    setWorking(null);
     void create({
-      template: quick,
+      template: sized?.outreach && outreach ? outreach : quick,
       draft: { ...draft, title: titleFrom(objective), audience: '', constraints: '', output_format: '', ...withDocuments(objective) },
       facts: [],
       chat: [],
@@ -896,7 +906,7 @@ export default function NewProjectPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasObjective && working === null && reading === null) {
                   e.preventDefault();
-                  quickStart();
+                  void quickStart();
                 }
               }}
               rows={3}
@@ -983,7 +993,7 @@ export default function NewProjectPage() {
               <span className="mt-1 block text-label opacity-90">{t('start.conversationNote')}</span>
             </button>
             <button
-              onClick={quickStart}
+              onClick={() => void quickStart()}
               disabled={!hasObjective || working !== null || reading !== null || !user || !templateFor('quick')}
               className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >

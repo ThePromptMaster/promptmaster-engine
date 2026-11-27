@@ -4,6 +4,7 @@ import type { ContactRow, EarlierContact } from './contacts';
 import { blankContact, parseJson } from './contacts';
 import { parseDelimited } from './csv';
 import {
+  suppressedBy,
   applyHistory,
   contactKey,
   contactKeys,
@@ -558,5 +559,16 @@ describe('import ids', () => {
     expect(nextImportId([])).toBe('i1');
     expect(nextImportId([{ id: 'i1' }, { id: 'i3' }, { id: 'i2' }])).toBe('i4');
     expect(nextImportId([{ id: 'x9' }, { id: 'i10' }, { id: '' }])).toBe('i11');
+  });
+});
+
+describe('suppressedBy (27 Nov pass)', () => {
+  it('stops every spelling of an opted-out Gmail address, and a suppressed domain', () => {
+    const list = [{ address: 'jane.doe@gmail.com', domain: null }, { address: null, domain: 'acme.example' }];
+    expect(suppressedBy('JaneDoe+news@googlemail.com', list)).toBe('jane.doe@gmail.com');
+    expect(suppressedBy('sam@ACME.example', list)).toBe('acme.example');
+    expect(suppressedBy('jane.doe@work.example', list)).toBeNull();
+    // Outside Gmail a dot or a +tag can be another person: compared as written.
+    expect(suppressedBy('j.ane@work.example', [{ address: 'jane@work.example' }])).toBeNull();
   });
 });

@@ -224,6 +224,31 @@ function done(actionKey: string, partial: Omit<StepOutcome, 'label'> & { sandbox
   };
 }
 
+/**
+ * Go's progress while it waits for sections, and the page's refresh as they land (at most every
+ * 20 s). Counted over this pass's sections only (27 Nov pass): a rewrite's sections were already
+ * complete, so the whole outline's count read "3 of 3 sections written" before any was rewritten,
+ * and the page was refreshed once at the start and not again until the end.
+ */
+export function sectionWaitProgress(
+  of: number,
+  report: (line: string) => void,
+  refresh: () => void,
+  now: () => number = Date.now,
+): (state: { written: readonly string[] }) => void {
+  let shown = 0;
+  let refreshedAt = -Infinity;
+  return (s) => {
+    const written = s.written.length;
+    report(`${written} of ${of} section${of === 1 ? '' : 's'} written`);
+    if (written > shown && now() - refreshedAt >= SECTION_REFRESH_MS) {
+      shown = written;
+      refreshedAt = now();
+      refresh();
+    }
+  };
+}
+
 /** Wait for the sections a step queued, and say what happened to each. */
 async function waitForSections(
   ctx: PerformContext,
@@ -243,19 +268,10 @@ async function waitForSections(
   // Sections reach the page as they are written, at most every 20 s, not only when the wait
   // ends: the chapters on screen and the side chat kept to the old text for minutes (26 Nov,
   // Sean: "the side chat lags behind").
-  let shownComplete = 0;
-  let refreshedAt = 0;
   const r: WaitResult = await awaitSectionJobs({
     projectId: ctx.project.id, artifactId: m.artifactId, sectionIds: ids, signal: ctx.signal,
     ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
-    onProgress: (s) => {
-      ctx.onProgress?.(`${s.complete} of ${s.total} sections written`);
-      if (s.complete > shownComplete && Date.now() - refreshedAt >= SECTION_REFRESH_MS) {
-        shownComplete = s.complete;
-        refreshedAt = Date.now();
-        void Promise.resolve(ctx.refresh?.()).catch(() => undefined);
-      }
-    },
+    onProgress: sectionWaitProgress(ids.length, (line) => ctx.onProgress?.(line), () => void Promise.resolve(ctx.refresh?.()).catch(() => undefined)),
   });
   ctx.refresh?.();
   await countSectionCost(ctx, m.artifactId, ids);

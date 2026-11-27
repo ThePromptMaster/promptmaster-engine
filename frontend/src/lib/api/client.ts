@@ -662,7 +662,7 @@ export const api = {
    * where the request's own words settle it, else one small call. Never fails
    * on the server: an unreadable answer is `standard`, marked `default`.
    */
-  async sizeRequest(req: { description: string; attached_chars?: number }): Promise<import('@/lib/workflow/request-size').RequestSize> {
+  async sizeRequest(req: { description: string; attached_chars?: number; rule_only?: boolean }): Promise<import('@/lib/workflow/request-size').RequestSize> {
     return apiFetch('/api/size-request', { method: 'POST', body: JSON.stringify(req) });
   },
 

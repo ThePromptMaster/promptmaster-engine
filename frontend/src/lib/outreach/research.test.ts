@@ -76,6 +76,19 @@ describe('filling in the blanks', () => {
     expect(parseContacts(saves[0]).items[0].name).toBe('Person c0');
   });
 
+  it('Stop pressed while a call is out is a stop, not an error (27 Nov pass: "signal is aborted without reason")', async () => {
+    const content = serializeContacts({ kind: 'stage_items', imports: [], items: [row('c1'), row('c2')] });
+    const controller = new AbortController();
+    const call = vi.fn(async () => {
+      controller.abort();
+      throw new DOMException('signal is aborted without reason', 'AbortError');
+    });
+    const save = vi.fn(async () => undefined);
+    const result = await runResearch({ content, call, keep: async () => null, save, signal: controller.signal });
+    expect(result).toEqual({ researched: 0, filled: 0, left: 2, stopped: true });
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('an error stops the run and says so; what was saved stays', async () => {
     const content = serializeContacts({ kind: 'stage_items', imports: [], items: [row('c1')] });
     const result = await runResearch({ content, call: async () => { throw new Error('Filling in the blanks searches the web: turn on Web access for this project first.'); }, keep: async () => null, save: async () => undefined });

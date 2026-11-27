@@ -52,4 +52,16 @@ describe('grouped decisions', () => {
     expect(needsResearch(chosen)).toBe(true);
     expect(researchRow(chosen).email).toBe('');
   });
+
+  it("a role PromptMaster found was the other person's; the list's own role stays (27 Nov pass)", () => {
+    const cands = JSON.stringify([{ name: 'Brian Cao', role: 'Co-Founder', email: '', why: 'Co-founder', source: 'S18' }, { name: 'Francis Cao', role: '', email: '', why: 'Co-founder', source: 'S19' }]);
+    const found = row('g', { role: 'Founder and CEO', src_role: 'S16', added: 'name,role,email', candidates: cands });
+    expect(chooseCandidate(found, 0)).toMatchObject({ name: 'Brian Cao', role: 'Co-Founder', src_role: 'S18' });
+    // The other candidate has no role: none is said, rather than the first person's.
+    const second = chooseCandidate(found, 1);
+    expect(second).toMatchObject({ name: 'Francis Cao', role: '', src_role: '' });
+    expect(second.added.split(',')).not.toContain('role');
+    const listed = row('h', { role: 'Head of Ops', added: 'name', candidates: cands });
+    expect(chooseCandidate(listed, 0)).toMatchObject({ name: 'Brian Cao', role: 'Head of Ops' });
+  });
 });

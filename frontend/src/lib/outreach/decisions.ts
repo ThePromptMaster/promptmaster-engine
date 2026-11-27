@@ -92,9 +92,15 @@ export function chooseCandidate(row: ContactRow, index: number): ContactRow {
   const c = list[index];
   if (!c) return row;
   const added = new Set(row.added.split(',').filter(Boolean));
+  // A role from the user's list stays; one PromptMaster found was the other person's (27 Nov pass:
+  // choosing Brian Cao kept "Founder and CEO", found for Mike Cao).
+  const listRole = Boolean(row.role.trim()) && !added.has('role');
   added.add('name');
-  if (c.role) added.add('role');
-  const next: ContactRow = { ...row, name: c.name, src_name: c.source, role: row.role || c.role, src_role: row.role ? row.src_role : c.source, status: '', reason: '' };
+  if (!listRole) {
+    if (c.role) added.add('role');
+    else added.delete('role');
+  }
+  const next: ContactRow = { ...row, name: c.name, src_name: c.source, role: listRole ? row.role : c.role, src_role: listRole ? row.src_role : c.role ? c.source : '', status: '', reason: '' };
   if (c.email && !row.email.trim()) {
     Object.assign(next, { email: c.email, email_status: 'verified', src_email: c.source, email_kind: 'named' });
     added.add('email');

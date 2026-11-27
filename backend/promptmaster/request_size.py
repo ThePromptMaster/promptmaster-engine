@@ -66,6 +66,9 @@ class SizeRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=60_000)
     #: Characters of documents attached at the start: a large brief is more to work through.
     attached_chars: int = Field(default=0, ge=0)
+    #: Only what the request's words settle, with no reading: "Get a first draft" asks this, to
+    #: send emails to a list to the Outreach workflow without waiting on a model (27 Nov).
+    rule_only: bool = False
 
 
 class SizeResponse(BaseModel):
@@ -95,7 +98,13 @@ _OUTREACH = re.compile(
     r"|\b(personal|personali[sz]ed|custom|individual|tailored)\s+(notes?|e-?mails?|messages?)\b[^.\n]{0,40}\b(to|for)\s+each\b"
     r"|\b(to|for|at)\s+each\s+(contact|company|person|lead|prospect|row|name|recipient|firm)\b"
     r"|\b(list|csv|spreadsheet|export|clay)\b[^\n]{0,120}\b(e-?mail them|write to (them|each)|reach out|personal notes?|send (them|it|each|out))\b"
-    r"|\be-?mails?\b[^.\n]{0,40}\b(\d{1,4}|these|those|all (of )?(the |my |our )?)\s*(prospects|leads|contacts|companies|firms|names|rows)\b",
+    # "Email these 25 prospects", not "the emails these contacts sent me".
+    r"|(?<!\bthe )(?<!\bmy )(?<!\bour )(?<!\bany )\be-?mails?\b[^.\n]{0,40}\b(\d{1,4}|these|those|all (of )?(the |my |our )?)\s*(prospects|leads|contacts|companies|firms|names|rows)\b"
+    # 27 Nov pass: Sean's own words ("the right person at each of these companies … personalize each
+    # email") and "Email these six test contacts" were read as one email.
+    r"|\b(to|for|at)\s+each\s+of\s+(these|those|the|my|our)\s+(\w+\s+){0,2}(contacts|companies|people|leads|prospects|rows|names|recipients|firms)\b"
+    r"|\bpersonali[sz]e\s+(each|every)\s+(e-?mail|note|message)\b"
+    r"|\b(e-?mail|write to|reach out to|contact)\s+(these|those|each of|all of|every one of)\b[^.\n]{0,30}\b(prospects|leads|contacts|companies|firms|people)\b",
     re.I,
 )
 
@@ -120,6 +129,9 @@ def several_deliverables(text: str) -> bool:
     return bool(_SEVERAL.search(text))
 
 
+OUTREACH_REASON = "The request is emails to a list, each found, approved and sent."
+
+
 def size_by_rule(description: str) -> SizeResponse | None:
     """What the request's own words settle. None when they settle nothing.
 
@@ -133,7 +145,10 @@ def size_by_rule(description: str) -> SizeResponse | None:
     if chapters or (words is not None and words >= FULL_WORDS):
         said = f"{chapters.group(1)} chapters" if chapters else f"about {words:,} words"
         return SizeResponse(depth="full", reason=f"The request asks for {said}, which is long work.", by="rule")
-    one_piece = not asks_full_process(text) and not several_deliverables(text) and not is_outreach(text)
+    if is_outreach(text):
+        # The Outreach workflow is used as it stands: nothing to size, so nothing to read (27 Nov).
+        return SizeResponse(depth="standard", reason=OUTREACH_REASON, by="rule")
+    one_piece = not asks_full_process(text) and not several_deliverables(text)
     if one_piece and words is not None and words <= CONCISE_WORDS:
         return SizeResponse(depth="concise", reason=f"The request asks for about {words:,} words, which is one sitting.", by="rule")
     return None
@@ -144,7 +159,7 @@ def at_least_standard(size: SizeResponse, description: str) -> SizeResponse:
     if size.depth == "concise" and asks_full_process(description):
         return SizeResponse(depth="standard", reason="The request asks for the full project workflow.", by="rule")
     if size.depth == "concise" and is_outreach(description):
-        return SizeResponse(depth="standard", reason="The request is emails to a list, each found, approved and sent.", by="rule")
+        return SizeResponse(depth="standard", reason=OUTREACH_REASON, by="rule")
     return size
 
 
@@ -185,6 +200,8 @@ async def size_request(client: OpenRouterClient, req: SizeRequest) -> SizeRespon
     ruled = size_by_rule(req.description)
     if ruled:
         return ruled
+    if req.rule_only:
+        return SizeResponse(reason="Not sized: only the request's own words were read.")
     system, user = build_size_prompt(req)
     try:
         result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=200, model=SIZE_MODEL)
