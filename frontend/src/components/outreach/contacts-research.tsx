@@ -108,9 +108,9 @@ export function DecisionGroups({ rows, busy, readOnly, onDecide }: { rows: reado
               {!readOnly && (
                 <span className="flex gap-2">
                   {canUse(g.kind) && (
-                    <button type="button" className={quiet} disabled={busy !== null} onClick={() => onDecide(g, 'use')} data-decide-use>{t(`outreach.use.${g.kind as 'guess' | 'general' | 'no_name' | 'contacted'}`)}</button>
+                    <button type="button" className={quiet} disabled={busy !== null} onClick={() => onDecide(g, 'use')} data-decide-use>{t(`outreach.use.${g.kind as 'guess' | 'general' | 'no_name' | 'contacted' | 'import_change'}`)}</button>
                   )}
-                  <button type="button" className={quiet} disabled={busy !== null} onClick={() => onDecide(g, 'skip')} data-decide-skip>{t('outreach.skipThem')}</button>
+                  <button type="button" className={quiet} disabled={busy !== null} onClick={() => onDecide(g, 'skip')} data-decide-skip>{g.kind === 'import_change' ? t('outreach.keepMine') : t('outreach.skipThem')}</button>
                 </span>
               )}
             </li>

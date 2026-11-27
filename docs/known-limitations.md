@@ -5926,3 +5926,48 @@ Limits:
     off is theirs to look at again.
 - **Limit.** The rule reads the request's words. "Email all the customers about the outage" is one email,
   not outreach. A list described in other words is left to the setup suggester's reading.
+
+### L-310 — Holds that follow a change; importing again; what needs you (2026-11-27)
+Sean, 26 Nov:
+- "If I change the offer or link for a batch, show me which drafts would change."
+- "If someone changes the recipient, body, link, attachment, or sender after approval, send that message back
+  for review."
+- Re-importing must not duplicate anyone or undo what was decided.
+
+**A change to the message.** Before it is saved, the Message stage says:
+- how many emails' text changes;
+- how many of those were approved, which go back for approval;
+- how many emails the user edited by hand still carry the old offer or link they typed, kept unless they
+  press "Replace there too".
+
+On save, every approved email not yet sent that the change reaches goes back for review, held and its
+approval withdrawn, with what changed (`lib/outreach/variable-change.ts`, `hold-changed.ts`).
+
+**Any other change** (a signature edited in Settings, a contact's new address, a replaced fact) does the same
+the next time the Drafts stage is open. The job runner holds such an email at send time in every case: the
+email is rebuilt from what is saved and compared with the approved one (L-305).
+- A send goes only while its draft is still approved under that approval. One whose contact stopped being
+  ready (set aside), or that was approved again, is held: "no longer an approved draft".
+
+**A replaced fact** (`lib/outreach/holds.ts`). An email that still states what a replaced fact said is held
+before approval, sent back if approved, and held at send time: "It still states what 'Go-live is on 14 March'
+said, since replaced by 'Go-live moved to 21 March'". It uses the same reading of replaced values as Go's
+repairs (`supersededFactValues`, `leftoverValues`): dates, money, weekdays, times, limits and numbers.
+
+**Importing again** (`mergeImport`). A row already on the list (same address, or same name at the same
+domain) is not added again:
+- When it says the same, it is counted as already on the list.
+- When it says a different name, role, address or company, the row keeps everything it had (status, research,
+  its email and approval) and waits under "Needs you" as "the new import says …". The choices are "Use the new
+  values" or "Keep what you had".
+- Suppressed and earlier-contacted people are marked as on the first import.
+
+**What needs you.** Every outreach stage shows a summary: contacts waiting on the user, to fill in from the
+web, emails to approve, held or sent back, not sent, scheduled and sent.
+
+Limits:
+- No per-email offer or link override on the page: an approved email is locked; withdraw it to change it.
+- No attachments yet (L-305).
+- The page's early check runs when the Message is saved or the Drafts stage is open. Otherwise the job runner
+  is the check, at send time.
+- A replaced fact holds only values the readers recognise. "Next week" moving to "the week after" is not read.

@@ -58,6 +58,11 @@ export interface ContactRow extends StageItem {
   colleague: string;
   /** When PromptMaster last searched the web for this row (ISO); '' when never. Not searched again by itself. */
   researched?: string;
+  /** JSON of the values a later import says differently ("email", "role" …), waiting on the user. */
+  incoming?: string;
+  /** The status and reason the row had before a re-import asked, restored by "Keep what you had". */
+  kept_status?: string;
+  kept_reason?: string;
 }
 
 /** An earlier email or touch, from the project history, the person's Sent mail, or their own record. */

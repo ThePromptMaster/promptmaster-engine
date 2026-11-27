@@ -5,9 +5,10 @@
  * Choosing between two people stays on its row.
  */
 import { REASONS, initialStatus, type ContactRow } from './contacts';
+import { IMPORT_CHANGE_PREFIX, inboxKind } from './import';
 import { RESEARCH_REASONS } from './research';
 
-export type DecisionKind = 'guess' | 'general' | 'no_name' | 'contacted' | 'not_found';
+export type DecisionKind = 'import_change' | 'guess' | 'general' | 'no_name' | 'contacted' | 'not_found';
 
 export interface DecisionGroup {
   kind: DecisionKind;
@@ -21,6 +22,7 @@ export interface DecisionGroup {
 function kindOf(row: ContactRow): DecisionKind | null {
   if (row.status !== 'decide') return null;
   const reason = row.reason ?? '';
+  if (row.incoming && reason.startsWith(IMPORT_CHANGE_PREFIX)) return 'import_change';
   if (row.email_status === 'guess' && reason.startsWith('Guessed from ')) return 'guess';
   if (reason === REASONS.generalInbox) return 'general';
   if (reason === REASONS.noName) return 'no_name';
@@ -29,7 +31,7 @@ function kindOf(row: ContactRow): DecisionKind | null {
   return null;
 }
 
-const ORDER: DecisionKind[] = ['contacted', 'guess', 'general', 'no_name', 'not_found'];
+const ORDER: DecisionKind[] = ['import_change', 'contacted', 'guess', 'general', 'no_name', 'not_found'];
 
 export function groupDecisions(rows: readonly ContactRow[]): DecisionGroup[] {
   const groups = new Map<string, DecisionGroup>();
@@ -46,6 +48,7 @@ export function groupDecisions(rows: readonly ContactRow[]): DecisionGroup[] {
 
 /** What each answer does, in the words saved on the row. */
 const USE: Record<DecisionKind, string | null> = {
+  import_change: 'You took the values the new import gives.',
   guess: 'You chose to use the guessed address.',
   general: 'You chose to write to the general inbox.',
   no_name: 'You chose to write to this address without a name.',
@@ -54,6 +57,7 @@ const USE: Record<DecisionKind, string | null> = {
   not_found: null,
 };
 const SKIP: Record<DecisionKind, string> = {
+  import_change: '',
   guess: 'Guessed address not used.',
   general: 'Only a general inbox.',
   no_name: 'No name for the address.',
@@ -70,6 +74,7 @@ export function decideGroup(rows: readonly ContactRow[], group: DecisionGroup, a
   const ids = new Set(group.rowIds);
   return rows.map((row) => {
     if (!ids.has(row.id) || kindOf(row) !== group.kind) return row;
+    if (group.kind === 'import_change') return answerImport(row, answer);
     if (answer === 'skip') return { ...row, status: 'skip', reason: SKIP[group.kind] };
     const note = USE[group.kind];
     return note ? { ...row, status: 'ready', reason: note } : row;
@@ -99,4 +104,23 @@ export function chooseCandidate(row: ContactRow, index: number): ContactRow {
   // person on a general inbox marked the row ready, and nothing looked for their address).
   if (!c.email) next.researched = '';
   return initialStatus(next);
+}
+
+/** A re-import's different values: taken (the row worked out again) or left (the row as it was). */
+function answerImport(row: ContactRow, answer: 'use' | 'skip'): ContactRow {
+  const base: ContactRow = { ...row, incoming: '', kept_status: undefined, kept_reason: undefined };
+  if (answer === 'skip') return { ...base, status: (row.kept_status ?? '') as ContactRow['status'], reason: row.kept_reason ?? '' };
+  let diff: Partial<Record<'name' | 'role' | 'email' | 'company', string>> = {};
+  try {
+    diff = JSON.parse(row.incoming || '{}');
+  } catch {
+    return base;
+  }
+  const next: ContactRow = { ...base, ...diff };
+  if (diff.email) Object.assign(next, { email_status: 'given', src_email: 'import', email_kind: inboxKind(diff.email) });
+  if (diff.role) next.src_role = 'import';
+  if (diff.name) next.src_name = 'import';
+  // A row someone already contacted, or chose to skip, stays where it was; the rest is worked out again.
+  if (row.kept_status === 'skip' || row.contacted) return { ...next, status: (row.kept_status ?? 'decide') as ContactRow['status'], reason: row.kept_reason ?? '' };
+  return initialStatus({ ...next, status: '', reason: '' });
 }

@@ -18,7 +18,7 @@ import {
   type EarlierContact,
   type MappedField,
 } from '@/lib/outreach/contacts';
-import { applyHistory, domainOf, guessMapping, inboxKind, isWebmail, markDuplicates, nextImportId, rowsFromCompanyList, rowsFromTable } from '@/lib/outreach/import';
+import { applyHistory, domainOf, guessMapping, inboxKind, isWebmail, mergeImport, nextImportId, rowsFromCompanyList, rowsFromTable } from '@/lib/outreach/import';
 import { asEarlierContact, listHistory, listSuppressions, recordContact, suppress } from '@/lib/supabase/outreach-contacts';
 import { chooseCandidate, decideGroup } from '@/lib/outreach/decisions';
 import { numberedSources } from '@/lib/workflow/sources';
@@ -118,13 +118,18 @@ export function ContactsPart({ context, stageId, readOnly }: { context: Outreach
       const incoming = pending.companies !== null
         ? rowsFromCompanyList(pending.companies, importId, newId)
         : rowsFromTable({ headers: pending.headers, rows: pending.rows, mapping: pending.mapping, importId, makeId: newId });
-      const merged = markDuplicates(doc.items, incoming);
+      // A row already on the list is not added again; one the new import says differently waits on you (26 Nov).
+      const merged = mergeImport(doc.items, incoming);
       const fresh = merged.rows.slice(doc.items.length);
       const check = await checked(fresh);
-      const items = [...doc.items, ...check.rows.map(initialStatus)];
+      const items = [...merged.rows.slice(0, doc.items.length), ...check.rows.map(initialStatus)];
       const record = { id: importId, at: new Date().toISOString(), from: pending.from, rows: incoming.length, mapping: pending.companies !== null ? {} : pending.mapping };
       await save({ ...doc, items, imports: [...doc.imports, record] }, 'outreach_import', `Imported ${incoming.length} contacts (${pending.from}).`);
-      setSaid(t('outreach.imported', { count: incoming.length, duplicates: merged.duplicates, found: check.found }) + (check.mailbox ? '' : ` ${t('outreach.mailboxUnchecked')}`));
+      setSaid(
+        t('outreach.imported', { count: merged.added, duplicates: merged.repeated + merged.duplicates, found: check.found }) +
+          (merged.changed ? ` ${t('outreach.importChanged', { count: merged.changed })}` : '') +
+          (check.mailbox ? '' : ` ${t('outreach.mailboxUnchecked')}`)
+      );
       setPending(null);
       setText('');
       setAdding(false);
