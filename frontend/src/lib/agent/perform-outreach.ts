@@ -17,7 +17,11 @@ import { assessKey, claimAssess, releaseAssess, reportAssess, whenAssessFree } f
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { webAccessOf, type WebUse } from '@/lib/workflow/web-found';
+import { appendWorkflowEvent } from '@/lib/supabase/workflow';
+import type { StageDefinition } from '@/lib/workflow/types';
 import type { PerformContext } from './perform';
+import { stageMoveActor } from './policy';
+import { upstreamChanges } from './recheck-first';
 
 export type OutreachActionKey = 'research_contacts' | 'draft_outreach';
 
@@ -131,4 +135,56 @@ export async function performOutreach(key: OutreachActionKey, ctx: PerformContex
     };
   }
   return { status: 'failed', output: 'This stage is not part of an outreach workflow.', toolsUsed: [], versionIds };
+}
+
+
+/**
+ * A reopened outreach stage (27 Nov, production pass: a change to Contacts reopened Message and
+ * Drafts, and Go stopped with "a repair failed"). Each part is settled in code, with no model call:
+ * - Contacts: the list is its own rows; it is kept and marked complete again.
+ * - Message: kept when only the list changed. When the brief changed, Go writes it again only if
+ *   the current one is Go's own; a message the user edited is theirs to keep or rewrite.
+ * - Drafts: brought in line with the contacts and the message (hand edits kept), and back in
+ *   progress: approving and sending stay the user's.
+ */
+export async function recheckOutreach(ctx: PerformContext, target: StageDefinition, keep: (res: WebUse) => Promise<unknown>): Promise<OutreachOutcome> {
+  const part = target.outreach?.part;
+  const head = ctx.bundles[target.id]?.versions.at(-1);
+  const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+  const event = async (type: 'stage_marked_complete' | 'stage_reopened', reason: string, payload: Record<string, unknown> = {}) => {
+    await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+      type,
+      stage_id: target.id,
+      actor,
+      agent_run_id: actor === 'system' ? ctx.run.id : null,
+      reason,
+      payload: { ...(head ? { evidence_version_id: head.id } : {}), ...payload },
+    });
+    await ctx.afterStageEvent();
+  };
+  if (part === 'contacts') {
+    await event('stage_marked_complete', 'Checked after a change: the list keeps its own rows, and nothing in them relied on what changed.', { checked_unchanged: true });
+    return { status: 'succeeded', toolsUsed: [], versionIds: [], output: `${target.label} keeps its rows as they are; marked complete again.` };
+  }
+  if (part === 'message') {
+    const changes = head ? upstreamChanges(ctx.template, ctx.bundles, target.id, head.created_at) ?? [] : [];
+    const onlyTheList = changes.every((c) => ctx.template.stages.find((s) => s.id === c.stageId)?.renderer === 'outreach');
+    if (head?.content?.trim() && onlyTheList) {
+      await event('stage_marked_complete', `Checked after a change: ${changes.map((c) => c.label).join(' and ') || 'the list'} changed, and the standard message does not depend on the rows.`, { checked_unchanged: true });
+      return { status: 'succeeded', toolsUsed: [], versionIds: [], output: `The standard message does not depend on the contact rows, so it was kept as it is and marked complete again.` };
+    }
+    if (head && head.source_operation !== 'outreach_message') {
+      return { status: 'failed', toolsUsed: [], versionIds: [], output: 'The brief changed after you edited the standard message. Keep it as it is, or write it again on the Message stage.' };
+    }
+    const written = await performOutreach('draft_outreach', { ...ctx, stage: target }, keep);
+    if (written.status === 'succeeded') await event('stage_marked_complete', 'Written again from the changed brief.');
+    return written;
+  }
+  if (part === 'drafts') {
+    const made = await performOutreach('draft_outreach', { ...ctx, stage: target }, keep);
+    if (made.status !== 'succeeded') return made;
+    await event('stage_reopened', 'Emails brought in line with the contacts and the message; approving them is yours.');
+    return made;
+  }
+  return { status: 'failed', toolsUsed: [], versionIds: [], output: 'This stage is not part of an outreach workflow.' };
 }

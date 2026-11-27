@@ -4,7 +4,7 @@
  * Pure code, no model: a group is the rows that share the same question and the same two answers.
  * Choosing between two people stays on its row.
  */
-import { REASONS, type ContactRow } from './contacts';
+import { REASONS, initialStatus, type ContactRow } from './contacts';
 import { RESEARCH_REASONS } from './research';
 
 export type DecisionKind = 'guess' | 'general' | 'no_name' | 'contacted' | 'not_found';
@@ -95,7 +95,8 @@ export function chooseCandidate(row: ContactRow, index: number): ContactRow {
     added.add('email');
   }
   next.added = [...added].join(',');
-  // A person with no address yet goes back for one search of their own.
-  if (!next.email.trim()) return { ...next, researched: '', status: '', reason: REASONS.noAddress };
-  return { ...next, status: 'ready' };
+  // A person with no address of their own goes back for one search for it (27 Nov pass: choosing a
+  // person on a general inbox marked the row ready, and nothing looked for their address).
+  if (!c.email) next.researched = '';
+  return initialStatus(next);
 }

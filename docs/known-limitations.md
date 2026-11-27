@@ -5891,7 +5891,11 @@ Limits:
   when a page shows a colleague's address with their name.
 - The search sees what Exa returns for each page, which can be part of a page. An address further down a
   long page may be missed.
-- A row is searched once (`researched`); choosing a person with no address sends it back for one more search.
+- A row is searched once (`researched`). Choosing one of two people sends the row back for one more search
+  unless a page showed that person's address.
+- A named person with only a general inbox PromptMaster found is searched for their own address, and stays
+  a decision if none is shown (27 Nov pass: choosing a person on hello@ marked the row ready). A general inbox
+  the list or the user gave is never replaced.
 - Research needs the project's Web access on. With it off, Go does not search and the button says why.
 - Reasons are stored in English. "Guessed from …" and the page's own "why" are shown as written in every
   interface language.
@@ -5911,5 +5915,12 @@ Limits:
   - It uses the Outreach workflow as it stands, with nothing designed. The setup suggester may also pick
     `email_outreach`.
   - The workflow is listed on the start screen (`20261222000100_outreach_listed.sql`).
+- **A change midway** (27 Nov pass: editing Contacts reopened Message and Drafts, and Go stopped with "a
+  repair failed"). Go settles a reopened outreach stage in code, with no model call
+  (`perform-outreach.ts::recheckOutreach`):
+  - the list is kept and closed;
+  - the message is kept when only the list changed, and written again after a brief change only if the
+    current one is Go's own;
+  - the emails are brought in line, hand edits kept, and left for the user to approve.
 - **Limit.** The rule reads the request's words. "Email all the customers about the outage" is one email,
   not outreach. A list described in other words is left to the setup suggester's reading.

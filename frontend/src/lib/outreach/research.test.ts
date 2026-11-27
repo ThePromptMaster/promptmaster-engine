@@ -30,6 +30,15 @@ describe('filling in the blanks', () => {
     expect(mergeResearch(row('c1', { name: 'Morgan' }), found('c1', { email_status: 'none', reason: 'The site lists only a contact form.' }), 'T')).toMatchObject({ status: 'decide', reason: 'The site lists only a contact form.', email_status: 'none' });
   });
 
+  it('a named address replaces a general inbox it found, never one the list gave', () => {
+    const found_ = row('c1', { name: 'Marko', email: 'hello@acme.example', email_kind: 'general', email_status: 'verified', src_email: 'S2', personal_line: 'Hi.', status: 'decide', reason: 'Only a general inbox: write to it, or find a person first.' });
+    expect(mergeResearch(found_, found('c1', { email: 'marko@acme.example', email_status: 'verified', src_email: '[S9]' }), 'T')).toMatchObject({ email: 'marko@acme.example', email_kind: 'named', src_email: 'S9', status: 'ready' });
+    expect(mergeResearch(found_, found('c1', { email_status: 'none' }), 'T')).toMatchObject({ email: 'hello@acme.example', status: 'decide' });
+    const given = { ...found_, src_email: 'import', email_status: 'given' as const };
+    expect(needsResearch({ ...given, researched: '' })).toBe(false);
+    expect(mergeResearch(given, found('c1', { email: 'marko@acme.example', email_status: 'verified' }), 'T').email).toBe('hello@acme.example');
+  });
+
   it('keeps a decision that is not research\'s own', () => {
     const before = row('c1', { name: 'Morgan', email: 'm@harbourline.example', status: 'decide', reason: 'Contacted before: 2026-03-22.' });
     expect(mergeResearch(before, found('c1', { detail: 'Opened a Leeds hub', src_detail: '[S1]', personal_line: 'Nice hub.' }), 'T')).toMatchObject({ status: 'decide', reason: 'Contacted before: 2026-03-22.', personal_line: 'Nice hub.' });
