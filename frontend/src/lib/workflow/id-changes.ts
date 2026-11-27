@@ -69,22 +69,31 @@ export interface IdChanges {
 const STOP = new Set(['about', 'after', 'again', 'also', 'been', 'before', 'being', 'from', 'have', 'into', 'more', 'must', 'need', 'needs', 'once', 'only', 'open', 'closed', 'resolved', 'complete', 'completed', 'done', 'status', 'still', 'than', 'that', 'their', 'there', 'these', 'this', 'those', 'through', 'under', 'until', 'were', 'what', 'when', 'which', 'will', 'with', 'within', 'without', 'would', 'owner', 'target', 'pending', 'progress']);
 
 /**
- * The meaningful words of the line the ID labels — a table row or list entry
- * that starts with it: what that item is about. A sentence that merely
+ * The meaningful words of each line the ID labels — a table row, a list entry or
+ * a heading that starts with it: what that item is about. A sentence that merely
  * mentions the ID says nothing about which item it is (18 Oct, pilot: prose
- * naming KES-T3 in a different sentence was read as a reused ID).
+ * naming KES-T3 in a different sentence was read as a reused ID; 27 Nov, Windward:
+ * "- D2 is revoked for R-18" was read as D2's own line).
  */
-function subjectOf(text: string, id: string): Set<string> {
-  const line = text.split('\n').find((l) => labels(l, id)) ?? '';
-  return new Set(
-    line.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !STOP.has(w))
-  );
+function subjectsOf(text: string, id: string): Set<string>[] {
+  return text
+    .split('\n')
+    .filter((l) => labels(l, id))
+    .map((line) => new Set(line.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !STOP.has(w))));
 }
 
-/** Whether the line is the item the ID labels: it starts with the ID, after a table bar, bullet or number. */
+/**
+ * Whether the line is the item the ID labels: it starts with the ID, after a table
+ * bar, bullet, number or heading mark, and the ID is set off as a label ("D2.",
+ * "D2:", "**D2**", "| D2 |", "D2 — …", a heading), not the subject of a sentence
+ * ("D2 is revoked…").
+ */
 function labels(line: string, id: string): boolean {
+  const heading = /^\s*#{1,6}\s/.test(line);
   const start = line.replace(/^[\s|*>#\-+]*(?:\d+[.)]\s*)?(?:\*\*)?/, '');
-  return start.startsWith(id) && itemIds(start.slice(0, id.length + 1)).has(id);
+  if (!start.startsWith(id) || !itemIds(start.slice(0, id.length + 1)).has(id)) return false;
+  const after = start.slice(id.length);
+  return heading || after === '' || /^\s*(?:\*\*|[.:|)\]]|[—–]|-\s)/.test(after);
 }
 
 /**
@@ -104,13 +113,19 @@ function labelsAnItem(text: string, id: string): boolean {
   return text.split('\n').some((l) => labels(l, id) || cell.test(l));
 }
 
+/**
+ * Reused: no line the ID labels in the revision shares a fifth of its words with
+ * any line it labelled before. The best pair is compared, so an item moved under
+ * History with a revoking note added beside it keeps its ID (27 Nov, Windward: D2
+ * kept as the R-18 exception and revoked by D3 was refused four times).
+ */
 function reusedIds(head: string, generated: string, both: readonly string[]): string[] {
   return both.filter((id) => {
-    const was = subjectOf(head, id);
-    const now = subjectOf(generated, id);
-    if (was.size < 4 || now.size < 4) return false;
-    const shared = [...was].filter((w) => now.has(w)).length;
-    return shared / Math.min(was.size, now.size) < 0.2;
+    const was = subjectsOf(head, id).filter((w) => w.size >= 4);
+    const now = subjectsOf(generated, id).filter((w) => w.size >= 4);
+    if (!was.length || !now.length) return false;
+    const best = Math.max(...was.flatMap((a) => now.map((b) => [...a].filter((w) => b.has(w)).length / Math.min(a.size, b.size))));
+    return best < 0.2;
   });
 }
 

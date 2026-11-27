@@ -1126,7 +1126,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         if (hasIdChanges(ids)) {
           const question = idChangeQuestion(ctx.stage.label, headVersion.version_number, ids);
           return done(key, {
-            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: { refused_text: content.slice(0, 20_000) },
             output: question, params: { ...params, conflict_question: true, routine_answer: idChangeDefault(headVersion.version_number) },
             stop: { status: 'awaiting_decision', reason: question },
             needs: { kind: 'answer_question', question },
@@ -1466,7 +1466,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       if (!target || (st?.status !== 'stale' && !measuredRepair && !carriedRepair)) {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
-      const superseded = supersededFactValues(ctx.project.facts);
+      // A rule a folder hands down that is in force here is still true (L-318).
+      const superseded = supersededFactValues(ctx.project.facts, (ctx.project.inherited?.inForce ?? []).filter((r) => !r.exceptedBy).map((r) => r.fact.statement));
       const why = withUserNote(measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
         : carriedRepair && params.accepted_fixes && carriedRows.every((r) => r.startsWith('[went back for] '))
@@ -1693,7 +1694,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
           // Marked, so the answer reaches the next repair: it was not, and the
           // same question came back after every answer (25 Oct).
           return done(key, {
-            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: { refused_text: content.slice(0, 20_000) },
             params: { conflict_question: true, routine_answer: idChangeDefault(headVersion.version_number) },
             output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
           });

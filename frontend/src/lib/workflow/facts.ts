@@ -96,17 +96,54 @@ export function answerOf(statement: string): string {
 }
 
 /**
+ * Who a replacement is limited to: "for Alex Rivera only", "only for Alex Rivera",
+ * "for Alex Rivera alone" (L-318, 27 Nov; Sean, Calder: "This supersedes CAL-01 for
+ * Alex Rivera only" was applied to the whole handoff, and Morgan Lee's CAL-01 terms
+ * were read as left behind). A name: capitalised words, up to four.
+ */
+const NAME = "(?:the\\s+)?[A-Z][\\p{L}'’.-]*(?:\\s+[A-Z][\\p{L}'’.-]*){0,3}";
+const SCOPE_AFTER = new RegExp(`\\bfor\\s+(${NAME})\\s+(?:only|alone)\\b`, 'u');
+const SCOPE_BEFORE = new RegExp(`\\bonly\\s+(?:for|to)\\s+(${NAME})`, 'u');
+
+/** The one person or thing a statement limits itself to, with the words that say so; null when none. */
+export function scopeOf(text: string): { scope: string; phrase: string } | null {
+  const m = SCOPE_AFTER.exec(text) ?? SCOPE_BEFORE.exec(text);
+  return m ? { scope: m[1].replace(/^the\s+/i, '').trim(), phrase: m[0] } : null;
+}
+
+/**
+ * "…with 18", "…to 12", "…, now Monday": the value a replacement brings in, after the
+ * one it replaces (27 Nov, a seat limit: "supersedes the 24-seat limit with 18" read 18
+ * as the old value, and every repair "still gave 18").
+ */
+const NEW_VALUE = /\s+(?:with|to)\s+(?=(?:the\s+|a\s+|an\s+)?(?:[$€£]?\d|[A-Z]{1,8}-?\d))|,\s*now\b/;
+
+/**
  * A fact that names what it replaces, split: what it says now, and the clause
  * that names the earlier value, up to the end of that sentence. Null when it
- * names nothing. An answer is read without its question (`answerOf`).
+ * names nothing. An answer is read without its question (`answerOf`). The new
+ * value a clause brings in ("with 18") belongs to what it says now; a limit to
+ * one person ("for Alex Rivera only") is its `scope`.
  */
-export function replacedClause(statement: string): { now: string; was: string } | null {
+export function replacedClause(statement: string): { now: string; was: string; scope?: string } | null {
   const said = answerOf(statement);
   const at = said.search(REPLACING);
   if (at <= 0) return null;
   const rest = said.slice(at);
-  const end = rest.search(/[.;](?=\s|$)/);
-  return end > 0 ? { now: said.slice(0, at) + rest.slice(end), was: rest.slice(0, end) } : { now: said.slice(0, at), was: rest };
+  // The clause ends at its sentence, a colon or a dash: "superseding the earlier Studio A limit of 24: the
+  // room now has 18 seats" replaces 24, and 18 is what it says now (27 Nov, a workshop seat limit: every
+  // repair "still gave 18"). "10:00" has no space after its colon.
+  const end = rest.search(/[.;:](?=\s|$)|\s[—–]\s/);
+  let was = end > 0 ? rest.slice(0, end) : rest;
+  let now = end > 0 ? said.slice(0, at) + rest.slice(end) : said.slice(0, at);
+  const scoped = scopeOf(was);
+  if (scoped) was = was.replace(scoped.phrase, ' ').replace(/\s+/g, ' ').trim();
+  const cut = was.search(NEW_VALUE);
+  if (cut > 0) {
+    now = `${now} ${was.slice(cut).trim()}`;
+    was = was.slice(0, cut);
+  }
+  return { now, was, ...(scoped ? { scope: scoped.scope } : {}) };
 }
 
 /**
@@ -184,7 +221,11 @@ export function replacesADecision(f: Pick<ProjectFact, 'source_ref' | 'supersede
  * superseded another, what the old one stated that the new one does not.
  * A repair must not leave any of these in place (D2, 8 Oct).
  */
-export function supersededFactValues(facts: readonly ProjectFact[] | undefined): SupersededValue[] {
+export function supersededFactValues(
+  facts: readonly ProjectFact[] | undefined,
+  /** Rules a folder hands down that are in force here: what they state is still true (L-318). */
+  inheritedStatements: readonly string[] = []
+): SupersededValue[] {
   const byId = new Map((facts ?? []).map((f) => [f.id, f]));
   const current = currentFacts(facts);
   // A value another current fact still states is still true, whatever was
@@ -193,17 +234,48 @@ export function supersededFactValues(facts: readonly ProjectFact[] | undefined):
   // (15 Oct, HARBOR: "the new version still states November 7").
   // What each fact states now: not the earlier value it names as replaced.
   // An answer's question is not what it states: an old value it mentions is not kept alive by it.
-  const live = current.map((f) => factValues(replacedClause(f.statement)?.now ?? answerOf(f.statement)));
+  const live: { fact: ProjectFact | null; values: ReturnType<typeof factValues> }[] = [
+    ...current.map((f) => ({ fact: f, values: factValues(replacedClause(f.statement)?.now ?? answerOf(f.statement)) })),
+    ...inheritedStatements.map((st) => ({ fact: null, values: factValues(replacedClause(st)?.now ?? st) })),
+  ];
+  const stated = (v: SupersededValue, except: (l: (typeof live)[number]) => boolean) =>
+    live.some((l) => !except(l) && l.values[v.kind].includes(v.value));
   return current.flatMap((f) => {
     // A choice between options changes no value: the other option's figures are still true.
     if (replacesADecision(f, byId)) return [];
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
-    if (old) return supersededValues(old.statement, f.statement);
+    if (old) {
+      // A replacement limited to one person replaces the old value for them alone (L-318).
+      const scope = scopeOf(answerOf(f.statement))?.scope;
+      return supersededValues(old.statement, f.statement)
+        .map((v) => (scope ? { ...v, scope } : v))
+        .filter((v) => v.scope || !stated(v, () => false));
+    }
     // "…to $27 million, superseding the earlier $30 million": the brief's
     // $30 million is what a repair must not leave (18 Oct, Ridgeway).
     const clause = replacedClause(f.statement);
-    return clause ? supersededValues(clause.was, clause.now).map((v) => ({ ...v, now: f.statement })) : [];
-  }).filter((s) => !live.some((v) => v[s.kind].includes(s.value)));
+    if (!clause) return [];
+    return supersededValues(clause.was, clause.now)
+      .map((v) => ({ ...v, now: f.statement, ...(clause.scope ? { scope: clause.scope } : {}) }))
+      // A scoped replacement leaves the old value true for everyone else; it is checked only where the text is
+      // about the one person. An earlier fact about the same thing is what the clause replaces: "Studio A holds
+      // 24 people" does not keep 24 alive beside "superseding the earlier Studio A limit of 24" (27 Nov). One
+      // about something else still does ("reconciliation finished November 7", HARBOR).
+      .filter((v) => v.scope || !stated(v, (l) => l.fact === f || (l.fact !== null && earlier(l.fact, f) && sameSubject(clause.was, l.fact.statement))));
+  });
+}
+
+const earlier = (a: Pick<ProjectFact, 'created_at'>, b: Pick<ProjectFact, 'created_at'>) => Date.parse(a.created_at) < Date.parse(b.created_at);
+
+/** Words that name what a clause is about, not that it replaces something or how. */
+const NOT_A_SUBJECT = new Set(['earlier', 'previous', 'previously', 'former', 'formerly', 'replacing', 'replaces', 'replaced', 'superseding', 'supersedes', 'superseded', 'instead', 'rather', 'longer', 'changed', 'from', 'with', 'that', 'this', 'than', 'were', 'limit', 'total', 'value', 'figure', 'number']);
+
+/** Whether an older fact is about what a replacing clause names: a word of four or more letters in common. */
+function sameSubject(was: string, statement: string): boolean {
+  const words = (t: string) => new Set((t.toLowerCase().match(/\p{L}{4,}/gu) ?? []).filter((w) => !NOT_A_SUBJECT.has(w)));
+  const a = words(was);
+  for (const w of words(statement)) if (a.has(w)) return true;
+  return false;
 }
 
 /** "the earlier $30 million for the same quarter": the clause a fact says it replaces, without its leading word. */
