@@ -295,6 +295,11 @@ export function governingRequirements(
       if (f.kind === 'words' && f.subject && f.max !== undefined && listedAmongParts(f.subject.split(/\s+/)[0], objective)) {
         out = out.filter((r) => !(r.kind === 'words' && r.subject === '' && !r.per && r.max === f.max));
       }
+      // "…applies only to the SMS reminder": the same figure said before, in the brief or a requirement, wherever
+      // it was read to belong, was this part's (28 Nov, production pass: "Keep it under 60 words" stayed whole).
+      if (f.only && f.max !== undefined) {
+        out = out.filter((r) => r === f || !(r.kind === f.kind && !r.per && r.max === f.max && !sameSubject(r.subject, f.subject)));
+      }
     }
   }
   return out;
@@ -388,6 +393,9 @@ export function measureEvidence(
  * 600–800 words per chapter" came back not checked, at 690–787).
  */
 /** The measurable requirements the brief and the recorded requirements set, wherever each applies. */
+/** A statement that says which part a limit is for: "the 60-word limit applies only to the SMS reminder". */
+const LIMIT_NAMES_PART = /\b\d[\d,]*[-\s](?:word|character|page|line|minute|slide)s?\b[^.;]*?\b(?:appl(?:y|ies)|is|are)\s+(?:only\s+)?(?:to|for)\b/i;
+
 export function projectRequirements(
   project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>
 ): MeasurableRequirement[] {
@@ -397,9 +405,15 @@ export function projectRequirements(
     parseRequirements(brief),
     currentFacts(project.facts)
       // A requirement the user recorded, or their answer to a question (L-319: Sean told Go which
-      // draft the 70-word limit belonged to, as an answer, and the measuring code never read it).
-      .filter((f) => f.kind === 'requirement' || answerOf(f.statement) !== f.statement)
-      .map((f) => parseRequirements([f.kind === 'requirement' ? f.statement : answerOf(f.statement)], brief.join('\n')))
+      // draft the 70-word limit belonged to, as an answer, and the measuring code never read it), or a
+      // fact that says which part a limit is for ("The 60-word limit applies only to the SMS reminder.",
+      // typed as a fact: 28 Nov, production pass).
+      .filter((f) => f.kind === 'requirement' || answerOf(f.statement) !== f.statement || LIMIT_NAMES_PART.test(f.statement))
+      .map((f) => {
+        const said = f.kind === 'requirement' ? f.statement : answerOf(f.statement);
+        const only = /\bonly\b/i.test(said) && LIMIT_NAMES_PART.test(said);
+        return parseRequirements([said], brief.join('\n')).map((r) => (only && r.subject ? { ...r, only: true } : r));
+      })
   );
 }
 

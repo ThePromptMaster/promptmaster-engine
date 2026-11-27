@@ -6252,6 +6252,12 @@ Limits:
   not.
 - A part with no heading of its own in the stage that writes it is not counted ("not verified").
 
+**Addition, 28 Nov (production pass, bakery launch pack).** "The 60-word limit applies only to the SMS reminder."
+typed in the Facts panel as a fact changed nothing; the pack stayed held to 60 words as a whole and on the email.
+A fact that says which part a limit is for is now read with the requirements (`LIMIT_NAMES_PART`), and with
+"only" it retires the same figure said before (in the brief or an earlier requirement), whichever part it had
+been read as.
+
 ### L-320 — Under "Handle them for me", an approved version is left alone and a stop says what it changes (2026-11-28)
 Sean, 27 Nov, museum print job:
 - "with 'Handle them for me' selected, Go asked me to interpret 'i2–i4' when the museum had already made clear

@@ -57,6 +57,11 @@ export interface MeasurableRequirement {
    * names (`governingRequirements`).
    */
   retires?: boolean;
+  /**
+   * The user said this limit is this part's alone ("the 60-word limit applies only to the SMS reminder"):
+   * the brief's same figure, read as another part's or the whole's, was this part's (28 Nov).
+   */
+  only?: boolean;
 }
 
 export interface Measurement {
