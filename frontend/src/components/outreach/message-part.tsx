@@ -153,7 +153,7 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
           <span className={label}>{t('outreach.sendAs')}</span>
           <select className={field} disabled={readOnly} value={sender?.id ?? ''} onChange={(e) => set({ sender_id: e.target.value || null, signature_id: null, reply_signature_id: null })} data-message-sender>
             {senders.length === 0 && <option value="">{t('outreach.noSender')}</option>}
-            {senders.map((s) => <option key={s.id} value={s.id}>{s.from_name ? `${s.from_name} <${s.from_address}>` : s.from_address}</option>)}
+            {senders.map((s) => <option key={s.id} value={s.id}>{s.from_address}</option>)}
           </select>
         </label>
         {(['signature_id', 'reply_signature_id'] as const).map((k) => (

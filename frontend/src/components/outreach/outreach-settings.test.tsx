@@ -67,7 +67,10 @@ describe('outreach email in Settings', () => {
     render(<OutreachSettings />);
     await waitFor(() => expect(document.querySelector('[data-email-headers]')).toBeTruthy());
     const headers = document.querySelector('[data-email-headers]')!.textContent ?? '';
-    expect(headers).toContain('Sean Moran <sean@x.co>');
+    // Gmail sends under the Google account's own name; no name is claimed (27 Nov).
+    expect(headers).toContain('Fromsean@x.co');
+    expect(headers).not.toContain('Sean Moran');
+    expect(screen.getByText(/Gmail sends under the name on your Google account/)).toBeTruthy();
     for (const h of ['From', 'To', 'Cc', 'Bcc', 'Subject', 'Links', 'Attachments', 'Signature']) expect(headers).toContain(h);
     expect(document.querySelector('[data-render-warning="compliance_missing"]')).toBeTruthy();
     const frame = document.querySelector('[data-preview-frame]') as HTMLIFrameElement;

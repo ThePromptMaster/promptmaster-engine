@@ -63,7 +63,9 @@ export function buildSnapshot({ draft, message, sender, signature, logo, purpose
   return {
     v: 1,
     provider: sender.toolkit,
-    from: { name: sender.from_name.trim(), address: sender.from_address.trim().toLowerCase() },
+    // No name: Gmail sends under the Google account's own name, which PromptMaster cannot set or read
+    // (Composio's draft tool takes no display name; seen on production, 27 Nov). The record holds what went.
+    from: { name: '', address: sender.from_address.trim().toLowerCase() },
     reply_to: (sender.reply_to ?? '').trim().toLowerCase(),
     to: test ? [sender.from_address.trim().toLowerCase()] : addresses(draft.to),
     cc: test ? [] : addresses(draft.cc ?? ''),

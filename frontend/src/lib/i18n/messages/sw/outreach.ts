@@ -11,6 +11,7 @@ export const sw: Record<keyof typeof en, string> = {
   "outreach.mailboxError": "Masanduku yako ya barua hayakuweza kukaguliwa sasa hivi.",
   "outreach.setUp": "Weka utumaji kutoka {address}",
   "outreach.fromName": "Jina la mtumaji",
+  "outreach.fromNameGmail": "Gmail hutuma kwa jina lililo kwenye akaunti yako ya Google. Kulibadilisha: Gmail, Mipangilio, Akaunti, Tuma barua kama.",
   "outreach.replyTo": "Jibu kwa (si lazima)",
   "outreach.commercial": "Huu ni ujumbe wa kibiashara",
   "outreach.commercialHint": "Barua pepe ya kibiashara hubeba anwani yako ya posta na njia ya kujiondoa chini yake.",

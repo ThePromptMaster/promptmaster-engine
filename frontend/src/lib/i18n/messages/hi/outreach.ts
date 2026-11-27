@@ -11,6 +11,7 @@ export const hi: Record<keyof typeof en, string> = {
   "outreach.mailboxError": "अभी आपके जुड़े मेलबॉक्स जाँचे नहीं जा सके।",
   "outreach.setUp": "{address} से भेजना सेट करें",
   "outreach.fromName": "प्रेषक का नाम",
+  "outreach.fromNameGmail": "Gmail आपके Google खाते के नाम से भेजता है। इसे बदलने के लिए: Gmail, सेटिंग, खाते, इस रूप में मेल भेजें।",
   "outreach.replyTo": "जवाब यहाँ (वैकल्पिक)",
   "outreach.commercial": "यह व्यावसायिक आउटरीच है",
   "outreach.commercialHint": "व्यावसायिक ईमेल के नीचे आपका डाक पता और बाहर निकलने का तरीका होता है।",

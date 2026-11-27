@@ -170,7 +170,7 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
       const blockers = await outreach.blockers(send);
       if (blockers.suppressed) return await hold(`${blockers.suppressed} is on your do-not-contact list.`);
       if (blockers.paused) {
-        await record({ status_reason: 'Waiting: all outreach is paused in Settings.' }, 'waiting', { why: 'paused' });
+        await record({ status_reason: 'Waiting: all outreach is paused in Settings. It goes within 15 minutes of turning that off.' }, 'waiting', { why: 'paused' });
         await store.releaseJob(job.id, worker, PAUSED_RETRY_SECONDS);
         return 'released';
       }
