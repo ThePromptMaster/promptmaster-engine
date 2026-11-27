@@ -131,4 +131,21 @@ describe('what Go is shown of the emails', () => {
     expect(text).not.toContain('{{');
     expect(text).toContain('Sender and signature: from Settings.');
   });
+
+  it("each email says what the earlier-contact check found for its contact (27 Nov pass)", async () => {
+    const { outreachExcerpt } = await import('@/lib/outreach/go-work');
+    const { serializeDrafts } = await import('@/lib/outreach/drafts');
+    const { blankContact, serializeContacts } = await import('@/lib/outreach/contacts');
+    const message = { ...blankMessage(), subject: 'Hello', body: 'Hi.', sender_id: 's1' };
+    const draft = (id: string, contact: string, to: string) => ({ id, status: '' as const, reason: '', contact_id: contact, to, cc: '', bcc: '', subject: 'Hello', body: 'Hi.', edited: '', overrides: '' });
+    const contacts = serializeContacts({ kind: 'stage_items', imports: [], items: [
+      { ...blankContact('c1'), email: 'jo@gmail.com', status: 'ready', contacted: JSON.stringify({ address: 'jo@gmail.com', on: '2026-11-27', source: 'promptmaster' }) },
+      { ...blankContact('c2'), email: 'kim@acme.example', status: 'ready' },
+    ] });
+    const bundles = { [stage('contacts').id]: bundle(contacts), [stage('message').id]: bundle(serializeMessage(message)), [stage('drafts').id]: bundle(serializeDrafts([draft('d1', 'c1', 'jo@gmail.com'), draft('d2', 'c2', 'kim@acme.example')])) };
+    const text = outreachExcerpt(template, stage('drafts'), bundles);
+    expect(text).toContain('Earlier contact: contacted before on 2026-11-27 (sent from PromptMaster); the user chose to write again.');
+    expect(text).toContain('Earlier contact: not contacted before.');
+    expect(text).toContain('nothing more is needed from the user for it');
+  });
 });

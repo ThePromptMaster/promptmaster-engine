@@ -57,6 +57,7 @@ import { applyTriage, decidedWords, isTriageTable, recordedDecisions, splitUntri
 import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { performOutreach, recheckOutreach, type OutreachActionKey } from '@/lib/agent/perform-outreach';
+import { outreachExcerpt } from '@/lib/outreach/go-work';
 import { restoreDecided } from '@/lib/workflow/commit-check';
 import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict';
 import { proposeTargets } from '@/lib/workflow/proposals';
@@ -3560,6 +3561,9 @@ async function judgeObjective(
   /** The saved version this text is, when the caller knows: for chapters, none may be. */
   saved?: { version: { id: string; version_number: number } | null }
 ) {
+  // An outreach deliverable is the emails as Go reads them, with what the earlier-contact check
+  // found, never the saved JSON (27 Nov pass: the check asked the user for their Sent mail).
+  if (holder?.renderer === 'outreach' && holder.outreach) content = outreachExcerpt(ctx.template, holder, ctx.bundles);
   const label = labelOverride ?? holder?.label ?? 'the deliverable';
   // What code counted and found met, with the count: the check may not count
   // again (11 Oct, survey brief: "the saved deliverable exceeds 200 words").
