@@ -7,7 +7,7 @@ import { drainOnce } from '@/lib/jobs/client-drain';
 import type { DraftRow, OutreachMessage } from '@/lib/outreach/drafts';
 import { backForReview, type Changed } from '@/lib/outreach/hold-changed';
 import { buildSnapshot, type Snapshot, type SnapshotPurpose } from '@/lib/outreach/snapshot';
-import { createApprovals, listApprovals, listSends, moveSends, revokeApproval, scheduleSends, type ApprovalRecord, type SendRecord } from '@/lib/supabase/outreach-sends';
+import { createApprovals, listApprovals, listInbound, listSends, moveSends, requestWatch, revokeApproval, scheduleSends, type ApprovalRecord, type InboundRecord, type SendRecord } from '@/lib/supabase/outreach-sends';
 import type { OutreachLogo, OutreachSender, OutreachSignature } from '@/types/outreach';
 
 /** Sends still moving: the record is read again every few seconds while any is. */
@@ -17,6 +17,8 @@ const POLL_MS = 5_000;
 export interface SendingIdentity {
   sender: OutreachSender | null;
   signature: OutreachSignature | null;
+  /** Under a follow-up (27 Nov); the first signature when none is set. */
+  replySignature?: OutreachSignature | null;
   logo: OutreachLogo | null;
   spacingSeconds: number;
 }
@@ -44,14 +46,28 @@ export function useSending(input: {
   const { projectId, userId, draftsStageId, messageStageId, message, identity, saveDrafts } = input;
   const [sends, setSends] = useState<SendRecord[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
+  const [inbound, setInbound] = useState<InboundRecord[]>([]);
   const live = useRef(true);
 
-  const apply = useCallback(([s, a]: [SendRecord[], ApprovalRecord[]]) => {
+  const apply = useCallback(([s, a, i]: [SendRecord[], ApprovalRecord[], InboundRecord[]]) => {
     if (!live.current) return;
     setSends(s);
     setApprovals(a);
+    setInbound(i);
   }, []);
-  const load = useCallback(() => Promise.all([listSends(projectId), listApprovals(projectId)]), [projectId]);
+  const load = useCallback(() => Promise.all([listSends(projectId), listApprovals(projectId), listInbound(projectId).catch(() => [] as InboundRecord[])]), [projectId]);
+
+  // What came back is read by the job runner; opening the page asks for a read now (27 Nov).
+  useEffect(() => {
+    let on = true;
+    requestWatch(projectId)
+      .then((queued) => (queued ? drainOnce(projectId) : false))
+      .then((ran) => (ran && on ? load().then(apply) : undefined))
+      .catch(() => undefined);
+    return () => {
+      on = false;
+    };
+  }, [projectId, load, apply]);
   const refresh = useCallback(async () => apply(await load()), [apply, load]);
 
   useEffect(() => {
@@ -73,8 +89,10 @@ export function useSending(input: {
 
   const snapshotOf = useCallback(
     (d: DraftRow, purpose: SnapshotPurpose): Snapshot | null =>
-      identity.sender ? buildSnapshot({ draft: d, message, sender: identity.sender, signature: identity.signature, logo: identity.logo, purpose }) : null,
-    [identity.sender, identity.signature, identity.logo, message]
+      identity.sender
+        ? buildSnapshot({ draft: d, message, sender: identity.sender, signature: purpose === 'followup' ? identity.replySignature ?? identity.signature : identity.signature, logo: identity.logo, purpose })
+        : null,
+    [identity.sender, identity.signature, identity.replySignature, identity.logo, message]
   );
 
   /** Approve these exact emails: each gets its ticket from the backend, then its approval row. */
@@ -111,19 +129,24 @@ export function useSending(input: {
   );
 
   const approve = useCallback(
-    async (drafts: DraftRow[], ids: Set<string>): Promise<ApproveResult> => {
+    async (drafts: DraftRow[], ids: Set<string>, withFollowup = false): Promise<ApproveResult> => {
       const { made, problems } = await ticketed(drafts.filter((d) => ids.has(d.id)), 'send');
+      // The follow-up is approved with its email, as its own exact email (27 Nov).
+      const follows = withFollowup && message.followup?.body.trim()
+        ? (await ticketed(made.map((m) => m.draft).filter((d) => d.followup?.trim()), 'followup')).made
+        : [];
       if (made.length) {
         const byDraft = new Map(made.map((m) => [m.draft.id, m.id]));
+        const followBy = new Map(follows.map((m) => [m.draft.id, m.id]));
         await saveDrafts(
-          drafts.map((d) => (byDraft.has(d.id) ? { ...d, status: 'approved' as const, reason: '', approval_id: byDraft.get(d.id) } : d)),
-          `Approved ${made.length} email${made.length === 1 ? '' : 's'} as they are.`
+          drafts.map((d) => (byDraft.has(d.id) ? { ...d, status: 'approved' as const, reason: '', approval_id: byDraft.get(d.id), followup_approval_id: followBy.get(d.id) ?? '' } : d)),
+          `Approved ${made.length} email${made.length === 1 ? '' : 's'} as they are${follows.length ? `, with ${follows.length} follow-up${follows.length === 1 ? '' : 's'}` : ''}.`
         );
       }
       await refresh();
       return { approved: made.length, problems };
     },
-    [ticketed, saveDrafts, refresh]
+    [ticketed, saveDrafts, refresh, message.followup]
   );
 
   const liveSendOf = useCallback((approvalId: string | undefined) => (approvalId ? sends.find((s) => s.approval_id === approvalId) ?? null : null), [sends]);
@@ -162,7 +185,9 @@ export function useSending(input: {
       if (s && !['scheduled', 'paused', 'held', 'failed', 'cancelled'].includes(s.status)) throw new Error('It is already in your mailbox.');
       if (s && ['scheduled', 'paused', 'held'].includes(s.status)) await moveSends([s.id], 'cancelled', 'Approval withdrawn.', true);
       else await revokeApproval(d.approval_id, 'Approval withdrawn.');
-      await saveDrafts(drafts.map((x) => (x.id === d.id ? { ...x, status: '' as const, approval_id: '' } : x)), `Withdrew the approval of the email to ${d.to}.`);
+      // Its follow-up goes with it.
+      if (d.followup_approval_id) await revokeApproval(d.followup_approval_id, 'Approval withdrawn.').catch(() => undefined);
+      await saveDrafts(drafts.map((x) => (x.id === d.id ? { ...x, status: '' as const, approval_id: '', followup_approval_id: '' } : x)), `Withdrew the approval of the email to ${d.to}.`);
       await refresh();
     },
     [liveSendOf, saveDrafts, refresh]
@@ -201,5 +226,9 @@ export function useSending(input: {
     [approvals, sends]
   );
 
-  return { sends, approvals, approvalById, liveSendOf, testOf, approve, send, sendTest, withdraw, move, holdChanged, refresh, canSend: Boolean(identity.sender) };
+  /** A first email's follow-up send, and what came back for it. */
+  const followupOf = useCallback((sendId: string | undefined) => (sendId ? sends.find((s) => s.parent_send_id === sendId) ?? null : null), [sends]);
+  const inboundOf = useCallback((sendId: string | undefined) => (sendId ? inbound.filter((i) => i.send_id === sendId) : []), [inbound]);
+
+  return { sends, approvals, inbound, approvalById, liveSendOf, followupOf, inboundOf, testOf, approve, send, sendTest, withdraw, move, holdChanged, refresh, canSend: Boolean(identity.sender) };
 }

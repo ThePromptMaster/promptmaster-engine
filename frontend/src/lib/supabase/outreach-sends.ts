@@ -37,6 +37,38 @@ export interface SendRecord {
   submitted_at: string | null;
   confirmed_at: string | null;
   failed_at: string | null;
+  /** A follow-up's first email. */
+  parent_send_id?: string | null;
+}
+
+/** What came back for an email (27 Nov): written by the job runner, read here. */
+export interface InboundRecord {
+  id: string;
+  send_id: string;
+  kind: 'reply' | 'auto_reply' | 'bounce' | 'opt_out';
+  from_address: string;
+  subject: string;
+  text: string;
+  company_domain: string;
+  received_at: string | null;
+  handled_at: string | null;
+}
+
+export async function listInbound(projectId: string): Promise<InboundRecord[]> {
+  const { data, error } = await createClient()
+    .from('outreach_inbound')
+    .select('id, send_id, kind, from_address, subject, text, company_domain, received_at, handled_at')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as InboundRecord[];
+}
+
+/** Ask the job runner to read what came back now (once per ten minutes per project). True when one was queued. */
+export async function requestWatch(projectId: string): Promise<boolean> {
+  const { data, error } = await createClient().rpc('request_outreach_watch', { p_project: projectId });
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export interface NewApproval {
@@ -78,7 +110,7 @@ export async function revokeApproval(id: string, reason: string): Promise<void> 
 export async function listSends(projectId: string): Promise<SendRecord[]> {
   const { data, error } = await createClient()
     .from('outreach_sends')
-    .select('id, approval_id, purpose, status, status_reason, scheduled_for, to_address, provider_message_id, thread_url, sent_copy_matches, submitted_at, confirmed_at, failed_at')
+    .select('id, approval_id, purpose, status, status_reason, scheduled_for, to_address, provider_message_id, thread_url, sent_copy_matches, submitted_at, confirmed_at, failed_at, parent_send_id')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false });
   if (error) throw error;

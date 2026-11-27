@@ -14,6 +14,8 @@ vi.mock('@/lib/supabase/outreach-sends', () => ({
   revokeApproval: (...a: unknown[]) => sends.revokeApproval(...a),
   listSends: async () => sends.list,
   listApprovals: async () => sends.approvals,
+  listInbound: async () => [],
+  requestWatch: async () => false,
 }));
 vi.mock('@/lib/supabase/outreach-identity', () => ({
   listSenders: async () => [{ id: 'snd1', user_id: 'u1', toolkit: 'gmail', from_name: 'Sean', from_address: 'sean@pm.example', reply_to: null, postal_address: '1 Main St', opt_out_line: 'Reply stop.', commercial: true }],

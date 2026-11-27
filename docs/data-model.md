@@ -353,3 +353,7 @@ documents (`lib/outreach/contacts.ts`, `drafts.ts`), the Message as `{kind:'outr
 | `outreach_send_events` | What happened to each send, in order | Functions only |
 
 A confirmed send adds a `promptmaster` row to `outreach_history`, so the next import knows the person was written to.
+
+| `outreach_inbound` (27 Nov, `20261223000000_outreach_inbound.sql`) | What came back for an email: `kind` (reply, auto_reply, bounce, opt_out), the sender, the subject, the reply's own text (≤4,000), `company_domain`, when | Only `record_outreach_inbound` (the job runner, holding a job's lease) inserts; the user may only set `handled_at` (trigger) |
+
+`outreach_sends.parent_send_id` is a follow-up's first email.

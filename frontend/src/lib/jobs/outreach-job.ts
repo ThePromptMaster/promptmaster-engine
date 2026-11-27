@@ -18,7 +18,7 @@
 import { changedSince, hashSnapshot, type Snapshot } from '@/lib/outreach/snapshot';
 import type { Job, JobStore } from './types';
 
-export const OUTREACH_KINDS: ReadonlySet<string> = new Set(['send_email', 'send_test']);
+export const OUTREACH_KINDS: ReadonlySet<string> = new Set(['send_email', 'send_test', 'send_followup', 'outreach_watch']);
 
 export type SendStatus = 'scheduled' | 'paused' | 'held' | 'submitting' | 'submitted' | 'confirmed' | 'bounced' | 'failed' | 'cancelled';
 
@@ -31,6 +31,22 @@ export interface SendRow {
   purpose: 'send' | 'test' | 'followup';
   status: SendStatus;
   to_address: string;
+  /** A follow-up's first email. */
+  parent_send_id?: string | null;
+  provider_thread_id?: string | null;
+  submitted_at?: string | null;
+  scheduled_for?: string | null;
+}
+
+/** What came back for one email (`POST /api/outreach/check-thread`). */
+export interface InboundEvent {
+  kind: 'reply' | 'auto_reply' | 'bounce' | 'opt_out';
+  message_id: string;
+  from: string;
+  subject: string;
+  text: string;
+  at: string;
+  company_domain: string;
 }
 
 export interface ApprovalRow {
@@ -76,6 +92,15 @@ export interface OutreachStore {
   /** `text` is the email as it would go now, read for facts the project has replaced. */
   blockers(send: SendRow, text?: string): Promise<Blockers>;
   record(jobId: string, worker: string, sendId: string, patch: SendPatch, event: string, detail?: Record<string, unknown>): Promise<boolean>;
+  /** A follow-up's first email, with its approval. */
+  parentOf(send: SendRow): Promise<{ send: SendRow; approval: ApprovalRow } | null>;
+  /** What came back, and what it does (`record_outreach_inbound`): the number new. */
+  recordInbound(jobId: string, worker: string, sendId: string, events: readonly InboundEvent[]): Promise<number>;
+  /** A first email confirmed: its approved follow-up is queued, and a watch for replies. */
+  afterConfirmed(jobId: string, worker: string, send: SendRow, confirmedAt: number): Promise<void>;
+  /** The project's emails sent in the last fourteen days, with their approvals, to read what came back. */
+  watchList(projectId: string): Promise<{ send: SendRow; approval: ApprovalRow }[]>;
+  enqueueWatch(userId: string, projectId: string, at: number): Promise<void>;
 }
 
 export interface Ticketed {
@@ -101,6 +126,9 @@ export class OutreachCallError extends Error {
 }
 
 export interface OutreachClient {
+  /** A follow-up, sent in the first email's thread. */
+  reply(t: Ticketed, threadId: string): Promise<Ids>;
+  checkThread(t: Ticketed, threadId: string, sinceEpochSeconds: number): Promise<InboundEvent[]>;
   createDraft(t: Ticketed): Promise<{ draft_id: string }>;
   sendDraft(t: Ticketed, draftId: string): Promise<Ids>;
   findSent(t: Ticketed, afterEpochSeconds: number): Promise<{ found: boolean } & Partial<Ids>>;
@@ -128,9 +156,41 @@ const MAX_CONFIRMS = 5;
 const PAUSED_RETRY_SECONDS = 900;
 const OFF_RETRY_SECONDS = 900;
 
+const WATCH_SOON_SECONDS = 30 * 60;
+const WATCH_LATER_SECONDS = 6 * 60 * 60;
+const WATCH_DAYS = 14;
+const DAY_MS = 86_400_000;
+const sentAt = (s: SendRow) => Date.parse(s.submitted_at ?? s.scheduled_for ?? '') || 0;
+
+/**
+ * Reading what came back for the project's recent emails (27 Nov): every half hour for a day after
+ * the latest one, then every six hours, for fourteen days. Each email is read with its own ticket.
+ */
+async function runWatch(args: { job: Job; store: JobStore; worker: string; outreach: OutreachStore; client: OutreachClient; now: () => number }): Promise<OutreachOutcome> {
+  const { job, store, worker, outreach, client, now } = args;
+  const list = await outreach.watchList(job.project_id);
+  let found = 0;
+  for (const { send, approval } of list) {
+    try {
+      const events = await client.checkThread({ userId: send.user_id, approval }, send.provider_thread_id ?? '', Math.floor(sentAt(send) / 1000));
+      if (events.length) found += await outreach.recordInbound(job.id, worker, send.id, events);
+    } catch {
+      // One email that could not be read does not stop the others; the next watch tries again.
+    }
+  }
+  const latest = Math.max(0, ...list.map(({ send }) => sentAt(send)));
+  if (latest && now() - latest < WATCH_DAYS * DAY_MS) {
+    const wait = now() - latest < DAY_MS ? WATCH_SOON_SECONDS : WATCH_LATER_SECONDS;
+    await outreach.enqueueWatch(job.user_id, job.project_id, now() + wait * 1000);
+  }
+  await store.completeJob(job.id, worker, { checked: list.length, found });
+  return 'done';
+}
+
 export async function runOutreachJob(args: { job: Job; store: JobStore; worker: string; outreach: OutreachStore; client: OutreachClient; now?: () => number }): Promise<OutreachOutcome> {
   const { job, store, worker, outreach, client } = args;
   const now = args.now ?? (() => Date.now());
+  if (job.kind === 'outreach_watch') return runWatch({ ...args, now });
   const sendId = String((job.payload as { send_id?: unknown }).send_id ?? '');
   const loaded = sendId ? await outreach.load(sendId) : null;
   if (!loaded) {
@@ -161,7 +221,27 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
     return 'done';
   }
 
+  // A follow-up goes in its first email's thread, and only while nobody has answered it.
+  const followup = approval.purpose === 'followup';
+  let threadId = '';
   try {
+    if (followup) {
+      const parent = await outreach.parentOf(send);
+      if (!parent || !['submitted', 'confirmed'].includes(parent.send.status) || !parent.send.provider_thread_id) {
+        return await hold('Its first email was not sent, so the follow-up is not.');
+      }
+      threadId = parent.send.provider_thread_id;
+      if (!cp.step) {
+        const events = await client.checkThread({ userId: parent.send.user_id, approval: parent.approval }, threadId, Math.floor(sentAt(parent.send) / 1000));
+        if (events.length) await outreach.recordInbound(job.id, worker, parent.send.id, events);
+        const stop = events.find((e) => e.kind !== 'auto_reply');
+        if (stop) {
+          // `record_outreach_inbound` has cancelled this follow-up, saying why.
+          await store.completeJob(job.id, worker, { stopped: stop.kind });
+          return 'done';
+        }
+      }
+    }
     if (!cp.step) {
       if (approval.revoked_at) return await hold('The approval was withdrawn.');
       const current = await outreach.current(approval);
@@ -190,6 +270,21 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
       // Re-entered after a failure making the draft. A draft never sends by itself, but look first.
       const found = await client.findSent(t, Math.floor(cp.at / 1000));
       if (found.found) await adopt(found);
+    }
+
+    if (cp.step === 'submitting' && followup) {
+      // A reply in the thread has no draft to send twice; unsure, Sent is searched like any send.
+      try {
+        await adopt(await client.reply(t, threadId));
+      } catch (e) {
+        if (!(e instanceof OutreachCallError) || e.code !== 'uncertain') throw e;
+        const found = await client.findSent(t, Math.floor((cp.at ?? now()) / 1000));
+        if (found.found) await adopt(found);
+        else {
+          await store.failJob(job.id, worker, 'send_uncertain', 'Not found in your Sent mail after the follow-up was interrupted. Not sent again automatically.', {}, false);
+          return 'failed';
+        }
+      }
     }
 
     if (cp.step === 'submitting') {
@@ -227,6 +322,8 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
       const c = await client.confirm(t, cp.message_id);
       if (c.sent) {
         await record({ status: 'confirmed', thread_url: c.thread_url || undefined, provider_thread_id: c.thread_id || undefined, sent_copy_matches: c.matches }, 'confirmed');
+        // A first email out: its approved follow-up is queued, and replies are watched for.
+        if (approval.purpose === 'send') await outreach.afterConfirmed(job.id, worker, { ...send, provider_thread_id: c.thread_id || send.provider_thread_id }, now()).catch(() => undefined);
         await store.completeJob(job.id, worker, { confirmed: true });
         return 'sent';
       }

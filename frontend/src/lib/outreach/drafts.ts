@@ -63,6 +63,10 @@ export interface DraftRow extends StageItem {
   overrides: string;
   /** The approval of this exact email (`outreach_approvals.id`), while it is approved. */
   approval_id?: string;
+  /** The follow-up, sent in the same thread a few business days later unless they reply: this contact's text (27 Nov). */
+  followup?: string;
+  /** The approval of the follow-up, given with the email's own. */
+  followup_approval_id?: string;
 }
 
 export function firstName(name: string): string {
@@ -98,7 +102,15 @@ export function draftFor(contact: ContactRow, message: OutreachMessage, id: stri
     body: fillTokens(message.body, values),
     edited: '',
     overrides: '',
+    followup: message.followup?.body ? fillTokens(message.followup.body, values) : '',
   };
+}
+
+/** The follow-up as it goes out: in the first email's thread ("Re: …"), its batch values filled. */
+export function followupText(d: Pick<DraftRow, 'subject' | 'body' | 'overrides' | 'followup'>, message: OutreachMessage): { subject: string; body: string } {
+  const values = draftVariables(d, message);
+  const subject = fillTokens(d.subject, values);
+  return { subject: /^re:/i.test(subject) ? subject : `Re: ${subject}`, body: fillTokens(d.followup ?? '', values) };
 }
 
 export function editedFields(d: Pick<DraftRow, 'edited'>): Set<string> {
@@ -150,6 +162,7 @@ export function syncDrafts(contacts: readonly ContactRow[], message: OutreachMes
       to: edited.has('to') ? had.to : fresh.to,
       subject: edited.has('subject') ? had.subject : fresh.subject,
       body: edited.has('body') ? had.body : fresh.body,
+      followup: edited.has('followup') ? had.followup : fresh.followup,
     });
   }
   return out;

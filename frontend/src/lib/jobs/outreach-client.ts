@@ -2,7 +2,7 @@
  * The drain's calls to the backend's sending routes (26 Nov): the worker credential names the
  * person, and the approval's ticket covers the one email. Without both, the backend sends nothing.
  */
-import { OutreachCallError, type Ids, type OutreachClient, type Ticketed } from './outreach-job';
+import { OutreachCallError, type Ids, type InboundEvent, type OutreachClient, type Ticketed } from './outreach-job';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const TIMEOUT_MS = 60_000;
@@ -46,6 +46,15 @@ export class HttpOutreachClient implements OutreachClient {
     if (d.code === 'uncertain' || d.code === 'not_sent') throw new OutreachCallError(message, d.code, res.status);
     // A 5xx without a code: the backend itself failed, possibly after the mailbox took it.
     throw new OutreachCallError(message, res.status >= 500 ? 'uncertain' : 'other', res.status);
+  }
+
+  reply(t: Ticketed, threadId: string) {
+    return this.post<Ids>('/api/outreach/send', t, { step: 'reply', thread_id: threadId });
+  }
+
+  async checkThread(t: Ticketed, threadId: string, sinceEpochSeconds: number) {
+    const res = await this.post<{ events: InboundEvent[] }>('/api/outreach/check-thread', t, { thread_id: threadId, since_epoch: sinceEpochSeconds });
+    return res.events ?? [];
   }
 
   createDraft(t: Ticketed) {

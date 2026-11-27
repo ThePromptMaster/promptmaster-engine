@@ -155,6 +155,34 @@ def _send_draft(arguments: dict[str, Any]) -> dict[str, Any]:
     return {"id": mid, "threadId": tid, "labelIds": ["SENT"]}
 
 
+# What came back (27 Nov, Phase 7): replies, automatic replies and bounces a test or E2E puts here.
+INBOX: dict[str, dict[str, Any]] = {}
+
+
+def _reply_to_thread(arguments: dict[str, Any]) -> dict[str, Any]:
+    thread = str(arguments.get("thread_id") or "")
+    first = next((m for m in SENT.values() if m.get("threadId") == thread), None)
+    if first is None:
+        from promptmaster.composio_client import ComposioError
+
+        raise ComposioError("GMAIL_REPLY_TO_THREAD failed: thread not found", 404)
+    mid = _next("mr")
+    SENT[mid] = {
+        "messageId": mid, "threadId": thread, "sender": MOCK_GMAIL_ADDRESS, "to": str(arguments.get("recipient_email") or ""),
+        "subject": f"Re: {first.get('subject', '')}", "messageTimestamp": _day(0, 13), "labelIds": ["SENT"],
+        "payload": {"mimeType": "text/html", "body": {"data": _b64(str(arguments.get("message_body") or ""))}},
+    }
+    return {"id": mid, "threadId": thread, "labelIds": ["SENT"]}
+
+
+def _inbox_found(query: str) -> list[dict[str, Any]]:
+    if query.startswith("from:(mailer-daemon"):
+        named = re.search(r'"([^"]+)"', query)
+        return [m for m in INBOX.values() if re.match(r"(mailer-daemon|postmaster)@", m.get("sender", "")) and named and named.group(1) in m.get("messageText", "")]
+    sender = re.match(r"from:(\S+)", query)
+    return [m for m in INBOX.values() if sender and sender.group(1).lower() in m.get("sender", "").lower()]
+
+
 def _mail_matches(query: str, m: dict[str, Any]) -> bool:
     senders = re.findall(r"from:\(([^)]*)\)", query)
     words = re.sub(r"from:\([^)]*\)|(?:after|before):\S+|-in:chats", " ", query)
@@ -253,6 +281,15 @@ def result(tool: str, arguments: dict[str, Any]) -> Any:
         return _create_draft(arguments)
     if tool == "GMAIL_SEND_DRAFT":
         return _send_draft(arguments)
+    if tool == "GMAIL_REPLY_TO_THREAD":
+        return _reply_to_thread(arguments)
+    if tool == "GMAIL_FETCH_MESSAGE_BY_THREAD_ID":
+        thread = str(arguments.get("thread_id") or "")
+        return {"messages": [m for m in [*SENT.values(), *INBOX.values()] if m.get("threadId") == thread]}
+    if tool == "GMAIL_FETCH_EMAILS" and str(arguments.get("query") or "").startswith("from:") and "from:(" not in str(arguments.get("query") or "")[:6]:
+        return {"messages": _inbox_found(str(arguments.get("query")))}
+    if tool == "GMAIL_FETCH_EMAILS" and str(arguments.get("query") or "").startswith("from:(mailer-daemon"):
+        return {"messages": _inbox_found(str(arguments.get("query")))}
     if tool == "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID" and str(arguments.get("message_id")) in SENT:
         return SENT[str(arguments.get("message_id"))]
     if tool == "GMAIL_FETCH_EMAILS" and "in:sent" in str(arguments.get("query") or ""):

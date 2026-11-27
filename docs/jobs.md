@@ -260,3 +260,10 @@ The send's status moves only through `record_outreach_send`, which requires the 
 `request_project_cancel` (Go's stop, the chapters' Pause) cancels only `draft_section` jobs. A send job that ends
 `failed` or `dead` marks its send failed (trigger `outreach_job_ended`), saying "may or may not have gone out" when
 it was mid-send.
+
+### Follow-ups and the watch (27 Nov)
+
+| Kind | Payload | Made by |
+|---|---|---|
+| `send_followup` | `{send_id}` | `schedule_outreach_followup`, called by the job runner once a first email is confirmed; `run_after` is N business days later in the user's time zone. Reads the first email's thread first: a reply, bounce or opt-out cancels it (`record_outreach_inbound`). Sent in the thread (`step: reply`); no Gmail draft. |
+| `outreach_watch` | `{project_id}` | after a first email is confirmed (+30 min), by itself (every 30 min for a day after the latest email, then every 6 h, up to 14 days), and by `request_outreach_watch` when the Drafts stage opens. Key `watch:{project}:{ten-minute bucket}`. |

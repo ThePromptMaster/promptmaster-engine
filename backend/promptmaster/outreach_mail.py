@@ -21,6 +21,7 @@ from urllib.parse import quote
 
 from .composio_client import Composio, ComposioError
 from .connections import _first, _header, _when, find_records
+from .outreach_inbound import Inbound, address_of, classify, clean_reply, company_domain
 
 logger = logging.getLogger(__name__)
 
@@ -337,3 +338,83 @@ async def received_html(c: Composio, user_id: str, message_id: str) -> str:
     except ComposioError as e:
         raise _composio_error(e) from e
     return _html_of(data)
+
+
+# ---------------------------------------------------------------------------
+# Follow-ups and what came back (27 Nov, Phase 7).
+# ---------------------------------------------------------------------------
+
+
+async def reply_in_thread(c: Composio, user_id: str, snapshot: dict[str, Any], thread_id: str, mailbox: str) -> Sent:
+    """A follow-up, sent in the thread of the first email. Composio quotes the latest message under it."""
+    to = list(snapshot.get("to") or [])
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_REPLY_TO_THREAD", {
+            "user_id": "me",
+            "thread_id": thread_id,
+            "message_body": str(snapshot.get("html") or ""),
+            "is_html": True,
+            "recipient_email": to[0] if to else "",
+            "include_signature": False,
+        })
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    message = str(find_key(data, ("messageId", "message_id")) or find_key(data, ("id",)) or "")
+    thread = str(find_key(data, ("threadId", "thread_id")) or thread_id)
+    if not message:
+        logger.warning("OUTREACH_REPLY_NO_ID keys=%s", list(data)[:10] if isinstance(data, dict) else type(data).__name__)
+        raise SendError("Gmail did not say what it sent.", uncertain=True)
+    return Sent(message_id=message, thread_id=thread, thread_url=gmail_thread_url(thread, mailbox))
+
+
+_INBOUND_RESULTS = 10
+
+
+def _inbound_of(record: dict[str, Any], recipient: str, ours: str, since_epoch: int) -> Inbound | None:
+    mid = str(_first(record, "messageId", "message_id", "id") or "")
+    sender = str(_first(record, "sender", "from") or _header(record, "From") or "")
+    subject = str(_first(record, "subject", "preview.subject") or _header(record, "Subject") or "")[:300]
+    text = str(_first(record, "messageText", "message_text", "preview.body", "snippet") or "")
+    when = _when(_first(record, "messageTimestamp", "message_timestamp", "date", "internalDate") or _header(record, "Date"))
+    if when:
+        try:
+            from datetime import datetime
+
+            if datetime.fromisoformat(when.replace("Z", "+00:00")).timestamp() < since_epoch:
+                return None
+        except ValueError:
+            pass
+    kind = classify(from_address=sender, subject=subject, text=text, recipient=recipient, ours=ours)
+    if not kind or not mid:
+        return None
+    cleaned = clean_reply(text) if kind in ("reply", "opt_out", "auto_reply") else ""
+    company = company_domain(sender, recipient) if kind in ("reply", "opt_out") else ""
+    return Inbound(kind=kind, message_id=mid, from_address=address_of(sender), subject=subject, text=cleaned, at=when, company_domain=company)
+
+
+async def inbound(c: Composio, user_id: str, *, thread_id: str, recipient: str, ours: str, since_epoch: int) -> list[Inbound]:
+    """Replies, automatic replies, opt-outs and bounces for one email sent to `recipient`, since it went:
+    in its thread, from the recipient elsewhere, and from the mail system naming the recipient."""
+    session = await c.create_session(user_id, ["gmail"])
+    records: list[dict[str, Any]] = []
+    calls: list[tuple[str, dict[str, Any]]] = []
+    if thread_id:
+        calls.append(("GMAIL_FETCH_MESSAGE_BY_THREAD_ID", {"user_id": "me", "thread_id": thread_id}))
+    after = max(0, since_epoch - 60)
+    calls.append(("GMAIL_FETCH_EMAILS", {"user_id": "me", "query": f"from:{recipient} after:{after}", "max_results": _INBOUND_RESULTS, "verbose": True, "include_payload": False}))
+    calls.append(("GMAIL_FETCH_EMAILS", {"user_id": "me", "query": f'from:(mailer-daemon OR postmaster) after:{after} "{recipient}"', "max_results": _INBOUND_RESULTS, "verbose": True, "include_payload": False}))
+    for tool, args in calls:
+        try:
+            data = await c.execute(session, tool, args)
+        except ComposioError as e:
+            raise _composio_error(e) from e
+        records.extend(find_records(data, ("messageId", "message_id", "id")))
+    seen: set[str] = set()
+    out: list[Inbound] = []
+    for r in records:
+        item = _inbound_of(r, recipient.lower(), ours.lower(), since_epoch)
+        if item and item.message_id not in seen:
+            seen.add(item.message_id)
+            out.append(item)
+    return out

@@ -17,6 +17,7 @@ import type { SendRecord } from '@/lib/supabase/outreach-sends';
 import type { OutreachContext } from '@/components/workflow/renderers/types';
 import type { OutreachLogo, OutreachSender, OutreachSignature } from '@/types/outreach';
 import { EmailPreview } from './email-preview';
+import { EmailReplies } from './email-replies';
 import { useSending } from './use-sending';
 
 const field = 'w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -83,6 +84,10 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
   const outOfDate = added + changed + removed > 0;
 
   const { sender, signature, logo } = identityFor(message, identity.senders, identity.signatures, identity.logos);
+  const replySignature = identity.signatures.find((s) => s.id === message.reply_signature_id) ?? null;
+  // The follow-up goes with an approval unless the user says not (27 Nov).
+  const [withFollowup, setWithFollowup] = useState(true);
+  const followupDays = message.followup?.after_business_days ?? 3;
 
   const save = useCallback((items: DraftRow[], operation: string, summary: string) => context.save(stageId, serializeDrafts(items), operation, summary), [context, stageId]);
   const sending = useSending({
@@ -91,7 +96,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
     draftsStageId: stageId,
     messageStageId: context.parts.message?.stageId ?? '',
     message,
-    identity: { sender, signature, logo, spacingSeconds: identity.spacing },
+    identity: { sender, signature, replySignature, logo, spacingSeconds: identity.spacing },
     saveDrafts: (items, summary) => save(items, 'outreach_edit', summary),
   });
 
@@ -161,7 +166,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
                 data-approve-selected
                 onClick={() =>
                   act('approve', async () => {
-                    const r = await sending.approve(drafts, selected);
+                    const r = await sending.approve(drafts, selected, withFollowup);
                     setProblems(Object.fromEntries(r.problems.map((p) => [p.draftId, p.problems])));
                     setSelected(new Set());
                     setSaid(t('outreach.approvedCount', { count: r.approved }));
@@ -170,6 +175,12 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
               >
                 {t('outreach.approveSelected', { count: selected.size })}
               </button>
+              {message.followup?.body.trim() && (
+                <label className="flex w-full items-center gap-2 text-label text-[var(--on-surface)]" data-with-followup>
+                  <input type="checkbox" checked={withFollowup} onChange={(e) => setWithFollowup(e.target.checked)} />
+                  {t('outreach.withFollowup', { days: followupDays })}
+                </label>
+              )}
             </div>
           )}
           {readyToSend.length > 0 && (
@@ -226,6 +237,15 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
                 if (p.length) setProblems((x) => ({ ...x, [d.id]: p }));
               })}
               onWithdraw={() => act(`w:${d.id}`, () => sending.withdraw(drafts, d))}
+              followup={send ? sending.followupOf(send.id) : null}
+              followupApproved={Boolean(d.followup_approval_id)}
+              followupDays={followupDays}
+              onCancelFollowup={(id) => act(`f:${d.id}`, () => sending.move(id, 'cancelled'))}
+              replies={
+                send ? (
+                  <EmailReplies records={sending.inboundOf(send.id)} contact={contacts.find((c) => c.id === d.contact_id)} context={context} readOnly={readOnly} />
+                ) : null
+              }
               onMove={(to) => send && act(`m:${d.id}`, () => sending.move(send.id, to))}
               onEdit={(patch, fields) => {
                 const edited = new Set([...editedFields(d), ...fields]);
@@ -284,6 +304,8 @@ function useSendWords() {
         return t('outreach.sendFailed', { reason: localTimes(s.status_reason) });
       case 'cancelled':
         return t('outreach.sendCancelled');
+      case 'bounced':
+        return t('outreach.sendBounced');
       default:
         return s.status;
     }
@@ -318,6 +340,13 @@ function DraftLine(props: {
   signatureName: string | null;
   /** A replaced fact the email still states, holding it. */
   replaced: string | null;
+  /** The follow-up's own send, once its email went (27 Nov). */
+  followup: SendRecord | null;
+  followupApproved: boolean;
+  followupDays: number;
+  onCancelFollowup: (sendId: string) => void;
+  /** What came back for this email. */
+  replies: React.ReactNode;
 }) {
   const { draft, message, open, onToggle, readOnly, busy, selectable, selected, onSelect, problems, send, approved, test, canTest, replaced } = props;
   const t = useT();
@@ -334,6 +363,17 @@ function DraftLine(props: {
   const approvedRender = useCallback(() => fromSnapshot(approved!), [approved]);
   const state = send ? words(send) : draft.status === 'approved' ? t('outreach.draftApproved') : draft.status === 'set_aside' ? t('outreach.draftSetAside') : held.length || replaced ? t('outreach.draftHeld') : t('outreach.draftToReview');
   const locked = draft.status === 'approved';
+  const at = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '');
+  const f = props.followup;
+  const followLine = f
+    ? f.status === 'scheduled' || f.status === 'paused'
+      ? t('outreach.followupScheduled', { when: at(f.scheduled_for) })
+      : f.status === 'confirmed' || f.status === 'submitted'
+        ? t('outreach.followupSent', { when: at(f.confirmed_at ?? f.submitted_at) })
+        : t('outreach.followupStopped', { reason: f.status_reason || f.status })
+    : props.followupApproved && draft.status === 'approved'
+      ? t('outreach.followupApproved', { days: props.followupDays })
+      : '';
   return (
     <li data-draft={draft.id} data-held={held.length > 0 || Boolean(replaced) || undefined} data-send-status={send?.status} className="rounded-xl bg-[var(--surface-container-low)]">
       <div className="flex items-start gap-2 px-3 py-2.5">
@@ -347,6 +387,7 @@ function DraftLine(props: {
             {held.length > 0 && <span className="block text-label text-[var(--pm-tertiary)]">{t('outreach.heldBecause', { list: held.join(', ') })}</span>}
             {replaced && <span className="block text-label text-[var(--pm-tertiary)]" data-held-replaced>{t('outreach.heldFor', { reason: replaced })}</span>}
             {!draft.status && draft.reason && <span className="block text-label text-[var(--pm-tertiary)]" data-back-for-review>{t('outreach.backForReview', { reason: draft.reason })}</span>}
+            {followLine && <span className="block text-label text-[var(--on-surface-variant)]" data-followup-state>{followLine}</span>}
             {draft.status === 'set_aside' && draft.reason && <span className="block text-label text-[var(--on-surface-variant)]">{draft.reason}</span>}
             {problems.length > 0 && <span role="alert" className="block text-label text-[var(--pm-error)]">{problems.join(' ')}</span>}
           </span>
@@ -354,6 +395,12 @@ function DraftLine(props: {
           <span className="max-w-[45%] shrink-0 text-end text-label font-semibold text-[var(--on-surface-variant)]" data-draft-state>{state}</span>
         </button>
       </div>
+      {props.replies && <div className="px-3 pb-2">{props.replies}</div>}
+      {open && f && (f.status === 'scheduled' || f.status === 'paused') && !readOnly && (
+        <div className="px-3 pb-2">
+          <button type="button" className={quiet} disabled={busy} onClick={() => props.onCancelFollowup(f.id)} data-cancel-followup>{t('outreach.cancelFollowup')}</button>
+        </div>
+      )}
       {open && (
         <div className="space-y-3 px-3 pb-3">
           {send?.thread_url && (

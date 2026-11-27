@@ -17,7 +17,7 @@ import type { StageItem } from '@/lib/workflow/stage-artifact';
 export type ContactStatus = '' | 'ready' | 'decide' | 'skip';
 
 /** Where a value came from: the import, a numbered web source ("S3"), the mailbox, or the user. */
-export type ValueSource = 'import' | 'you' | 'mailbox' | `S${number}` | '';
+export type ValueSource = 'import' | 'you' | 'mailbox' | 'reply' | `S${number}` | '';
 
 export interface ContactRow extends StageItem {
   id: string;
