@@ -988,7 +988,7 @@ export function useGoLoop(opts: Options) {
           continue;
         }
 
-        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(freshEvents) });
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(freshEvents, o.project.facts) });
         // One read decides the moves, the requirements and what the planner
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
@@ -1193,7 +1193,7 @@ export function useGoLoop(opts: Options) {
           extraTriesRef.current
         );
         // A draft older than the work before it, held since before the stage was entered, is written again rather than repaired (L-328).
-        const drafted = new Set(Object.entries(o.bundles).filter(([id, b]) => (b?.versions.length ?? 0) > 0 && !draftPredatesInputs(o.template, o.state, id, b?.versions.at(-1), o.bundles, lastBriefChangeAt(freshEvents))).map(([id]) => id));
+        const drafted = new Set(Object.entries(o.bundles).filter(([id, b]) => (b?.versions.length ?? 0) > 0 && !draftPredatesInputs(o.template, o.state, id, b?.versions.at(-1), o.bundles, lastBriefChangeAt(freshEvents, o.project.facts))).map(([id]) => id));
         const holder = deliverableDocument(o.template, o.bundles)?.stage;
         // Once the deliverable is written it can't be "stuck" on anything but
         // itself: what's left is the world's, and gets recorded (7 Nov).
@@ -2410,7 +2410,7 @@ export function useGoLoop(opts: Options) {
         });
         const current = runRef.current;
         if (cancelled || abortRef.current || !current || current.id !== liveRunId || current.needs !== need) return;
-        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(o.events) });
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(o.events, o.project.facts) });
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),

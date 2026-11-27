@@ -66,4 +66,10 @@ describe('a draft older than the work before it, held since before the stage was
     expect(lastBriefChangeAt([ev('2026-11-27T15:10:00Z', { field: 'facts' }), ev('2026-11-27T15:20:00Z', { presentation_only: true }), ev('2026-11-27T15:30:00Z', { made_before_change: true })])).toBe('2026-11-27T15:10:00Z');
     expect(lastBriefChangeAt([{ type: 'stage_version_saved', created_at: '2026-11-27T15:10:00Z', payload: {} }])).toBeUndefined();
   });
+
+  it('a fact added counts by its own time: one added while the first stage was drafted wrote no event', () => {
+    expect(lastBriefChangeAt([], [{ created_at: '2026-11-27T21:07:14Z', retired_at: null }])).toBe('2026-11-27T21:07:14Z');
+    expect(lastBriefChangeAt([{ type: 'brief_changed', created_at: '2026-11-27T21:20:00Z', payload: {} }], [{ created_at: '2026-11-27T21:07:14Z' }])).toBe('2026-11-27T21:20:00Z');
+    expect(lastBriefChangeAt([], [{ created_at: '2026-11-27T21:07:14Z', retired_at: '2026-11-27T21:08:00Z' }])).toBeUndefined();
+  });
 });

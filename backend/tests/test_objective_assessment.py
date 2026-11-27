@@ -711,3 +711,69 @@ def test_a_count_of_each_chapter_answers_a_requirement_about_each_chapter():
     assert _measured_for("Roughly 600–800 words per chapter", [counted]) == counted
     assert _measured_for("A 500-word summary", [counted]) is None
 
+
+
+# 27 Nov (Sean, Northline; L-329): "Final review couldn't compare v4's outreach
+# wording against approved Output v2 … I compared the rendered message text and
+# it matched exactly." The browser compares the section in code; the check is told.
+from promptmaster.objective_assessment import ComparedSection  # noqa: E402
+
+NORTHLINE = (
+    "## OUTREACH — Candidate outreach draft\n\n**Version 2.**\n\nDear [Candidate name],\n\n"
+    "I am writing about the role of VP Operations at Northline Fixtures.\n"
+)
+SAME = ComparedSection(
+    section="OUTREACH", version=2, identical=True,
+    line="OUTREACH in Output v4 compared in code with Output v2, the version an approval names — identical word for word, apart from its internal note lines",
+)
+KEEP = "Keep the approved Version 2 OUTREACH wording as the source, unchanged"
+
+
+def test_the_prompt_carries_what_code_compared():
+    _system, user = build_assessment_prompt(_inputs(), "Output", NORTHLINE, [], compared=[SAME])
+    assert "COMPARED IN CODE WITH THE VERSION AN APPROVAL NAMES" in user
+    assert "- OUTREACH in Output v4 compared in code with Output v2" in user
+
+
+def test_an_identical_approved_section_is_kept_not_left_unchecked():
+    a = parse_assessment({
+        "outcome": "partly", "reason": "The v2 wording could not be compared.",
+        "basis_quote": "I am writing about the role of VP Operations at Northline Fixtures.",
+        "criteria": [{"requirement": KEEP, "verdict": "not_checked", "basis": "Output v2 is not shown."}],
+    }, NORTHLINE, [], compared=[SAME])
+    assert a.criteria[0].verdict == "met"
+    assert a.criteria[0].basis.startswith("Compared in code: OUTREACH in Output v4")
+    assert a.outcome == "met"
+    assert "approved section was compared" in a.reason
+
+
+def test_a_difference_is_told_not_turned_into_a_verdict():
+    differs = SAME.model_copy(update={"identical": False, "line": "OUTREACH … — differs: v2: Dear Ms Lee | v4: Dear Jordan"})
+    a = parse_assessment({
+        "outcome": "partly", "reason": "Not compared.",
+        "criteria": [{"requirement": KEEP, "verdict": "not_checked", "basis": "x"}],
+    }, NORTHLINE, [], compared=[differs])
+    assert a.criteria[0].verdict == "not_checked"
+
+
+def test_a_requirement_not_about_keeping_the_section_is_left_alone():
+    a = parse_assessment({
+        "outcome": "partly", "reason": "x",
+        "criteria": [{"requirement": "OUTREACH says no message has been sent", "verdict": "not_checked", "basis": "x"}],
+    }, NORTHLINE, [], compared=[SAME])
+    assert a.criteria[0].verdict == "not_checked"
+
+
+def test_the_router_passes_the_comparisons():
+    stub = AsyncMock()
+    stub.generate_json.return_value = ({"outcome": "partly", "reason": "x", "criteria": []}, None)
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/agent/assess-objective", json={
+            "inputs": _inputs().model_dump(), "deliverable_label": "Output", "content": NORTHLINE, "steps": [],
+            "compared": [SAME.model_dump()],
+        })
+        assert r.status_code == 200, r.text
+        assert "COMPARED IN CODE WITH THE VERSION AN APPROVAL NAMES" in stub.generate_json.call_args.kwargs["prompt"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)

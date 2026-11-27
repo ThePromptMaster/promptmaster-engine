@@ -12,6 +12,7 @@
  */
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { parseItems } from '@/lib/workflow/stage-artifact';
+import { sectionUnder, sectionsNamed } from './approved-sections';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 
 /** The history the check is shown, all versions together. */
@@ -52,12 +53,15 @@ export function referencedVersions(
   template: Pick<WorkflowTemplate, 'stages'>,
   bundles: Record<string, StageArtifactBundle>,
   text: string,
+  /** Other text that cites versions: the facts, where an approval names "Output v2" (L-329). */
+  cites = '',
 ): string[] {
   const cited: { stageId: string; label: string; n: number }[] = [];
+  const citing = cites ? `${text}\n${cites}` : text;
   for (const s of template.stages) {
     const labels = [...new Set([s.short_label, s.label].filter(Boolean))];
     const re = new RegExp(`\\b(?:${labels.map(escape).join('|')})\\s+v(\\d{1,3})\\b`, 'gi');
-    for (const m of text.matchAll(re)) {
+    for (const m of citing.matchAll(re)) {
       const n = Number(m[1]);
       if (!cited.some((c) => c.stageId === s.id && c.n === n)) cited.push({ stageId: s.id, label: s.short_label || s.label, n });
     }
@@ -71,9 +75,13 @@ export function referencedVersions(
     if (!v || v.id === head?.id) continue;
     const items = parseItems(v.content);
     const prefix = `${c.label} v${c.n}`;
+    // A section the citing text names is sent whole, not the version's opening (L-329: OUTREACH began past the cut).
+    const named = items ? [] : sectionsNamed(v.content ?? '', cites).map((n) => sectionUnder(v.content ?? '', n)).filter((x): x is string => !!x);
     const block = items
       ? items.map((i) => rowLine(prefix, i)).join('\n')
-      : `${prefix}:\n${(v.content ?? '').trim().slice(0, PROSE_MAX)}`;
+      : named.length
+        ? `${prefix}, the section${named.length === 1 ? '' : 's'} cited:\n${named.join('\n\n').trim().slice(0, PROSE_MAX)}`
+        : `${prefix}:\n${(v.content ?? '').trim().slice(0, PROSE_MAX)}`;
     if (used + block.length > HISTORY_MAX) continue;
     out.push(block);
     used += block.length;

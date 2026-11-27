@@ -6430,3 +6430,37 @@ Limits:
 - With no change since, a carried quick answer is still the draft the later stages build on (L-123), and is
   revised rather than written again.
 - A stage the projection reopened, or one finished, is left to its recheck, as before.
+- The last change is the later of the user's last `brief_changed` and the newest current fact (added 28 Nov: a fact
+  added while the first stage was still being drafted recorded no event, so the rule did not see it on the
+  production rerun of Alder).
+
+### L-329 — The final check compares the section an approval names with the version it names (2026-11-28)
+
+Sean, 27 Nov (Northline Fixtures): "Final review couldn't compare v4's outreach wording against approved Output v2,
+even though v2 was visible in Timeline. I compared the rendered message text and it matched exactly. Can the
+verifier open the specific historical version named in an approval and check the approved section before marking
+the objective met?"
+
+What happened: the approval was a fact ("D5 … for only the OUTREACH message wording as it appears in saved Output
+v2"). The objective check was shown an earlier version only when the deliverable itself named it ("Output v2"),
+and v4 said "Version 2"; even then it got the version's first 3,000 characters, and OUTREACH began later. So it
+recorded "Keep the approved Version 2 OUTREACH wording … unchanged" as not checked. In his saved texts the message
+is identical; only the internal header line above it changed.
+
+Now:
+- **Compared in code** (`lib/agent/approved-sections.ts`, `approvedComparisons`): each sentence of a current fact or
+  the constraints that gives an approval and names a stage's version ("Output v2") is read for the sections of that
+  version it names by heading ("OUTREACH"). Each is compared line by line with the same section of the text being
+  judged; quoted note lines and lines marked "not part of the message" are set aside and said. A sentence that says
+  a section is unapproved names none ("BRIEF and SCREEN in Output v2 remain unapproved").
+- **The check is told the result** (`compared` on `assess-objective`, `objective_assessment.py`): a requirement to
+  keep that section as approved is met when the comparison found it identical, with the comparison as its basis; a
+  difference is shown to the check with the differing lines, never turned into a verdict by code.
+- **The versions the facts cite are sent too** (`referencedVersions`), with a cited section sent whole rather than
+  the version's opening.
+
+Limits:
+- Only an approval written as a fact or constraint that names the stage and version ("Output v2") is read. An
+  approval ticked on a stage is already tied to its version (L-117).
+- Sections are found by Markdown heading; an approval of a passage with no heading of its own is not compared.
+

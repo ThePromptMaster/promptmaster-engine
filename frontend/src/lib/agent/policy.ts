@@ -376,9 +376,19 @@ export function stageHasCurrentDraft(
   return !entered || !head?.created_at || head.created_at >= entered;
 }
 
-/** When the user last changed the brief or the facts: not a wording edit, nor Go's own record (L-322). */
-export function lastBriefChangeAt(events: readonly { type: string; created_at: string; payload?: Record<string, unknown> | null }[]): string | undefined {
-  return [...events].reverse().find((e) => e.type === 'brief_changed' && !e.payload?.presentation_only && !e.payload?.made_before_change)?.created_at;
+/**
+ * When the user last changed the brief or the facts: not a wording edit, nor
+ * Go's own record (L-322). A fact added counts by its own time too: one added
+ * while the first stage was still being drafted recorded no event (27 Nov,
+ * production rerun of Alder).
+ */
+export function lastBriefChangeAt(
+  events: readonly { type: string; created_at: string; payload?: Record<string, unknown> | null }[],
+  facts: readonly { created_at: string; retired_at?: string | null }[] = []
+): string | undefined {
+  const event = [...events].reverse().find((e) => e.type === 'brief_changed' && !e.payload?.presentation_only && !e.payload?.made_before_change)?.created_at;
+  const fact = facts.filter((f) => !f.retired_at).map((f) => f.created_at).sort().at(-1);
+  return [event, fact].filter((x): x is string => !!x).sort().at(-1);
 }
 
 /**

@@ -51,7 +51,7 @@ from promptmaster.task_outcomes import TaskOutcomesRequest, TaskOutcomesResponse
 from promptmaster.stages_concerned import StagesConcernedRequest, StagesConcernedResponse, stages_concerned
 from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
-from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
+from promptmaster.objective_assessment import ComparedSection, ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
@@ -387,6 +387,8 @@ class AssessObjectiveRequest(BaseModel):
     later_stage: str = Field(default="", max_length=200)
     #: The project's data files, by name and columns (25 Oct, churn research).
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
+    #: Sections an approval names in an earlier version, compared in code (L-329).
+    compared: list[ComparedSection] = Field(default_factory=list, max_length=12)
     model: str = ""
 
 
@@ -414,6 +416,7 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
             req.known_versions,
             req.later_stage,
             req.data_files,
+            req.compared,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
