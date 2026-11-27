@@ -128,7 +128,8 @@ export function ContactsPart({ context, stageId, readOnly }: { context: Outreach
       setSaid(
         t('outreach.imported', { count: merged.added, duplicates: merged.repeated + merged.duplicates, found: check.found }) +
           (merged.changed ? ` ${t('outreach.importChanged', { count: merged.changed })}` : '') +
-          (check.mailbox ? '' : ` ${t('outreach.mailboxUnchecked')}`)
+          // Nothing new to check: the mailbox was not asked, and that is not news (27 Nov pass).
+          (check.mailbox || !fresh.length ? '' : ` ${t('outreach.mailboxUnchecked')}`)
       );
       setPending(null);
       setText('');

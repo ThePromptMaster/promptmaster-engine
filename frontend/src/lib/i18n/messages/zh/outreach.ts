@@ -188,6 +188,7 @@ export const zh: Record<keyof typeof en, string> = {
   "outreach.change.lead": "保存后，由这条消息生成的邮件会改变：",
   "outreach.change.follow": "文本会改变的邮件：{count} 封",
   "outreach.change.approved": "其中已批准、需要你重新批准的：{count} 封",
+  "outreach.change.sent": "已发送的，保持发出时的样子：{count} 封",
   "outreach.change.kept": "你编辑过、保留你输入的旧措辞的邮件：{count} 封",
   "outreach.change.replaceThere": "那里也替换",
   "outreach.sum.decide": "等待你处理的联系人：{count}",

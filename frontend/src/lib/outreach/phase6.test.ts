@@ -67,8 +67,9 @@ describe('a change to the message, seen before it is saved', () => {
   it('counts the emails that follow, the approved ones among them, and the hand edits that keep the old wording', () => {
     const after = { ...message, variables: { ...message.variables, offer: 'a free trial' } };
     const typed = draft('d3', { body: 'Try the beta, made for you, at {{link}}.', edited: 'body' });
-    const preview = previewChange(message, after, [draft('d1'), draft('d2', { status: 'approved' }), typed, draft('d4', { status: 'set_aside' })]);
-    expect(preview).toEqual({ follow: 2, approved: 1, kept: ['d3'] });
+    const went = draft('d5', { status: 'approved', approval_id: 'a5' });
+    const preview = previewChange(message, after, [draft('d1'), draft('d2', { status: 'approved', approval_id: 'a2' }), typed, draft('d4', { status: 'set_aside' }), went], new Set(['a5']));
+    expect(preview).toEqual({ follow: 3, approved: 1, sent: 1, kept: ['d3'] });
     expect(replaceInDrafts([typed], preview.kept, message, after)[0].body).toBe('Try a free trial, made for you, at {{link}}.');
   });
 });

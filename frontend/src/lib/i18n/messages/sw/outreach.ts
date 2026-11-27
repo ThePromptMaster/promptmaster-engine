@@ -188,6 +188,7 @@ export const sw: Record<keyof typeof en, string> = {
   "outreach.change.lead": "Kuhifadhi hili kunabadilisha barua pepe zilizotengenezwa kutoka kwa ujumbe:",
   "outreach.change.follow": "Barua pepe ambazo maandishi yake yanabadilika: {count}",
   "outreach.change.approved": "Zilizoidhinishwa kati yao, zinazorudi kwako kuidhinishwa tena: {count}",
+  "outreach.change.sent": "Zimeshatumwa, zinabaki kama zilivyotumwa: {count}",
   "outreach.change.kept": "Barua pepe ulizohariri zinazobaki na maneno ya zamani uliyoandika: {count}",
   "outreach.change.replaceThere": "Badilisha huko pia",
   "outreach.sum.decide": "Watu wanaokusubiri: {count}",
