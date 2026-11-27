@@ -149,8 +149,7 @@ import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/
 import { useBriefChange } from './use-brief-change';
 import { useTaskReconcile } from './use-task-reconcile';
 import { StageStatusLine } from './stage-status-line';
-import { latestUpdate } from '@/lib/workflow/latest-update';
-import { changeDetail } from '@/lib/workflow/timeline';
+import { latestChangeGroup, latestUpdate } from '@/lib/workflow/latest-update';
 import { stageStatusSummary } from '@/lib/workflow/stage-status';
 import { currentTasks, openSystemTasks } from '@/lib/workflow/task-reconcile';
 import { openBriefChange, proposedChange, settledChange, SETTLED_SHOWN_MS, type ProposedChange } from '@/lib/workflow/brief-change';
@@ -2327,13 +2326,10 @@ export function WorkflowWorkspace({
   );
   // The latest update, in the Go panel (L-321): what it touched, the tasks since, any blocked check.
   const latestUpdateNow = useMemo(() => {
-    const change = [...(events ?? [])].reverse().find((e) => e.type === 'brief_changed' && e.actor === 'user' && changeDetail(e));
-    if (!change) return null;
-    const touched = (Array.isArray(change.payload?.affected) ? (change.payload!.affected as { stage_id?: unknown }[]) : [])
-      .map((a) => (typeof a.stage_id === 'string' ? a.stage_id : ''))
-      .filter(Boolean);
+    const group = latestChangeGroup(events ?? []);
+    if (!group) return null;
     return latestUpdate({
-      events: events ?? [], state, summary: summariseSince(change.created_at, touched),
+      events: events ?? [], state, summary: summariseSince(group.since, group.touched),
       steps: [...(go.priorSteps ?? []), ...go.steps], tasks: recommendations.tasks, onHold: taskView.onHold.length,
     });
   }, [events, state, summariseSince, go.priorSteps, go.steps, recommendations.tasks, taskView.onHold.length]);
