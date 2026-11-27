@@ -71,7 +71,8 @@ import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type Add
 import { creditStop, OUT_OF_CREDITS } from './credit-stop';
 import { delegationSentences } from './delegation';
 import { touchesObjective } from './stop-audit';
-import { createTask, listTasks } from '@/lib/supabase/tasks';
+import { createTask, listTasks, setTaskStatus } from '@/lib/supabase/tasks';
+import { staleTasks, type StageTexts } from './stale-tasks';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -2498,7 +2499,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         (i) => !(i.kind === 'unmet_blocking' && i.stageId === ctx.stage.id) && blocksCompletion(i)
       );
       if (ctx.deliverableDone && open.length > 0) {
-        const list = open.map(describeOutstanding).join('; ');
+        // Each item without its own full stop: "…after this stage used it.." (27 Nov pass).
+        const list = open.map((i) => describeOutstanding(i).replace(/\.+$/, '')).join('; ');
         const reason = `The deliverable is written, but the work is not finished: ${list}.`;
         // 26 Nov, production pass (ops plan, after the crew rate changed): under "Handle them
         // for me" the run stopped to ask "Carry on with the open work?" when all that was open
@@ -2544,6 +2546,8 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         const judged = kept
           ? { toolsUsed: [] as string[], changes: {} }
           : { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
+        // A fresh check is when tasks an earlier one recorded are looked at again (27 Nov).
+        if (!kept) await retireStaleTasks(ctx);
         if (assessment.outcome === 'met') {
           if (!kept) await recordOpenActions(ctx, assessment.open_actions ?? [], holder?.id ?? ctx.stage.id);
           const checked = `${describeBasis(basis)}${kept ? ' (The check already made on this version; nothing has changed since, so it was not repeated.)' : ''}`;
@@ -3212,6 +3216,29 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
     await ctx.refresh?.();
   } catch {
     // The document stands; the task list is a convenience beside it.
+  }
+}
+
+/**
+ * Dismisses the open tasks an earlier objective check recorded that the work has
+ * moved past (`staleTasks`, 27 Nov). A manuscript's chapters are not in its
+ * version text, so a long-form stage is never judged.
+ */
+async function retireStaleTasks(ctx: PerformContext): Promise<void> {
+  try {
+    const texts: StageTexts = Object.fromEntries(
+      ctx.template.stages
+        .filter((s) => s.renderer !== 'long_form')
+        .map((s) => {
+          const head = ctx.bundles[s.id]?.versions.at(-1);
+          return [s.id, head ? { text: head.content ?? '', at: head.created_at } : undefined];
+        })
+    );
+    const stale = staleTasks(await listTasks(ctx.project.id), texts);
+    for (const t of stale) await setTaskStatus(t.id, 'dismissed');
+    if (stale.length) await ctx.refresh?.();
+  } catch {
+    // The task list is a convenience beside the document.
   }
 }
 
