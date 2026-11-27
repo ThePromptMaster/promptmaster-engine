@@ -44,8 +44,15 @@ export interface FactValues {
   times: string[];
   /** "words:120" for "under 120 words": a length the text is held to. */
   limits: string[];
-  /** Other numbers, commas removed; years and the parts of dates, amounts, times and limits excluded. */
+  /** Other numbers, commas removed; years and the parts of dates, amounts, times, limits and ids excluded. */
   numbers: string[];
+  /**
+   * An identifier as written: "CAL-01", "FIRM-01", "S4", "N8", "BANK-05" (L-318, 27 Nov;
+   * Sean, Calder: "This supersedes CAL-01 for Alex Rivera only" was read as the number
+   * 01, and every repair was refused for "still giving 01" in Morgan Lee's CAL-01 and in
+   * the template's FIRM-01 heading). Whole, so FIRM-01 is never CAL-01.
+   */
+  ids: string[];
 }
 
 /** One value as a text writes it: what it is, and the words that said it. */
@@ -57,7 +64,14 @@ export interface ValueMention {
   range?: string;
 }
 
-const KINDS = ['dates', 'money', 'weekdays', 'times', 'limits', 'numbers'] as const;
+const KINDS = ['dates', 'money', 'weekdays', 'times', 'limits', 'numbers', 'ids'] as const;
+
+/**
+ * Capital letters, an optional hyphen, digits and at most one letter after: CAL-01,
+ * S4, N8, BANK-05, REC-03a. Not inside a longer word or number ("KES-T3" is read as
+ * a whole elsewhere; here its "T3" is part of a word joined by a hyphen and is left).
+ */
+const ID = /(?<![\p{L}\p{N}-])[A-Z]{1,8}-?\d{1,4}[A-Za-z]?(?![\p{L}\p{N}]|-[\p{L}\p{N}])/gu;
 
 const month = (name: string) => MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
 const amount = (raw: string) => {
@@ -87,6 +101,8 @@ export function valueMentions(text: string): ValueMention[] {
       return ' ';
     });
   };
+  // First: an id's digits are part of its name, never a number of their own (L-318).
+  take(ID, (m) => ({ kind: 'ids', value: m[0] }));
   take(MONTH_DAY, (m) => ({ kind: 'dates', value: `${month(m[1])}-${Number(m[2])}` }));
   take(DAY_MONTH, (m) => ({ kind: 'dates', value: `${month(m[2])}-${Number(m[1])}` }));
   take(NUMERIC_DATE, (m) => (Number(m[1]) <= 12 && Number(m[2]) <= 31 ? { kind: 'dates', value: `${Number(m[1])}-${Number(m[2])}` } : null));
@@ -173,6 +189,12 @@ export interface SupersededValue {
   /** The new fact's statement. */
   now: string;
   value: string;
+  /**
+   * The one person or thing the replacement is limited to ("for Alex Rivera only",
+   * L-318): the old value stays true for everyone else, so it is left behind only in
+   * a passage about them.
+   */
+  scope?: string;
 }
 
 /**
@@ -593,6 +615,36 @@ export interface LeftoverMention {
   sentence: string;
 }
 
+/** Whether a line names the scope: the whole name, or its last word when that is a surname-like word. */
+function namesScope(line: string, scope: string): boolean {
+  const lower = line.toLowerCase();
+  if (lower.includes(scope.toLowerCase())) return true;
+  const last = scope.split(/\s+/).at(-1) ?? '';
+  return last.length >= 4 && new RegExp(`(?<![\\p{L}])${last.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'iu').test(line);
+}
+
+/**
+ * The lines about one person or thing: a line that names it, and every line of a
+ * section whose heading names it, up to the next heading at its level or above
+ * (L-318: Alex Rivera's block in a handoff, not Morgan Lee's).
+ */
+function linesAbout(lines: readonly string[], scope: string): string[] {
+  const out: string[] = [];
+  let within: number | null = null;
+  for (const line of lines) {
+    const t = line.trim();
+    const heading = /^(#{1,6})\s+(.*)$/.exec(t);
+    const bold = !heading && /^\*\*([^*]+)\*\*:?$/.exec(t);
+    if (heading || bold) {
+      const level = heading ? heading[1].length : 7;
+      if (within !== null && level <= within) within = null;
+      if (namesScope(heading ? heading[2] : (bold as RegExpExecArray)[1], scope)) within = level;
+    }
+    if (within !== null || namesScope(t, scope)) out.push(line);
+  }
+  return out;
+}
+
 /**
  * The superseded values `text` still states as current, each with the
  * sentences that state it. A sentence that names the old value beside the new
@@ -615,6 +667,13 @@ export function leftoverMentions(
   const kept = statedLines(text);
   const pieces = sentencesOf(kept.join('\n'));
   const reported = carriesOnReporting(kept);
+  // A replacement limited to one person is left behind only where the text is about them (L-318).
+  const scopedPieces = new Map<string, string[]>();
+  const piecesFor = (s: SupersededValue) => {
+    if (!s.scope) return pieces;
+    if (!scopedPieces.has(s.scope)) scopedPieces.set(s.scope, sentencesOf(linesAbout(kept, s.scope).join('\n')));
+    return scopedPieces.get(s.scope)!;
+  };
   // Rows of a table are serialised as JSON: a key before a colon is not a label.
   const labelled = !/^\s*[[{]/.test(text);
   const out: LeftoverMention[] = [];
@@ -625,7 +684,7 @@ export function leftoverMentions(
     // Its own label when it had one: "migration", not every word of a list of prices.
     const ownLabel = coincident && s.kind === 'money' ? labelOfOldFigure(s) : [];
     const subject = coincident ? (ownLabel.length ? ownLabel : subjectWords(s.now)) : [];
-    for (const raw of pieces) {
+    for (const raw of piecesFor(s)) {
       const p = withoutEmphasis(raw);
       if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];

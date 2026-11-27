@@ -6180,3 +6180,32 @@ version is v4.)".
 Limits:
 - The full stage check (alignment, clarity, drift) still runs only when Go or the user asks for it.
 
+### L-318 — An id is read whole, and a replacement for one person is checked only where the text is about them (2026-11-28)
+Sean, 27 Nov, Calder finalist handoff: the client gave one finalist, Alex Rivera, an exception (CAL-03): "This
+supersedes CAL-01 for Alex Rivera only." Go's two repairs of the draft records were refused for "still giving
+01", pointing at Morgan Lee's CAL-01 instructions and the firm template's FIRM-01 heading, both correct.
+
+Two readings were wrong, and both are fixed (`lib/workflow/fact-values.ts`, `facts.ts`):
+- **An id is a value of its own.** "CAL-01", "FIRM-01", "S4", "N8", "BANK-05" are read whole (`ids`); their
+  digits are never a number. Before, "CAL-01" was the number 01, and so was every other "-01".
+- **A replacement for one person** ("for Alex Rivera only", "only for …", "for … alone") replaces the old
+  value for them alone (`scope`). A repair is checked for it only in a passage about them: a line naming them,
+  or the section under a heading naming them. Morgan's CAL-01 stands; CAL-01 given as Alex's current terms is
+  still refused, and the message names "CAL-01".
+- A rule a folder hands down that is in force here keeps its values true, like a current fact.
+
+Two more cases of the same check, from Sean's 27 Nov tests:
+- **A seat limit.** "…superseding the earlier Studio A limit of 24: the room now has 18 seats" was read as
+  replacing 18, and every repair "still gave 18". The replaced clause now ends at a colon or a dash as well as
+  a full stop, and "…with 18", "…to 12" or ", now Monday" is the new value, not the old. An older fact about
+  the same thing ("Studio A holds 24 people") no longer keeps the old value alive; one about something else
+  still does.
+- **An item kept under History** (Windward): D2, moved under History as revoked by D3, was refused four times
+  as "would give D2 to a different item", because "- D2 is revoked for R-18…" was read as D2's own line. Only
+  a line that labels the id counts ("**D2.**", "D2:", "| D2 |", a heading), and the best pair of its lines is
+  compared. A refused revision's text is kept on its step.
+
+Limits:
+- A scope is a capitalised name of up to four words. "For the North division only" is not read as a scope.
+- An id is capital letters then digits; "q3" or "v2" are not ids.
+

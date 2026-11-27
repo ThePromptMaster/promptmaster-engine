@@ -102,3 +102,40 @@ describe('a revision that only respells an ID, or mentions a removed one (8 Nov,
   });
 });
 
+
+describe('an item moved to History with a note that revokes it keeps its id (27 Nov, Windward)', () => {
+  // A revision kept D2 (the R-18 exception) under History as revoked by D3, and added D3 above it.
+  // "- D2 is revoked for R-18…" was read as D2's own line, shared no words with it, and four
+  // repairs were refused as "would give D2 to a different item".
+  const head = [
+    '## Decisions in force',
+    '',
+    '**D1.** Issuer: Release lead Rowan. Issued: Monday 09:00 (signed). Freeze all non-critical merges to main.',
+    '',
+    '**D2.** Issuer: Release lead Rowan. Issued: Monday 10:00 (signed). Exception for R-18: the payments hotfix may merge during the freeze.',
+  ].join('\n');
+  const generated = [
+    '## Decisions in force',
+    '',
+    '**D1.** Issuer: Release lead Rowan. Issued: Monday 09:00 (signed). Freeze all non-critical merges to main.',
+    '',
+    '**D3.** Issuer: Release lead Rowan. Issued: Tuesday 08:30 (signed). R-18 waits for the end of the freeze.',
+    '- D2 is revoked for R-18 effective immediately because the vendor rollback failed staging validation.',
+    '',
+    '## History',
+    '',
+    '**D2.** Issuer: Release lead Rowan. Issued: Monday 10:00 (signed). Exception for R-18: the payments hotfix may merge during the freeze. Revoked by D3.',
+  ].join('\n');
+
+  it('is not reused', () => {
+    expect(idChanges({ head, generated, removed: new Set() }).reused).toEqual([]);
+  });
+
+  it('a different item under the same label is still caught', () => {
+    const swapped = generated.replace(
+      '**D2.** Issuer: Release lead Rowan. Issued: Monday 10:00 (signed). Exception for R-18: the payments hotfix may merge during the freeze. Revoked by D3.',
+      '**D2.** Vendor onboarding checklist assigned to procurement analysts for quarterly supplier review.'
+    );
+    expect(idChanges({ head, generated: swapped, removed: new Set() }).reused).toEqual(['D2']);
+  });
+});
