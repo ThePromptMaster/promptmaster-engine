@@ -45,6 +45,8 @@ type Need =
        * with no word of why).
        */
       checkReason?: string;
+      /** The check of the version asked about says it does not meet the objective, in its first finding's words. */
+      checkFailed?: string;
       /**
        * The version the stop asks about (L-320; a peer's trace of Sean's 27 Nov Alder run: a refusal
        * written on v3 was shown on v4, which had different findings). A newer version ends the stop,
@@ -1148,6 +1150,7 @@ export function needsUser(input: {
       ...(c.hint ? { hint: c.hint } : {}),
       ...(authority ? { authority } : {}),
       ...(refusal ? { checkReason: refusal } : {}),
+      ...(facts.evaluationFindings?.offObjective ? { checkFailed: facts.evaluationFindings.offObjective.finding || '—' } : {}),
       ...(facts.headVersionId ? { checkedVersionId: facts.headVersionId } : {}),
       ...(input.openElsewhere?.length ? { openRows: input.openElsewhere.slice(0, 12) } : {}),
     };
@@ -1376,7 +1379,9 @@ export function describeNeed(
         need.authority === 'reserved' ? (isOutgoing(need.label) ? t('need.reservedOutgoing') : t('need.reserved')) : need.authority === 'policy_ask' ? t('need.policyAsk')
           : need.checkReason ? t('need.approvalRefused', { reason: need.checkReason }) : '';
       const on = ctx.versionOf?.[need.stageId];
-      const message = [t('need.approval', { label: word(need.label) }), on ? t('need.approvalOn', { stage: stageLabel(need.stageId), version: on }) : '', why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
+      // A check of this version that says it misses the objective is said before the approval is given (28 Nov).
+      const failed = need.checkFailed ? t('need.approvalCheckFailed', { finding: need.checkFailed }) : '';
+      const message = [t('need.approval', { label: word(need.label) }), on ? t('need.approvalOn', { stage: stageLabel(need.stageId), version: on }) : '', failed, why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
       const open = need.openRows ?? [];
       if (open.length === 0) return { message, action: t('need.approveResume') };
       // A finding still undecided elsewhere is named before the approval, and

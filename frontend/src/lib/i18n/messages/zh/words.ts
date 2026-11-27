@@ -3,6 +3,7 @@ import type { en } from '../areas/words';
 /** Chinese for `areas/words.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Record<keyof typeof en, string> = {
   "tw:Recorded who has a version": "已记录谁拿到了哪个版本",
+  "tw:Saved from the project before a change; reopened": "按变更前的项目内容保存；已重新打开",
   "tw:Took back a record of who has a version": "已撤销一条版本接收记录",
   "tw:Your change reopened later stages": "你的修改重新打开了后续阶段",
   "tw:Checked after a change and kept": "改动后已检查并保留",

@@ -89,6 +89,12 @@ export interface EvaluationFacts {
   aboutHead: boolean;
   /** When that check was made: a stop raised before it is asked again of what it found (L-320). */
   at?: string;
+  /**
+   * The check of the head says it does not meet the objective (alignment Low or drift High), with its
+   * first finding: an approval asked on it says so (28 Nov, a peer's Morrow rerun: "Needs your approval
+   * … Shortlist v3" two seconds after v3's check failed, with nothing about the check).
+   */
+  offObjective?: { finding: string };
 }
 
 /** The current draft of a stage that drafts prose. */
@@ -337,10 +343,14 @@ export async function readStageFacts(input: {
 
   if (stageDrafts(stage) && latestEvaluation && !isFailedEvaluation(latestEvaluation)) {
     const head = bundles[stage.id]?.versions.at(-1);
+    const aboutHead = Boolean(head && latestEvaluation.version_id === head.id);
+    const off = aboutHead && (latestEvaluation.alignment_score === 'Low' || latestEvaluation.drift_score === 'High');
+    const first = latestEvaluation.findings?.[0];
     facts.evaluationFindings = {
       count: latestEvaluation.findings?.length ?? 0,
-      aboutHead: Boolean(head && latestEvaluation.version_id === head.id),
+      aboutHead,
       ...(latestEvaluation.created_at ? { at: latestEvaluation.created_at } : {}),
+      ...(off ? { offObjective: { finding: (first?.summary || latestEvaluation.alignment_explanation || '').slice(0, 400) } } : {}),
     };
   }
 

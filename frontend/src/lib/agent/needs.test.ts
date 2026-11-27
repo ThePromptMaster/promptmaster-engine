@@ -820,3 +820,23 @@ describe('why a stop is the user\'s (26 Nov, Sean: "what decision is needed, why
     expect(describeNeed(need, (id) => id).message).toContain('it sends something to people outside this project');
   });
 });
+
+describe('an approval asked on a version whose check missed the objective says so (28 Nov, a peer\'s Morrow rerun)', () => {
+  const unmet = [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }];
+  it('names the check and its first finding on the card', () => {
+    const need = needsUser({
+      ...base, stage: stage('positioning'), allowed: ['advance_stage'], stageEvaluation: evaluation('positioning', unmet),
+      facts: { headVersionId: 'v3', evaluationFindings: { count: 4, aboutHead: true, offObjective: { finding: 'The draft is a full decision memo, not a shortlist of the assessment table.' } } },
+    });
+    expect(need).toMatchObject({ kind: 'tick_criterion', checkedVersionId: 'v3', checkFailed: 'The draft is a full decision memo, not a shortlist of the assessment table.' });
+    expect(describeNeed(need!, label).message).toContain('The check of this version says it does not meet the objective yet: The draft is a full decision memo');
+  });
+  it('says nothing of the kind when the check held', () => {
+    const need = needsUser({
+      ...base, stage: stage('positioning'), allowed: ['advance_stage'], stageEvaluation: evaluation('positioning', unmet),
+      facts: { headVersionId: 'v3', evaluationFindings: { count: 0, aboutHead: true } },
+    });
+    expect(need).not.toHaveProperty('checkFailed');
+    expect(describeNeed(need!, label).message).not.toContain('does not meet the objective');
+  });
+});

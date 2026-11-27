@@ -124,6 +124,7 @@ export const DECISIONS: Partial<Record<WorkflowEvent['type'], string>> = {
   web_access_changed: 'Web access changed',
   revision_refused: 'A revision was refused',
   version_shared: 'Recorded who has a version',
+  version_predates_change: 'Saved from the project before a change; reopened',
 };
 
 export function projectTimeline(

@@ -53,6 +53,7 @@ const UNION: WorkflowEventType[] = [
   'inherited_checked',
   'inherited_hold',
   'version_shared',
+  'version_predates_change',
 ];
 
 function checkConstraintValues(): string[] {
