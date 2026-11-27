@@ -107,6 +107,7 @@ import {
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { roundClose, type RoundClose } from '@/lib/agent/round-close';
 import { knownVersions, referencedVersions } from '@/lib/agent/version-history';
+import { approvedComparisons, comparisonLine } from '@/lib/agent/approved-sections';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
@@ -3653,6 +3654,12 @@ async function judgeObjective(
   // fails goes to the assessment as failed checks (1 Nov).
   // A label of its own means the text is a round's working, not the delivered document.
   const check = holder ? await checkDeliverable(ctx, holder, content, label, saved, labelOverride !== undefined) : null;
+  // A section an approval names in an earlier version ("the OUTREACH message wording
+  // as it appears in saved Output v2"), compared in code with this text (L-329).
+  const approvals = [...currentFacts(ctx.project.facts).map((f) => f.statement), ctx.project.constraints ?? ''].filter(Boolean);
+  const judgedVersion = saved ? saved.version : holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+  const compared = approvedComparisons(ctx.template, ctx.bundles, content, judgedVersion, approvals)
+    .map((c) => ({ section: c.section, version: c.version, identical: c.identical, line: comparisonLine(c, holder?.short_label || holder?.label || label) }));
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -3671,7 +3678,9 @@ async function judgeObjective(
       known_versions: knownVersions(ctx.template, ctx.bundles),
       // What the attached files hold is supplied, not missing (25 Oct, churn research).
       data_files: dataFileBriefs(ctx.project),
-      history: referencedVersions(ctx.template, ctx.bundles, content),
+      // Versions the facts cite too: an approval names "Output v2" there, not in the text (L-329).
+      history: referencedVersions(ctx.template, ctx.bundles, content, approvals.join('\n')),
+      compared,
       later_stage: laterStage ?? '',
       model: ctx.project.model,
     },

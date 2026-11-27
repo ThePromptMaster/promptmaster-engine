@@ -1196,6 +1196,8 @@ export const api = {
       later_stage?: string;
       /** The project's data files, by name and columns (25 Oct). */
       data_files?: import('@/lib/workflow/digest').DataFileBrief[];
+      /** Sections an approval names in an earlier version, compared in code with this text (L-329). */
+      compared?: { section: string; line: string; identical: boolean; version: number }[];
       model?: string;
     },
     signal?: AbortSignal

@@ -210,6 +210,7 @@ def build_assessment_prompt(
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
     data_files: list[DataFileBrief] | None = None,
+    compared: list[ComparedSection] | None = None,
 ) -> tuple[str, str]:
     record = "\n".join(
         f"- S{i + 1}: {s.action_key} — {s.execution_label or 'no execution label'}"
@@ -241,6 +242,14 @@ def build_assessment_prompt(
             "EARLIER VERSIONS THE DELIVERABLE REFERS TO, with the decisions recorded on their rows:\n"
             + "\n".join(history) + "\n\n"
             if history else ""
+        )
+        + (
+            # 28 Nov (Sean, Northline, L-329): "Final review couldn't compare v4's outreach
+            # wording against approved Output v2." Code opened the version and compared.
+            "COMPARED IN CODE WITH THE VERSION AN APPROVAL NAMES (line by line; authoritative — do not mark "
+            "whether these sections were kept as approved \"not_checked\"):\n"
+            + "\n".join(f"- {c.line}" for c in compared) + "\n\n"
+            if compared else ""
         )
         + (
             f"THIS IS A ROUND CHECK, NOT THE FINAL ONE. The deliverable in its finished form is written by a later "
@@ -341,6 +350,37 @@ def _is_evidence(quote: str, content: str) -> bool:
         if line.lstrip().startswith("#") and _norm(line) == _norm(quote):
             return False
     return True
+
+
+class ComparedSection(BaseModel):
+    """A section an approval names in an earlier version, compared in code with
+    the deliverable (28 Nov, Sean, Northline; L-329). The comparison is made in
+    the browser, line by line; the check is told the result."""
+
+    section: str = Field(max_length=200)
+    version: int = 0
+    identical: bool = False
+    #: "OUTREACH in Output v4 compared in code with Output v2, … — identical word for word".
+    line: str = Field(max_length=1_500)
+
+
+#: A requirement about keeping an approved section as it was.
+_KEEPS = re.compile(
+    r"\b(?:unchanged|as approved|approved|same|word for word|verbatim|identical|source|keep|kept|preserv\w*|do not change|not (?:be )?changed)\b",
+    re.I,
+)
+
+
+def _compared_for(requirement: str, compared: list[ComparedSection]) -> ComparedSection | None:
+    """The identical comparison a requirement to keep an approved section is about:
+    it names the section and asks for it kept. A difference is told to the check,
+    never turned into a verdict here: an approval can be meant to be superseded."""
+    if not _KEEPS.search(requirement):
+        return None
+    for c in compared:
+        if c.identical and re.search(rf"(?<![\w]){re.escape(c.section)}(?![\w])", requirement, re.I):
+            return c
+    return None
 
 
 #: How code counts, said to the model wherever a count is (frontend `COUNTING_RULE`).
@@ -657,6 +697,7 @@ def parse_assessment(
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
     data_files: list[DataFileBrief] | None = None,
+    compared: list[ComparedSection] | None = None,
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -771,6 +812,8 @@ def parse_assessment(
 
     criteria: list[CriterionResult] = []
     overruled: list[str] = []
+    #: Requirements to keep an approved section, settled by the comparison made in code (L-329).
+    settled_by_comparison: list[str] = []
 
     for c in result.get("criteria") or []:
         if not isinstance(c, dict):
@@ -797,6 +840,11 @@ def parse_assessment(
         elif counted and verdict != "met":
             overruled.append(f"{requirement} ({'said not met' if verdict == 'not_met' else 'not checked'})")
             verdict, basis = "met", f"Measured in code: {counted}"
+        # An approved section the code compared and found identical is kept (L-329).
+        same = _compared_for(requirement, compared or []) if verdict != "met" else None
+        if same:
+            settled_by_comparison.append(requirement)
+            verdict, basis = "met", f"Compared in code: {same.line}"[:400]
         criteria.append(CriterionResult(requirement=requirement, verdict=verdict, basis=basis))
     # A requirement the check found unmet is a reason the objective is not met.
     if outcome == "met" and any(c.verdict == "not_met" for c in criteria):
@@ -811,7 +859,7 @@ def parse_assessment(
     # Every requirement it found unmet was one code measured as met: its
     # verdict rested on a miscount. Met when it can show the text; else partly.
     if (
-        claimed != "met" and (overruled or declined) and not failed_checks and not blockers
+        claimed != "met" and (overruled or declined or settled_by_comparison) and not failed_checks and not blockers
         and not any(c.verdict == "not_met" for c in criteria)
     ):
         outcome = "met" if quoted else "partly"
@@ -823,6 +871,10 @@ def parse_assessment(
             reason, note = "Met: every requirement holds; the measured ones were counted in code.", said
     if in_project:
         said = f"{said} [Set aside: it names saved work that is in the project: {'; '.join(in_project)}.]".strip()
+    if settled_by_comparison:
+        said = f"{said} [Settled by comparing the approved version in code: {'; '.join(settled_by_comparison)}.]".strip()
+        if outcome == "met" and not overruled:
+            reason, note = "Met: every requirement holds; the approved section was compared with the version the approval names, in code.", said
     if declined:
         said = f"{said} [Set aside as a request, not a requirement: {'; '.join(declined)}.]".strip()
         if outcome == "met" and not overruled:
@@ -938,23 +990,24 @@ async def assess_objective(
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
     data_files: list[DataFileBrief] | None = None,
+    compared: list[ComparedSection] | None = None,
 ) -> ObjectiveAssessment:
     requests = request_facts(inputs)
     # The check is not shown a carried-forward finding that only restates a request.
     failed_checks = set_aside_requests(failed_checks, requests)[0]
     system, user = build_assessment_prompt(
         inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured, history, known_versions, later_stage,
-        data_files,
+        data_files, compared,
     )
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files)
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files, compared)
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files)
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files, compared)
     parsed.read_chars = clip_by_section(content, MAX_ASSESS_CONTENT)[1]
     parsed.total_chars = len(content.strip())
     return parsed
