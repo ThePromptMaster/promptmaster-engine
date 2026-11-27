@@ -22,7 +22,7 @@ _VALID_MODES = {
     "therapist", "cold_critic", "analyst",
 }
 
-_VALID_WORKFLOWS = {"book", "research", "single_output", "exploration", "assessment"}
+_VALID_WORKFLOWS = {"book", "research", "single_output", "exploration", "assessment", "email_outreach"}
 
 
 
@@ -93,7 +93,7 @@ SETUP_SUGGESTER_SYSTEM = (
     "memo, a comparison table or a decision log is single_output (23 Oct: a "
     "vendor comparison memo, table, pilot plan and decision log was given the "
     "13-stage research workflow).\n"
-    "- single_output: one thing, done well, in one sitting — a memo, an email, "
+    "- single_output: one thing, done well, in one sitting — a memo, one email, "
     "an analysis, a plan, an answer, a speech, a talk, a letter, a poem, a short "
     "story. A short piece is never a book, however it is worded (12 Oct: a "
     "two-minute speech became a book whose first stage listed topic ideas).\n"
@@ -105,6 +105,11 @@ SETUP_SUGGESTER_SYSTEM = (
     "criteria — screening candidates or profiles, scoring proposals or suppliers, "
     "triaging applications — where the user pastes items in batches and wants a "
     "verdict on each. Judging one thing once is single_output.\n"
+    # 26 Nov (Sean: a rough list of companies to personal emails, sent and recorded).
+    "- email_outreach: emails to a list of people or companies — a contact list, "
+    "leads, a Clay or CSV export — where each gets a personal note, the user "
+    "approves them, and they are sent and followed up. One email to one person "
+    "is single_output.\n"
     "Pick the smallest workflow that fits; most everyday objectives are "
     "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
     # Sean, 18 Oct (email 7): a cookbook from an Instagram account's videos.
@@ -170,7 +175,7 @@ def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None,
         f"{_format_answers(answers)}"
         "Recommend a setup. Return JSON in this exact shape:\n"
         "{\n"
-        '  "workflow": "book|research|single_output|exploration|assessment",\n'
+        '  "workflow": "book|research|single_output|exploration|assessment|email_outreach",\n'
         '  "workflow_reason": "...",\n'
         '  "mode": "architect|critic|clarity|coach|therapist|cold_critic|analyst",\n'
         '  "audience": "...",\n'

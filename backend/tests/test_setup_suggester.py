@@ -225,3 +225,15 @@ def test_the_setup_never_invents_headings_and_keeps_the_delegation_verbatim():
     assert "never invent headings, an order or a number of sections" in SETUP_SUGGESTER_SYSTEM
     assert "Copy word for word, never shortened or merged" in SETUP_SUGGESTER_SYSTEM
     assert "what may be done without asking them" in SETUP_SUGGESTER_SYSTEM
+
+
+def test_emails_to_a_list_are_offered_the_outreach_workflow():
+    """26 Nov (Sean): a rough list of companies to personal emails, approved and sent."""
+    from typing import get_args
+
+    from promptmaster.schemas import WorkflowKey
+    from promptmaster.setup_suggester import _VALID_WORKFLOWS, build_setup_prompt
+    text = SETUP_SUGGESTER_SYSTEM + build_setup_prompt("Email 10 companies from my Clay list")
+    assert "- email_outreach:" in text and "email_outreach" in _VALID_WORKFLOWS
+    assert "One email to one person is single_output." in text
+    assert "email_outreach" in get_args(WorkflowKey)

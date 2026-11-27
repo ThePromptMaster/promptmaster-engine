@@ -16,6 +16,8 @@ export interface RequestSize {
   depth: RequestDepth;
   reason: string;
   by: 'rule' | 'model' | 'default';
+  /** Emails to a list (26 Nov): the start uses the Outreach workflow as it stands. */
+  outreach?: boolean;
 }
 
 /** The one-stage workflow serves it. */

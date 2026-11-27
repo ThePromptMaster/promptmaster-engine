@@ -33,6 +33,7 @@ export type Performer =
   | 'return' // goes back to an earlier stage the analysis says needs more work (Q2, 9 Oct)
   | 'add_stage' // adds the next task the saved work names as a stage, and starts it (25 Oct)
   | 'assess' // judges the batch an Assess stage was given (6 Nov)
+  | 'outreach' // fills in the contact list, writes the message and the emails; never approves or sends (27 Nov)
   | 'block' // stage_blocked
   | 'ask' // stop for the user
   | 'complete'; // end the run, if the objective really is met
@@ -70,6 +71,9 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   // 6 Nov: an example's sample batch is judged by Go, not carried to the box by hand.
   // 16 Nov: so is what a paste left over, so the label names neither.
   { key: 'assess_batch', family: 'writing', label: 'Assess the pasted batch', performer: 'assess', important: false },
+  // 27 Nov (Sean): Go researches and drafts an outreach round; approving and sending stay the user's.
+  { key: 'research_contacts', family: 'research', label: 'Fill in the blanks on the contact list', performer: 'outreach', important: false },
+  { key: 'draft_outreach', family: 'writing', label: 'Write the outreach emails', performer: 'outreach', important: false },
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
   // 3 Oct: what the draft already concluded reaches the status, as a proposal the user confirms.

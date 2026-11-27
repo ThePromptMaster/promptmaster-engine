@@ -41,6 +41,7 @@ export interface ContactRow extends StageItem {
   email_status: '' | 'given' | 'verified' | 'guess' | 'none';
   /** The fields PromptMaster filled, comma separated ("name,role,email"). */
   added: string;
+  src_name?: string;
   src_email: string;
   src_role: string;
   src_detail: string;
@@ -55,6 +56,8 @@ export interface ContactRow extends StageItem {
   contacted: string;
   /** JSON `EarlierContact`: someone else at the same company was reached before. */
   colleague: string;
+  /** When PromptMaster last searched the web for this row (ISO); '' when never. Not searched again by itself. */
+  researched?: string;
 }
 
 /** An earlier email or touch, from the project history, the person's Sent mail, or their own record. */

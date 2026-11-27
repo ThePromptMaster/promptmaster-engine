@@ -52,6 +52,8 @@ export const zh: Record<keyof typeof en, string> = {
   'need.pasteBatch': '这个阶段只评估您提供的内容，目前还没有内容。请把{items}粘贴到此阶段的输入框，然后按“{button}”。之后由我继续。',
   'need.pasteItems': '条目',
   'need.showBox': '前往输入框',
+  'need.importContacts': '这一阶段需要你的联系人名单，目前还没有。把名单粘贴到本阶段的框中，或选择一个 CSV 或 Excel 文件（来自 Clay 或其他地方），然后按 {button}。我会从那里继续。',
+  'need.showImport': '前往名单',
   'need.triage_one': '{count} 个重大或未评级的发现项需要你决定：请在下方表格中逐一接受、拒绝或推迟。',
   'need.triage_other': '{count} 个重大或未评级的发现项需要你决定：请在下方表格中逐一接受、拒绝或推迟。',
   'need.repairs_one': '对{stage}的 {count} 次修正',

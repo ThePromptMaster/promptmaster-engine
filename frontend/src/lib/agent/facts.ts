@@ -12,6 +12,7 @@
  * claim against it.
  */
 
+import { outreachFacts, type OutreachFacts } from '@/lib/outreach/go-work';
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { batchAwaited } from '@/lib/workflow/assess';
 import { assessKey, assessRunFor } from '@/lib/workflow/assess-lock';
@@ -162,6 +163,8 @@ export interface StageFacts {
   batch?: { offered: boolean; noun: string | null; left?: boolean };
   /** The stage still holds what a curated example prepared for the reader to approve. */
   prepared?: boolean;
+  /** An outreach stage: what Go can fill in or write there, and whether the list is still to come (27 Nov). */
+  outreach?: OutreachFacts;
 }
 
 export async function readStageFacts(input: {
@@ -252,6 +255,11 @@ export async function readStageFacts(input: {
     facts.batch = { offered: true, noun: stage.assess?.item_noun?.trim() || null, left: true };
   }
   if (bundles[stage.id]?.versions.at(-1)?.source_operation === PREPARED_OPERATION) facts.prepared = true;
+  if (stage.renderer === 'outreach') {
+    // The page filling in the blanks holds the same lock Go's research takes.
+    const running = assessRunFor(assessKey(project.id, stage.id))?.by === 'page';
+    facts.outreach = outreachFacts({ template, stage, bundles, webOn: project.web_access === 'on', running });
+  }
 
   if (effectiveRenderer(stage) === 'review') {
     const schema = itemSchemaFor(stage);

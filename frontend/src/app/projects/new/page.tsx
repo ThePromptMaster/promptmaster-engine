@@ -392,11 +392,17 @@ export default function NewProjectPage() {
         // A new project has Web access on: its setup may not say there is no web (22 Oct).
         web_access: 'on',
       }),
-      sizing.then((size) => (oneStageFor(size, brought) && templateFor('quick') ? null : designFor(ask, brought, given, designDepth(size) ?? (size?.depth === 'concise' ? 'standard' : undefined)))),
+      // Emails to a list are the Outreach workflow as it stands: nothing is designed for them (26 Nov).
+      sizing.then((size) => ((size?.outreach && templateFor('email_outreach')) || (oneStageFor(size, brought) && templateFor('quick')) ? null : designFor(ask, brought, given, designDepth(size) ?? (size?.depth === 'concise' ? 'standard' : undefined)))),
     ]);
-    const standard = templateFor(suggestion.workflow) ?? templateFor('single_output');
-    const concise = oneStageFor(await sizing, brought) ? templateFor('quick') : undefined;
-    const recommended = concise ?? design ?? standard;
+    const sized = await sizing;
+    const picked = templateFor(suggestion.workflow);
+    // A workflow made to be used as it stands wins over a design and the one-stage route: the
+    // request's own words (`sized.outreach`) or the setup's pick name it.
+    const asIs = (sized?.outreach ? templateFor('email_outreach') : null) ?? (picked?.used_as_is ? picked : null);
+    const standard = asIs ?? picked ?? templateFor('single_output');
+    const concise = !asIs && oneStageFor(sized, brought) ? templateFor('quick') : undefined;
+    const recommended = asIs ?? concise ?? (design || standard);
     const split = withDocuments(ask);
     const suggested: SetupDraft = {
       title: titleFrom(ask),
@@ -413,6 +419,10 @@ export default function NewProjectPage() {
       // What the user pasted as a sample stays theirs, whichever way in they took.
       ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output } : {}),
     };
+    if (asIs) {
+      const reason = suggestion.workflow === asIs.key ? suggestion.workflow_reason : words.pitch(asIs);
+      return { suggestion: { ...suggestion, workflow: asIs.key as typeof suggestion.workflow, workflow_reason: reason }, recommended, standard, design: null, draft: suggested };
+    }
     return { suggestion, recommended, standard, design, draft: suggested };
   }
 

@@ -397,7 +397,7 @@ export interface SetupRationale {
   output_format: string;
 }
 
-export type WorkflowKey = 'book' | 'research' | 'single_output' | 'exploration' | 'assessment';
+export type WorkflowKey = 'book' | 'research' | 'single_output' | 'exploration' | 'assessment' | 'email_outreach';
 
 export interface SetupSuggestion {
   mode: ModeType;

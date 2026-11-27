@@ -12,6 +12,7 @@ const ICON: Record<string, string> = {
   single_output: 'bolt',
   exploration: 'explore',
   assessment: 'fact_check',
+  email_outreach: 'forward_to_inbox',
   quick: 'chat',
 };
 
@@ -26,6 +27,7 @@ export const PITCH: Record<string, string> = {
   exploration: 'An idea taken as far as it goes — round after round, tested as you go.',
   assessment: 'Criteria set once, then items judged against them in batches — on a traffic light, a score or your own scale.',
   quick: 'An answer or a draft straight away; take it into the full process whenever it needs more.',
+  email_outreach: 'A list and a goal in; researched contacts and emails you approve out, sent from your own mailbox.',
 };
 
 interface Props {

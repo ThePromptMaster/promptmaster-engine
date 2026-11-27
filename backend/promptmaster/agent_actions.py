@@ -94,6 +94,13 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="assess_batch", family="writing", label="Assess the pasted batch",
                 when="This stage judges a batch of items, it was given one (a curated example's sample), and "
                      "nothing is judged yet. Judges each item against the earlier stages. No params."),
+    # 27 Nov (Sean): Go researches and drafts an outreach round; approving and sending stay the user's.
+    AgentAction(key="research_contacts", family="research", label="Fill in the blanks on the contact list",
+                when="An outreach contact list has rows missing a person, an address or a detail, and Web access is on. "
+                     "Searches the web for them, five at a time, and keeps only what a page shows. No params."),
+    AgentAction(key="draft_outreach", family="writing", label="Write the outreach emails",
+                when="An outreach Message stage with no standard message (writes it from the brief), or a Drafts stage "
+                     "whose emails do not match the contacts and the message (makes them). Never approves or sends. No params."),
     AgentAction(key="apply_findings", family="writing", label="Apply the findings",
                 when="The latest check of this draft produced findings that have not been applied. "
                      "Revises the draft against them as a new version.",
