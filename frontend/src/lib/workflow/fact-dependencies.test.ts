@@ -99,3 +99,10 @@ describe('a stage that cites a changed fact\'s source relied on it (L-316)', () 
     expect(sentenceUsingFact(text, 'South S4 ran successfully on the new system at 3:10; North and West have not run (OPS-02).')).toBe('South S4 ran on the new system at 3:10, and North and West have not run (OPS-02).');
   });
 });
+
+describe('the sentence quoted for a source id says something (27 Nov, production pass)', () => {
+  it('prefers a row\'s statement to its bare id line', () => {
+    const rows = '[\n  {\n    "id": "OPS-01",\n    "statement": "OPS-01 reports that nothing has run and the old system is available."\n  }\n]';
+    expect(sentenceUsingFact(rows, 'OPS-01: Nothing has run; the old system is available for all three divisions.')).toContain('reports that nothing has run');
+  });
+});

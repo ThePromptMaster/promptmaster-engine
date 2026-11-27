@@ -1,0 +1,210 @@
+{
+ "key": "custom_cedar",
+ "label": "Cedar",
+ "version": 1,
+ "stages": [
+  {
+   "id": "objective_and_success",
+   "label": "Objective and success",
+   "renderer": "prose",
+   "entry_prompt_hint": "State the objective in the user's words: a fictional Milwaukee magazine packet for the Cedar Street pedestrian bridge opening. It has three separately reviewable drafts (web brief, photo caption, newsletter blurb) and a release checklist showing each item's current version, source IDs, approval status and whether it can be published. Set out the rules that decide success, as the user stated them: - The public opening date and time go in the web brief and the newsletter blurb. - The cost goes in the web brief only. - The caption identifies what the photo actually shows and carries the photo credit. - The newsletter blurb stays under 70 words. - Only an editor instruction carrying an ED source ID approves a draft. - An approval applies only to the exact version reviewed. - A factual change invalidates approval for every draft it affects. - Restoring a previously approved fact does not restore an invalidated approval. - Prior drafts and approvals stay in the history. - Publication is tracked separately from approval. - No item has been published. Say what success looks like: every item is accurate to its current sources, and its approval and publishability states follow these rules. A",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "objective_and_success.objective",
+     "rule": {
+      "type": "field_non_empty",
+      "field": "objective"
+     },
+     "check": "auto",
+     "label": "Objective is stated",
+     "blocking": true
+    },
+    {
+     "id": "objective_and_success.written",
+     "rule": {
+      "type": "artifact_non_empty"
+     },
+     "check": "auto",
+     "label": "Objective and success is written",
+     "blocking": true
+    },
+    {
+     "id": "objective_and_success.approved",
+     "check": "manual",
+     "label": "I approve this objective and the rules for success",
+     "blocking": true,
+     "authority": "delegable"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "objective_and_success_text",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  },
+  {
+   "id": "source_fact_register",
+   "label": "Source fact register",
+   "renderer": "list",
+   "entry_prompt_hint": "List every fact the user supplied, one card per fact. Each card gives: - the source ID (CITY-01, COST-01, PHOTO-01, or any later ID) - the exact fact - which drafts may use it under the placement rules - its status: current, superseded or restored, with the ID of the source that changed it Keep these details distinct: - the invitation-only ribbon-cutting on Thursday, December 10, at 4 p.m. is a separate event from the public opening on Friday, December 11, 2026, at 9 a.m. - the photo shows the bridge during construction in October 2026, not the opening. ED instructions are approvals, not facts. Note them only as approvals awaiting the checklist. Add nothing the user did not supply. Do not pull bridge facts from the web, because this is a fictional publication. A lazy answer merges the two events or drops the source IDs.",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "source_fact_register.items",
+     "rule": {
+      "n": 1,
+      "type": "min_items"
+     },
+     "check": "auto",
+     "label": "At least one item",
+     "blocking": true
+    },
+    {
+     "id": "source_fact_register.approved",
+     "check": "manual",
+     "label": "I confirm the register matches the supplied sources",
+     "blocking": true,
+     "authority": "delegable"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "research_notes",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  },
+  {
+   "id": "draft_the_three_items",
+   "label": "Draft the three items",
+   "renderer": "prose",
+   "entry_prompt_hint": "Write three separately headed drafts, each labelled with its item name, version number and the source IDs it uses. **Web brief** Write magazine-ready prose for Milwaukee readers. It includes: - the public opening date and time - the $2.4 million final cost - the ribbon-cutting, clearly described as invitation-only so readers do not plan to attend it **Photo caption** Describe what the photo actually shows: the Cedar Street bridge during construction in October 2026. Do not describe it as the opening or as a finished bridge. End with the credit: Lena Ruiz. **Newsletter blurb** Keep it under 70 words, and state its word count. It includes the public opening date and time. It carries no cost figure. Versioning: - When this stage is revisited after an update, revise only the drafts that the changed fact affects, as new version numbers. - Leave unaffected drafts at their current version. Use only register facts and invent no quotes or details. A lazy answer puts the cost in the newsletter, captions the photo as the opening, or misstates the word count. Do not write about the project's records inside the copy.",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "draft_the_three_items.written",
+     "rule": {
+      "type": "artifact_non_empty"
+     },
+     "check": "auto",
+     "label": "Draft the three items is written",
+     "blocking": true
+    },
+    {
+     "id": "draft_the_three_items.approved",
+     "check": "manual",
+     "label": "I confirm these drafts follow the sourced facts and placement rules",
+     "blocking": true,
+     "authority": "delegable"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "draft_the_three_items_text",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  },
+  {
+   "id": "check_drafts_against_sources",
+   "label": "Check drafts against sources",
+   "renderer": "review",
+   "entry_prompt_hint": "Check each current draft against the source register and the rules. Look for: - a wrong date, time or day - the ribbon-cutting presented as public - cost appearing anywhere outside the web brief - a missing public opening date or time in the brief or the newsletter - a caption that misdescribes the photo or lacks the Lena Ruiz credit - a newsletter of 70 words or more (count it) - a version label or source IDs that do not match the content Each finding names the draft and version, the problem, the governing source or rule, and the fix. Do not invent problems to fill the table. If a draft is clean, say so. A lazy check only re-reads tone.",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "check_drafts_against_sources.triaged",
+     "rule": {
+      "type": "all_findings_triaged"
+     },
+     "check": "auto",
+     "label": "Every finding accepted or rejected",
+     "blocking": false
+    },
+    {
+     "id": "check_drafts_against_sources.approved",
+     "check": "manual",
+     "label": "I accept that the drafts are accurate once the accepted findings are fixed",
+     "blocking": true,
+     "authority": "delegable"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "critique_report",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  },
+  {
+   "id": "apply_update_and_next_round",
+   "label": "Apply update and next round",
+   "renderer": "prose",
+   "entry_prompt_hint": "Take the user's latest update (a new or changed fact, a restored fact, or an ED instruction) and say exactly what it does. For a fact change: - name the source ID - list which drafts it affects under the placement rules - state that their approvals are invalidated - state that unaffected drafts keep their status Restoring an earlier fact still invalidates approval. Say so explicitly when it applies. For an ED instruction: - record the ED ID - record the exact item and version it approves - refuse to treat it as approval of any other version An approval from anyone without an ED source ID does not count. Say so. Keep the full history of earlier versions and approvals as history. Then say which drafts the next round must revise, or say plainly that none need revision and only the checklist changes. A lazy answer carries an old approval onto a new version.",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "apply_update_and_next_round.written",
+     "rule": {
+      "type": "artifact_non_empty"
+     },
+     "check": "auto",
+     "label": "Apply update and next round is written",
+     "blocking": true
+    },
+    {
+     "id": "apply_update_and_next_round.approved",
+     "check": "manual",
+     "label": "I confirm this update's effects on drafts and approvals are recorded correctly",
+     "blocking": true,
+     "authority": "delegable"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "apply_update_and_next_round_text",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  },
+  {
+   "id": "release_checklist",
+   "label": "Release checklist",
+   "renderer": "prose",
+   "entry_prompt_hint": "Write the release checklist as a Markdown table with one row each for the web brief, photo caption and newsletter blurb. The columns are: - current version - source IDs - approval status (approved with the ED ID and the version reviewed, invalidated with the reason, or awaiting editor approval) - publishable (yes only when the current version itself carries a valid ED approval) - published Published is tracked separately and stays \"No\" for every item unless the user says otherwise. No item is currently published. Below the table, give the history: prior versions, prior approvals and what invalidated each. The checklist can be finished while approvals are still pending. List the next step as editor review of each unapproved current version. A lazy checklist marks an item publishable on an approval of an older version.",
+   "required": true,
+   "exit_criteria": [
+    {
+     "id": "release_checklist.written",
+     "rule": {
+      "type": "artifact_non_empty"
+     },
+     "check": "auto",
+     "label": "Release checklist is written",
+     "blocking": true
+    },
+    {
+     "id": "release_checklist.approved",
+     "check": "manual",
+     "label": "I approve this release checklist as it stands",
+     "blocking": true,
+     "authority": "reserved"
+    }
+   ],
+   "expected_artifacts": [
+    {
+     "kind": "release_checklist_text",
+     "primary": true,
+     "cardinality": "one"
+    }
+   ]
+  }
+ ]
+}

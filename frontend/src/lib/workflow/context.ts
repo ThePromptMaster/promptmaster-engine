@@ -25,9 +25,9 @@ import { carriedForwardUnmet, carriedRows, carriedText, deferredNotBlocking, con
 import { keptOpen, type CarriedRow } from './settled-rows';
 import type { OpenFindingRow, StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage, rowsRequired } from './engine';
-import { currentFacts } from './facts';
+import { answerOf, currentFacts } from './facts';
 import { describeUnsupported, unsupportedClaims } from './evidence-claims';
-import { measure, parseRequirements, requirementLabel, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
+import { listedAmongParts, measure, parseRequirements, requirementLabel, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
@@ -281,12 +281,20 @@ export function governingRequirements(
         out = out.filter((r) => !(r.kind === f.kind && r.subject === f.subject && (f.max === undefined || r.max === undefined || r.max === f.max)));
         continue;
       }
-      const names = (subject: string) => Boolean(subject) && new RegExp(`\\b${subject}s?\\b`, 'i').test(objective);
-      const same = out.findIndex((r) => r.kind === f.kind && r.subject === f.subject);
+      // A part the objective lists among several is that part, never the whole (L-319).
+      const names = (subject: string) => Boolean(subject) && new RegExp(`\\b${subject}s?\\b`, 'i').test(objective) && !listedAmongParts(subject.split(/\s+/)[0], objective);
+      // "newsletter" and "newsletter blurb" are one part.
+      const sameSubject = (a: string, b: string) => a === b || (Boolean(a) && Boolean(b) && (a.includes(b) || b.includes(a)));
+      const same = out.findIndex((r) => r.kind === f.kind && sameSubject(r.subject, f.subject) && Boolean(r.per) === Boolean(f.per));
       const whole = out.findIndex((r) => r.kind === f.kind && r.subject === '' && names(f.subject));
       if (same >= 0) out[same] = f;
       else if (whole >= 0) out[whole] = { ...f, id: out[whole].id, subject: '' };
       else out = [...out, f];
+      // The user said whose limit it is: the same figure read as the whole deliverable's was this part's
+      // (Sean, Cedar Street: "the 70-word limit applies only to the newsletter blurb").
+      if (f.kind === 'words' && f.subject && f.max !== undefined && listedAmongParts(f.subject.split(/\s+/)[0], objective)) {
+        out = out.filter((r) => !(r.kind === 'words' && r.subject === '' && !r.per && r.max === f.max));
+      }
     }
   }
   return out;
@@ -383,10 +391,15 @@ export function measureEvidence(
 export function projectRequirements(
   project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>
 ): MeasurableRequirement[] {
+  const brief = [project.objective ?? '', project.constraints ?? '', project.output_format ?? ''];
   return governingRequirements(
     project.objective ?? '',
-    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
-    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
+    parseRequirements(brief),
+    currentFacts(project.facts)
+      // A requirement the user recorded, or their answer to a question (L-319: Sean told Go which
+      // draft the 70-word limit belonged to, as an answer, and the measuring code never read it).
+      .filter((f) => f.kind === 'requirement' || answerOf(f.statement) !== f.statement)
+      .map((f) => parseRequirements([f.kind === 'requirement' ? f.statement : answerOf(f.statement)], brief.join('\n')))
   );
 }
 
@@ -409,8 +422,14 @@ export function stageRequirements(
 ): { requirement: MeasurableRequirement; whole: boolean }[] {
   const requirements = projectRequirements(project);
   if (!requirements.length) return [];
-  if (finishingStage(template)?.id === stage.id) return requirementsForStage(stage, stage.id, requirements, true);
-  return requirementsForStage(stage, deliverableStage(template)?.id, requirements);
+  const brief = [project.objective ?? '', project.constraints ?? '', project.output_format ?? ''].join('\n');
+  const parts = {
+    listed: (subject: string) => listedAmongParts(subject.split(/\s+/)[0], brief) || listedAmongParts(subject, brief),
+    writtenElsewhere: (subject: string) =>
+      template.stages.some((s) => s.id !== stage.id && s.renderer === 'prose' && `${s.label} ${s.entry_prompt_hint ?? ''}`.toLowerCase().includes(subject)),
+  };
+  if (finishingStage(template)?.id === stage.id) return requirementsForStage(stage, stage.id, requirements, true, parts);
+  return requirementsForStage(stage, deliverableStage(template)?.id, requirements, false, parts);
 }
 
 /**

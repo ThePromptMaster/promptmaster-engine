@@ -6209,3 +6209,33 @@ Limits:
 - A scope is a capitalised name of up to four words. "For the North division only" is not read as a scope.
 - An id is capital letters then digits; "q3" or "v2" are not ids.
 
+### L-319 — A word limit is measured on the part it names (2026-11-28)
+Sean, 27 Nov, Cedar Street Bridge: the brief said "Keep the newsletter under 70 words". Go held the release
+checklist to it, saved three repair versions and paused. After Sean told Go which draft the limit was for, the
+check still measured the checklist, at 247 words.
+
+Three readings were wrong (`lib/workflow/measurable.ts`, `context.ts`):
+- **"Newsletter" was a name for the whole deliverable**, like "essay" or "document". It still is when the work
+  is a newsletter. When the brief lists it among several parts ("three drafts (web brief, photo caption,
+  newsletter blurb)"), it is that part (`listedAmongParts`). "Keep the X under N words" names X.
+- **A listed part is measured where it is written.** On a stage that holds several drafts, it is measured under
+  its own heading, never as the stage's whole text. On the deliverable, a checklist that only lists the parts,
+  it is not measured at all when another stage writes the part. The checklist's history label "**Newsletter
+  blurb**" had been counted as the blurb (28 words of history).
+- **The user's answer about a limit is read.** An answer recorded as a fact ("The 70-word limit applies only
+  to the newsletter blurb") is parsed with the requirements, and it retires a whole-deliverable limit with the
+  same figure.
+
+The same reading fixes Alder Quay (a peer's trace of Sean's 27 Nov test): "Executive update (maximum 95
+words)" names the update; the bracket used to hide the name, and the 95 words were held against the whole
+853-word packet. One limit said twice, named in one field and unnamed in another, is the named part's, unless
+the unnamed one says it is the total.
+
+When a whole-text limit is missed by double or more, Go's stop now also says what it could not establish: "If
+this limit is for one part of the work rather than all of it, say which part, and only that part is counted."
+
+Limits:
+- "Listed among several" is read from brackets and list commas; a part described only in prose elsewhere is
+  not.
+- A part with no heading of its own in the stage that writes it is not counted ("not verified").
+

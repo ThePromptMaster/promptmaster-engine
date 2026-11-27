@@ -60,11 +60,21 @@ export function sentenceUsingFact(text: string, statement: string): string | nul
 function sentenceCitingSource(text: string, statement: string): string | null {
   const ids = sourceIds(statement);
   if (!ids.length) return null;
+  // The sentence that says most about it: a bare `"id": "OPS-01",` line of a table's rows quotes
+  // nothing the user can read (27 Nov, production pass).
+  let best: string | null = null;
+  let bestWords = -1;
   for (const sentence of sentences(text)) {
     const cited = sourceIds(sentence);
-    if (ids.some((id) => cited.includes(id))) return sentence.slice(0, 300);
+    if (!ids.some((id) => cited.includes(id))) continue;
+    const words = (sentence.match(/\p{L}{3,}/gu) ?? []).filter((w) => !/^(?:id|ids)$/i.test(w)).length;
+    if (words >= 4) return sentence.slice(0, 300);
+    if (words > bestWords) {
+      best = sentence;
+      bestWords = words;
+    }
   }
-  return null;
+  return best ? best.slice(0, 300) : null;
 }
 
 function sentenceUsingValues(text: string, statement: string): string | null {
