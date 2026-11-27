@@ -5921,6 +5921,8 @@ Limits:
   - the list is kept and closed;
   - the message is kept when only the list changed, and written again after a brief change only if the
     current one is Go's own;
-  - the emails are brought in line, hand edits kept, and left for the user to approve.
+  - the emails are brought in line, hand edits kept, and left for the user to approve. When they already
+    match, a version records the check: Go may save a version but not reopen a stage. A round the user signed
+    off is theirs to look at again.
 - **Limit.** The rule reads the request's words. "Email all the customers about the outage" is one email,
   not outreach. A list described in other words is left to the setup suggester's reading.
