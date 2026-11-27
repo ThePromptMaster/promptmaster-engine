@@ -746,6 +746,11 @@ export const api = {
   },
 
   /** The standard outreach message and its follow-up, from the brief (26 Nov). A writer: may search the web. */
+  /** Who a reply says to write to instead, each with the reply's own words (27 Nov). One small call; saves nothing. */
+  outreachReplySuggestion(req: { reply: string; contact: string; company: string }): Promise<{ people: { name: string; role: string; email: string; quote: string }[] }> {
+    return apiFetch('/api/outreach/reply-suggestion', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** Fill in up to five contacts from the web, each value with its source (27 Nov). Saves nothing; 409 while Web access is off. */
   researchContacts(
     req: { inputs: PMInput; brief: string; rows: import('@/lib/outreach/research').ResearchRow[]; web_access: 'on' | 'off' },

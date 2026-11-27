@@ -6,24 +6,78 @@
  */
 import { replacedIn } from '@/lib/outreach/holds';
 import type { ProjectFact } from '@/types/project';
+import { addBusinessDays } from '@/lib/outreach/business-days';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { parseDrafts, parseMessage } from '@/lib/outreach/drafts';
 import { buildSnapshot, type Snapshot } from '@/lib/outreach/snapshot';
 import type { OutreachLogo, OutreachSender, OutreachSignature } from '@/types/outreach';
-import type { ApprovalRow, Blockers, OutreachStore, SendPatch, SendRow } from './outreach-job';
+import type { ApprovalRow, Blockers, InboundEvent, OutreachStore, SendPatch, SendRow } from './outreach-job';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const SEND_COLUMNS = 'id, user_id, project_id, approval_id, job_id, purpose, status, to_address, parent_send_id, provider_thread_id, submitted_at, scheduled_for';
+const APPROVAL_COLUMNS = 'id, user_id, project_id, stage_id, message_stage_id, draft_id, purpose, snapshot, message_hash, ticket, revoked_at';
+const WATCH_DAYS = 14;
 
 export class SupabaseOutreachStore implements OutreachStore {
   constructor(private readonly db: SupabaseClient) {}
 
+  async parentOf(send: SendRow): Promise<{ send: SendRow; approval: ApprovalRow } | null> {
+    return send.parent_send_id ? this.load(send.parent_send_id) : null;
+  }
+
+  async recordInbound(jobId: string, worker: string, sendId: string, events: readonly InboundEvent[]): Promise<number> {
+    const { data, error } = await this.db.rpc('record_outreach_inbound', { p_job: jobId, p_worker: worker, p_send: sendId, p_items: events });
+    if (error) throw error;
+    return Number(data ?? 0);
+  }
+
+  async afterConfirmed(jobId: string, worker: string, send: SendRow, confirmedAt: number): Promise<void> {
+    const { data: approval } = await this.db.from('outreach_approvals').select('project_id, user_id, message_stage_id').eq('id', send.approval_id).maybeSingle();
+    const a = approval as { project_id: string; user_id: string; message_stage_id: string } | null;
+    const [messageContent, { data: settings }] = await Promise.all([
+      a ? this.stageContent(a.project_id, a.user_id, a.message_stage_id) : Promise.resolve(null),
+      this.db.from('outreach_settings').select('timezone').eq('user_id', send.user_id).maybeSingle(),
+    ]);
+    const days = parseMessage(messageContent)?.followup?.after_business_days ?? 3;
+    const runAfter = addBusinessDays(new Date(confirmedAt), days, (settings as { timezone?: string } | null)?.timezone || 'UTC');
+    const { error } = await this.db.rpc('schedule_outreach_followup', { p_job: jobId, p_worker: worker, p_send: send.id, p_run_after: runAfter.toISOString() });
+    if (error) throw error;
+    await this.enqueueWatch(send.user_id, send.project_id, confirmedAt + 30 * 60 * 1000);
+  }
+
+  async watchList(projectId: string): Promise<{ send: SendRow; approval: ApprovalRow }[]> {
+    const since = new Date(Date.now() - WATCH_DAYS * 86_400_000).toISOString();
+    const { data: sends } = await this.db.from('outreach_sends').select(SEND_COLUMNS).eq('project_id', projectId).eq('purpose', 'send').in('status', ['submitted', 'confirmed']).gte('submitted_at', since).limit(200);
+    const rows = (sends ?? []) as SendRow[];
+    if (!rows.length) return [];
+    const { data: approvals } = await this.db.from('outreach_approvals').select(APPROVAL_COLUMNS).in('id', rows.map((s) => s.approval_id));
+    const byId = new Map(((approvals ?? []) as ApprovalRow[]).map((a) => [a.id, a]));
+    return rows.flatMap((send) => (byId.has(send.approval_id) ? [{ send, approval: byId.get(send.approval_id)! }] : []));
+  }
+
+  async enqueueWatch(userId: string, projectId: string, at: number): Promise<void> {
+    const bucket = new Date(at).toISOString().slice(0, 15).replace(/[-:T]/g, '');
+    const { error } = await this.db.from('jobs').insert({
+      user_id: userId,
+      project_id: projectId,
+      kind: 'outreach_watch',
+      payload: { project_id: projectId },
+      idempotency_key: `watch:${projectId}:${bucket}`,
+      max_attempts: 3,
+      run_after: new Date(at).toISOString(),
+    });
+    // Already queued for that ten minutes: fine.
+    if (error && (error as { code?: string }).code !== '23505') throw error;
+  }
+
   async load(sendId: string): Promise<{ send: SendRow; approval: ApprovalRow } | null> {
-    const { data: send } = await this.db.from('outreach_sends').select('id, user_id, project_id, approval_id, job_id, purpose, status, to_address').eq('id', sendId).maybeSingle();
+    const { data: send } = await this.db.from('outreach_sends').select(SEND_COLUMNS).eq('id', sendId).maybeSingle();
     if (!send) return null;
     const { data: approval } = await this.db
       .from('outreach_approvals')
-      .select('id, user_id, project_id, stage_id, message_stage_id, draft_id, purpose, snapshot, message_hash, ticket, revoked_at')
+      .select(APPROVAL_COLUMNS)
       .eq('id', (send as SendRow).approval_id)
       .eq('user_id', (send as SendRow).user_id)
       .maybeSingle();
@@ -49,7 +103,9 @@ export class SupabaseOutreachStore implements OutreachStore {
     if (!draft || !message) return null;
     // A real send goes only while its draft is still approved under this approval: one set aside
     // (its contact no longer ready) or approved again is not sent on the old approval (27 Nov).
-    if (approval.purpose !== 'test' && (draft.status !== 'approved' || draft.approval_id !== approval.id)) return null;
+    if (approval.purpose === 'send' && (draft.status !== 'approved' || draft.approval_id !== approval.id)) return null;
+    // A follow-up goes only while its email stays approved and the follow-up is still the one approved with it.
+    if (approval.purpose === 'followup' && (draft.status !== 'approved' || draft.followup_approval_id !== approval.id)) return null;
     const { data: sender } = await this.db.from('outreach_senders').select('*').eq('id', approval.snapshot.sender_id).eq('user_id', approval.user_id).maybeSingle();
     if (!sender) return null;
     let signature: OutreachSignature | null = null;

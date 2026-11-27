@@ -22,6 +22,10 @@ export interface OutreachCounts {
   scheduled: number;
   sent: number;
   failed: number;
+  /** Emails someone answered, that bounced, or whose person asked to stop (27 Nov). */
+  replied: number;
+  bounced: number;
+  optedOut: number;
 }
 
 export function outreachCounts(input: {
@@ -30,7 +34,9 @@ export function outreachCounts(input: {
   drafts: string | null | undefined;
   sends: readonly { status: string; purpose: string }[];
   facts?: readonly ProjectFact[];
+  inbound?: readonly { send_id: string; kind: string }[];
 }): OutreachCounts {
+  const answered = (kind: string) => new Set((input.inbound ?? []).filter((i) => i.kind === kind).map((i) => i.send_id)).size;
   const rows = parseContacts(input.contacts).items;
   const message = parseMessage(input.message) ?? blankMessage();
   const drafts = parseDrafts(input.drafts);
@@ -53,5 +59,8 @@ export function outreachCounts(input: {
     scheduled: real.filter((s) => s.status === 'scheduled' || s.status === 'paused').length,
     sent: real.filter((s) => s.status === 'submitted' || s.status === 'confirmed').length,
     failed: real.filter((s) => s.status === 'failed').length,
+    replied: answered('reply'),
+    bounced: answered('bounce'),
+    optedOut: answered('opt_out'),
   };
 }

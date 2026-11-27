@@ -5971,3 +5971,71 @@ Limits:
 - The page's early check runs when the Message is saved or the Drafts stage is open. Otherwise the job runner
   is the check, at send time.
 - A replaced fact holds only values the readers recognise. "Next week" moving to "the week after" is not read.
+
+### L-311 — Follow-ups, replies, bounces, opt-outs and the next contact (2026-11-27)
+Sean, 26 Nov:
+- follow-ups that stop when someone replies;
+- a bounce or an opt-out stops everything to that address;
+- a reply from the company holds the other emails to it;
+- a reply naming someone else becomes the next contact.
+
+**The follow-up.**
+- It is approved with its email ("Send the follow-up N business days later, unless they reply", on by
+  default), as its own exact email: the follow-up text, "Re:" the subject, the reply signature.
+- When the first email is confirmed, the follow-up is queued that many business days later: Saturday and
+  Sunday are skipped in the time zone in Settings (`schedule_outreach_followup`).
+- Before it goes, the job runner reads the first email's thread. A reply, a bounce or an opt-out cancels it
+  ("Follow-up not sent: They replied on 3 Dec"). An automatic reply is recorded and stops nothing.
+- Otherwise it is sent in the thread (`GMAIL_REPLY_TO_THREAD`) and confirmed like any send.
+- Each email shows its follow-up's state, and a scheduled one can be cancelled.
+
+**What came back** (`promptmaster/outreach_inbound.py`, rules only, no model):
+- a message in the thread from someone other than the sender, or from the recipient anywhere since it was
+  sent, is a reply;
+- an automatic reply is recognised by its subject or opening words;
+- a bounce is from the mail system and names the recipient;
+- an opt-out is by its words (L-313).
+
+The reply is kept without the quoted email under it. The job runner writes it to `outreach_inbound`
+(`record_outreach_inbound`, holding a job's lease), and the user can only mark it handled. Effects:
+- **Bounce:** the email is marked bounced, and the address goes on the do-not-contact list.
+- **Opt-out:** the address goes on the do-not-contact list, and every queued email to it, in any
+  project, is held.
+- **A reply from the company's own domain** (not a webmail address): the other emails queued to that domain
+  in the project are paused, "acme.com replied on …; Resume to send it anyway".
+
+**The next contact.** On a reply, "Who to write to next?" makes one small call (Haiku 5.5, the reply fenced
+as someone else's words). Code keeps a person only when the reply names them and contains the quote, and an
+address only when the reply shows it. "Add Sarah and draft a note" adds her as a contact:
+- the reply is her source;
+- the personal line is "Morgan suggested I get in touch with you.";
+- her email is drafted and not approved.
+
+**Who reads the mailbox.** `/api/outreach/check-thread` takes the worker credential and the email's own
+ticket, so the job runner reads only threads of emails the person approved.
+
+### L-312 — How often replies are read, and what it costs (2026-11-27)
+A watch job reads what came back for the project's emails sent in the last 14 days:
+- every 30 minutes for a day after the latest one, then every 6 hours, until 14 days have passed;
+- also when the Drafts stage is opened (at most once per ten minutes) and just before a follow-up goes.
+
+Each email read is three Composio calls (its thread, mail from the recipient, mail-system notices that name
+them). Ten emails cost about 30 calls a read: about 1,440 calls on the first day, 120 a day after that.
+
+It misses:
+- a reply from a different address that is not in the thread (a colleague answering from their own inbox);
+- a bounce that does not name the address;
+- anything more than 14 days later.
+
+A reply arriving between two reads stops a follow-up only if it is read before the follow-up goes. The
+follow-up itself reads first, so the gap is the time the call takes.
+
+### L-313 — Opt-out is a conservative rule, and it stays (2026-11-27)
+An opt-out is recognised only by words that ask to stop: "unsubscribe", "remove me", "take me off", "stop
+emailing / contacting / sending / writing", "opt out", "do not contact / email", "no more emails", "not
+interested". They must be in the reply's own words, not in the quoted email under it. Anything else is a
+reply for the user to read.
+
+An opt-out puts the address on the do-not-contact list and holds every queued email to it. It is never
+lifted by PromptMaster (`opted_out` cannot be lifted, L-304). A softer refusal ("maybe next quarter") is a
+reply: its follow-up is cancelled, and nothing else changes.

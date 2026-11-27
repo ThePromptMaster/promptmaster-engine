@@ -9,7 +9,7 @@
  * (`backend/promptmaster/outreach_message.py::Snapshot`).
  */
 import type { OutreachLogo, OutreachSender, OutreachSignature } from '@/types/outreach';
-import { draftText, type DraftRow, type OutreachMessage } from './drafts';
+import { draftText, followupText, type DraftRow, type OutreachMessage } from './drafts';
 import { renderEmail } from './render';
 
 export type SnapshotPurpose = 'send' | 'test' | 'followup';
@@ -40,7 +40,7 @@ export function addresses(field: string): string[] {
 }
 
 export interface SnapshotInput {
-  draft: Pick<DraftRow, 'to' | 'cc' | 'bcc' | 'subject' | 'body' | 'overrides'>;
+  draft: Pick<DraftRow, 'to' | 'cc' | 'bcc' | 'subject' | 'body' | 'overrides'> & Partial<Pick<DraftRow, 'followup'>>;
   message: OutreachMessage;
   sender: OutreachSender;
   signature: OutreachSignature | null;
@@ -49,7 +49,8 @@ export interface SnapshotInput {
 }
 
 export function buildSnapshot({ draft, message, sender, signature, logo, purpose }: SnapshotInput): Snapshot {
-  const text = draftText(draft, message);
+  // A follow-up is its own email: the follow-up text, in the thread ("Re: …"), with the reply signature (27 Nov).
+  const text = purpose === 'followup' ? followupText(draft, message) : draftText(draft, message);
   const email = renderEmail({
     sender,
     signature,

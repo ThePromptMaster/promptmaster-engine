@@ -25,6 +25,7 @@ from promptmaster.errors import PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.outreach_drafting import DraftedMessage, draft_message
+from promptmaster.outreach_replies import suggest_next
 from promptmaster.outreach_research import MAX_ROWS as RESEARCH_ROWS, READ_MODEL, ResearchedRow, ResearchRow, research
 from promptmaster.schemas import PMInput, WebUse
 from promptmaster.web_search import WebAccess, with_web
@@ -38,8 +39,10 @@ from promptmaster.outreach_mail import (
     confirm_sent,
     create_draft,
     find_sent,
+    inbound,
     mailbox_address,
     received_html,
+    reply_in_thread,
     send_draft,
     sent_check,
 )
@@ -282,9 +285,10 @@ def _send_error(e: SendError) -> HTTPException:
 
 
 class SendRequest(TicketedRequest):
-    #: draft: make the Gmail draft; send: send the draft made before.
-    step: Literal["draft", "send"]
+    #: draft: make the Gmail draft; send: send the draft made before; reply: a follow-up in the first email's thread.
+    step: Literal["draft", "send", "reply"]
     draft_id: str = Field(default="", max_length=200)
+    thread_id: str = Field(default="", max_length=200)
 
 
 @router.post("/send")
@@ -294,12 +298,55 @@ async def api_send(req: SendRequest, user: AuthUser = Depends(worker_only), comp
     try:
         if req.step == "draft":
             return {"draft_id": await create_draft(composio, user.id, req.snapshot)}
+        if req.step == "reply":
+            if req.purpose != "followup" or not req.thread_id:
+                raise HTTPException(status_code=422, detail="A reply is a follow-up, in a thread.")
+            sent = await reply_in_thread(composio, user.id, req.snapshot, req.thread_id, mailbox)
+            return {"message_id": sent.message_id, "thread_id": sent.thread_id, "thread_url": sent.thread_url}
         if not req.draft_id:
             raise HTTPException(status_code=422, detail="Which draft?")
         sent = await send_draft(composio, user.id, req.draft_id, mailbox)
         return {"message_id": sent.message_id, "thread_id": sent.thread_id, "thread_url": sent.thread_url}
     except SendError as e:
         raise _send_error(e)
+
+
+class CheckThreadRequest(TicketedRequest):
+    #: The first email's thread; '' when it is not known yet.
+    thread_id: str = Field(default="", max_length=200)
+    since_epoch: int = Field(ge=0)
+
+
+@router.post("/check-thread")
+async def api_check_thread(req: CheckThreadRequest, user: AuthUser = Depends(worker_only), composio: Composio = Depends(get_composio)) -> dict:
+    """What came back for one approved email: replies, automatic replies, opt-outs, bounces. Only with
+    that email's ticket, so the worker reads only threads of emails the person approved."""
+    _checked(req, user)
+    mailbox = await _mailbox_matches(composio, user, req.snapshot)
+    to = [str(a).lower() for a in (req.snapshot.get("to") or [])]
+    if not to:
+        return {"events": []}
+    try:
+        found = await inbound(composio, user.id, thread_id=req.thread_id, recipient=to[0], ours=mailbox, since_epoch=req.since_epoch)
+    except SendError as e:
+        raise _send_error(e)
+    return {"events": [{"kind": i.kind, "message_id": i.message_id, "from": i.from_address, "subject": i.subject, "text": i.text, "at": i.at, "company_domain": i.company_domain} for i in found]}
+
+
+class ReplySuggestionRequest(BaseModel):
+    reply: str = Field(min_length=1, max_length=4_000)
+    contact: str = Field(default="", max_length=200)
+    company: str = Field(default="", max_length=300)
+
+
+@router.post("/reply-suggestion")
+async def api_reply_suggestion(req: ReplySuggestionRequest, client: OpenRouterClient = Depends(get_client)) -> dict:
+    """Who a reply says to write to instead, each with the reply's own words. 1 small LLM call; saves nothing."""
+    try:
+        people = await suggest_next(client, req.reply, req.contact, req.company)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
+    return {"people": [p.model_dump() for p in people]}
 
 
 class FindSentRequest(TicketedRequest):

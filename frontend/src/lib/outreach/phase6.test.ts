@@ -96,6 +96,6 @@ describe('what needs you', () => {
     const contacts = JSON.stringify({ kind: 'stage_items', imports: [], items: [row('c1', { status: 'decide' }), row('c2')] });
     const drafts = JSON.stringify({ kind: 'stage_items', items: [draft('d1'), draft('d2', { body: 'Hi {{first_name}}' }), draft('d3', { reason: 'Changed since you approved it: the text.' }), draft('d4', { status: 'approved' })] });
     const sends = [{ status: 'scheduled', purpose: 'send' }, { status: 'confirmed', purpose: 'send' }, { status: 'confirmed', purpose: 'test' }, { status: 'failed', purpose: 'send' }];
-    expect(outreachCounts({ contacts, message: JSON.stringify(message), drafts, sends })).toEqual({ decide: 1, search: 2, approve: 1, held: 2, scheduled: 1, sent: 1, failed: 1 });
+    expect(outreachCounts({ contacts, message: JSON.stringify(message), drafts, sends })).toEqual({ decide: 1, search: 2, approve: 1, held: 2, scheduled: 1, sent: 1, failed: 1, replied: 0, bounced: 0, optedOut: 0 });
   });
 });

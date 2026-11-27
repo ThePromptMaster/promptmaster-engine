@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { OutreachCallError, runOutreachJob, type ApprovalRow, type Blockers, type OutreachClient, type OutreachStore, type SendPatch, type SendRow } from './outreach-job';
+import { OutreachCallError, runOutreachJob, type ApprovalRow, type Blockers, type InboundEvent, type OutreachClient, type OutreachStore, type SendPatch, type SendRow } from './outreach-job';
 import type { Snapshot } from '@/lib/outreach/snapshot';
 import type { Job, JobStore } from './types';
 
@@ -9,9 +9,14 @@ const snap: Snapshot = {
   subject: 'A quick look', html: '<p>Hi</p>', text: 'Hi', links: [], commercial: false, footer: '', signature_id: 's1', sender_id: 'snd1',
 };
 
-function setup(opts: { current?: Snapshot | null; blockers?: Partial<Blockers>; status?: SendRow['status']; revoked?: boolean } = {}) {
-  const job: Job = { id: 'j1', user_id: 'u1', project_id: 'p1', kind: 'send_email', status: 'leased', payload: { send_id: 'send1' }, checkpoint: {}, attempts: 1, max_attempts: 6, lease_owner: 'w', cancel_requested: false };
+function setup(opts: {
+  current?: Snapshot | null; blockers?: Partial<Blockers>; status?: SendRow['status']; revoked?: boolean;
+  kind?: string; purpose?: SendRow['purpose']; parent?: { send: SendRow; approval: ApprovalRow } | null; events?: InboundEvent[];
+  watch?: { send: SendRow; approval: ApprovalRow }[];
+} = {}) {
+  const job: Job = { id: 'j1', user_id: 'u1', project_id: 'p1', kind: opts.kind ?? 'send_email', status: 'leased', payload: { send_id: 'send1' }, checkpoint: {}, attempts: 1, max_attempts: 6, lease_owner: 'w', cancel_requested: false };
   const calls: string[] = [];
+  const inbound: InboundEvent[] = [];
   const records: { patch: SendPatch; event: string }[] = [];
   const store = {
     checkpointJob: async (_id: string, _w: string, cp: Record<string, unknown>) => {
@@ -22,17 +27,31 @@ function setup(opts: { current?: Snapshot | null; blockers?: Partial<Blockers>; 
     failJob: async (_id: string, _w: string, code: string, _m: string, _d: unknown, retryable: boolean) => (calls.push(`fail:${code}:${retryable}`), true),
     releaseJob: async (_id: string, _w: string, s: number) => (calls.push(`release:${s}`), true),
   } as unknown as JobStore;
-  const send: SendRow = { id: 'send1', user_id: 'u1', project_id: 'p1', approval_id: 'a1', job_id: 'j1', purpose: 'send', status: opts.status ?? 'scheduled', to_address: 'morgan@harbourline.example' };
-  const approval: ApprovalRow = { id: 'a1', user_id: 'u1', project_id: 'p1', stage_id: 'drafts', message_stage_id: 'message', draft_id: 'd1', purpose: 'send', snapshot: snap, message_hash: 'h', ticket: 't', revoked_at: opts.revoked ? '2026-11-26' : null };
+  const send: SendRow = { id: 'send1', user_id: 'u1', project_id: 'p1', approval_id: 'a1', job_id: 'j1', purpose: opts.purpose ?? 'send', status: opts.status ?? 'scheduled', to_address: 'morgan@harbourline.example', parent_send_id: opts.parent ? opts.parent.send.id : null };
+  const approval: ApprovalRow = { id: 'a1', user_id: 'u1', project_id: 'p1', stage_id: 'drafts', message_stage_id: 'message', draft_id: 'd1', purpose: opts.purpose ?? 'send', snapshot: snap, message_hash: 'h', ticket: 't', revoked_at: opts.revoked ? '2026-11-26' : null };
   const outreach: OutreachStore = {
     load: async () => ({ send, approval }),
     current: async () => (opts.current === undefined ? snap : opts.current),
     blockers: async () => ({ paused: false, capUntil: null, suppressed: null, ...opts.blockers }),
     record: async (_j, _w, _s, patch, event) => (records.push({ patch, event }), true),
+    parentOf: async () => opts.parent ?? null,
+    recordInbound: async (_j, _w, _s, events) => (inbound.push(...events), events.length),
+    afterConfirmed: async () => {
+      calls.push('afterConfirmed');
+    },
+    watchList: async () => opts.watch ?? [],
+    enqueueWatch: async (_u, _p, at) => {
+      calls.push(`watch:${at}`);
+    },
   };
   // A mailbox: drafts that, once sent, are gone; and Sent.
   const mailbox = { drafts: new Set<string>(), sent: [] as string[], n: 0, failNextSend: null as null | 'uncertain_after_accept' | 'uncertain_before', sentVisible: true };
   const client: OutreachClient = {
+    reply: async (_t, thread) => {
+      mailbox.sent.push(`reply-in-${thread}`);
+      return { message_id: 'm-reply', thread_id: thread, thread_url: 'u' };
+    },
+    checkThread: async () => opts.events ?? [],
     createDraft: async () => {
       const id = `dr${++mailbox.n}`;
       mailbox.drafts.add(id);
@@ -56,7 +75,7 @@ function setup(opts: { current?: Snapshot | null; blockers?: Partial<Blockers>; 
     confirm: async () => ({ sent: true, thread_id: 't', thread_url: 'https://mail.google.com/mail/#all/t', matches: true }),
   };
   const run = () => runOutreachJob({ job, store, worker: 'w', outreach, client, now: () => 1_000_000 });
-  return { job, calls, records, mailbox, run };
+  return { job, calls, records, mailbox, run, inbound };
 }
 
 // Sean, 26 Nov: "If a send times out, check the mailbox before retrying so the person doesn't get two copies."
@@ -66,7 +85,7 @@ describe('sending one approved email', () => {
     expect(await s.run()).toBe('sent');
     expect(s.records.map((r) => r.patch.status ?? r.event)).toEqual(['submitting', 'draft_made', 'submitted', 'confirmed']);
     expect(s.mailbox.sent).toHaveLength(1);
-    expect(s.calls).toEqual(['complete']);
+    expect(s.calls).toEqual(['afterConfirmed', 'complete']);
   });
 
   it('holds an email changed since it was approved, and says what changed', async () => {
@@ -140,5 +159,49 @@ describe('sending one approved email', () => {
     const s = setup({ status: 'paused' });
     expect(await s.run()).toBe('done');
     expect(s.mailbox.sent).toHaveLength(0);
+  });
+});
+
+// Sean, 26 Nov: follow-ups that stop when someone replies; a bounce or an opt-out stops everything to them.
+describe('follow-ups and what came back', () => {
+  const first = { send: { id: 'first', user_id: 'u1', project_id: 'p1', approval_id: 'a0', job_id: 'j0', purpose: 'send' as const, status: 'confirmed' as const, to_address: 'morgan@harbourline.example', provider_thread_id: 'th1', submitted_at: '2026-11-27T10:00:00Z' }, approval: { id: 'a0', user_id: 'u1', project_id: 'p1', stage_id: 'drafts', message_stage_id: 'message', draft_id: 'd1', purpose: 'send' as const, snapshot: snap, message_hash: 'h', ticket: 't', revoked_at: null } };
+  const reply: InboundEvent = { kind: 'reply', message_id: 'r1', from: 'morgan@harbourline.example', subject: 'Re: hi', text: 'Talk to Sarah.', at: '2026-11-28T09:00:00Z', company_domain: 'harbourline.example' };
+
+  it('a follow-up goes in the first email\'s thread when nobody has answered', async () => {
+    const s = setup({ kind: 'send_followup', purpose: 'followup', parent: first });
+    expect(await s.run()).toBe('sent');
+    expect(s.mailbox.sent).toEqual(['reply-in-th1']);
+    expect(s.records.map((r) => r.patch.status ?? r.event)).toEqual(['submitting', 'submitted', 'confirmed']);
+  });
+
+  it('a reply stops it: what came back is recorded on the first email, and nothing is sent', async () => {
+    const s = setup({ kind: 'send_followup', purpose: 'followup', parent: first, events: [reply] });
+    expect(await s.run()).toBe('done');
+    expect(s.mailbox.sent).toEqual([]);
+    expect(s.inbound).toEqual([reply]);
+  });
+
+  it('an automatic reply is recorded and stops nothing', async () => {
+    const s = setup({ kind: 'send_followup', purpose: 'followup', parent: first, events: [{ ...reply, kind: 'auto_reply' }] });
+    expect(await s.run()).toBe('sent');
+    expect(s.inbound).toHaveLength(1);
+  });
+
+  it('no follow-up when the first email did not go', async () => {
+    const s = setup({ kind: 'send_followup', purpose: 'followup', parent: { ...first, send: { ...first.send, status: 'failed' as const } } });
+    expect(await s.run()).toBe('held');
+  });
+
+  it('a first email confirmed queues its follow-up and a watch', async () => {
+    const s = setup();
+    expect(await s.run()).toBe('sent');
+    expect(s.calls).toContain('afterConfirmed');
+  });
+
+  it('the watch reads each recent email and comes back in half an hour while they are fresh', async () => {
+    const s = setup({ kind: 'outreach_watch', watch: [{ ...first, send: { ...first.send, submitted_at: new Date(1_000_000 - 60_000).toISOString() } }], events: [reply] });
+    expect(await s.run()).toBe('done');
+    expect(s.inbound).toEqual([reply]);
+    expect(s.calls).toEqual([`watch:${1_000_000 + 30 * 60 * 1000}`, 'complete']);
   });
 });
