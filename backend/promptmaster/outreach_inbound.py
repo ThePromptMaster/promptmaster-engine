@@ -57,12 +57,20 @@ def address_of(raw: str) -> str:
     return found[0].lower() if found else ""
 
 
+_ATTRIBUTION_START = re.compile(r"^(on|le|am|el|em)\s", re.IGNORECASE)
+_ATTRIBUTION_END = re.compile(r"(wrote|a écrit|schrieb|escribió|escreveu)\s*:\s*$", re.IGNORECASE)
+
+
 def clean_reply(text: str) -> str:
-    """The reply above the quoted email: quoted lines and everything from "On … wrote:" dropped."""
+    """The reply above the quoted email: quoted lines and everything from "On … wrote:" dropped,
+    including the attribution Gmail wraps over two or three lines (27 Nov pass)."""
     kept: list[str] = []
-    for line in (text or "").replace("\r\n", "\n").split("\n"):
+    lines = (text or "").replace("\r\n", "\n").split("\n")
+    for i, line in enumerate(lines):
         stripped = line.strip()
         if _QUOTE_START.match(stripped):
+            break
+        if _ATTRIBUTION_START.match(stripped) and any(_ATTRIBUTION_END.search(l.strip()) for l in lines[i : i + 3]):
             break
         if stripped.startswith(">"):
             continue
