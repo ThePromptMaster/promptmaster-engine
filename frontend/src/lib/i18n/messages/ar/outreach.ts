@@ -11,6 +11,7 @@ export const ar: Record<keyof typeof en, string> = {
   "outreach.mailboxError": "تعذّر التحقق من صناديق بريدك المتصلة الآن.",
   "outreach.setUp": "إعداد الإرسال من {address}",
   "outreach.fromName": "اسم المرسل",
+  "outreach.fromNameGmail": "يرسل Gmail باسم حسابك في Google. لتغييره: Gmail، الإعدادات، الحسابات، إرسال بريد باسم.",
   "outreach.replyTo": "الرد إلى (اختياري)",
   "outreach.commercial": "هذا تواصل تجاري",
   "outreach.commercialHint": "يحمل البريد التجاري في أسفله عنوانك البريدي وطريقة لإلغاء الاشتراك.",

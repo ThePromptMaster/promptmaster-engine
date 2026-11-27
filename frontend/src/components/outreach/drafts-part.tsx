@@ -8,6 +8,7 @@ import { parseContacts } from '@/lib/outreach/contacts';
 import { blankMessage, changedBySync, draftText, editedFields, parseDrafts, parseMessage, serializeDrafts, syncDrafts, type DraftRow, type OutreachMessage } from '@/lib/outreach/drafts';
 import { unresolvedPlaceholders } from '@/lib/outreach/placeholders';
 import { renderEmail, type RenderedEmail } from '@/lib/outreach/render';
+import { isWaiting, localTimes } from '@/lib/outreach/send-words';
 import type { Snapshot } from '@/lib/outreach/snapshot';
 import { listLogos, listSenders, listSignatures, loadOutreachSettings } from '@/lib/supabase/outreach-identity';
 import type { SendRecord } from '@/lib/supabase/outreach-sends';
@@ -212,7 +213,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
               onSetAside={(why) => update(d.id, { status: 'set_aside', reason: why }, `Set aside the email to ${d.to}.`)}
               onRestore={() => update(d.id, { status: '', reason: '' }, `Brought back the email to ${d.to}.`)}
               preview={renderFor(d, message, sender, signature, logo)}
-              from={sender ? (sender.from_name ? `${sender.from_name} <${sender.from_address}>` : sender.from_address) : t('outreach.noSender')}
+              from={sender ? sender.from_address : t('outreach.noSender')}
               replyTo={sender?.reply_to ?? null}
               signatureName={signature ? [signature.name, signature.company].filter(Boolean).join(', ') : null}
             />
@@ -244,11 +245,13 @@ function useSendWords() {
     const at = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '');
     switch (s.status) {
       case 'scheduled':
-        return s.status_reason ? `${t('outreach.sendScheduled', { when: at(s.scheduled_for) })} ${s.status_reason}` : t('outreach.sendScheduled', { when: at(s.scheduled_for) });
+        // Held back by the runner (Pause all, today's limit): the reason says when it goes, not the slot it missed.
+        if (isWaiting(s.status_reason)) return localTimes(s.status_reason);
+        return s.status_reason ? `${t('outreach.sendScheduled', { when: at(s.scheduled_for) })} ${localTimes(s.status_reason)}` : t('outreach.sendScheduled', { when: at(s.scheduled_for) });
       case 'paused':
         return t('outreach.sendPaused');
       case 'held':
-        return t('outreach.sendHeld', { reason: s.status_reason });
+        return t('outreach.sendHeld', { reason: localTimes(s.status_reason) });
       case 'submitting':
         return t('outreach.sendSubmitting');
       case 'submitted':
@@ -256,7 +259,7 @@ function useSendWords() {
       case 'confirmed':
         return t('outreach.sendConfirmed', { when: at(s.confirmed_at) });
       case 'failed':
-        return t('outreach.sendFailed', { reason: s.status_reason });
+        return t('outreach.sendFailed', { reason: localTimes(s.status_reason) });
       case 'cancelled':
         return t('outreach.sendCancelled');
       default:

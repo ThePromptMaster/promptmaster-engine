@@ -20,7 +20,7 @@ const draft: Pick<DraftRow, 'to' | 'cc' | 'bcc' | 'subject' | 'body' | 'override
 describe('the exact email approved', () => {
   it('carries everything that goes out, filled in, with the footer', () => {
     const s = buildSnapshot({ draft, message, sender, signature, logo: null, purpose: 'send' });
-    expect(s).toMatchObject({ from: { name: 'Sean Moran', address: 'sean@promptmaster.example' }, to: ['morgan@harbourline.example'], subject: 'A look for Harbourline', commercial: true, footer: '1 Main Street\nReply "unsubscribe" to stop.' });
+    expect(s).toMatchObject({ from: { name: '', address: 'sean@promptmaster.example' }, to: ['morgan@harbourline.example'], subject: 'A look for Harbourline', commercial: true, footer: '1 Main Street\nReply "unsubscribe" to stop.' });
     expect(s.text).toContain('See https://promptmasterv1.com');
     expect(s.links).toEqual(['https://promptmasterv1.com']);
   });

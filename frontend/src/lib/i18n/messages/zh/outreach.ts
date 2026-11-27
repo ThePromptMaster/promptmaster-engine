@@ -11,6 +11,7 @@ export const zh: Record<keyof typeof en, string> = {
   "outreach.mailboxError": "暂时无法检查你已连接的邮箱。",
   "outreach.setUp": "设置从 {address} 发送",
   "outreach.fromName": "发件人名称",
+  "outreach.fromNameGmail": "Gmail 以你的 Google 账号名称发送。如需更改：Gmail、设置、账号、用这个地址发送邮件。",
   "outreach.replyTo": "回复地址（可选）",
   "outreach.commercial": "这是商业外联",
   "outreach.commercialHint": "商业邮件底部会附上你的邮寄地址和退订方式。",

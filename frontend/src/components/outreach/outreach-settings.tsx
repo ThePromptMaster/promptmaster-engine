@@ -207,7 +207,8 @@ function SenderEditor({ userId, sender, signatures, logos, onChanged }: {
     [form, sender.from_address, shownSig, logo, subject, sample]
   );
   const warnings = render(false).warnings;
-  const from = form.from_name.trim() ? `${form.from_name.trim()} <${sender.from_address}>` : sender.from_address;
+  // Gmail sends under the Google account's own name: Composio's draft tool takes no display name (27 Nov).
+  const from = sender.from_address;
 
   return (
     <div className="mt-4 space-y-5">
@@ -229,10 +230,9 @@ function SenderEditor({ userId, sender, signatures, logos, onChanged }: {
             });
         }}
       >
-        <label className="sm:col-span-1">
-          <span className={label}>{t('outreach.fromName')}</span>
-          <input className={field} value={form.from_name} maxLength={120} onChange={(e) => set('from_name', e.target.value)} data-from-name />
-        </label>
+        <p className="text-label text-[var(--on-surface-variant)] sm:col-span-2" data-from-name-note>
+          {t('outreach.fromNameGmail')}
+        </p>
         <label className="sm:col-span-1">
           <span className={label}>{t('outreach.replyTo')}</span>
           <input className={field} type="email" value={form.reply_to ?? ''} maxLength={320} onChange={(e) => set('reply_to', e.target.value || null)} />

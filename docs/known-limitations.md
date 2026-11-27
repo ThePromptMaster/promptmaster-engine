@@ -5838,6 +5838,8 @@ Limits:
 - No attachments yet.
 - Today's limit counts this person's sends across projects, not the mailbox's; tests do not count. Scheduled times
   are the browser's local time.
+- Why a send waits or is held is written by the server, in English, in every interface language. A time in it is
+  shown in the reader's local time, and a waiting send says when it goes rather than the slot it missed (27 Nov).
 - "Go never approves or sends" is enforced in code (no action, no route Go can reach), not by the database: Go acts
   with the person's own session.
 
@@ -5855,3 +5857,8 @@ the person's choice. A draft left behind by a failed attempt stays in Drafts and
 - They take no separate plain-text part: the email is HTML only. The details in it are text, so they read with
   images off.
 - Gmail's own signature is never added (`include_signature: false`), so the signature appears once.
+- **No From name** (27 Nov, seen on production): Composio's draft tool takes no display name, so Gmail sends under
+  the name on the Google account ("John Maheswaran", where Settings had said "John Test (PromptMaster)"). Settings
+  no longer offers a From name and says where to change it in Gmail; the approved record and the previews carry the
+  address only, so "what the recipient was sent" never names a sender they did not see. PromptMaster never changes
+  the Gmail setting itself.
