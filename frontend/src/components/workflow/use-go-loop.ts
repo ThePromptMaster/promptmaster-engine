@@ -816,7 +816,7 @@ export function useGoLoop(opts: Options) {
       upsertStep(step);
       let output = `Recorded as still to do in the real world: ${plan.action}`;
       try {
-        await createTask(o.project.id, o.project.user_id, { title: plan.action.slice(0, 240), detail: question.slice(0, 1000), stage: stage.id, origin: 'system' });
+        await createTask(o.project.id, o.project.user_id, { title: plan.action.slice(0, 240), detail: question.slice(0, 1000), stage: stage.id, origin: 'system', basis: { from: 'go_record' } });
       } catch (e) {
         output = `Could not record it (${(e as Error).message}), so it is asked instead.`;
       }

@@ -133,6 +133,7 @@ export const sw: Record<keyof typeof en, string> = {
   'cl.approvedVersion': 'imeidhinishwa v{approved} · ya sasa v{current}',
   'cl.whatChanged': 'Kilichobadilika tangu v{approved}, toleo ulilloidhinisha',
   'cl.committed': 'Imethibitishwa chini ya sera yako ya maamuzi ya kawaida, baada ya kukagua: {what}',
+  'cl.committedOn': '(Ilitolewa kwenye v{given}; toleo la sasa ni v{current}.)',
   'cl.title': 'Ili kumaliza hatua hii',
   'cl.finishNow': 'Maliza — ona kazi yako iliyokamilika',
   'cl.done': '{met} kati ya {total} vimekamilika',

@@ -22,7 +22,7 @@
  * nothing and blocks nothing, exactly as the transition bar stays enabled.
  */
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { EvaluationRatings } from './evaluation-ratings';
 import type { Evaluation } from '@/types/project';
 import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
@@ -38,10 +38,16 @@ interface Props {
   /** Run the check again, offered beside a check that could not run. */
   onRetry?: () => void;
   retrying?: boolean;
+  /**
+   * Go re-confirmed this version after a change, without a full stage check
+   * (L-317): said as a check of this version, beside the last full one.
+   */
+  reconfirmed?: { version: number; at: string; what: string } | null;
 }
 
-export function StageEvaluationPanel({ evaluation, earlier = null, onRetry, retrying = false }: Props) {
+export function StageEvaluationPanel({ evaluation, earlier = null, onRetry, retrying = false, reconfirmed = null }: Props) {
   const t = useT();
+  const locale = useLocale();
   const findings = evaluation?.findings ?? [];
   const interpretation = evaluation?.interpretation ?? null;
 
@@ -74,9 +80,18 @@ export function StageEvaluationPanel({ evaluation, earlier = null, onRetry, retr
         {/* 17 Nov (Sean, Hidden Innovation): v1's check, open beside v2, read as
             the verdict on v2 ("still missing" for a fix v2 had). It stays closed
             under a line that says which version it was of. */}
+        {reconfirmed && !evaluation && (
+          <p data-reconfirmed className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-label text-[var(--on-surface)]">
+            <span aria-hidden className="material-symbols-outlined mr-1 align-middle text-[18px] text-[var(--pm-secondary)]">task_alt</span>
+            {t('pnl.reconfirmed', { version: reconfirmed.version, date: new Date(reconfirmed.at).toLocaleDateString(locale, { month: 'short', day: 'numeric' }) })}
+            {reconfirmed.what ? <span className="text-[var(--on-surface-variant)]"> {reconfirmed.what}</span> : null}
+          </p>
+        )}
         {earlier && (
           <details data-earlier-check className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
-            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">{t('pnl.lastCompleted', { version: earlier.version })}</summary>
+            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+              {reconfirmed && !evaluation ? t('pnl.lastFullCheck', { version: earlier.version }) : t('pnl.lastCompleted', { version: earlier.version })}
+            </summary>
             <div className="mt-2">
               <StageEvaluationPanel evaluation={earlier.evaluation} />
             </div>

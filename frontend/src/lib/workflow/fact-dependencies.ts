@@ -33,8 +33,41 @@ function numbers(text: string): string[] {
   return (text.match(NUMBER) ?? []).map((n) => n.replace(/,/g, '')).filter((n) => n.length > 0);
 }
 
+/**
+ * A source's id as a fact cites it: OPS-02, BANK-04, CITY-01, CAL-03, FIRM-01
+ * (letters, a hyphen, digits). Not a file or item name like S4, N8 or B2: those
+ * name what the work is about, not where a statement came from.
+ */
+const SOURCE_ID = /(?<![\p{L}\p{N}-])[A-Z]{2,8}-\d{1,4}[A-Za-z]?(?![\p{L}\p{N}-])/gu;
+
+/** The source ids a text cites, as written. */
+export function sourceIds(text: string): string[] {
+  return [...new Set(text.match(SOURCE_ID) ?? [])];
+}
+
 /** The first sentence of `text` that uses the fact, or null. */
 export function sentenceUsingFact(text: string, statement: string): string | null {
+  return sentenceUsingValues(text, statement) ?? sentenceCitingSource(text, statement);
+}
+
+/**
+ * A sentence that cites a source the changed fact cites (L-316, 27 Nov; Sean,
+ * payroll cutover: the bank's correction and the first completion report changed,
+ * and the Source log, which paraphrases each source beside its id, was never
+ * reopened, so it went on lacking the two newest sources while it said Complete).
+ * What cites the source relied on what it said.
+ */
+function sentenceCitingSource(text: string, statement: string): string | null {
+  const ids = sourceIds(statement);
+  if (!ids.length) return null;
+  for (const sentence of sentences(text)) {
+    const cited = sourceIds(sentence);
+    if (ids.some((id) => cited.includes(id))) return sentence.slice(0, 300);
+  }
+  return null;
+}
+
+function sentenceUsingValues(text: string, statement: string): string | null {
   // A date or an amount of money is matched however it is written ("Nov 12",
   // "12 November", "$12.00"), and on its own: "launches Nov 12" uses "Launch
   // date: November 12, 2026" without repeating the year (8 Oct, TeamNotes).

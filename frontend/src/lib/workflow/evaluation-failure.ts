@@ -54,3 +54,25 @@ export function lastCompletedCheck<E extends Explained>(
     .sort((a, b) => b.version_number - a.version_number)[0];
   return earlier ? { evaluation: evaluations[earlier.id], version: earlier.version_number } : null;
 }
+
+/**
+ * Go's re-confirmation of the version shown, after a change (L-317, 27 Nov; Sean,
+ * payroll: "the source log says Complete, but v4 says its last check was on v1").
+ * A repair re-confirms the stage's approvals against the new version without a
+ * full stage check; that is a check of this version, of what it says, and is shown
+ * as one, beside the last full check.
+ */
+export function reconfirmationOf(
+  events: readonly { type: string; stage_id: string; reason?: string; payload?: Record<string, unknown>; created_at: string }[],
+  stageId: string,
+  versionId: string | undefined,
+  versions: readonly { id: string; version_number: number }[]
+): { version: number; at: string; what: string } | null {
+  if (!versionId) return null;
+  const version = versions.find((v) => v.id === versionId)?.version_number;
+  if (version === undefined) return null;
+  const found = [...events]
+    .reverse()
+    .find((e) => e.type === 'criterion_committed' && e.stage_id === stageId && e.payload?.reconfirmed === true && e.payload?.evidence_version_id === versionId);
+  return found ? { version, at: found.created_at, what: (found.reason ?? '').trim() } : null;
+}

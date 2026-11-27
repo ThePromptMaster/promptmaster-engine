@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { replacementOf, rewordedOnly, sentenceUsingFact, stagesUsingFacts, statementsOf } from './fact-dependencies';
+import { replacementOf, rewordedOnly, sentenceUsingFact, sourceIds, stagesUsingFacts, statementsOf } from './fact-dependencies';
 import type { ProjectFact } from '@/types/project';
 
 describe('which finished work used a fact (L-52)', () => {
@@ -66,5 +66,36 @@ describe('a fact only reworded, every value the same (27 Nov, production pass of
     ];
     expect(replacementOf('Crew: Rate is $410 a day.', facts)).toBe('Crew: The day rate is $410.');
     expect(replacementOf('Rate is $410 a day.', facts)).toBeUndefined();
+  });
+});
+
+describe('a stage that cites a changed fact\'s source relied on it (L-316)', () => {
+  // Sean, payroll cutover, 27 Nov: the second update changed the OPS-02 and BANK-04 lines.
+  // The Source log paraphrases each source beside its id, so no figure-and-word match found it,
+  // and it went on without the two newest sources while it said Complete.
+  const log = [
+    '| 20 | BANK-04 | The bank | North N7; West W4 | G2 | The bank retracts the North portion of BANK-03. | Same-source correction | Current |',
+    '| 21 | OPS-02 | Operations | All three divisions | South done on the new system; North and West not yet run. | Current |',
+  ].join('\n');
+  const caption = 'Photo: the bridge deck under construction, October 2026 (PHOTO-01). Credit: City of Milwaukee.';
+
+  it('reads a source id whole, never a file name', () => {
+    expect(sourceIds('South S4 ran (OPS-02); see BANK-04, CAL-01 and FIRM-01. N8, B2, i5.')).toEqual(['OPS-02', 'BANK-04', 'CAL-01', 'FIRM-01']);
+    expect(sourceIds('A KES-T3 code and Q3-2026 are not ids; a REC-03a suffix is.')).toEqual(['REC-03a']);
+  });
+
+  it('reopens the log that cites OPS-02 and leaves the caption that cites only PHOTO-01', () => {
+    const removed = ['South S4 ran successfully on the new system at 3:10 p.m.; North and West have not run (OPS-02).'];
+    expect(sentenceUsingFact(log, removed[0])).toContain('OPS-02');
+    const out = stagesUsingFacts(removed, [
+      { stage_id: 'source_log', label: 'Source log', text: log },
+      { stage_id: 'caption', label: 'Caption', text: caption },
+    ]);
+    expect(out.map((o) => o.stage_id)).toEqual(['source_log']);
+  });
+
+  it('still prefers the sentence that states the old figures', () => {
+    const text = 'Entry 21 cites OPS-02.\nSouth S4 ran on the new system at 3:10, and North and West have not run (OPS-02).';
+    expect(sentenceUsingFact(text, 'South S4 ran successfully on the new system at 3:10; North and West have not run (OPS-02).')).toBe('South S4 ran on the new system at 3:10, and North and West have not run (OPS-02).');
   });
 });

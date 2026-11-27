@@ -133,6 +133,7 @@ export const hi: Record<keyof typeof en, string> = {
   "cl.approvedVersion": "स्वीकृत v{approved} · मौजूदा v{current}",
   "cl.whatChanged": "v{approved} के बाद क्या बदला, जो संस्करण आपने स्वीकृत किया था",
   "cl.committed": "आपकी नियमित-निर्णय नीति के तहत दर्ज किया गया, यह जाँचने के बाद: {what}",
+  "cl.committedOn": "(v{given} पर दिया गया; मौजूदा संस्करण v{current} है।)",
   "cl.title": "इस चरण को पूरा करने के लिए",
   "cl.finishNow": "पूरा करें — अपना पूरा काम देखें",
   "cl.done": "{total} में से {met} पूरे",

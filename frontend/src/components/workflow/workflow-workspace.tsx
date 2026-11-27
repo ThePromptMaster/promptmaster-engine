@@ -146,6 +146,8 @@ import { FactsNextStep, OfferedChangeNotice } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
+import { useTaskReconcile } from './use-task-reconcile';
+import { currentTasks, openSystemTasks } from '@/lib/workflow/task-reconcile';
 import { openBriefChange, proposedChange, settledChange, SETTLED_SHOWN_MS, type ProposedChange } from '@/lib/workflow/brief-change';
 import { replaceDocumentInContext, contextFromDocuments, documentInContext } from '@/lib/data/extract-text';
 import { changedLines, factsFromReplacedLines } from '@/lib/data/replaced-lines';
@@ -194,7 +196,7 @@ import { decisionAsFact, delegatedWhy, queueAnswerAsFact, rowAnswerAsFact } from
 import { cachedDecisionOffer, readDecisionOffer, useDecisionOptions } from './agent/use-decision-options';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
 import type { MessageAttachment } from '@/lib/data/attachments';
-import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
+import { isFailedEvaluation, lastCompletedCheck, reconfirmationOf } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { meanwhile } from '@/lib/agent/meanwhile';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
@@ -852,6 +854,12 @@ export function WorkflowWorkspace({
   }, []);
   // The last check that ran, on an earlier version, while this one has none that did (4 Nov).
   const earlierEvaluation = lastCompletedCheck(stageVersionList, evaluations, activeVersionId ?? headVersion?.id);
+  // The version shown was re-confirmed by Go after a change, though the full check last ran earlier (L-317):
+  // said as such, so "not checked yet" is not read beside a stage marked complete.
+  const reconfirmedShown = useMemo(
+    () => reconfirmationOf(events ?? [], stageId, activeVersionId ?? headVersion?.id, stageVersionList),
+    [events, stageId, activeVersionId, headVersion?.id, stageVersionList]
+  );
 
   // A stage's unsaved edits belong to that stage.
   useEffect(() => {
@@ -1383,14 +1391,21 @@ export function WorkflowWorkspace({
 
   // Approvals committed under the routine-decision policy on this stage, while
   // still ticked: what the check found, for the checklist (5 Oct).
+  // Which version it was given on, when that is not the one shown (L-317: an approval reason written on
+  // v3 read as the verdict on v4, which had two newer sources).
   const committedByPolicy = useMemo(() => {
     const out: Record<string, string> = {};
+    const head = stageBundles[stageId]?.versions.at(-1);
+    const numberOf = (id: unknown) => stageBundles[stageId]?.versions.find((v) => v.id === id)?.version_number;
     for (const e of events ?? []) {
       const id = e.type === 'criterion_committed' && e.stage_id === stageId ? String(e.payload?.criterion_id ?? '') : '';
-      if (id && project.manual_checks?.[id]) out[id] = e.reason ?? '';
+      if (!id || !project.manual_checks?.[id]) continue;
+      const given = numberOf(e.payload?.evidence_version_id);
+      const stale = head && given !== undefined && e.payload?.evidence_version_id !== head.id;
+      out[id] = `${e.reason ?? ''}${stale ? ` ${t('cl.committedOn', { given, current: head.version_number })}` : ''}`;
     }
     return out;
-  }, [events, stageId, project.manual_checks]);
+  }, [events, stageId, project.manual_checks, stageBundles, t]);
   // A saved change to the brief reopens only what relied on it (5 Oct).
   // The stage a side-chat revision was applied to already carries the setup change that came with it (18 Nov).
   const revisedWith = useRef<{ stageId: string; at: number } | null>(null);
@@ -1424,6 +1439,14 @@ export function WorkflowWorkspace({
     project, template, state, bundles: stageBundles, events, stageId: state.current_stage_id, appendEvent, refreshEvents,
     enabled: project.status !== 'finalized' && !project.example_key && events !== null,
   });
+  // A task the work has moved past is closed with why, whoever saved the version (L-315).
+  const upsertTask = useProjectStore((s) => s.upsertTask);
+  useTaskReconcile({
+    project, template, bundles: stageBundles, events: events ?? undefined, tasks: recommendations.tasks, upsertTask,
+    enabled: events !== null && !project.example_key,
+  });
+  // What is still to do, one reading for every view of it: the panel, the finished screen, the status (L-315).
+  const taskView = useMemo(() => currentTasks(recommendations.tasks, state), [recommendations.tasks, state]);
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   const heldHereNow = useMemo(() => heldStages(project.inherited, events).get(stageId), [project.inherited, events, stageId]);
   // A commitments sign-off on a version that proposes none is recorded as not
@@ -2629,7 +2652,7 @@ export function WorkflowWorkspace({
     finalized: project.status === 'finalized',
     repairFailed: !go.active && go.run?.needs?.kind === 'repair_stuck',
     waitingOnUser: !go.active && !go.run?.ended_at && go.run?.status === 'awaiting_decision',
-    openActions: recommendations.tasks.filter((task) => task.status === 'open' && task.origin === 'system').length,
+    openActions: openSystemTasks(recommendations.tasks, state).length,
     allStagesDone: completion.notStarted === 0 && completion.leftOpen === 0 && completion.blocked === 0,
   });
   const overallLine = overall === 'in_progress' ? null : (
@@ -3376,7 +3399,7 @@ export function WorkflowWorkspace({
               completion={completion}
               evaluation={deliverableEvaluation}
               limitation={statedLimitation(lastFinish?.reason)}
-              openActions={recommendations.tasks.filter((task) => task.status === 'open' && task.origin === 'system').map((task) => task.title)}
+              openActions={taskView.actionable.filter((task) => task.origin === 'system').map((task) => task.title)}
               onReopen={() => void reopenProject()}
               onEdit={() => {
                 // Reopen, and land on the stage that holds the work itself.
@@ -3828,14 +3851,14 @@ export function WorkflowWorkspace({
                   </summary>
                   <div className="mt-3 space-y-4">
                     {showDials && dials}
-                    <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
+                    <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} reconfirmed={reconfirmedShown} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
                   </div>
                 </details>
               )
             ) : (
               <>
                 {showDials && dials}
-                <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
+                <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} reconfirmed={reconfirmedShown} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
               </>
             )}
 
@@ -3877,7 +3900,8 @@ export function WorkflowWorkspace({
 
             <TasksPanel
               stageName={(id) => stageNameShown(id)}
-              tasks={recommendations.tasks}
+              view={taskView}
+              onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
               onResolve={(id, status) => void recommendations.resolveTask(id, status)}
               busy={recommendations.busy}
               readOnly={!isCurrent}
