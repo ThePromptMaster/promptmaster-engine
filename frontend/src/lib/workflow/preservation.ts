@@ -159,12 +159,22 @@ export function restoreLines(before: string, after: string, lines: readonly stri
   const a = after.split('\n');
   const afterNorm = a.map((l) => norm(l));
   const afterMask = a.map((l) => masked(l));
-  /** Where a surviving line of `before` stands in `after`, or -1. */
-  const placeOf = (line: string) => {
+  /**
+   * Where a surviving line of `before` stands in `after`, or -1: its first copy
+   * after `from`, the line last found, else its first copy anywhere. A line that
+   * recurs ("$$" around each formula) is read in order: Sean's Alder Objective
+   * v3 (27 Nov) had a slots line put back after the first "$$" in the document,
+   * inside another formula (L-327).
+   */
+  const nextOf = (list: readonly string[], value: string, from: number) => {
+    const later = list.indexOf(value, from + 1);
+    return later >= 0 ? later : list.indexOf(value);
+  };
+  const placeOf = (line: string, from: number) => {
     if (!line.trim()) return -1;
-    const exact = afterNorm.indexOf(norm(line));
+    const exact = nextOf(afterNorm, norm(line), from);
     if (exact >= 0) return exact;
-    const m = afterMask.indexOf(masked(line));
+    const m = nextOf(afterMask, masked(line), from);
     if (m >= 0) return m;
     // A reworded paragraph: the line of `after` sharing most of its words.
     const w = words(line);
@@ -186,7 +196,7 @@ export function restoreLines(before: string, after: string, lines: readonly stri
   let i = 0;
   while (i < b.length) {
     if (!(b[i].trim() && want.has(b[i].trim()))) {
-      const at = placeOf(b[i]);
+      const at = placeOf(b[i], anchor);
       if (at >= 0) anchor = at;
       i += 1;
       continue;
@@ -239,9 +249,15 @@ export function keepUnasked(
   before: string,
   after: string,
   instruction: string,
-  keep: (line: string) => boolean = () => true
+  keep: (line: string) => boolean = () => true,
+  /**
+   * The work itself changed since `before` (an objective, audience or format
+   * the user changed): the revision is a rewrite, and nothing of the old
+   * version is put back. It stays in the version history (L-327).
+   */
+  rewrite = false
 ): Preserved {
-  if (!before.trim() || !after.trim() || asksForRemovals(instruction)) return { text: after, restored: [], reported: [] };
+  if (rewrite || !before.trim() || !after.trim() || asksForRemovals(instruction)) return { text: after, restored: [], reported: [] };
   // A line the instruction itself names ("the 0-minute Training item") was
   // asked about: whatever became of it is the instruction's doing.
   const named = stems(instruction);
@@ -285,12 +301,88 @@ export function askedOfRecheck(
   return asked.length ? `${why} ${asked.join(' ')}` : why;
 }
 
+/** A change to these makes the work a different piece of work: a revision after one is a rewrite. */
+const WORK_FIELDS: readonly string[] = ['objective', 'audience', 'output_format'];
+/** The brief fields whose new text says what is asked of the work. */
+const ASKED_FIELDS: readonly string[] = ['objective', 'audience', 'constraints', 'output_format'];
+
+/**
+ * What the user changed in the brief after a version was made (28 Nov, Sean,
+ * Redwood; L-327). "I changed the objective, audience, constraints, and format
+ * to a customer-facing FAQ … The revision record says Go kept lines the rewrite
+ * had dropped, including the memo header, Pavel's staffing tasks, and the $1,200
+ * contingency." The guard was told only the reopen reason ("Review the plan was
+ * changed"), never the new brief, which said "Omit internal staffing, Pavel, the
+ * $1,200 contingency". Now the new text of each brief field changed since is
+ * part of what was asked, and a change to what the work is (objective, audience
+ * or format, judged an intent change) makes the revision a rewrite.
+ */
+export function briefChangedSince(
+  events: readonly { type: string; created_at: string; payload?: Record<string, unknown> | null }[],
+  versionCreatedAt: string | undefined
+): { asked: string[]; rewrite: boolean } {
+  const since = versionCreatedAt ? Date.parse(versionCreatedAt) : NaN;
+  if (Number.isNaN(since)) return { asked: [], rewrite: false };
+  // The user's own edits of the brief: not a folder's rules or a linked project.
+  const changes = events.filter(
+    (e) => e.type === 'brief_changed' && Date.parse(e.created_at) > since && !e.payload?.presentation_only && !e.payload?.origin && ASKED_FIELDS.includes(String(e.payload?.field ?? ''))
+  );
+  return {
+    asked: changes.map((e) => (typeof e.payload?.after === 'string' ? e.payload.after.trim() : '')).filter(Boolean),
+    rewrite: changes.some((e) => e.payload?.kind === 'intent' && WORK_FIELDS.includes(String(e.payload?.field))),
+  };
+}
+
+/**
+ * What a revision of a stage was asked to do, for `keepUnasked`: `why` (the
+ * instruction or the reopen reason), the facts recorded since its current
+ * version (`askedOfRecheck`), and the brief as changed since (`briefChangedSince`).
+ */
+export function askedOfStage(
+  why: string,
+  facts: Parameters<typeof askedOfRecheck>[1],
+  versionCreatedAt: string | undefined,
+  events: Parameters<typeof briefChangedSince>[0]
+): { asked: string; rewrite: boolean } {
+  const base = askedOfRecheck(why, facts, versionCreatedAt);
+  const brief = briefChangedSince(events, versionCreatedAt);
+  return { asked: brief.asked.length ? `${base} ${brief.asked.join(' ')}` : base, rewrite: brief.rewrite };
+}
+
 /**
  * The values an instruction says are wrong: "revenue was $27 million, not $30
  * million", "instead of 100 hours". A line the revision dropped that states
  * one is the old figure, and is never put back (19 Oct, Ridgeway).
  */
 export function correctedValues(instruction: string): ValueMention[] {
+  // "they still use five slots, East minimum 4 … instead of three slots …": what
+  // the text still uses is the old value, and what follows "instead of" is the
+  // new one (27 Nov, Sean, Alder: "Slots: 5 of 5 used, none spare" was put back
+  // after the check said the version "still use[s] five slots … instead of three
+  // slots"; L-327). Read before the general rule, which would take it the other way.
+  const stillUses: ValueMention[] = [];
+  // The whole clause, "instead of …" too, is taken out before the general rule reads the rest.
+  const rest = instruction.replace(STILL_INSTEAD, (whole: string, old: string) => {
+    stillUses.push(...valueMentions(withDigits(old)));
+    return ' '.repeat(whole.length);
+  });
+  return [...stillUses, ...generalCorrected(rest)];
+}
+
+/** "still use(s) X … instead of Y", up to the end of Y's sentence. */
+const STILL_INSTEAD = /\bstill\s+(?:(?:be|being)\s+)?(?:uses?|using|says?|saying|gives?|giving|shows?|showing|states?|stating|lists?|listing|has|have|having|keeps?|keeping|treats?|treating|counts?|counting|reads?|reading)\s+((?:[^.]|\.(?!\s))+?)\binstead of\b(?:[^.]|\.(?!\s))*/gi;
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+};
+
+/** "five slots" as "5 slots": a count written in words is the same count. */
+function withDigits(text: string): string {
+  return text.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/gi, (w) => String(NUMBER_WORDS[w.toLowerCase()]));
+}
+
+function generalCorrected(instruction: string): ValueMention[] {
   const spans = [...instruction.matchAll(/\b(?:not(?!\s+(?:more|less|fewer|over|under|exceed\w*|above|below|later|earlier)\b)|instead of|rather than|replacing|supersed\w+|corrected from)\s+(?:the\s+)?(?:(?:earlier|previous|old|proposed|original)\s+)?([^,;:]+?)(?=[,;:]|\.(?:\s|$)|$)/gi)];
   return spans.flatMap((m) => valueMentions(m[1]));
 }
