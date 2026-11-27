@@ -72,8 +72,9 @@ import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type Add
 import { creditStop, OUT_OF_CREDITS } from './credit-stop';
 import { delegationSentences } from './delegation';
 import { touchesObjective } from './stop-audit';
-import { createTask, listTasks, setTaskStatus } from '@/lib/supabase/tasks';
-import { staleTasks, type StageTexts } from './stale-tasks';
+import { createTask, listTasks } from '@/lib/supabase/tasks';
+import { retireMovedPastTasks } from './retire-tasks';
+import { stageHeads, taskKey } from '@/lib/workflow/task-reconcile';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -2566,7 +2567,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         // A fresh check is when tasks an earlier one recorded are looked at again (27 Nov).
         if (!kept) await retireStaleTasks(ctx);
         if (assessment.outcome === 'met') {
-          if (!kept) await recordOpenActions(ctx, assessment.open_actions ?? [], holder?.id ?? ctx.stage.id);
+          if (!kept) await recordOpenActions(ctx, assessment.open_actions ?? [], holder?.id ?? ctx.stage.id, 'objective_check', head?.id);
           const checked = `${describeBasis(basis)}${kept ? ' (The check already made on this version; nothing has changed since, so it was not repeated.)' : ''}`;
           // Met is not finished (Sean, 10 Oct, email 2: "Finished: the objective is
           // verified as met" beside "2 done · 3 to go"). What the workflow still
@@ -2684,7 +2685,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
             const screen = touchesObjective(ask)
               ? null
               : await api.agentScreenQuestion({ inputs: inputsFrom(ctx.project), question: ask, stage_label: holder?.label ?? ctx.stage.label, earlier_stages: [], reserved_approvals: [], delegation: delegationSentences(ctx.project), model: ctx.project.model }, ctx.signal).catch(() => null);
-            if (screen?.verdict === 'real_world_action') await recordOpenActions(ctx, [screen.action], holder?.id ?? ctx.stage.id);
+            if (screen?.verdict === 'real_world_action') await recordOpenActions(ctx, [screen.action], holder?.id ?? ctx.stage.id, 'screen');
             // Go's own extra holds nothing up (15 Nov, Sean: a backup volunteer it had suggested).
             else if (screen?.verdict !== 'optional_suggestion') kept.push(ask);
           }
@@ -3219,16 +3220,32 @@ async function closeRepairedManuscript(ctx: PerformContext, key: string, target:
  * open tasks (8 Nov; "the training-event document should finish with the
  * unresolved staffing action clearly recorded"). Best-effort: a task that can't
  * be saved never stops a finished document from counting as finished.
+ *
+ * `from`: an objective check's actions are sentences of the deliverable, so the
+ * task follows the sentence (L-315); a screened question's action is the model's
+ * own words, and keeps the date rule. A task already open or done is not added
+ * again; one retired earlier may come back as a new row, the old one kept as history.
  */
-async function recordOpenActions(ctx: PerformContext, actions: readonly string[], stageId: string): Promise<void> {
+async function recordOpenActions(
+  ctx: PerformContext,
+  actions: readonly string[],
+  stageId: string,
+  from: 'objective_check' | 'screen' = 'objective_check',
+  versionId?: string | null
+): Promise<void> {
   if (!actions.length) return;
-  const key = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   try {
-    const have = new Set((await listTasks(ctx.project.id)).map((t) => key(t.title)));
+    const have = new Set((await listTasks(ctx.project.id)).filter((t) => t.status !== 'dismissed').map((t) => taskKey(t.title)));
     for (const action of actions) {
-      if (have.has(key(action))) continue;
-      have.add(key(action));
-      await createTask(ctx.project.id, ctx.project.user_id, { title: action.slice(0, 240), stage: stageId, origin: 'system' });
+      if (have.has(taskKey(action))) continue;
+      have.add(taskKey(action));
+      await createTask(ctx.project.id, ctx.project.user_id, {
+        title: action.slice(0, 240),
+        stage: stageId,
+        origin: 'system',
+        basis: { from, ...(versionId ? { version_id: versionId } : {}) },
+        ...(versionId ? { origin_version_id: versionId } : {}),
+      });
     }
     await ctx.refresh?.();
   } catch {
@@ -3237,23 +3254,20 @@ async function recordOpenActions(ctx: PerformContext, actions: readonly string[]
 }
 
 /**
- * Dismisses the open tasks an earlier objective check recorded that the work has
- * moved past (`staleTasks`, 27 Nov). A manuscript's chapters are not in its
- * version text, so a long-form stage is never judged.
+ * Closes the open tasks the work has moved past (L-315; L-293 for a task in a
+ * model's own words), each with why. The page does the same whenever a stage
+ * gets a new version; this makes sure it is done before a check records new ones.
  */
 async function retireStaleTasks(ctx: PerformContext): Promise<void> {
   try {
-    const texts: StageTexts = Object.fromEntries(
-      ctx.template.stages
-        .filter((s) => s.renderer !== 'long_form')
-        .map((s) => {
-          const head = ctx.bundles[s.id]?.versions.at(-1);
-          return [s.id, head ? { text: head.content ?? '', at: head.created_at } : undefined];
-        })
-    );
-    const stale = staleTasks(await listTasks(ctx.project.id), texts);
-    for (const t of stale) await setTaskStatus(t.id, 'dismissed');
-    if (stale.length) await ctx.refresh?.();
+    const { closed, created } = await retireMovedPastTasks({
+      project: ctx.project,
+      heads: stageHeads(ctx.template, ctx.bundles),
+      events: ctx.loadEvents ? await ctx.loadEvents() : [],
+      tasks: await listTasks(ctx.project.id),
+      signal: ctx.signal,
+    });
+    if (closed.length || created.length) await ctx.refresh?.();
   } catch {
     // The task list is a convenience beside the document.
   }

@@ -5665,7 +5665,8 @@ from has changed since, and either:
 
 Limits:
 - A task with neither, such as "tell Harbor at least 7 days before its booking starts", is kept. Nothing in the
-  text can show it has passed.
+  text can show it has passed. Since 28 Nov this rule is only for a task in a model's own words; a task an
+  objective check recorded follows its sentence (L-315).
 - A manuscript stage is never judged: its chapters are not in its version text.
 - Dismissed is the task list's own state: the timeline does not record it.
 
@@ -6109,3 +6110,73 @@ their own role, not the one found for the first. An outreach round now delivers 
 (`deliverableStage`, `deliverableDocument`): the objective check had been judging the Brief, said "the
 deliverable is a brief, not drafts", and asked for the Sent mail the Contacts stage had already read. The
 emails are read as text, each with its earlier-contact finding, never as the saved JSON.
+
+### L-315 — A task follows the sentence of the work it came from (2026-11-28)
+Sean, 27 Nov, payroll cutover: after South's completion report the final pack correctly said North N8 was the
+only run left, while "Carried forward" still held 16 open tasks: pay South on the old system, run West again,
+run North on both systems. "Two people opening different parts of the same project would come away with
+different instructions."
+
+Each objective check recorded the actions its deliverable names as tasks, and only the date-or-placeholder rule
+(L-293) ever took one back. The payroll tasks had neither, so they lived forever.
+
+**Now.** A task an objective check records is a sentence of the deliverable, word for word (the backend keeps
+no other). It is current while the stage's current version still says it as current work: not under a history
+heading or in a history table, not quoted, struck through or on a line labelled "Superseded:" or "Previously:".
+When a newer version no longer says it, the task is closed, decided in code (`tasksMovedPast`,
+`lib/workflow/task-reconcile.ts`). The page runs this whenever a stage that holds tasks gets a new version,
+whoever saved it, and Go before it records a check's tasks (`retireMovedPastTasks`).
+
+Why it closed is then labelled by one small call (`POST /api/agent/task-outcomes`), with words found where it
+says they are:
+- **Done**, with the fact that reports it happened ("South S4 ran successfully on the new system at 3:10 p.m.
+  (OPS-02)"). The task is marked done, not dropped.
+- **Replaced**, with the instruction that took its place.
+- **Reworded**: the work still asks for it in other words. The old task closes and one in the new words opens,
+  once.
+- Otherwise "no longer in {stage} v{n}". A failed call labels nothing; the task is still closed.
+
+Each closed task keeps `resolution`, `resolved_by` and `basis` (stage, version, the change before that version,
+the quote): the panel's "done or retired" history shows them. A task whose stage is reopened for a change is
+"on hold until {stage} is updated" and is not counted as something to act on. The panel, the finished screen
+and the status line read one list (`currentTasks`).
+
+Running it again changes nothing: only open tasks are written, and a task already open or done is not added
+again. A retired sentence that comes back opens a new task; the old one stays as history.
+
+Limits:
+- Only a check's tasks follow a sentence. A task in a model's own words (Go's "record it", a screened question)
+  keeps L-293, and a task the user wrote is never closed by PromptMaster.
+- A task taken from a contingency ("Only then run N8 on the old system") is current while the contingency is
+  in the pack. Its title does not carry the condition.
+- A table or manuscript deliverable is read by the date rule only: its sentences are not in its version text.
+- The task list follows the deliverable. Until Go (or the user) updates the deliverable after a change, its
+  tasks are on hold, not closed.
+
+### L-316 — A change reopens what cites its source (2026-11-28)
+Sean, 27 Nov, payroll: the second update changed the OPS-02 and BANK-04 lines. Only the stages that repeated
+the changed lines' figures were reopened. The Source log paraphrases each source beside its id, so it was never
+reopened and went on without BANK-05 and OPS-03 while it said Complete.
+
+Now a changed or removed fact also reopens a stage with a sentence or table row citing a source id the fact
+cites (`sourceIds`, `lib/workflow/fact-dependencies.ts`): letters, a hyphen, digits, such as OPS-02 or CITY-01.
+A file or item name such as S4, N8 or B2 is not a source id.
+
+Limits:
+- A fact with no source id is matched as before, by its figures and words.
+- A stage that relies on a source without citing it is found only by the model check for added facts, or not
+  at all (L-39).
+
+### L-317 — A check says which version it covers (2026-11-28)
+Sean, 27 Nov, payroll: "the source log says Complete, but v4 says its last check was on v1, and its approval
+explanation leaves out the two newest sources."
+
+A repair re-confirms a stage's approvals against the new version; it does not run the full stage check. The
+check panel said "This version has not been checked yet" beside a stage marked complete. It now says "v4 was
+re-confirmed after the change on {date}: {what it found}", and folds the full check under "The full stage check
+last ran on v1". An approval explanation given on an earlier version says so: "(Given on v3; the current
+version is v4.)".
+
+Limits:
+- The full stage check (alignment, clarity, drift) still runs only when Go or the user asks for it.
+

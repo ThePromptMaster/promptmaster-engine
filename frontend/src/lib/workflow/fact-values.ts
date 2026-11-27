@@ -506,7 +506,8 @@ function carriesOnReporting(lines: readonly string[]): Set<string> {
  * The lines of `text` that state things, not report them: quotations, a history
  * section or table, and a list under a line that sets values aside are left out.
  */
-function statedLines(text: string): string[] {
+function statedLines(text: string, options: { attribution?: boolean } = {}): string[] {
+  const attribution = options.attribution !== false;
   // A list under a line that sets values aside ("The following alternatives
   // are excluded:") is that line's: each item reports a value, it does not
   // state it (8 Oct, production: "- $18 per user per month price").
@@ -534,7 +535,7 @@ function statedLines(text: string): string[] {
       historyTable = false;
     }
     if (/:\s*$/.test(t)) {
-      underAttribution = ATTRIBUTED.test(t);
+      underAttribution = attribution && ATTRIBUTED.test(t);
       return !underAttribution;
     }
     if (underAttribution && (/^([-*+]|\d+[.)])\s/.test(t) || (t && t.length < 80 && !/[.!?]$/.test(t)))) return false;
@@ -556,6 +557,34 @@ export function statedSentences(text: string): string[] {
     const p = withoutEmphasis(raw);
     return !(/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw));
   });
+}
+
+/**
+ * A line that labels itself as history: "Superseded: run S4 on the old system",
+ * "Previously: …", "~~old text~~". Read for task sentences only (L-315).
+ */
+const HISTORY_LINE = /^\W*(?:superseded|previously|formerly|earlier(?: instruction)?|replaced|retired|withdrawn|no longer (?:applies|current)|history|was)\b\s*[:—–-]/i;
+
+/** Lowercase words and numbers, one space apart: how a task's sentence is found in a text. */
+function plainWords(text: string): string {
+  return withoutEmphasis(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+/**
+ * Whether `text` still says `sentence` as current work (L-315, 27 Nov; Sean,
+ * payroll cutover: "Carried forward" told the next operator to run South on the
+ * old system after the pack had dropped that instruction). A task an objective
+ * check recorded is a sentence of the deliverable; it is current while the
+ * deliverable says it outside a history section or table, a quotation, a
+ * struck-through span or a line labelled as history. Unlike the leftover check,
+ * a list under "Actions requested:" still states its items: a task is an action
+ * by nature. Pure.
+ */
+export function statesAsCurrent(text: string, sentence: string): boolean {
+  const wanted = plainWords(withoutQuotations(sentence.replace(/~~[^~]*~~/g, ' ')));
+  if (!wanted) return true;
+  const lines = statedLines(text.replace(/~~[^~\n]*~~/g, ' '), { attribution: false }).filter((l) => !HISTORY_LINE.test(l));
+  return plainWords(lines.join('\n')).includes(wanted);
 }
 
 /** One superseded value a text still states as current, and a sentence that states it. */

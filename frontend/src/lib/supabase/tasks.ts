@@ -30,6 +30,32 @@ import { createClient } from './client';
 export type TaskStatus = 'open' | 'done' | 'dismissed';
 export type TaskOrigin = 'user' | 'recommendation' | 'evaluation' | 'system';
 
+/**
+ * Where a task came from, and once closed what closed it (L-315). Ordinary
+ * data beside the task; nothing reads it as evidence of anything.
+ */
+export interface TaskBasis {
+  /** How it was made: a sentence an objective check found, Go's "record it", a screened question, or a reworded one. */
+  from?: 'objective_check' | 'go_record' | 'screen' | 'reworded';
+  /** The version it was drawn from. */
+  version_id?: string;
+  /** The task a reworded one replaces. */
+  replaces?: string;
+  // Once closed by PromptMaster:
+  /** The stage whose newer version no longer says it, and that version. */
+  stage_id?: string;
+  retired_version_id?: string;
+  retired_version_number?: number;
+  /** Why: reported done by a fact, replaced, reworded, no longer in the work, or the date/placeholder rule. */
+  outcome?: 'done' | 'replaced' | 'reworded' | 'gone' | 'moved_past';
+  /** The words that show it: a fact reporting it done, or what replaced it. */
+  quote?: string;
+  /** The change to the brief or facts before that version, when there was one. */
+  change?: { seq: number; at: string; what: string };
+  /** The task that carries on a reworded one. */
+  replaced_by?: string;
+}
+
 export interface ProjectTask {
   id: string;
   user_id: string;
@@ -42,11 +68,16 @@ export interface ProjectTask {
   origin_recommendation_id: string | null;
   created_at: string;
   resolved_at: string | null;
+  /** Why it closed, in words (L-315); null while open or closed before 28 Nov. */
+  resolution?: string | null;
+  resolved_by?: 'user' | 'system' | null;
+  basis?: TaskBasis | null;
+  origin_version_id?: string | null;
 }
 
 const COLUMNS =
   'id, user_id, project_id, title, detail, stage, status, origin, ' +
-  'origin_recommendation_id, created_at, resolved_at';
+  'origin_recommendation_id, created_at, resolved_at, resolution, resolved_by, basis, origin_version_id';
 
 export async function listTasks(projectId: string): Promise<ProjectTask[]> {
   const supabase = createClient();
@@ -66,6 +97,8 @@ export interface NewTask {
   stage?: string | null;
   origin?: TaskOrigin;
   origin_recommendation_id?: string | null;
+  basis?: TaskBasis | null;
+  origin_version_id?: string | null;
 }
 
 export async function createTask(
@@ -84,6 +117,8 @@ export async function createTask(
       stage: task.stage ?? null,
       origin: task.origin ?? 'user',
       origin_recommendation_id: task.origin_recommendation_id ?? null,
+      ...(task.basis ? { basis: task.basis } : {}),
+      ...(task.origin_version_id ? { origin_version_id: task.origin_version_id } : {}),
     })
     .select(COLUMNS)
     .single();
@@ -101,6 +136,8 @@ export async function setTaskStatus(id: string, status: TaskStatus): Promise<Pro
       // No trigger owns this one — project_tasks is ordinary user data, not
       // audit evidence, so there is nothing here to protect from the client.
       resolved_at: status === 'open' ? null : new Date().toISOString(),
+      resolved_by: status === 'open' ? null : 'user',
+      ...(status === 'open' ? { resolution: null } : {}),
     })
     .eq('id', id)
     .select(COLUMNS)
@@ -108,6 +145,33 @@ export async function setTaskStatus(id: string, status: TaskStatus): Promise<Pro
 
   if (error) throw error;
   return data as unknown as ProjectTask;
+}
+
+/**
+ * PromptMaster closes a task the work has moved past, saying why (L-315). Only
+ * an open task is touched, so a second tab or a repeat does nothing: null then.
+ */
+export async function closeTaskBySystem(
+  task: Pick<ProjectTask, 'id' | 'basis'>,
+  close: { status: 'done' | 'dismissed'; resolution: string; basis: TaskBasis }
+): Promise<ProjectTask | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('project_tasks')
+    .update({
+      status: close.status,
+      resolved_at: new Date().toISOString(),
+      resolved_by: 'system',
+      resolution: close.resolution.slice(0, 600),
+      basis: { ...(task.basis ?? {}), ...close.basis },
+    })
+    .eq('id', task.id)
+    .eq('status', 'open')
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as unknown as ProjectTask | null) ?? null;
 }
 
 export function openTasks(tasks: readonly ProjectTask[]): ProjectTask[] {

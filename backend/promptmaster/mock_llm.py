@@ -336,6 +336,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import question_screen
     from promptmaster import decision_options
     from promptmaster import settled_items
+    from promptmaster import task_outcomes
     from promptmaster import section_targets
     from promptmaster import question_groups
     from promptmaster.stage import _LIST_INSTRUCTION
@@ -711,6 +712,15 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Every section given: a repair in the mock rewrites what it was sent, as before 17 Nov.
         ids = re.findall(r"^\[([^\]]+)\] ", prompt.split("SECTIONS:\n", 1)[-1], re.M)
         return {"already_done": False, "sections": [{"id": i, "why": "Mock: listed."} for i in ids], "note": "Mock."}
+    if system.startswith(task_outcomes.TASK_OUTCOMES_INSTRUCTION[:60]):
+        # A task is done when a fact line says "ran" or "done" about the same first word; otherwise gone.
+        facts = re.findall(r"^\[[^\]]+\] (.*)$", prompt.split("FACTS:\n", 1)[-1].split("\n\nTASKS:", 1)[0], re.M)
+        out = []
+        for m in re.finditer(r"^\[([^\]]+)\] from [^\n]*\nTASK: ([^\n]*)$", prompt, re.M):
+            words = re.findall(r"[A-Z]+\d+", m.group(2))
+            hit = next((f for f in facts if words and any(w in f for w in words) and re.search(r"\b(ran|done|paid|sent)\b", f)), None)
+            out.append({"id": m.group(1), "outcome": "done", "quote": hit[:200]} if hit else {"id": m.group(1), "outcome": "gone"})
+        return {"outcomes": out}
     if system.startswith(settled_items.SETTLES_INSTRUCTION[:60]):
         # A note that begins "Answer:" settles its finding; any other note postpones it.
         out = []

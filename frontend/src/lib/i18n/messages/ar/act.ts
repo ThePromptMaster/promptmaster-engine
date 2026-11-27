@@ -133,6 +133,7 @@ export const ar: Record<keyof typeof en, string> = {
   'cl.approvedVersion': 'الموافق عليها v{approved} · الحالية v{current}',
   'cl.whatChanged': 'ما تغيّر منذ v{approved}، النسخة التي وافقت عليها',
   'cl.committed': 'اعتُمد وفق سياستك للقرارات الروتينية، بعد التحقق من: {what}',
+  'cl.committedOn': '(أُعطيت على v{given}؛ الإصدار الحالي هو v{current}.)',
   'cl.title': 'لإنهاء هذه المرحلة',
   'cl.finishNow': 'إنهاء — شاهد عملك المنجز',
   'cl.done': 'أُنجز {met} من {total}',

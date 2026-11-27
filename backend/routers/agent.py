@@ -47,6 +47,7 @@ from promptmaster.decision_options import DecisionOptionsRequest, DecisionOption
 from promptmaster.commitments import CommitmentsRequest, CommitmentsResponse, check_commitments
 from promptmaster.delegated_approvals import ApprovalDelegatedRequest, ApprovalDelegatedResponse, approvals_delegated
 from promptmaster.settled_items import SettlesRequest, SettlesResponse, settled_items
+from promptmaster.task_outcomes import TaskOutcomesRequest, TaskOutcomesResponse, task_outcomes
 from promptmaster.stages_concerned import StagesConcernedRequest, StagesConcernedResponse, stages_concerned
 from promptmaster.section_targets import SectionsToRepairRequest, SectionsToRepairResponse, sections_to_repair
 from promptmaster.question_groups import GroupQuestionsRequest, GroupQuestionsResponse, group_questions
@@ -550,6 +551,19 @@ async def api_settles(req: SettlesRequest, client: OpenRouterClient = Depends(ge
     except Exception:  # noqa: BLE001 - "still open" is the safe answer to any failure here
         logger.warning("Settled-items check failed; the findings stay open", exc_info=True)
         return SettlesResponse()
+
+
+@router.post("/task-outcomes", response_model=TaskOutcomesResponse)
+async def api_task_outcomes(req: TaskOutcomesRequest, client: OpenRouterClient = Depends(get_client)) -> TaskOutcomesResponse:
+    """Why each task the work moved past was closed: done (a fact reports it), replaced,
+    or reworded (L-315, 27 Nov). The browser has already decided the tasks are retired;
+    this only labels them, with quotes found in the facts or the current text. 1 small
+    LLM call; commits nothing. Any failure labels nothing, so each is "no longer in the work"."""
+    try:
+        return await task_outcomes(client, req)
+    except Exception:  # noqa: BLE001 - an unlabelled retirement is the safe answer to any failure here
+        logger.warning("Task-outcome labelling failed; the tasks are retired without a label", exc_info=True)
+        return TaskOutcomesResponse()
 
 
 @router.post("/stages-concerned", response_model=StagesConcernedResponse)

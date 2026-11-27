@@ -133,6 +133,7 @@ export const zh: Record<keyof typeof en, string> = {
   'cl.approvedVersion': '已批准 v{approved} · 当前 v{current}',
   'cl.whatChanged': '自你批准的 v{approved} 以来的改动',
   'cl.committed': '已按你的常规决定策略提交，提交前已检查：{what}',
+  'cl.committedOn': '（在 v{given} 上给出；当前版本是 v{current}。）',
   'cl.title': '完成本阶段需要',
   'cl.finishNow': '完成——查看最终成果',
   'cl.done': '已完成 {met}/{total}',

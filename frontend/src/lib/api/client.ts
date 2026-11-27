@@ -1118,6 +1118,18 @@ export const api = {
   },
 
   /**
+   * Why each task the work moved past was closed (L-315): done (a fact reports
+   * it), replaced, or reworded, each with words found where it says. The tasks
+   * are already being retired; any failure labels nothing.
+   */
+  async agentTaskOutcomes(
+    req: { objective: string; tasks: { id: string; text: string; stage: string; current: string }[]; facts: { id: string; text: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ outcomes: { id: string; outcome: 'done' | 'replaced' | 'reworded' | 'gone'; quote?: string; now?: string }[] }> {
+    return apiFetch('/api/agent/task-outcomes', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  /**
    * Which sections of a reopened manuscript the reason concerns, and whether the
    * change is already in them (17 Nov). `checked: false` means no answer was had,
    * never "rewrite everything".
