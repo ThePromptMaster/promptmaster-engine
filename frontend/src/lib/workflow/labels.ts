@@ -57,6 +57,7 @@ const OPERATION_LABEL: Record<string, string> = {
   outreach_check: 'Checked against your Sent mail',
   outreach_message: 'AI draft',
   outreach_drafts: 'Emails made from the message',
+  outreach_research: 'Filled in from the web',
 };
 
 /**
@@ -70,7 +71,7 @@ const SAVED_OPERATIONS = new Set([
   'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
   'chat_save', 'chat_rows', 'literature_lookup', 'literature_search', 'sandbox_result', 'long_form_complete', 'manuscript_snapshot', 'finished_version',
   'assess_batch', 'carried_from_quick', 'example_prewritten',
-  'outreach_import', 'outreach_edit', 'outreach_check',
+  'outreach_import', 'outreach_edit', 'outreach_check', 'outreach_research',
 ]);
 
 export function isSaved(operation: string | null | undefined): boolean {

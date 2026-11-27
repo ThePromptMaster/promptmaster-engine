@@ -74,6 +74,8 @@ class SizeResponse(BaseModel):
     reason: str = ""
     #: "rule" when the request's own words decided it, "model" when a reading did.
     by: Literal["rule", "model", "default"] = "default"
+    #: Emails to a list (26 Nov): the start uses the Outreach workflow as it stands.
+    outreach: bool = False
 
 
 def _amount(match: re.Match[str]) -> float:
@@ -85,6 +87,22 @@ def stated_words(text: str) -> int | None:
     """The largest length the request states for the piece, in words, or None."""
     found = [_amount(m) for m in _WORDS.finditer(text)] + [_amount(m) * WORDS_PER_PAGE for m in _PAGES.finditer(text)]
     return int(max(found)) if found else None
+
+
+#: Emails to a list (26 Nov): each one is short, but the work is the list, the research, approval and sending.
+_OUTREACH = re.compile(
+    r"\b(outreach|cold[- ]e-?mails?|e-?mail campaign|mail ?merge|prospecting)\b"
+    r"|\b(personal|personali[sz]ed|custom|individual|tailored)\s+(notes?|e-?mails?|messages?)\b[^.\n]{0,40}\b(to|for)\s+each\b"
+    r"|\b(to|for|at)\s+each\s+(contact|company|person|lead|prospect|row|name|recipient|firm)\b"
+    r"|\b(list|csv|spreadsheet|export|clay)\b[^\n]{0,120}\b(e-?mail them|write to (them|each)|reach out|personal notes?|send (them|it|each|out))\b"
+    r"|\be-?mails?\b[^.\n]{0,40}\b(\d{1,4}|these|those|all (of )?(the |my |our )?)\s*(prospects|leads|contacts|companies|firms|names|rows)\b",
+    re.I,
+)
+
+
+def is_outreach(text: str) -> bool:
+    """Emails to a list of people or companies: never the one-stage workflow."""
+    return bool(_OUTREACH.search(text or ""))
 
 
 def asks_full_process(text: str) -> bool:
@@ -115,7 +133,7 @@ def size_by_rule(description: str) -> SizeResponse | None:
     if chapters or (words is not None and words >= FULL_WORDS):
         said = f"{chapters.group(1)} chapters" if chapters else f"about {words:,} words"
         return SizeResponse(depth="full", reason=f"The request asks for {said}, which is long work.", by="rule")
-    one_piece = not asks_full_process(text) and not several_deliverables(text)
+    one_piece = not asks_full_process(text) and not several_deliverables(text) and not is_outreach(text)
     if one_piece and words is not None and words <= CONCISE_WORDS:
         return SizeResponse(depth="concise", reason=f"The request asks for about {words:,} words, which is one sitting.", by="rule")
     return None
@@ -125,19 +143,22 @@ def at_least_standard(size: SizeResponse, description: str) -> SizeResponse:
     """A request for the full process is never the one-stage workflow, whatever a reading said."""
     if size.depth == "concise" and asks_full_process(description):
         return SizeResponse(depth="standard", reason="The request asks for the full project workflow.", by="rule")
+    if size.depth == "concise" and is_outreach(description):
+        return SizeResponse(depth="standard", reason="The request is emails to a list, each found, approved and sent.", by="rule")
     return size
 
 
 SIZE_INSTRUCTION = (
     "Someone has asked an assistant for a piece of work. Say how much process the work needs, from the "
     "request alone. Judge the work, not how long the request is: a long brief can ask for a short memo.\n\n"
-    "concise: one piece a capable person writes in one sitting and checks once. An email, a message, a "
+    "concise: one piece a capable person writes in one sitting and checks once. One email, a message, a "
     "short memo or note, a summary, an answer to a question, a one-page brief, a screen or assessment of "
     "one thing against a few stated criteria using only what was supplied, a short list, a rewrite of "
     "supplied text.\n\n"
     "standard: one deliverable that needs separate work before it is written, or a real review after: a "
     "report or proposal that has to be researched or analysed first, a plan with several parts that must "
-    "agree, a decision document weighing several options with figures, a package of a few documents.\n\n"
+    "agree, a decision document weighing several options with figures, a package of a few documents, "
+    "emails to a list of people or companies (outreach).\n\n"
     "full: long or many-part work. A book, a manuscript, a thesis, a long report in chapters, a study "
     "or investigation that runs over rounds, a programme of many documents.\n\n"
     "A request that says concise, brief, short or quick about the deliverable is concise unless it also "

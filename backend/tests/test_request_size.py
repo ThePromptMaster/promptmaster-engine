@@ -63,7 +63,7 @@ def test_the_endpoint_uses_a_small_model_and_a_rule_skips_it(client_for_app):
     assert mock.generate_json.call_args.kwargs["model"] == SIZE_MODEL
     mock.generate_json.reset_mock()
     res = client.post("/api/size-request", json={"description": "A 200 word thank-you note"})
-    assert res.json() == {"depth": "concise", "reason": "The request asks for about 200 words, which is one sitting.", "by": "rule"}
+    assert res.json() == {"depth": "concise", "reason": "The request asks for about 200 words, which is one sitting.", "by": "rule", "outreach": False}
     mock.generate_json.assert_not_called()
 
 
@@ -123,3 +123,35 @@ def test_a_reading_that_says_concise_is_raised_for_a_full_process_request(client
     res = client.post("/api/size-request", json={"description": LAUNCH})
     assert res.json()["depth"] == "standard"
     mock.generate_json.assert_called_once()
+
+
+@pytest.mark.parametrize("request_text, outreach", [
+    ("I have a list of 10 companies from Clay; find the right person, write a personal note to each and send", True),
+    ("Here is a CSV of contacts. Draft a personalised email to each and send them after I approve", True),
+    ("Email these 25 prospects about the beta", True),
+    ("Write an email to my landlord about the leak", False),
+    ("A memo on Q3 leads conversion", False),
+    ("Write a 300-word email to all the customers about the outage", False),
+])
+def test_emails_to_a_list_are_never_the_one_stage_workflow(request_text, outreach):
+    """26 Nov (Sean): each email is short, but the work is the list, the research, the approval and the send."""
+    from promptmaster.request_size import SizeResponse, is_outreach
+    assert is_outreach(request_text) is outreach
+    read = at_least_standard(SizeResponse(depth="concise", reason="An email.", by="model"), request_text)
+    assert (read.depth == "standard") is outreach
+    if outreach:
+        assert size_by_rule(request_text + " About 120 words each.") is None
+
+
+def test_the_size_says_when_a_request_is_emails_to_a_list():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"depth": "concise", "reason": "An email."}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        c = TestClient(app)
+        r = c.post("/api/size-request", json={"description": "I have a list of 10 companies from Clay; write a personal note to each and send"})
+        assert r.json()["outreach"] is True and r.json()["depth"] == "standard"
+        r = c.post("/api/size-request", json={"description": "Write an email to my landlord about the leak"})
+        assert r.json()["outreach"] is False
+    finally:
+        app.dependency_overrides.pop(get_client, None)

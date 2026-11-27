@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+
+import { blankContact, REASONS, type ContactRow } from './contacts';
+import { chooseCandidate, decideGroup, groupDecisions } from './decisions';
+
+const row = (id: string, patch: Partial<ContactRow>): ContactRow => ({ ...blankContact(id), status: 'decide', ...patch });
+
+// Sean, 26 Nov: an uncertain address or detail is a row to resolve; one press answers a group.
+describe('grouped decisions', () => {
+  const rows = [
+    row('a', { domain: 'acme.example', email: 'jo.b@acme.example', email_status: 'guess', reason: 'Guessed from x.y@acme.example S2; …' }),
+    row('b', { domain: 'acme.example', email: 'al.c@acme.example', email_status: 'guess', reason: 'Guessed from x.y@acme.example S2; …' }),
+    row('c', { domain: 'beta.example', email: 'info@beta.example', email_kind: 'general', reason: REASONS.generalInbox }),
+    row('d', { email: 'm@x.example', name: 'M', reason: 'Contacted before: 2026-03-22.' }),
+    row('e', { reason: 'The site lists only a contact form.' }),
+    row('f', { reason: 'Two people could be right: choose one.' }),
+    row('g', { status: 'ready', email: 'ok@x.example' }),
+  ];
+
+  it('groups rows that share a question; two people stay on their row', () => {
+    expect(groupDecisions(rows).map((g) => [g.key, g.rowIds])).toEqual([
+      ['contacted', ['d']],
+      ['guess:acme.example', ['a', 'b']],
+      ['general', ['c']],
+      ['not_found', ['e']],
+    ]);
+  });
+
+  it('one press decides the whole group, saying what was chosen', () => {
+    const [, guesses] = groupDecisions(rows);
+    const next = decideGroup(rows, guesses, 'use');
+    expect(next.filter((r) => ['a', 'b'].includes(r.id)).map((r) => [r.status, r.reason])).toEqual([
+      ['ready', 'You chose to use the guessed address.'],
+      ['ready', 'You chose to use the guessed address.'],
+    ]);
+    const notFound = groupDecisions(rows).find((g) => g.kind === 'not_found')!;
+    expect(decideGroup(rows, notFound, 'use').find((r) => r.id === 'e')!.status).toBe('decide');
+    expect(decideGroup(rows, notFound, 'skip').find((r) => r.id === 'e')).toMatchObject({ status: 'skip', reason: 'No address found.' });
+  });
+
+  it('choosing one of two people takes their details and source', () => {
+    const two = row('f', { reason: 'Two people could be right: choose one.', candidates: JSON.stringify([{ name: 'Ann Lee', role: 'COO', email: 'ann@acme.example', why: 'Runs ops', source: 'S3' }, { name: 'Bo Ray', role: 'VP', email: '', why: 'Supply', source: 'S3' }]) });
+    expect(chooseCandidate(two, 0)).toMatchObject({ name: 'Ann Lee', role: 'COO', email: 'ann@acme.example', email_status: 'verified', src_email: 'S3', status: 'ready' });
+    // No address yet: searched again for that person.
+    expect(chooseCandidate(two, 1)).toMatchObject({ name: 'Bo Ray', email: '', researched: '', reason: REASONS.noAddress });
+  });
+});

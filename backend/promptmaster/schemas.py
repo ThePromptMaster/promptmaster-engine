@@ -565,7 +565,7 @@ class SetupRationale(BaseModel):
     output_format: str = Field(default="")
 
 
-WorkflowKey = Literal["book", "research", "single_output", "exploration", "assessment"]
+WorkflowKey = Literal["book", "research", "single_output", "exploration", "assessment", "email_outreach"]
 
 
 class SetupSuggestion(BaseModel):

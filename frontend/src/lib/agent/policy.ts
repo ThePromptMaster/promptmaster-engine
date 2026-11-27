@@ -430,6 +430,10 @@ export function allowedActions(
   // and never over an existing outline, which is the user's editor.
   if (facts.outline && facts.outline.namedSections === 0) keys.push('generate_outline');
   if (facts.batch?.offered) keys.push('assess_batch');
+  // 27 Nov: an outreach round's own work. Research only with the web on, and waits on the page's run.
+  const outreach = facts.outreach;
+  if (outreach?.part === 'contacts' && outreach.webOn && ((outreach.researchLeft ?? 0) > 0 || outreach.running)) keys.push('research_contacts');
+  if (outreach?.messageEmpty || (outreach?.draftsBehind ?? 0) > 0) keys.push('draft_outreach');
   // B3: only the routine rows; a table with none left is the user's.
   if (facts.review && facts.review.routine.length > 0) keys.push('triage_findings');
   // 3 Oct: rows the draft left without a status get a proposal from their own

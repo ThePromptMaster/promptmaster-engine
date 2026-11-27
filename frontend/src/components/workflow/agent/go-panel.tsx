@@ -327,6 +327,13 @@ export function GoPanel({
       case 'paste_batch':
         needsActions?.showBatch?.();
         return;
+      case 'import_contacts': {
+        // The list's own box, on the Contacts stage (27 Nov).
+        const box = document.querySelector<HTMLElement>('[data-import-text]');
+        box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        box?.focus();
+        return;
+      }
       default:
         return;
     }

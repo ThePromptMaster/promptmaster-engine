@@ -24,10 +24,11 @@ import { EMAIL_OUTREACH_V1 } from '../src/lib/workflow/templates/email-outreach.
 const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1, QUICK_V1, EMAIL_OUTREACH_V1];
 
 /**
- * Seeded but not offered on the start screen yet (26 Nov): Outreach is built over several
- * releases, and its sending arrives after its first. A later migration lists it.
+ * System workflows seeded but not offered on the start screen. Empty now: email_outreach was
+ * seeded unlisted (26 Nov) and listed by 20261222000100_outreach_listed.sql once it could
+ * research, draft and send.
  */
-const UNLISTED = new Set(['email_outreach']);
+const UNLISTED = new Set<string>([]);
 
 const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 

@@ -82,6 +82,8 @@ type Need =
   | { kind: 'large_job'; stageId: string; sections: number }
   /** An Assess stage with nothing to judge: only the user can paste what it judges (6 Nov). */
   | { kind: 'paste_batch'; stageId: string; noun: string | null }
+  /** An outreach list with no contacts: only the user can bring the list (27 Nov). */
+  | { kind: 'import_contacts'; stageId: string }
   | { kind: 'triage_findings'; stageId: string; count: number }
   /**
    * A repair that did not settle (13 Oct, Sean: "The recovery should identify
@@ -438,6 +440,7 @@ export function needHeading(need: NeedsUser): 'suggestion' | 'repair' | 'decisio
     case 'continue_budget':
     case 'unblock_stage':
     case 'paste_batch':
+    case 'import_contacts':
     case 'set_objective':
       return 'waiting';
     default:
@@ -798,6 +801,28 @@ export function requiredWork(input: {
     };
   }
 
+  if (can('research_contacts')) {
+    const left = facts.outreach?.researchLeft ?? 0;
+    return {
+      key: 'research_contacts',
+      rationale: facts.outreach?.running
+        ? `You are filling in the blanks on ${stage.label}; Go waits for it.`
+        : `${stage.label} has ${left} contact${left === 1 ? '' : 's'} missing a person, an address or a detail.`,
+      expected: 'Each value found saved with the page it came from; an uncertain address or person left for you to decide.',
+    };
+  }
+  if (can('draft_outreach')) {
+    return {
+      key: 'draft_outreach',
+      rationale: facts.outreach?.messageEmpty
+        ? `${stage.label} has no standard message yet.`
+        : `${stage.label}'s emails do not match the contacts and the message yet.`,
+      expected: facts.outreach?.messageEmpty
+        ? 'The standard first email and a follow-up, written from the brief.'
+        : 'An email per ready contact, made from the message; edits made by hand kept.',
+    };
+  }
+
   if (facts.batch?.offered && can('assess_batch')) {
     return {
       key: 'assess_batch',
@@ -1021,6 +1046,8 @@ export function needsUser(input: {
   // Nothing to judge yet, and nothing Go can fetch: said plainly, before any planner
   // call. Left to the planner it told testers to "attach a data file" (6 Nov, production).
   if (facts.batch && !facts.batch.offered) return { kind: 'paste_batch', stageId: stage.id, noun: facts.batch.noun };
+  // The same for an outreach list with no contacts: left to the planner, it sent the user to the Data panel (26 Nov).
+  if (facts.outreach?.part === 'contacts' && facts.outreach.empty && !facts.outreach.running) return { kind: 'import_contacts', stageId: stage.id };
 
   // FR-18: a large drafting run under Autonomous is a spend the user confirms.
   if (policy === 'autonomous' && allowed.includes('draft_sections') && facts.manuscript) {
@@ -1153,6 +1180,8 @@ export function needStillHolds(
       return input.state.stages[need.stageId]?.status === 'blocked';
     case 'paste_batch':
       return Boolean(input.facts.batch);
+    case 'import_contacts':
+      return Boolean(input.facts.outreach?.empty);
     case 'wait_for_jobs':
       return (input.facts.manuscript?.pendingJobs.length ?? 0) > 0;
     case 'repair_stuck':
@@ -1363,6 +1392,8 @@ export function describeNeed(
         message: t('need.pasteBatch', { items: need.noun ? word(need.noun) : t('need.pasteItems'), button: t('assess.run') }),
         action: t('need.showBox'),
       };
+    case 'import_contacts':
+      return { message: t('need.importContacts', { button: t('outreach.importNext') }), action: t('need.showImport') };
     case 'decide_rows':
       if (need.proposed) {
         const rest = need.count - need.proposed;

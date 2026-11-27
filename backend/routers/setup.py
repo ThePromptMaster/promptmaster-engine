@@ -16,7 +16,7 @@ from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, PMInput, SavedSource, SetupSuggestion, ThirdPartyItem, WebUse
 from promptmaster.project_context import brought_titles
 from promptmaster import web_search
-from promptmaster.request_size import SizeRequest, SizeResponse, size_request
+from promptmaster.request_size import SizeRequest, SizeResponse, is_outreach, size_request
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.front_door import BRIEF_FIELDS, DraftBrief, FrontDoorTurn, Turn, front_door_turn
@@ -188,7 +188,9 @@ async def api_size_request(
     """How much process a request needs: concise, standard or full (11 Nov). A rule
     where the request's own words settle it, else 1 small LLM call; saves nothing,
     and never fails: an unreadable answer is `standard`."""
-    return await size_request(client, req)
+    size = await size_request(client, req)
+    size.outreach = is_outreach(req.description)
+    return size
 
 
 class ReviseWorkflowRequest(BaseModel):

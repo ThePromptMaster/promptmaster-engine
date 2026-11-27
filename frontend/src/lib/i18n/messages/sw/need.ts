@@ -52,6 +52,8 @@ export const sw: Record<keyof typeof en, string> = {
   'need.pasteBatch': 'Hatua hii hutathmini unachoipa, na bado haina chochote. Bandika {items} kwenye kisanduku cha hatua hii kisha ubonyeze {button}. Nitaendelea kutoka hapo.',
   'need.pasteItems': 'vipengee',
   'need.showBox': 'Nenda kwenye kisanduku',
+  'need.importContacts': 'Hatua hii inahitaji orodha yako ya watu wa kuwasiliana nao, na bado haina. Ibandike, au chagua faili ya CSV au Excel (kutoka Clay au popote), kwenye kisanduku cha hatua hii kisha ubonyeze {button}. Nitaendelea kutoka hapo.',
+  'need.showImport': 'Nenda kwenye orodha',
   'need.triage_one': 'Tokeo {count} kubwa au lisilopimwa ni lako kuamua: kubali, kataa au ahirisha kila moja kwenye jedwali hapa chini.',
   'need.triage_other': 'Matokeo {count} makubwa au yasiyopimwa ni yako kuamua: kubali, kataa au ahirisha kila moja kwenye jedwali hapa chini.',
   'need.repairs_one': 'Urekebishaji {count} wa {stage}',

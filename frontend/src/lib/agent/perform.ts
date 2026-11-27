@@ -56,6 +56,7 @@ import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage, decidedWords, isTriageTable, recordedDecisions, splitUntriaged } from '@/lib/workflow/triage';
 import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
+import { performOutreach, type OutreachActionKey } from '@/lib/agent/perform-outreach';
 import { restoreDecided } from '@/lib/workflow/commit-check';
 import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict';
 import { proposeTargets } from '@/lib/workflow/proposals';
@@ -1936,6 +1937,12 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       } finally {
         releaseAssess(lockKey, 'go');
       }
+    }
+
+    case 'outreach': {
+      // 27 Nov (Sean): Go researches and drafts an outreach round; approving and sending stay the user's.
+      const r = await performOutreach(key as OutreachActionKey, ctx, (res) => keepWeb(ctx, res, ctx.stage));
+      return done(key, { status: r.status, output: r.output, toolsUsed: r.toolsUsed, changes: r.versionIds.length ? { version_ids: r.versionIds } : {} });
     }
 
     case 'confirm': {

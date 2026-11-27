@@ -746,6 +746,14 @@ export const api = {
   },
 
   /** The standard outreach message and its follow-up, from the brief (26 Nov). A writer: may search the web. */
+  /** Fill in up to five contacts from the web, each value with its source (27 Nov). Saves nothing; 409 while Web access is off. */
+  researchContacts(
+    req: { inputs: PMInput; brief: string; rows: import('@/lib/outreach/research').ResearchRow[]; web_access: 'on' | 'off' },
+    signal?: AbortSignal
+  ): Promise<import('@/lib/outreach/research-run').ResearchResponse> {
+    return apiFetch('/api/outreach/research', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   draftOutreachMessage(req: { inputs: PMInput; brief: string; model?: string; web_access?: 'on' | 'off' }): Promise<OutreachDraftedMessage> {
     return apiFetch('/api/outreach/draft-message', { method: 'POST', body: JSON.stringify(req) });
   },

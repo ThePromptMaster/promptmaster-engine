@@ -25,6 +25,7 @@ from promptmaster.errors import PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.outreach_drafting import DraftedMessage, draft_message
+from promptmaster.outreach_research import MAX_ROWS as RESEARCH_ROWS, READ_MODEL, ResearchedRow, ResearchRow, research
 from promptmaster.schemas import PMInput, WebUse
 from promptmaster.web_search import WebAccess, with_web
 from routers._errors import llm_http_error
@@ -157,6 +158,40 @@ async def api_draft_message(req: DraftMessageRequest, client: OpenRouterClient =
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
     return DraftMessageResponse(**message.model_dump(), **web.model_dump(), model_used=_model_used(req.model, client))
+
+
+WEB_NEEDED = "Filling in the blanks searches the web: turn on Web access for this project first."
+
+
+class ResearchRequest(BaseModel):
+    inputs: PMInput
+    #: The Brief stage's text: who the right person is depends on it.
+    brief: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
+    rows: list[ResearchRow] = Field(default_factory=list, max_length=RESEARCH_ROWS)
+    web_access: WebAccess = "off"
+
+
+class ResearchResponse(WebUse):
+    rows: list[ResearchedRow] = Field(default_factory=list)
+    model_used: str = ""
+
+
+@router.post("/research")
+async def api_research(req: ResearchRequest, client: OpenRouterClient = Depends(get_client)) -> ResearchResponse:
+    """Fill in up to five contacts from the web, each value with its source (`promptmaster/outreach_research.py`).
+
+    At most two searches per contact and one model call for all of them. Refused while the
+    project's Web access is off: an address is only ever what a page shows.
+    """
+    if req.web_access != "on":
+        raise HTTPException(status_code=409, detail=WEB_NEEDED)
+    if not req.rows:
+        return ResearchResponse()
+    try:
+        rows, sources, queries, _usage = await research(client, req.inputs, req.brief, req.rows)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
+    return ResearchResponse(rows=rows, web_sources=sources, web_query=" · ".join(queries)[:300], model_used=READ_MODEL)
 
 
 # ---------------------------------------------------------------------------

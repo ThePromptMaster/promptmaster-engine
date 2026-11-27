@@ -20,6 +20,9 @@ import {
 } from '@/lib/outreach/contacts';
 import { applyHistory, domainOf, guessMapping, inboxKind, isWebmail, markDuplicates, nextImportId, rowsFromCompanyList, rowsFromTable } from '@/lib/outreach/import';
 import { asEarlierContact, listHistory, listSuppressions, recordContact, suppress } from '@/lib/supabase/outreach-contacts';
+import { chooseCandidate, decideGroup } from '@/lib/outreach/decisions';
+import { numberedSources } from '@/lib/workflow/sources';
+import { DecisionGroups, ResearchBar, StartFiles } from './contacts-research';
 import type { OutreachContext } from '@/components/workflow/renderers/types';
 
 const MAPPED: readonly MappedField[] = ['name', 'first_name', 'last_name', 'role', 'company', 'website', 'email', 'linkedin'];
@@ -63,6 +66,8 @@ export function ContactsPart({ context, stageId, readOnly }: { context: Outreach
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(doc.items.length === 0);
   const userId = context.project.user_id;
+  // [S n] on a row links to the page it came from.
+  const sourceUrls = useMemo(() => new Map(numberedSources(context.project.sources).map((e) => [`S${e.n}`, e.source.url])), [context.project.sources]);
 
   const save = async (next: ContactsDocument, operation: string, summary: string) => {
     await context.save(stageId, serializeContacts(next), operation, summary);
@@ -175,10 +180,20 @@ export function ContactsPart({ context, stageId, readOnly }: { context: Outreach
       )}
       {said && <p role="status" className="rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-label text-[var(--on-surface)]">{said}</p>}
       {error && <p role="alert" className="text-label text-[var(--pm-error)]">{error}</p>}
+      {doc.items.length > 0 && <ResearchBar context={context} stageId={stageId} content={context.parts.contacts?.content} readOnly={readOnly} />}
+      <DecisionGroups
+        rows={doc.items}
+        busy={busy}
+        readOnly={readOnly}
+        onDecide={(group, answer) =>
+          act(`group:${group.key}`, () => save({ ...doc, items: decideGroup(doc.items, group, answer) }, 'outreach_edit', `${answer === 'use' ? 'Kept' : 'Skipped'} ${group.rowIds.length} contact${group.rowIds.length === 1 ? '' : 's'} (${group.kind.replace('_', ' ')}).`))
+        }
+      />
 
       {!readOnly && adding && !pending && (
         <div data-import className="space-y-2 rounded-xl bg-[var(--surface-container-low)] p-4">
           <p className="text-body text-[var(--on-surface)]">{t('outreach.importLead')}</p>
+          <StartFiles files={context.project.data_files ?? []} busy={busy !== null} onUse={(raw, name) => prepare(raw, `file: ${name}`)} />
           <textarea
             className={`${field} min-h-[140px] font-mono text-label`}
             value={text}
@@ -265,6 +280,8 @@ export function ContactsPart({ context, stageId, readOnly }: { context: Outreach
                   await updateRow(r.id, { contacted: JSON.stringify({ address: r.email.toLowerCase(), on: on || undefined, source: 'manual' } satisfies EarlierContact), status: 'decide', reason: `Contacted before: ${on || 'date unknown'}.` }, `Recorded earlier contact with ${r.name || r.email}.`);
                 })
               }
+              sourceUrls={sourceUrls}
+              onChoose={(i) => act(`choose:${r.id}`, () => updateRow(r.id, chooseCandidate(r, i), `Chose who to write to at ${r.company}.`))}
               onSuppress={() =>
                 act(`supp:${r.id}`, async () => {
                   await suppress(userId, { address: r.email });
@@ -296,8 +313,10 @@ function withEdit(row: ContactRow, patch: Partial<Pick<ContactRow, 'name' | 'rol
   return initialStatus({ ...row, ...next, ...kept }) as Partial<ContactRow>;
 }
 
-function ContactLine({ row, open, onToggle, readOnly, busy, reason, onReady, onSkip, onEdit, onContactedBefore, onSuppress }: {
+function ContactLine({ row, open, onToggle, readOnly, busy, reason, onReady, onSkip, onEdit, onContactedBefore, onSuppress, onChoose, sourceUrls }: {
   row: ContactRow;
+  onChoose: (index: number) => void;
+  sourceUrls: ReadonlyMap<string, string>;
   open: boolean;
   onToggle: () => void;
   readOnly: boolean;
@@ -312,6 +331,7 @@ function ContactLine({ row, open, onToggle, readOnly, busy, reason, onReady, onS
   const t = useT();
   const given = parseJson<Record<string, string>>(row.given) ?? {};
   const contacted = parseJson<EarlierContact>(row.contacted);
+  const candidates = parseJson<{ name: string; role: string; email: string; why: string; source: string }[]>(row.candidates) ?? [];
   const colleague = parseJson<EarlierContact>(row.colleague);
   const added = new Set(row.added.split(',').filter(Boolean));
   const [form, setForm] = useState({ name: row.name, role: row.role, email: row.email, company: row.company });
@@ -357,13 +377,27 @@ function ContactLine({ row, open, onToggle, readOnly, busy, reason, onReady, onS
               {added.size || row.detail ? (
                 <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 text-label">
                   {[...added].map((k) => (
-                    <div key={k} className="contents"><dt className="text-[var(--on-surface-variant)]">{k}</dt><dd className="break-words text-[var(--on-surface)]">{String(row[k] ?? '')} {sourceChip(row, k)}</dd></div>
+                    <div key={k} className="contents"><dt className="text-[var(--on-surface-variant)]">{k}</dt><dd className="break-words text-[var(--on-surface)]">{String(row[k] ?? '')} {sourceChip(row, k, sourceUrls)}</dd></div>
                   ))}
-                  {row.detail && <div className="contents"><dt className="text-[var(--on-surface-variant)]">{t('outreach.detail')}</dt><dd className="break-words text-[var(--on-surface)]">{row.detail} {row.src_detail && <span className="text-[var(--pm-primary)]">[{row.src_detail}]</span>}</dd></div>}
+                  {row.detail && <div className="contents"><dt className="text-[var(--on-surface-variant)]">{t('outreach.detail')}</dt><dd className="break-words text-[var(--on-surface)]">{row.detail} {sourceChip(row, 'detail', sourceUrls)}</dd></div>}
                 </dl>
               ) : <p className="text-label text-[var(--on-surface-variant)]">{t('outreach.nothingAdded')}</p>}
             </div>
           </div>
+          {!readOnly && candidates.length > 0 && !row.name.trim() && (
+            <div className="space-y-1.5 rounded-lg bg-[var(--surface-container-lowest)] p-2.5" data-candidates>
+              <p className="text-label font-semibold text-[var(--on-surface)]">{t('outreach.whoShouldItBe')}</p>
+              {candidates.map((c, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 text-label">
+                  <span className="min-w-0 flex-1 text-[var(--on-surface)]">
+                    {c.name}{c.role ? `, ${c.role}` : ''}{c.email ? ` · ${c.email}` : ''} <span className="text-[var(--on-surface-variant)]">{c.why}</span>{' '}
+                    {sourceLink(c.source, sourceUrls)}
+                  </span>
+                  <button type="button" className={quiet} disabled={busy !== null} onClick={() => onChoose(i)} data-choose-candidate>{t('outreach.chooseThem', { name: c.name })}</button>
+                </div>
+              ))}
+            </div>
+          )}
           {contacted?.thread_url && <a href={contacted.thread_url} target="_blank" rel="noreferrer" className="text-label text-[var(--pm-primary)] hover:underline">{t('outreach.openThread')}</a>}
           {!readOnly && (
             <>
@@ -406,8 +440,18 @@ function ContactLine({ row, open, onToggle, readOnly, busy, reason, onReady, onS
   );
 }
 
-function sourceChip(row: ContactRow, field: string) {
-  const src = field === 'email' ? row.src_email : field === 'role' ? row.src_role : '';
-  return src && src !== 'import' ? <span className="text-[var(--pm-primary)]">[{src}]</span> : null;
+function sourceChip(row: ContactRow, field: string, urls: ReadonlyMap<string, string>) {
+  const src = field === 'email' ? row.src_email : field === 'role' ? row.src_role : field === 'name' ? row.src_name ?? '' : field === 'detail' || field === 'personal_line' ? row.src_detail : '';
+  return src && src !== 'import' ? sourceLink(src, urls) : null;
+}
+
+/** [S n] as a link to the page it names, when the project holds it; the word otherwise ("you", "mailbox"). */
+function sourceLink(src: string, urls: ReadonlyMap<string, string>) {
+  const url = urls.get(src);
+  return url ? (
+    <a href={url} target="_blank" rel="noreferrer" className="text-[var(--pm-primary)] hover:underline" data-source-link>[{src}]</a>
+  ) : (
+    <span className="text-[var(--pm-primary)]">[{src}]</span>
+  );
 }
 

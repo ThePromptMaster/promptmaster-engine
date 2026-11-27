@@ -5862,3 +5862,54 @@ the person's choice. A draft left behind by a failed attempt stays in Drafts and
   no longer offers a From name and says where to change it in Gmail; the approved record and the previews carry the
   address only, so "what the recipient was sent" never names a sender they did not see. PromptMaster never changes
   the Gmail setting itself.
+
+### L-308 — Filling in the blanks: "verified" means a page shows it (2026-11-27)
+Sean, 26 Nov: a list missing a contact's name, title, email or a personal detail is completed by
+PromptMaster with the source shown, a named person before a general inbox, and the reason given when
+nothing is found.
+- **How.** "Fill in the blanks" on Contacts, and Go's `research_contacts`, search for the rows missing
+  a person, an address or a detail, five a call (`POST /api/outreach/research`).
+  - Code writes at most two queries per contact from the row alone.
+  - One model call reads every page; code then keeps each value only where a page shows it.
+  - Each kept value cites its page as [S n], saved to the project's sources and linked from the row.
+- **An address.**
+  - It is *verified* only when it appears, character for character, on a page the search returned.
+  - One no page shows is dropped, whoever proposed it.
+  - A *guess* is made only by code: from a colleague's address that a page shows with that colleague's name
+    (jane.doe@ gives first.last@). It is always a row for the user ("Guessed from … [S n]"), never ready by
+    itself.
+- **The rest.**
+  - A name, role or candidate is kept only when its page names them.
+  - A detail is kept only when most of its words are on its page, and the personal line only with it.
+  - Values the list had are never replaced.
+- **Decisions.** Rows waiting on the user are grouped by question under "Needs you", and one press answers
+  a group: contacted before, guessed addresses at one domain, a general inbox only, an address with no name,
+  no address found. Choosing between two people stays on the row.
+
+Limits:
+- No email-finder service. An address a company does not publish is not found; a guess is offered only
+  when a page shows a colleague's address with their name.
+- The search sees what Exa returns for each page, which can be part of a page. An address further down a
+  long page may be missed.
+- A row is searched once (`researched`); choosing a person with no address sends it back for one more search.
+- Research needs the project's Web access on. With it off, Go does not search and the button says why.
+- Reasons are stored in English. "Guessed from …" and the page's own "why" are shown as written in every
+  interface language.
+- Cost: per five contacts, up to ten searches on Haiku 5.5 with Exa, plus one Sonnet 5.5 read.
+
+### L-309 — Go on an outreach round, and the start choosing it (2026-11-27)
+- **Go's moves.** Go fills in the blanks (`research_contacts`), writes the standard message when there
+  is none, and makes an email per ready contact (`draft_outreach`).
+  - All three are gated on the stage's facts (`lib/outreach/go-work.ts`), never on the workflow key.
+  - Go never approves or sends: no action does it, and a test scans every file Go runs for the approval
+    and sending code (`lib/agent/outreach-go.test.ts`). The round's sign-off is the user's.
+- **An empty list.** Go asks for the list in words that name the box on the stage. Left to the planner, it
+  sent the user to "Attach a data file in the Data panel" (26 Nov). A table attached at the start is
+  offered on the box as the list.
+- **The start.**
+  - A request for emails to a list (`request_size.is_outreach`, a rule) is never sized concise.
+  - It uses the Outreach workflow as it stands, with nothing designed. The setup suggester may also pick
+    `email_outreach`.
+  - The workflow is listed on the start screen (`20261222000100_outreach_listed.sql`).
+- **Limit.** The rule reads the request's words. "Email all the customers about the outage" is one email,
+  not outreach. A list described in other words is left to the setup suggester's reading.
