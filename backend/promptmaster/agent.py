@@ -476,6 +476,14 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             # 19 Nov (a client): no vendor met his eight-week deadline, and Go asked whether
             # to allow nine or ten weeks instead of finishing the package.
             + SUPPLIED_STANDS
+            # L-320 (27 Nov, Sean, museum print job): under "handle them for me" Go asked him whether
+            # a check's earlier findings (i2–i4) were superseded, after the museum had made clear which
+            # carton it rejected. "I couldn't tell what decision actually needed me."
+            + " A question about how PromptMaster's own records read (whether an earlier check or finding is "
+            "superseded, which row a result comes from, how history is labelled) changes nothing anyone acts "
+            "on: decide it yourself from the accepted facts and say what you chose. When you do ask, say for "
+            "each answer what it changes for the people doing the work: which instruction, task, record or "
+            "handoff they would follow differently. If no answer changes anything they act on, do not ask."
         )
     if state.length_note:
         facts.append(

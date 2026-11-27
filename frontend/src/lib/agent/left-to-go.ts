@@ -39,8 +39,21 @@ export function askedIds(params: Readonly<Record<string, unknown>> | null | unde
  * `params.finding_id`; read from the text alone, nothing was named, so the answer
  * decided nothing and the question also said "approving leaves it open").
  */
+/**
+ * "i2–i4", "F3-F5", "items 2 to 4" of one prefix written out as each id, so a range names its middle
+ * too (L-320, 27 Nov; Sean, museum: "i2–i4" named i2 and i4, never i3). At most twenty in a range.
+ */
+export function expandRanges(text: string): string {
+  return text.replace(/\b([A-Za-z]{1,4})(\d{1,3})\s*(?:[–—-]|\bto\b|\bthrough\b)\s*(?:\1)?(\d{1,3})\b/g, (all, prefix: string, a: string, b: string) => {
+    const from = Number(a);
+    const to = Number(b);
+    if (!(to > from) || to - from > 20) return all;
+    return Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${from + i}`).join(', ');
+  });
+}
+
 export function namedRows(texts: readonly string[], open: readonly OpenRow[], asked: readonly string[] = []): NamedRow[] {
-  const said = texts.filter(Boolean).join('\n');
+  const said = expandRanges(texts.filter(Boolean).join('\n'));
   const out: NamedRow[] = [];
   for (const r of open) {
     if (!r.id || out.some((x) => x.id === r.id && x.stageId === r.stageId)) continue;

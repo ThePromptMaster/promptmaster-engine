@@ -6208,6 +6208,11 @@ Two more cases of the same check, from Sean's 27 Nov tests:
   a line that labels the id counts ("**D2.**", "D2:", "| D2 |", a heading), and the best pair of its lines is
   compared. A refused revision's text is kept on its step.
 
+A production pass on a rebuilt Calder project found the passage too wide: a table row naming both finalists
+("**Morgan Lee:** Calder calls… **Alex Rivera:** one call…") was read whole as Alex's, and the repair was refused
+for Morgan's CAL-01. It is now read sentence by sentence, and a mention said of someone else in its own words
+("Lee: CAL-01", "CAL-01's terms for Lee", "CAL-01 (Lee only)") is not Alex's.
+
 Limits:
 - A scope is a capitalised name of up to four words. "For the North division only" is not read as a scope.
 - An id is capital letters then digits; "q3" or "v2" are not ids.
@@ -6241,4 +6246,38 @@ Limits:
 - "Listed among several" is read from brackets and list commas; a part described only in prose elsewhere is
   not.
 - A part with no heading of its own in the stage that writes it is not counted ("not verified").
+
+### L-320 — Under "Handle them for me", an approved version is left alone and a stop says what it changes (2026-11-28)
+Sean, 27 Nov, museum print job:
+- "with 'Handle them for me' selected, Go asked me to interpret 'i2–i4' when the museum had already made clear
+  which carton it rejected";
+- "after I approved v8, it asked me to approve v9 for wording changes";
+- "I'd like routine edits to keep moving, and when it does stop, I'd like the question to tell me what my choice
+  changes for the people doing the work."
+
+What happened: v8 was a repair, and Go asked for its approval before checking it. Once approved, Go checked
+v8, applied three wording findings as v9, and the approval no longer held (L-117), so it asked again. The i5
+question was a major finding whose change only relabelled earlier findings ("Treat i2–i4 as superseded
+history"), so it was the user's by severity.
+
+Now:
+- **A version the user approved is not polished afterwards** (`approvedHead`, `lib/agent/facts.ts`): Go offers no
+  check, revision or findings on it. A change that reopens it is still repaired.
+- **A re-approval is asked of checked work** (`reapprovalDue`): when the user's approval was given on an earlier
+  version, the current one is checked and its findings applied before the user is asked again.
+- **A stop asks about the version it names** (`checkedVersionId`): a newer version, or a check of the current one
+  made after the stop that found something, ends it; Go asks again of what the stage holds (a peer's trace of
+  Sean's Alder and Morrow runs: a v3 refusal shown on v4, and "Approve and resume" kept after the user's own
+  check flagged a contradiction).
+- **Record-keeping findings are Go's** (`onlyRecordKeeping`): a finding whose change only relabels earlier
+  findings as superseded or history is routine whatever its severity.
+- **"i2–i4" names i3** (`expandRanges`), so an answer about a range decides every finding in it.
+- **The planner's rule under "handle them for me"**: a question about how PromptMaster's own records read is
+  decided, not asked; a question that is asked says, for each answer, what it changes for the people doing the
+  work, and one whose answers change nothing they act on is not asked.
+
+Limits:
+- The approval rule is unchanged: an approval stands for the version it was given on (L-117). The fix is that
+  Go no longer makes a new version of approved work for wording.
+- "What it changes for the people doing the work" is a planner instruction, not checked in code.
 

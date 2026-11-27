@@ -703,6 +703,9 @@ def test_under_handle_the_planner_makes_routine_choices_itself():
     """Q1b (production, 9 Oct): Go asked the user for a pendulum's L, g and amplitudes."""
     _, handled = build_next_action_prompt(INPUTS, STATE.model_copy(update={"routine_decisions": "handle"}), RESEARCH, "autonomous")
     assert "ROUTINE DECISIONS ARE YOURS" in handled
+    # L-320: a question about PromptMaster's own records is Go's; a question says what it changes.
+    assert "how PromptMaster's own records read" in handled
+    assert "what it changes for the people doing the work" in handled
     assert "parameter values, units, which cases and how many" in handled
     _, asked = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
     assert "ROUTINE DECISIONS ARE YOURS" not in asked

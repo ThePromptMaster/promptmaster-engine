@@ -46,6 +46,12 @@ type Need =
        */
       checkReason?: string;
       /**
+       * The version the stop asks about (L-320; a peer's trace of Sean's 27 Nov Alder run: a refusal
+       * written on v3 was shown on v4, which had different findings). A newer version ends the stop,
+       * and it is asked again of what the stage holds now.
+       */
+      checkedVersionId?: string;
+      /**
        * Undecided findings on other stages that block finishing (2 Nov, after
        * Sean's 1 Nov recruitment plan: Go asked "I approve this plan" while
        * Check's i11 was still open, and the request did not say so). They are
@@ -877,6 +883,26 @@ export function requiredWork(input: {
     };
   }
 
+  // An approval given on an earlier version, the stage changed since: the current version is checked and its
+  // findings applied before the user is asked again, as for a first approval (L-320, museum print job: v8, a
+  // repair, was put to the user unchecked; once approved, a check of it made v9 and a second question).
+  if (facts.reapprovalDue && !onlyApprovalLeft(stageEvaluation) && facts.draft && !input.asItStands) {
+    const findings = facts.evaluationFindings;
+    if (findings?.aboutHead && findings.count > 0 && can('apply_findings')) {
+      return {
+        key: 'apply_findings',
+        rationale: `Your approval of ${stage.label} was given on an earlier version, and the check of this one raised ${findings.count} finding${findings.count === 1 ? '' : 's'} Go can fix before asking you again.`,
+        expected: 'A new version with the findings applied.',
+      };
+    }
+    if (!facts.draft.checked && can('evaluate_stage')) {
+      return {
+        key: 'evaluate_stage',
+        rationale: `Your approval of ${stage.label} was given on an earlier version; checking this one first, so what you approve again has been checked.`,
+        expected: 'A check of the current version against the objective.',
+      };
+    }
+  }
   if (!onlyApprovalLeft(stageEvaluation)) return null;
   // A table (review, list) has no draft to check or apply findings to, but
   // its routine approval is still Go's to commit. Until 2 Nov it fell through
@@ -1122,6 +1148,7 @@ export function needsUser(input: {
       ...(c.hint ? { hint: c.hint } : {}),
       ...(authority ? { authority } : {}),
       ...(refusal ? { checkReason: refusal } : {}),
+      ...(facts.headVersionId ? { checkedVersionId: facts.headVersionId } : {}),
       ...(input.openElsewhere?.length ? { openRows: input.openElsewhere.slice(0, 12) } : {}),
     };
   }
@@ -1191,11 +1218,19 @@ export function needStillHolds(
       // used-up repair again, and round it went (15 Oct, HARBOR). It holds
       // while the stage is still waiting for its recheck.
       return input.state.stages[need.stageId]?.status === 'stale';
-    case 'tick_criterion':
+    case 'tick_criterion': {
+      // Asked of a version the stage no longer holds: asked again of the one it does (L-320).
+      if (need.checkedVersionId && input.facts.headVersionId && need.checkedVersionId !== input.facts.headVersionId) return false;
+      // A check of the current version made after the stop found something: the approval is not asked
+      // as it stood (a peer's trace of Sean's Morrow run: "Approve and resume" stayed after the user's own
+      // check flagged a contradiction).
+      const checked = input.facts.evaluationFindings;
+      if (need.raisedAt && checked?.aboutHead && checked.count > 0 && checked.at && Date.parse(checked.at) > Date.parse(need.raisedAt)) return false;
       // Asked for directly: the box is either still unticked or it is not.
       // (Going back through needsUser would drop a request raised while other
       // moves were still on offer — see the 'complete' performer.)
       return input.stageEvaluation.unmet.some((c) => c.id === need.criterionId);
+    }
     default: {
       const now = needsUser(input);
       return Boolean(now && now.kind === need.kind);
