@@ -624,11 +624,12 @@ function namesScope(line: string, scope: string): boolean {
 }
 
 /**
- * The lines about one person or thing: a line that names it, and every line of a
- * section whose heading names it, up to the next heading at its level or above
- * (L-318: Alex Rivera's block in a handoff, not Morgan Lee's).
+ * The pieces about one person or thing (L-318): every sentence of a section whose heading names it, up
+ * to the next heading at its level or above, and elsewhere a sentence that names it itself. A line that
+ * names two people ("**Morgan Lee:** Calder calls… **Alex Rivera:** one call…") is read sentence by
+ * sentence, so Morgan's terms are not read as Alex's (27 Nov, production pass of the Calder fix).
  */
-function linesAbout(lines: readonly string[], scope: string): string[] {
+function piecesAbout(lines: readonly string[], scope: string): string[] {
   const out: string[] = [];
   let within: number | null = null;
   for (const line of lines) {
@@ -640,9 +641,28 @@ function linesAbout(lines: readonly string[], scope: string): string[] {
       if (within !== null && level <= within) within = null;
       if (namesScope(heading ? heading[2] : (bold as RegExpExecArray)[1], scope)) within = level;
     }
-    if (within !== null || namesScope(t, scope)) out.push(line);
+    for (const piece of sentencesOf(line)) if (within !== null || namesScope(piece, scope)) out.push(piece);
   }
   return out;
+}
+
+/**
+ * A mention of a value tied to someone else in its own words: "Lee: CAL-01", "CAL-01's terms for Lee",
+ * "CAL-01 (Lee only)". Read for a replacement limited to one person, where the old value stays true for
+ * everyone else (L-318).
+ */
+function tiedToSomeoneElse(piece: string, raw: string, scope: string): boolean {
+  const scopeWords = new Set(scope.toLowerCase().split(/\s+/));
+  const other = (name: string | undefined) => Boolean(name) && !scopeWords.has(name!.toLowerCase());
+  for (let at = piece.indexOf(raw); at >= 0; at = piece.indexOf(raw, at + raw.length)) {
+    const before = piece.slice(Math.max(0, at - 40), at);
+    const after = piece.slice(at + raw.length, at + raw.length + 40);
+    const named = /([A-Z][\p{L}'’-]+)\s*:\s*(?:\*\*)?\s*$/u.exec(before)?.[1];
+    const forWhom = /^(?:['’]s)?[^.;|]{0,20}?\b(?:for|to|of)\s+(?:[A-Z][\p{L}'’-]+\s+)?([A-Z][\p{L}'’-]+)/u.exec(after)?.[1];
+    const only = /^\s*\(\s*(?:[A-Z][\p{L}'’-]+\s+)?([A-Z][\p{L}'’-]+)\s+only\s*\)/u.exec(after)?.[1];
+    if (!(other(named) || other(forWhom) || other(only))) return false;
+  }
+  return true;
 }
 
 /**
@@ -671,7 +691,7 @@ export function leftoverMentions(
   const scopedPieces = new Map<string, string[]>();
   const piecesFor = (s: SupersededValue) => {
     if (!s.scope) return pieces;
-    if (!scopedPieces.has(s.scope)) scopedPieces.set(s.scope, sentencesOf(linesAbout(kept, s.scope).join('\n')));
+    if (!scopedPieces.has(s.scope)) scopedPieces.set(s.scope, piecesAbout(kept, s.scope));
     return scopedPieces.get(s.scope)!;
   };
   // Rows of a table are serialised as JSON: a key before a colon is not a label.
@@ -693,6 +713,8 @@ export function leftoverMentions(
       // own words is it the replaced one. A fact naming nothing is read strictly.
       if (coincident && subject.length && !boundToSubject(p, s, subject)) continue;
       if (labelled && aboutSomethingElse(p, s)) continue;
+      // "Lee: CAL-01", "CAL-01's terms for Lee": the old value, said of someone the replacement does not cover.
+      if (s.scope && valueMentions(p).filter((m) => m.kind === s.kind && m.value === s.value).every((m) => tiedToSomeoneElse(p, m.raw, s.scope!))) continue;
       out.push({ value: s, sentence: quotable(raw) });
     }
   }

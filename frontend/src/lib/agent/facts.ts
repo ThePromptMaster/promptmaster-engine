@@ -87,6 +87,8 @@ export interface EvaluationFacts {
   count: number;
   /** The findings are about the head version, so applying them is meaningful. */
   aboutHead: boolean;
+  /** When that check was made: a stop raised before it is asked again of what it found (L-320). */
+  at?: string;
 }
 
 /** The current draft of a stage that drafts prose. */
@@ -165,6 +167,38 @@ export interface StageFacts {
   prepared?: boolean;
   /** An outreach stage: what Go can fill in or write there, and whether the list is still to come (27 Nov). */
   outreach?: OutreachFacts;
+  /**
+   * The user approved this stage's current version themselves (a reserved approval given on the head):
+   * Go does not check, revise or apply findings to it again (L-320, 27 Nov; Sean, museum print job: v8
+   * was approved, Go checked it, applied three wording findings, and asked him to approve v9).
+   */
+  approvedHead?: boolean;
+  /** The stage's current version: what a stop raised on it asks about (L-320). */
+  headVersionId?: string;
+  /**
+   * A reserved approval was given on an earlier version and the stage has changed since: before the user
+   * is asked again, the current version is checked and its findings applied (L-320: v8, a repair, was put
+   * to him unchecked).
+   */
+  reapprovalDue?: boolean;
+}
+
+/** Whether the user's own approval stands on this stage's current version, or was given on an earlier one. */
+export function approvalOnHead(
+  project: Pick<Project, 'manual_checks' | 'manual_check_versions'>,
+  stage: Pick<StageDefinition, 'exit_criteria'>,
+  versions: readonly { id: string; content?: string | null }[]
+): { approvedHead: boolean; reapprovalDue: boolean } {
+  const head = versions.at(-1);
+  if (!head) return { approvedHead: false, reapprovalDue: false };
+  const ticked = project.manual_checks ?? {};
+  const given = project.manual_check_versions ?? {};
+  const reserved = stage.exit_criteria.filter((c) => c.check === 'manual' && c.authority !== 'delegable' && ticked[c.id]);
+  const onHead = (id: string | undefined) => id === head.id || (id !== undefined && versions.find((v) => v.id === id)?.content === head.content);
+  return {
+    approvedHead: reserved.length > 0 && reserved.every((c) => onHead(given[c.id])),
+    reapprovalDue: reserved.some((c) => given[c.id] !== undefined && !onHead(given[c.id])),
+  };
 }
 
 export async function readStageFacts(input: {
@@ -255,6 +289,11 @@ export async function readStageFacts(input: {
     facts.batch = { offered: true, noun: stage.assess?.item_noun?.trim() || null, left: true };
   }
   if (bundles[stage.id]?.versions.at(-1)?.source_operation === PREPARED_OPERATION) facts.prepared = true;
+  const headNow = bundles[stage.id]?.versions.at(-1);
+  if (headNow) facts.headVersionId = headNow.id;
+  const approval = approvalOnHead(project, stage, bundles[stage.id]?.versions ?? []);
+  if (approval.approvedHead) facts.approvedHead = true;
+  if (approval.reapprovalDue) facts.reapprovalDue = true;
   if (stage.renderer === 'outreach') {
     // The page filling in the blanks holds the same lock Go's research takes.
     const running = assessRunFor(assessKey(project.id, stage.id))?.by === 'page';
@@ -277,6 +316,7 @@ export async function readStageFacts(input: {
     facts.evaluationFindings = {
       count: latestEvaluation.findings?.length ?? 0,
       aboutHead: Boolean(head && latestEvaluation.version_id === head.id),
+      ...(latestEvaluation.created_at ? { at: latestEvaluation.created_at } : {}),
     };
   }
 

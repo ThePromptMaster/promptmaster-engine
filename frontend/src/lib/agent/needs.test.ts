@@ -270,6 +270,18 @@ describe('needStillHolds: a recorded stop is checked against the project (1 Oct,
     expect(needStillHolds(need, at('positioning', { stageEvaluation: evaluation('positioning', other) }))).toBe(false);
   });
 
+  it('an approval asked of an earlier version, or before a check that found something, is asked again (L-320)', () => {
+    const unmet = [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }];
+    const need: NeedsUser = { kind: 'tick_criterion', stageId: 'positioning', criterionId: 'pos.differentiator', label: 'x', onStage: 'positioning', checkedVersionId: 'v3', raisedAt: '2026-11-27T15:07:00Z' };
+    const still = { stageEvaluation: evaluation('positioning', unmet) };
+    expect(needStillHolds(need, at('positioning', { ...still, facts: { headVersionId: 'v3' } }))).toBe(true);
+    expect(needStillHolds(need, at('positioning', { ...still, facts: { headVersionId: 'v4' } }))).toBe(false);
+    const checkedAfter = { headVersionId: 'v3', evaluationFindings: { count: 1, aboutHead: true, at: '2026-11-27T15:08:22Z' } };
+    expect(needStillHolds(need, at('positioning', { ...still, facts: checkedAfter }))).toBe(false);
+    const checkedBefore = { ...checkedAfter, evaluationFindings: { ...checkedAfter.evaluationFindings, at: '2026-11-27T15:06:00Z' } };
+    expect(needStillHolds(need, at('positioning', { ...still, facts: checkedBefore }))).toBe(true);
+  });
+
   it('an approval asked for while other moves were still on offer holds until it is given (production pass, 2026-10-02)', () => {
     const unmet = [{ id: 'analysis.verdicts', label: 'I confirm each hypothesis has an evidence-backed verdict', satisfied: false, blocking: true, manual: true }];
     const need: NeedsUser = { kind: 'tick_criterion', stageId: 'positioning', criterionId: 'analysis.verdicts', label: unmet[0].label, onStage: 'positioning' };

@@ -84,3 +84,20 @@ describe('the value a replacement brings in is not the one it replaces', () => {
     expect(values).not.toContain('weekdays:monday');
   });
 });
+
+describe('a line naming both finalists is read sentence by sentence (27 Nov, production pass)', () => {
+  // The repair Go saved on a rebuilt Calder project, refused for "still gives CAL-01" in Morgan Lee's
+  // terms: "| Lee: CAL-01 (Lee only).", "Morgan Lee stays under CAL-01", "CAL-01's terms for Lee".
+  const REPAIR = readFileSync('src/lib/workflow/__fixtures__/calder-objective-repair.md', 'utf8');
+
+  it('passes: every CAL-01 there is said of Morgan Lee', () => {
+    expect(leftoverMentions(REPAIR, supersededFactValues([CAL03]))).toEqual([]);
+  });
+
+  it('still refuses CAL-01 said of Alex Rivera in a line that names both', () => {
+    const wrong = '| Who contacts references | **Morgan Lee:** Calder calls (CAL-01). **Alex Rivera:** Calder conducts the reference calls under CAL-01. | Supplied |';
+    const left = leftoverMentions(wrong, supersededFactValues([CAL03]));
+    expect(left.map((l) => l.sentence)).toEqual([expect.stringContaining('Alex Rivera')]);
+  });
+});
+

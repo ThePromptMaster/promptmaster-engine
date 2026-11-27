@@ -417,7 +417,9 @@ export function allowedActions(
     // revised it (wiping every decision) and triaged it again.
     // Nor is what an example prepared for the reader to approve: on production (6 Nov)
     // Go paid to check and rewrite it, and its rewrite ruled every sample deal out.
-    else if (stage.renderer !== 'review' && !facts.prepared) {
+    // Nor is a version the user approved themselves polished afterwards: wording findings on it made a
+    // new version and a new approval question (L-320). A change that reopens it is repaired (recheck_stage).
+    else if (stage.renderer !== 'review' && !facts.prepared && !facts.approvedHead) {
       // A version already checked is not checked again (19 Oct: the same
       // stale Realign version was checked twice and the run stalled).
       if (!facts.draft?.checked) keys.push('evaluate_stage');

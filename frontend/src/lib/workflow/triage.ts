@@ -125,6 +125,7 @@ export function findingRisk(item: StageItem, schema: StageItemSchema, facts?: re
   if (quotedFact(item.changes, facts)) return 'material';
   if (quotedFact(item.implements, facts)) return 'routine';
   if (copiesApproved(item)) return 'routine';
+  if (onlyRecordKeeping(item)) return 'routine';
   const field = schema.fields.find((f) => f.key === 'severity' && f.options);
   if (!field) return 'material';
   const value = (item.severity ?? '').trim().toLowerCase();
@@ -141,6 +142,23 @@ export function findingRisk(item: StageItem, schema: StageItemSchema, facts?: re
 export function copiesApproved(item: StageItem): boolean {
   const text = [item.finding, item.issue, item.suggested_change, item.reason].filter(Boolean).join(' ');
   return /\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)? (?:as approved|text|wording))\b/i.test(text) && /\bapproved\b/i.test(text);
+}
+
+/**
+ * A finding about how the check's own record reads, not about the work: it marks earlier findings
+ * superseded or as history, or says which rows a result comes from (L-320, 27 Nov; Sean, museum print
+ * job: "i2, i3 and i4 … are superseded" was put to him under "handle them for me", whatever its
+ * severity). Deciding it changes nothing anyone acts on. Routine whatever its severity: it names
+ * earlier findings by id, says they are superseded or history, and asks for no change to the work.
+ */
+export function onlyRecordKeeping(item: StageItem): boolean {
+  // Its change is to relabel earlier findings, first thing: "Treat i2–i4 as superseded history", "Mark i3
+  // as historical". A finding whose change says what to do to the work ("Do not carry i2's reserve into
+  // the final plan") is about the work, whatever it says of earlier rows.
+  const change = String(item.suggested_change ?? '').trim();
+  const ID = String.raw`[a-z]{1,2}\d{1,3}`;
+  const ids = String.raw`(?:findings?\s+|rows?\s+)?${ID}(?:\s*(?:,|and|to|through|[–—-])\s*(?:${ID}|\d{1,3}))*`;
+  return new RegExp(String.raw`^(?:treat|mark|record|label|regard|keep)\s+${ids}\s+(?:as\s+)?(?:superseded|history|historical|no longer current)\b`, 'i').test(change);
 }
 
 export function splitUntriaged(

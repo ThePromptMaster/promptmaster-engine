@@ -2429,7 +2429,7 @@ export function useGoLoop(opts: Options) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [need, liveRunId, pendingStepId, phase, opts.state, opts.bundles, opts.context, opts.project.objective, commitRun]);
+  }, [need, liveRunId, pendingStepId, phase, opts.state, opts.bundles, opts.context, opts.project.objective, opts.latestEvaluation, commitRun]);
 
   /**
    * Close an outdated proposal and ask the planner again about the stage as it
