@@ -323,9 +323,10 @@ export function briefChangedSince(
 ): { asked: string[]; rewrite: boolean } {
   const since = versionCreatedAt ? Date.parse(versionCreatedAt) : NaN;
   if (Number.isNaN(since)) return { asked: [], rewrite: false };
-  // The user's own edits of the brief: not a folder's rules or a linked project.
+  // The user's own edits of the brief: not a folder's rules, a linked project,
+  // or Go's record that a step was made before a change (L-322).
   const changes = events.filter(
-    (e) => e.type === 'brief_changed' && Date.parse(e.created_at) > since && !e.payload?.presentation_only && !e.payload?.origin && ASKED_FIELDS.includes(String(e.payload?.field ?? ''))
+    (e) => e.type === 'brief_changed' && Date.parse(e.created_at) > since && !e.payload?.presentation_only && !e.payload?.origin && !e.payload?.made_before_change && ASKED_FIELDS.includes(String(e.payload?.field ?? ''))
   );
   return {
     asked: changes.map((e) => (typeof e.payload?.after === 'string' ? e.payload.after.trim() : '')).filter(Boolean),

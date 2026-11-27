@@ -54,7 +54,8 @@ describe('a revision after the work itself changed is a rewrite (L-327)', () => 
     const wording = { ...events[1], payload: { ...events[1].payload, presentation_only: true } };
     const folder = { ...events[1], payload: { ...events[1].payload, origin: 'folder' } };
     const reference = { ...events[1], payload: { ...events[1].payload, field: 'context', origin: 'reference' } };
-    expect(briefChangedSince([wording, folder, reference], outputV1At)).toEqual({ asked: [], rewrite: false });
+    const madeBefore = { ...events[1], payload: { ...events[1].payload, kind: 'fact', made_before_change: true } };
+    expect(briefChangedSince([wording, folder, reference, madeBefore], outputV1At)).toEqual({ asked: [], rewrite: false });
     expect(briefChangedSince([change('objective', 'Same memo, tighter', '2026-11-27T16:03:27.000Z', 'fact')], outputV1At).rewrite).toBe(false);
   });
 });
