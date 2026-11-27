@@ -114,6 +114,8 @@ The project timeline shows the same record: each change expands to "Was / Now" a
 4. **A sent record is the user's word.** PromptMaster sends nothing, so it cannot confirm what was sent.
 5. **A trade-off a change forces can be settled by Go.** The crew-rate change broke the cap. Under "Handle them for me", Go asked itself the question and met the cap by shrinking the contingency, which was an instruction, not a requirement. It recorded the choice as its own and said so plainly. Some teams would want that put to them. If so, a change that can only be met by giving up something the brief or a stage asked for should become a stop.
 
+6. **A repaired commitment is said, not always stopped at.** Go stopped at the commitment after the first date change because it went back to work on that stage. On a later change it only repaired the commitment, so Go finished with "Objective met" and "re-confirm it if it should stand", and the commitment showed as "re-approve" on the page. The approval stands for the version it was given on (L-117). If a changed customer commitment should always wait for the user, that is a rule to add.
+
 **I would close 2 first.** It is what makes the answer to "what did this change affect?" provable rather than judged, and at change 30 that is the difference between trusting the notice and checking every deliverable by hand. Gap 1 is the larger change, and is worth doing once a project with parallel deliverables shows the cost.
 
 ## A side-by-side test
@@ -161,10 +163,13 @@ Model spend, from the project's own usage record:
 
 Wall-clock time from creating the project to the end was about an hour, most of it my own pauses between steps. Each update after a change took Go 3 to 6 minutes.
 
-While running this I fixed five things on the live site:
+While running this, and in a second pass on 27 November with three more delivery date changes and the restated fact (change 4 below), I fixed eight things on the live site:
 
 - the change notice said "Everything else stands" while it listed work still to be checked;
 - each line under "changed since" carried Go's whole note to the user;
 - the example asked the customer for an address the facts never give;
 - under "Handle them for me" Go stopped to ask about two rechecks it does itself;
-- "Since your last visit" left out the plan's newest version, and listed the budget as both kept and redone.
+- "Since your last visit" left out the plan's newest version, and listed the budget as both kept and redone;
+- a date change rewrote the budget, which states no date, because Go's own earlier question ("instead of the 10% used now") was read as a replaced value; the rewrite also dropped the 10% working that explains the contingency;
+- "Carried forward" kept "confirm a receiving contact before Tuesday, March 30" next to the April date that replaced it, and a placeholder address already ruled out;
+- a fact restated with the same figures reopened the budget and the plan, and the plan was rewritten. Now it is judged like a new fact, and on the second pass nothing reopened.
