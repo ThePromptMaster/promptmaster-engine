@@ -36,7 +36,7 @@ export const zh: Record<keyof typeof en, string> = {
   "sent.keepOld": "让他们保留 v{n}",
   "sent.keepNote": "他们保留 v{n}。",
   "sent.undo": "撤销",
-  "sent.record": "把 v{n} 发给别人了？记录下来",
+  "sent.record": "发给别人了？记录下来",
   "sent.formTitle": "记录谁拿到了 v{n}",
   "sent.to": "发给",
   "sent.toHint": "例如：Bayview Grocers、Dana Ruiz",

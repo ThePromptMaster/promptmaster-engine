@@ -36,7 +36,7 @@ export const hi: Record<keyof typeof en, string> = {
   "sent.keepOld": "v{n} उनके पास रहने दें",
   "sent.keepNote": "उनके पास v{n} रहेगा।",
   "sent.undo": "पूर्ववत करें",
-  "sent.record": "v{n} किसी को भेजा? दर्ज करें",
+  "sent.record": "यह किसी को भेजा? दर्ज करें",
   "sent.formTitle": "दर्ज करें कि v{n} किसके पास है",
   "sent.to": "किसे भेजा",
   "sent.toHint": "उदा. Bayview Grocers, Dana Ruiz",

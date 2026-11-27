@@ -36,7 +36,7 @@ export const ar: Record<keyof typeof en, string> = {
   "sent.keepOld": "أبقِ الإصدار v{n} لديهم",
   "sent.keepNote": "يحتفظون بالإصدار v{n}.",
   "sent.undo": "تراجع",
-  "sent.record": "أرسلت الإصدار v{n} إلى أحد؟ سجّل ذلك",
+  "sent.record": "أرسلت هذا إلى أحد؟ سجّل ذلك",
   "sent.formTitle": "سجّل من لديه الإصدار v{n}",
   "sent.to": "أُرسل إلى",
   "sent.toHint": "مثال: Bayview Grocers، Dana Ruiz",
