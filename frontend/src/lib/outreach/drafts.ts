@@ -61,6 +61,8 @@ export interface DraftRow extends StageItem {
   edited: string;
   /** JSON `{ offer?, link? }`: this email's own values in place of the batch's. */
   overrides: string;
+  /** The approval of this exact email (`outreach_approvals.id`), while it is approved. */
+  approval_id?: string;
 }
 
 export function firstName(name: string): string {

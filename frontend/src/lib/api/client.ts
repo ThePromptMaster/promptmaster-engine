@@ -735,6 +735,16 @@ export const api = {
     return apiFetch('/api/outreach/sent-check', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** Check each email may go out and mint its ticket; the hash is computed by the backend (26 Nov). */
+  outreachTickets(approvals: { approval_id: string; purpose: 'send' | 'test' | 'followup'; snapshot: unknown }[]): Promise<{ approval_id: string; message_hash: string; ticket: string; problems: string[] }[]> {
+    return apiFetch('/api/outreach/tickets', { method: 'POST', body: JSON.stringify({ approvals }) });
+  },
+
+  /** A test email as it arrived in the person's own inbox: logo, signature once, links, body (26 Nov). */
+  outreachCheckTest(req: { snapshot: unknown; message_id: string }): Promise<{ checks: { key: string; ok: boolean; detail: string }[] }> {
+    return apiFetch('/api/outreach/check-test', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** The standard outreach message and its follow-up, from the brief (26 Nov). A writer: may search the web. */
   draftOutreachMessage(req: { inputs: PMInput; brief: string; model?: string; web_access?: 'on' | 'off' }): Promise<OutreachDraftedMessage> {
     return apiFetch('/api/outreach/draft-message', { method: 'POST', body: JSON.stringify(req) });

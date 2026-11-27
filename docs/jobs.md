@@ -234,3 +234,29 @@ under `concurrent drains`, asserts that only one drain holds a project at a time
 
 There is no test that exercises the real Postgres functions — see
 [`known-limitations.md`](known-limitations.md).
+
+
+## Outreach email jobs (26 Nov, `lib/jobs/outreach-job.ts`)
+
+Approved outreach email goes out through this queue, so "send now" and a scheduled send are one path and the server,
+not the browser, records what happened (L-305).
+
+| Kind | Payload | Made by |
+|---|---|---|
+| `send_email` | `{send_id}` | `schedule_outreach_sends` (the user's press), `run_after` = when it should go, key `send:<approval>` |
+| `send_test` | `{send_id}` | the same, for "Send test to myself" |
+
+`max_attempts` is 6. The drain dispatches these kinds to `runOutreachJob` before the section handler. Checkpoints
+(`job.checkpoint`):
+
+| Step | Done before the next call | On re-entry |
+|---|---|---|
+| none (prepare) | approval not withdrawn; the email built again from what is saved now hashes the same as the approved one; not on the do-not-contact list; not paused; under today's limit | |
+| `submitting` (`at`) | a Gmail draft is made | Sent is searched first |
+| `sending` (`draft_id`) | the draft is sent | sent again: a sent draft is gone, so that cannot send twice; unsure, Sent is searched; two empty searches 150 s apart and it is failed, never re-sent |
+| `confirm` (`message_id`) | Gmail shows it in Sent | retried every 60 s up to 5 times, then left as submitted |
+
+The send's status moves only through `record_outreach_send`, which requires the caller to hold the job's lease.
+`request_project_cancel` (Go's stop, the chapters' Pause) cancels only `draft_section` jobs. A send job that ends
+`failed` or `dead` marks its send failed (trigger `outreach_job_ended`), saying "may or may not have gone out" when
+it was mid-send.

@@ -5796,3 +5796,62 @@ Limits:
 - A reason on a row is stored in English; the known ones are shown translated.
 - Nested data on a row (the imported line, earlier contact, candidates) is kept as a JSON string, because a stage's
   rows hold strings.
+
+### L-303 — "PromptMaster only reads" became "reads, and sends only the emails you approve" (2026-11-26)
+The connected-accounts note in every language now says PromptMaster reads, and sends only the emails the person
+approves; it never changes or deletes anything. Gmail's grant was already full mailbox access (L-201), so connected
+Gmail accounts need no new consent to send. Salesforce and HubSpot are still read only. What PromptMaster sends and
+how is L-305.
+
+### L-305 — Approving and sending outreach email (2026-11-26)
+Sean, 26 Nov: "Let me approve one email or a selected batch. Record the exact version I approved. If someone changes
+the recipient, body, link, attachment, or sender after approval, send that message back for review. Give me send
+now, schedule, and pause … Give me a Send test to myself button."
+- **Approve.** Select emails and approve them; nothing with a placeholder left can be selected. Each approval stores
+  the exact email (From, Reply-To, To, Cc, Bcc, subject, HTML and text, links, footer, signature) and a ticket.
+  - The backend checks the email may go before minting it: from the connected mailbox, one recipient, a test only to
+    yourself, nothing left to fill in, the commercial footer, https links.
+  - The hash is the backend's own.
+- **Send.** "Send now" or "Schedule" queues one job per email, spaced as Settings says. The drain sends it through
+  Gmail, draft then send, whether or not a tab is open, and records each step: scheduled, sending, in your mailbox,
+  sent (with "Open in Gmail"), held, failed, cancelled. Scheduled and paused sends can be paused, resumed or
+  cancelled. An approval not yet sent can be withdrawn.
+- **Held at send time.** The email is rebuilt from what is saved at that moment. If it differs from what was
+  approved (the text, a link, the recipient, the sender details, the signature or logo), it is held and says what
+  changed. It is also held if the approval was withdrawn or the address is on the do-not-contact list. Pause all in
+  Settings and today's limit make it wait.
+- **What the recipient was told** stays on the email: the approved copy, after it is sent.
+- **Test to yourself** sends the same email to the sending mailbox. "Check the email that arrived" reads it back:
+  the logo is there and under the signature, the signature appears once, every link, the text approved.
+- **Who may send.** Only the job runner, as the worker, with the email's ticket: an HMAC of the person, the
+  approval, its purpose and its hash, keyed by `OUTREACH_TICKET_SECRET`, which only the backend holds.
+  - A leaked worker credential alone sends nothing.
+  - A person's own session cannot call the send route.
+  - The connections routes still refuse workers.
+  - Go has no action that approves or sends.
+  - `OUTREACH_SENDING=off` stops everything.
+
+Limits:
+- Gmail only; an Outlook mailbox is listed but cannot send yet.
+- Composio documents its results only as `data`. Ids are read by key wherever they sit, and a result that holds no
+  id fails safe: the draft is made again, or Sent is searched.
+- No attachments yet.
+- Today's limit counts this person's sends across projects, not the mailbox's; tests do not count. Scheduled times
+  are the browser's local time.
+- "Go never approves or sends" is enforced in code (no action, no route Go can reach), not by the database: Go acts
+  with the person's own session.
+
+### L-306 — An email is never sent twice after a timeout (2026-11-26)
+Gmail can accept an email and the call still time out. The send is made as a draft first, and the draft is sent.
+Once sent, a draft no longer exists, so sending it again cannot send a second copy. When a step fails and it is not
+certain whether the email went, the job searches Sent for the same recipient and subject since the send began, and
+adopts what it finds. After two empty searches at least 150 s apart (Gmail's search can lag), the send is marked
+failed: "Not found in your Sent mail after the send was interrupted. Not sent again automatically." Retrying it is
+the person's choice. A draft left behind by a failed attempt stays in Drafts and never sends by itself.
+
+### L-307 — How the email is built for the mailbox (2026-11-26)
+- Composio's Gmail tools take no custom headers. There is no List-Unsubscribe header, so the opt-out is the line in
+  the footer and works by reply.
+- They take no separate plain-text part: the email is HTML only. The details in it are text, so they read with
+  images off.
+- Gmail's own signature is never added (`include_signature: false`), so the signature appears once.

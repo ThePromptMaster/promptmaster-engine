@@ -182,3 +182,158 @@ async def sent_check(
             if domain in wanted_domains and (domain not in by_domain or hit.on > by_domain[domain].on):
                 by_domain[domain] = hit
     return by_address, by_domain
+
+
+# ---------------------------------------------------------------------------
+# Sending, through the person's own Gmail (Sean, 26 Nov: "If a send times out, check the mailbox
+# before retrying so the person doesn't get two copies"). Draft, then send the draft: a draft that
+# was sent no longer exists, so sending it again cannot send twice, and its id is something to
+# look for. Composio documents every result only as `data`, so ids are read by key.
+# ---------------------------------------------------------------------------
+
+
+class SendError(Exception):
+    """A send that failed. `uncertain`: it may have reached Gmail, so Sent is searched before any retry."""
+
+    def __init__(self, message: str, uncertain: bool) -> None:
+        super().__init__(message)
+        self.uncertain = uncertain
+
+
+@dataclass(frozen=True)
+class Sent:
+    message_id: str
+    thread_id: str
+    thread_url: str
+
+
+def _gmail_args(snapshot: dict[str, Any]) -> dict[str, Any]:
+    to = list(snapshot.get("to") or [])
+    return {
+        "user_id": "me",
+        "recipient_email": to[0] if to else "",
+        **({"extra_recipients": to[1:]} if len(to) > 1 else {}),
+        **({"cc": list(snapshot["cc"])} if snapshot.get("cc") else {}),
+        **({"bcc": list(snapshot["bcc"])} if snapshot.get("bcc") else {}),
+        "subject": str(snapshot.get("subject") or ""),
+        "body": str(snapshot.get("html") or ""),
+        "is_html": True,
+        # Gmail's own signature would sit under ours: "check … whether the signature appears twice".
+        "include_signature": False,
+    }
+
+
+def _composio_error(e: ComposioError) -> SendError:
+    # A refusal before Gmail accepted anything (bad request, expired grant) is certain: it did not go.
+    certain = e.status is not None and 400 <= e.status < 500
+    return SendError(str(e)[:300], uncertain=not certain)
+
+
+async def create_draft(c: Composio, user_id: str, snapshot: dict[str, Any]) -> str:
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_CREATE_EMAIL_DRAFT", _gmail_args(snapshot))
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    # The draft resource is {id, message: {id, threadId}}: the draft's own id is the shallowest `id`.
+    draft_id = str(find_key(data, ("draft_id", "draftId")) or find_key(data, ("id",)) or "")
+    if not draft_id:
+        logger.warning("OUTREACH_DRAFT_NO_ID keys=%s", list(data)[:10] if isinstance(data, dict) else type(data).__name__)
+        raise SendError("Gmail made the draft but did not say its id.", uncertain=False)
+    return draft_id
+
+
+async def send_draft(c: Composio, user_id: str, draft_id: str, mailbox: str) -> Sent:
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_SEND_DRAFT", {"user_id": "me", "draft_id": draft_id})
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    thread = str(find_key(data, ("threadId", "thread_id")) or "")
+    message = str(find_key(data, ("messageId", "message_id")) or find_key(data, ("id",)) or "")
+    if not message:
+        logger.warning("OUTREACH_SEND_NO_ID keys=%s", list(data)[:10] if isinstance(data, dict) else type(data).__name__)
+        raise SendError("Gmail did not say what it sent.", uncertain=True)
+    return Sent(message_id=message, thread_id=thread, thread_url=gmail_thread_url(thread, mailbox))
+
+
+def _quoted(text: str) -> str:
+    return '"' + re.sub(r'["\\]', " ", text)[:150] + '"'
+
+
+async def find_sent(c: Composio, user_id: str, snapshot: dict[str, Any], after_epoch: int, mailbox: str) -> Sent | None:
+    """This email in Sent, if it went: the same recipient and subject, since the send began."""
+    to = [str(a).lower() for a in (snapshot.get("to") or [])]
+    if not to:
+        return None
+    query = f"in:sent to:{to[0]} subject:{_quoted(str(snapshot.get('subject') or ''))} after:{max(0, after_epoch - 60)}"
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_FETCH_EMAILS", {"user_id": "me", "query": query, "max_results": 5, "verbose": False, "include_payload": False})
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    for r in find_records(data, ("messageId", "message_id", "id")):
+        if to[0] in _recipients(r):
+            mid = str(_first(r, "messageId", "message_id", "id") or "")
+            thread = str(_first(r, "threadId", "thread_id") or "")
+            if mid:
+                return Sent(message_id=mid, thread_id=thread, thread_url=gmail_thread_url(thread, mailbox))
+    return None
+
+
+@dataclass(frozen=True)
+class Confirmed:
+    sent: bool
+    thread_id: str
+    thread_url: str
+    #: The copy in Sent has the approved subject and recipient.
+    matches: bool
+
+
+async def confirm_sent(c: Composio, user_id: str, message_id: str, snapshot: dict[str, Any], mailbox: str) -> Confirmed:
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {"user_id": "me", "message_id": message_id, "format": "metadata"})
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    labels = find_key(data, ("labelIds", "label_ids")) or []
+    thread = str(find_key(data, ("threadId", "thread_id")) or "")
+    record = data if isinstance(data, dict) else {}
+    subject = str(_first(record, "subject", "preview.subject") or _header(record, "Subject") or find_key(data, ("subject",)) or "")
+    to = [str(a).lower() for a in (snapshot.get("to") or [])]
+    matches = bool(to) and to[0] in _recipients(record) and subject.strip() == str(snapshot.get("subject") or "").strip()
+    return Confirmed(sent=isinstance(labels, list) and "SENT" in labels, thread_id=thread, thread_url=gmail_thread_url(thread, mailbox), matches=matches)
+
+
+def _html_of(data: Any) -> str:
+    """The HTML part of a full Gmail message, decoded; '' when there is none."""
+    import base64
+
+    parts: list[Any] = []
+    payload = find_key(data, ("payload",))
+    stack = [payload] if payload else []
+    while stack:
+        p = stack.pop()
+        if isinstance(p, dict):
+            if str(p.get("mimeType", "")).lower() == "text/html":
+                body = (p.get("body") or {}).get("data") if isinstance(p.get("body"), dict) else None
+                if body:
+                    parts.append(body)
+            stack.extend(p.get("parts") or [])
+    for raw in parts:
+        try:
+            return base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8", errors="replace")
+        except (ValueError, TypeError):
+            continue
+    text = find_key(data, ("messageText", "message_text"))
+    return text if isinstance(text, str) else ""
+
+
+async def received_html(c: Composio, user_id: str, message_id: str) -> str:
+    """A test email as it arrived in the person's own inbox (sent to themselves, it is the same message)."""
+    session = await c.create_session(user_id, ["gmail"])
+    try:
+        data = await c.execute(session, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {"user_id": "me", "message_id": message_id, "format": "full"})
+    except ComposioError as e:
+        raise _composio_error(e) from e
+    return _html_of(data)

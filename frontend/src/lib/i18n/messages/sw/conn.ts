@@ -5,7 +5,7 @@ export const sw: Record<keyof typeof en, string> = {
   'conn.headerItem': 'Akaunti zilizounganishwa',
   'conn.settingsTitle': 'Akaunti zilizounganishwa',
   'conn.settingsLead': 'Unganisha barua pepe, kalenda, faili na CRM yako ili PromptMaster iweze kuziangalia yenyewe: unapofungua "Pendekeza kazi kutoka kwa akaunti zangu", kwenye gumzo la mradi, na inapoandika rasimu ya hatua. Kila inachosoma kinaorodheshwa ili uweze kukiondoa. Kwenye mradi unaweza pia kuzima utafutaji.',
-  'conn.composioNote': 'Google na Microsoft huonyesha "Composio" kwenye skrini zao: Composio ni huduma inayoshikilia muunganisho kwa ajili ya PromptMaster. Skrini ya Gmail inaomba ufikiaji kamili wa barua pepe zako. PromptMaster husoma tu: haitumi, haibadilishi wala haifuti chochote.',
+  'conn.composioNote': 'Google na Microsoft huonyesha "Composio" kwenye skrini zao: Composio ni huduma inayoshikilia muunganisho kwa ajili ya PromptMaster. Skrini ya Gmail inaomba ufikiaji kamili wa barua pepe zako. PromptMaster husoma, na hutuma tu barua unazoidhinisha. Haibadilishi wala haifuti chochote.',
   'conn.reads.gmail': 'Hutafuta barua pepe zako zote na kusoma zinazolingana.',
   'conn.reads.googlecalendar': 'Hutafuta mikutano yako yote na kusoma inayolingana.',
   'conn.reads.googledrive': 'Hutafuta faili zako zote na kusoma zinazolingana.',
