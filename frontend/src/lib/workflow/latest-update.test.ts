@@ -88,3 +88,21 @@ describe('a change with no fact lines still says what changed', () => {
     expect(latestUpdate({ events: [constraints], state: { stages: {} }, summary: null, steps: [], tasks: [], onHold: 0 })?.what).toEqual(['The constraints changed']);
   });
 });
+
+describe('changes entered one after another are one update (27 Nov, production pass)', () => {
+  it('reads an exception entered as two requirements and a fact as one update', () => {
+    const add = (at: string, line: string, prev: string) => ({
+      type: 'brief_changed', stage_id: 'final', actor: 'user', created_at: at,
+      payload: { kind: 'fact', field: 'facts', before: prev, after: `${prev}\n- ${line}`, affected: [{ stage_id: 'final', reason: 'x' }] },
+    }) as WorkflowEvent;
+    const events = [
+      add('2026-11-27T19:00:00Z', 'Older change.', ''),
+      add('2026-11-27T19:44:20Z', 'Requirement: One-time exception for Alex Rivera only.', '- Older change.'),
+      add('2026-11-27T19:44:30Z', "Requirement: Alex Rivera's contact sheet stays internal.", '- Older change.\n- Requirement: One-time exception for Alex Rivera only.'),
+      add('2026-11-27T19:44:40Z', 'For Alex Rivera, nothing has been sent.', "- Older change.\n- Requirement: One-time exception for Alex Rivera only.\n- Requirement: Alex Rivera's contact sheet stays internal."),
+    ];
+    const u = latestUpdate({ events, state: { stages: {} }, summary: null, steps: [], tasks: [], onHold: 0 })!;
+    expect(u.at).toBe('2026-11-27T19:44:20Z');
+    expect(u.what).toEqual(['One-time exception for Alex Rivera only.', "Alex Rivera's contact sheet stays internal.", 'For Alex Rivera, nothing has been sent.']);
+  });
+});

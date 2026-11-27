@@ -44,6 +44,22 @@ function reasonOf(output: string): string {
   return (cut > 0 && cut < 260 ? t.slice(0, cut) : t.slice(0, 260)).trim();
 }
 
+/** How close together a user's changes are read as one update: entered one after another. */
+export const ONE_UPDATE_MS = 5 * 60_000;
+
+/**
+ * The user's latest update: their latest change, with the changes they made just before it (27 Nov,
+ * production pass: an exception entered as two requirements and a fact read as only its last line).
+ */
+export function latestChangeGroup(events: readonly WorkflowEvent[]): { since: string; events: WorkflowEvent[]; touched: string[] } | null {
+  const mine = events.filter((e) => e.type === 'brief_changed' && e.actor === 'user' && changeDetail(e));
+  const last = mine.at(-1);
+  if (!last) return null;
+  const group = mine.filter((e) => Date.parse(last.created_at) - Date.parse(e.created_at) <= ONE_UPDATE_MS);
+  const touched = [...new Set(group.flatMap((e) => (Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: unknown }[]) : []).map((a) => (typeof a.stage_id === 'string' ? a.stage_id : '')).filter(Boolean)))];
+  return { since: group[0].created_at, events: group, touched };
+}
+
 export function latestUpdate(input: {
   events: readonly WorkflowEvent[];
   state: Pick<WorkflowState, 'stages'>;
@@ -53,17 +69,22 @@ export function latestUpdate(input: {
   /** Open tasks on hold now (`currentTasks(...).onHold.length`). */
   onHold: number;
 }): LatestUpdate | null {
-  const change = [...input.events].reverse().find((e) => e.type === 'brief_changed' && e.actor === 'user' && changeDetail(e));
-  if (!change) return null;
-  const at = change.created_at;
-  const d = changeDetail(change)!;
+  const group = latestChangeGroup(input.events);
+  if (!group) return null;
+  const at = group.since;
   const fieldWords: Record<string, string> = { objective: 'The objective changed', constraints: 'The constraints changed', audience: 'The audience changed', output_format: 'The format changed', context: 'The project material changed', facts: 'The facts changed' };
-  const ref = change.payload?.reference as { name?: unknown } | undefined;
-  const field = typeof change.payload?.field === 'string' ? change.payload.field : '';
-  const said = [...d.pairs.map((p) => p.to), ...d.added, ...d.removed.map((r) => `No longer: ${r}`)];
-  // A change with no fact lines of its own (an edited constraint, a refreshed linked project) still says what changed.
-  if (!said.length) said.push(typeof ref?.name === 'string' && ref.name ? `${ref.name} changed` : (fieldWords[field] ?? 'The brief changed'));
-  const touched = new Set(d.reopened.map((r) => r.stageId));
+  const said: string[] = [];
+  const touched = new Set(group.touched);
+  for (const change of group.events) {
+    const d = changeDetail(change)!;
+    const ref = change.payload?.reference as { name?: unknown } | undefined;
+    const field = typeof change.payload?.field === 'string' ? change.payload.field : '';
+    const lines = [...d.pairs.map((p) => p.to), ...d.added, ...d.removed.map((r) => `No longer: ${r}`)];
+    // A change with no fact lines of its own (an edited constraint, a refreshed linked project) still says what changed.
+    if (!lines.length) lines.push(typeof ref?.name === 'string' && ref.name ? `${ref.name} changed` : (fieldWords[field] ?? 'The brief changed'));
+    for (const l of lines) if (!said.includes(l)) said.push(l);
+    for (const r of d.reopened) touched.add(r.stageId);
+  }
 
   const records: LatestUpdate['records'] = [];
   for (const r of input.summary?.redoing ?? []) {
