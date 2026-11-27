@@ -66,6 +66,7 @@ export const zh: Record<keyof typeof en, string> = {
   "assess.stop": "停止",
   "assess.view": "哪些批次",
   "assess.viewAll": "所有批次（{n}）",
+  "assess.replaced": "已被修订替换，作为历史保留：{list}",
   "assess.viewLatest": "最新批次：第 {n} 批（{count}）",
   "assess.viewBatch": "第 {n} 批（{count}）",
   "assess.viewBatchAt": "第 {n} 批 · {when}（{count}）",

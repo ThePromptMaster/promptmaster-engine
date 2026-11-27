@@ -66,6 +66,7 @@ export const ar: Record<keyof typeof en, string> = {
   "assess.stop": "إيقاف",
   "assess.view": "أي الدفعات",
   "assess.viewAll": "كل الدفعات ({n})",
+  "assess.replaced": "استُبدل بمراجعة، ومحفوظ كسجل: {list}",
   "assess.viewLatest": "آخر دفعة: الدفعة {n} ({count})",
   "assess.viewBatch": "الدفعة {n} ({count})",
   "assess.viewBatchAt": "الدفعة {n} · {when} ({count})",

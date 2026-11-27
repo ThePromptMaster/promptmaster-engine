@@ -17,7 +17,7 @@
  * judged is skipped when it is sent again.
  */
 
-import { ASSESS_MAX_CALLS, appendBatch, batchChunk, nextBatch, restAfter, type AssessPending, type AssessedRow } from './assess';
+import { ASSESS_MAX_CALLS, appendBatch, batchChunk, comparativeRows, nextBatch, restAfter, tableLines, type AssessPending, type AssessedRow } from './assess';
 import type { StageItem } from './stage-artifact';
 
 export interface BatchReply {
@@ -54,7 +54,8 @@ function aborted(signal: AbortSignal | undefined, e?: unknown): boolean {
 export async function assessPaste(args: {
   text: string;
   existing: StageItem[];
-  call: (chunk: string, already: string[]) => Promise<BatchReply>;
+  /** One call; `rejudge` sends rows the table holds, to be judged again (L-330). */
+  call: (chunk: string, already: string[], opts?: { rejudge?: boolean }) => Promise<BatchReply>;
   /** Saves the table after each call. */
   save: (items: StageItem[], pending: AssessPending | null, added: number) => Promise<void>;
   /** After each save: rows added so far, and how many the last call said were left. */
@@ -86,7 +87,8 @@ export async function assessPaste(args: {
     const chunk = batchChunk(rest);
     let reply: BatchReply;
     try {
-      reply = await args.call(chunk, items.map((i) => i.subject ?? '').filter(Boolean));
+      // The rows that stand, with their ids, so a revision can name the row it revises (L-330).
+      reply = await args.call(chunk, tableLines(items));
     } catch (e) {
       if (!aborted(args.signal, e)) throw e;
       stopped = true;
@@ -115,6 +117,36 @@ export async function assessPaste(args: {
     }
     await args.save(items, pending, fresh);
     args.onProgress?.(added, pending ? pending.count || null : 0);
+  }
+  // 28 Nov (Sean, Morrow Library; L-330): Briar's revision replaced its row, but
+  // Cedar kept "the only bid that passes G1 to G3". A row that compared itself with
+  // the others is judged again, once, against the table as it now stands.
+  const revisedNow = new Set(items.filter((i) => i.revises && !args.existing.some((e) => e.id === i.id)).map((i) => i.id));
+  if (revisedNow.size && !stopped && !aborted(args.signal)) {
+    const again = comparativeRows(items, revisedNow);
+    if (again.length) {
+      const text = again.map((r) => `### ${r.subject ?? r.id} (${r.id})\n${(r.profile ?? '').trim() || [r.rationale, r.evidence].filter(Boolean).join('\n')}`).join('\n\n');
+      try {
+        const reply = await args.call(batchChunk(text), tableLines(items), { rejudge: true });
+        calls += 1;
+        const known = new Set(again.map((r) => r.id));
+        const rows = reply.items.filter((r) => r.revises && known.has(r.revises));
+        if (rows.length) {
+          // Each keeps its own pasted text and batch: it is the same item, judged again.
+          const before = new Map(again.map((r) => [r.id, r]));
+          const next = appendBatch(items, rows, now(), undefined, undefined).map((i) => {
+            const old = i.revises && known.has(i.revises) && !items.some((x) => x.id === i.id) ? before.get(i.revises) : undefined;
+            return old ? { ...i, batch: old.batch ?? i.batch, ...(old.profile ? { profile: old.profile } : {}), rejudged: 'true' } : i;
+          });
+          items = next;
+          await args.save(items, pending, 0);
+        }
+      } catch (e) {
+        if (!aborted(args.signal, e)) {
+          // The revision stands; the other rows keep their earlier judgment.
+        } else stopped = true;
+      }
+    }
   }
   return { items, added, ungraded, alreadyIn, pending, webQueries, calls, stopped, cut, batch };
 }

@@ -23,7 +23,7 @@ def test_names_already_in_the_table_are_left_out_and_counted():
     assert "ALREADY IN THE TABLE" in _ASSESS_INSTRUCTION
     assert "next_from" in _ASSESS_INSTRUCTION
     _system, user = build_assess_prompt(PMInput(objective="Screen candidates", audience="", constraints="", output_format="", mode="architect"), StageDigest(), SCALE, PASTE, already=["Candidate 1"])
-    assert "ALREADY IN THE TABLE (not judged again):\n- Candidate 1" in user
+    assert "ALREADY IN THE TABLE (id | subject | verdict; not judged again unless revised):\n- Candidate 1" in user
     assert "do not skip these" not in user
     out = parse_assessment({"items": [], "not_assessed": 0, "already_in_table": 1}, SCALE, PASTE)
     assert out.already_in_table == 1

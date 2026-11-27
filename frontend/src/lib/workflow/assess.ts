@@ -222,6 +222,41 @@ export interface AssessedRow {
   rationale: string;
   evidence: string;
   gaps: string;
+  /** The table row this one revises (L-330). */
+  revises?: string;
+}
+
+/**
+ * The rows that stand: a row a revision replaced keeps its place in the table
+ * as history (`superseded_by`), and is left out of counts, views and what later
+ * stages read as the current assessment (28 Nov, Sean, Morrow Library; L-330).
+ */
+export function activeRows(items: readonly StageItem[]): StageItem[] {
+  return items.filter((i) => !i.superseded_by?.trim());
+}
+
+/** The rows a revision replaced. */
+export function replacedRows(items: readonly StageItem[]): StageItem[] {
+  return items.filter((i) => i.superseded_by?.trim());
+}
+
+/** The table as the model is told it: "a_b573e4131b | V-B Briar | Red", for the rows that stand. */
+export function tableLines(items: readonly StageItem[]): string[] {
+  return activeRows(items).map((i) => [i.id, (i.subject ?? '').trim(), (i.verdict ?? '').trim() || 'no verdict'].join(' | ')).filter((l) => !l.includes('|  |'));
+}
+
+/** A reference a subject opens with, like "V-B" or "C12": two items sharing one are the same item. */
+export function referenceOf(subject: string | undefined): string {
+  const m = /^\s*(?:[([])?([A-Z]{1,4}-[A-Z0-9]{1,4}|[A-Z]{1,3}\d{1,4})\b/.exec(subject ?? '');
+  return m ? m[1] : '';
+}
+
+/** A rationale that compares the row with others ("the only bid that…"): a revision of another row can change it. */
+const COMPARES = /\b(?:only|sole|lowest|cheapest|highest|best|ranks?|ranked|first choice|outranks?|than (?:the )?other|compared with|alone)\b/i;
+
+/** The rows a revision elsewhere may have changed: those that stand and compare themselves with others. */
+export function comparativeRows(items: readonly StageItem[], except: ReadonlySet<string>): StageItem[] {
+  return activeRows(items).filter((i) => !except.has(i.id) && COMPARES.test(`${i.rationale ?? ''} ${i.gaps ?? ''}`));
 }
 
 /**
@@ -276,21 +311,36 @@ export function profileSlices(source: string, subjects: readonly string[]): Map<
  */
 export function appendBatch(existing: StageItem[], rows: AssessedRow[], at: string, source?: string, batchOf?: string): StageItem[] {
   const batch = batchOf || String(nextBatch(existing));
+  // A revision replaces the row it revises (28 Nov, Sean, Morrow Library: "Assess
+  // kept both Briar rows active"; L-330): the one the model named, or else the one
+  // row that stands under the same reference ("V-B") with another subject.
+  const standing = activeRows(existing);
+  const revised = new Map<string, string>();
+  for (const r of rows) {
+    const named = r.revises && standing.some((i) => i.id === r.revises) ? r.revises : '';
+    const ref = referenceOf(r.subject);
+    const byRef = !named && ref ? standing.filter((i) => referenceOf(i.subject) === ref && subjectKey(i.subject) !== subjectKey(r.subject)) : [];
+    const target = named || (byRef.length === 1 ? byRef[0].id : '');
+    if (target && ![...revised.values()].includes(target)) revised.set(r.id, target);
+  }
   // A name already in the table is not added twice (15 Nov: carrying a paste on,
-  // or pasting the same profiles again, duplicated rows).
-  const seen = new Set(existing.map((i) => subjectKey(i.subject)).filter(Boolean));
+  // or pasting the same profiles again, duplicated rows). A revision is added.
+  const seen = new Set(standing.map((i) => subjectKey(i.subject)).filter(Boolean));
   const fresh = rows.filter((r) => {
+    if (revised.has(r.id)) return true;
     const key = subjectKey(r.subject);
     if (!key) return true;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  const replacedBy = new Map([...revised].map(([newId, oldId]) => [oldId, newId]));
   const profiles = source ? profileSlices(source, fresh.map((r) => r.subject)) : new Map<string, string>();
   return [
-    ...existing,
+    ...existing.map((i) => (replacedBy.has(i.id) ? { ...i, superseded_by: replacedBy.get(i.id)!, superseded_at: at } : i)),
     ...fresh.map((r) => ({
       ...(profiles.get(r.subject) ? { profile: profiles.get(r.subject) } : {}),
+      ...(revised.has(r.id) ? { revises: revised.get(r.id)! } : {}),
       id: r.id,
       subject: r.subject,
       verdict: r.verdict,
@@ -319,7 +369,9 @@ export function levelOf(scale: AssessScale, verdict: string | undefined): ScaleL
 }
 
 /** How many rows sit at each level, in scale order, then the ungraded ones. */
-export function verdictCounts(scale: AssessScale, items: StageItem[]): { label: string; tone: VerdictTone; count: number }[] {
+export function verdictCounts(scale: AssessScale, all: StageItem[]): { label: string; tone: VerdictTone; count: number }[] {
+  // A row a revision replaced is history, not counted (L-330).
+  const items = activeRows(all);
   const counts = scale.levels.map((l) => ({ label: l.label, tone: l.tone, count: items.filter((i) => i.verdict === l.label).length }));
   const ungraded = items.filter((i) => !levelOf(scale, i.verdict)).length;
   return ungraded ? [...counts, { label: '', tone: 'neutral' as const, count: ungraded }] : counts;
@@ -351,7 +403,9 @@ export function batchesOf(items: StageItem[]): BatchInfo[] {
 }
 
 /** The rows a view shows. A batch that is gone (a restored version) shows every row. */
-export function rowsInView(items: StageItem[], view: BatchView): StageItem[] {
+export function rowsInView(all: StageItem[], view: BatchView): StageItem[] {
+  // Rows a revision replaced are listed apart, as history (L-330).
+  const items = activeRows(all);
   if (view.kind === 'all') return items;
   const batches = batchesOf(items);
   const wanted = view.kind === 'latest' ? batches.at(-1)?.batch : view.batch;

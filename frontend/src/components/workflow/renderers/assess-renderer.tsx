@@ -31,6 +31,8 @@ import {
   verdictCounts,
   type AssessScale,
   type BatchView,
+  activeRows,
+  replacedRows,
 } from '@/lib/workflow/assess';
 import type { StageItem } from '@/lib/workflow/stage-artifact';
 import { downloadBlob, downloadFile } from '@/lib/utils';
@@ -146,7 +148,9 @@ export function AssessRenderer({
   const editable = !readOnly && isHead;
   // Which rows, then how they are sorted (26 Nov, Sean: "Latest batch + Best first
   // would show the greens first … for just the LinkedIn page we're working on").
-  const batches = useMemo(() => batchesOf(items), [items]);
+  const batches = useMemo(() => batchesOf(activeRows(items)), [items]);
+  // Rows a revision replaced, kept as history (L-330).
+  const replaced = useMemo(() => replacedRows(items), [items]);
   const inView = useMemo(() => rowsInView(items, view), [items, view]);
   const counts = verdictCounts(scale, inView);
   const shown = useMemo(() => {
@@ -164,7 +168,7 @@ export function AssessRenderer({
   };
   const latest = batches.at(-1);
   const viewOptions = [
-    { value: 'all', label: t('assess.viewAll', { n: items.length }) },
+    { value: 'all', label: t('assess.viewAll', { n: items.length - replaced.length }) },
     ...(latest ? [{ value: 'latest', label: t('assess.viewLatest', { n: latest.batch, count: latest.count }) }] : []),
     ...[...batches].reverse().map((b) => ({
       value: `b:${b.batch}`,
@@ -518,6 +522,11 @@ export function AssessRenderer({
               </tbody>
             </table>
           </div>
+          {replaced.length > 0 && (
+            <p className="text-label text-[var(--on-surface-variant)]">
+              {t('assess.replaced', { list: replaced.map((r) => `${r.subject || r.id}${r.verdict ? ` (${r.verdict})` : ''}`).join('; ') })}
+            </p>
+          )}
         </section>
       )}
     </div>

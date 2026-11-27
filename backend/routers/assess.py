@@ -29,8 +29,11 @@ class AssessBatchRequest(BaseModel):
     scale: AssessScale
     text: str = Field(min_length=1, max_length=MAX_ASSESS_CHARS)
     stage_hint: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
-    #: Subjects already in the table, so a re-paste is noticed.
+    #: The rows already in the table ("id | subject | verdict"), so a re-paste is noticed
+    #: and a revision names the row it revises (L-330).
     already: list[str] = Field(default_factory=list, max_length=500)
+    #: The pasted rows are the table's own, judged again after another row was revised (L-330).
+    rejudge: bool = False
     model: str = ""
     web_access: WebAccess = "off"
 
@@ -61,7 +64,8 @@ async def api_assess_batch(
             scale=req.scale,
             text=req.text,
             stage_hint=req.stage_hint,
-            already=[s[:120] for s in req.already],
+            already=[s[:200] for s in req.already],
+            rejudge=req.rejudge,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)

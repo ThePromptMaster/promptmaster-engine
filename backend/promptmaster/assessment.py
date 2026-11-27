@@ -20,6 +20,7 @@ that is not is cleared and said, never guessed into the nearest level.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 
 from pydantic import BaseModel, Field
@@ -58,6 +59,8 @@ class AssessedItem(BaseModel):
     rationale: str = ""
     evidence: str = ""
     gaps: str = ""
+    #: The table row this one revises (28 Nov, L-330): only an id the table holds.
+    revises: str = ""
 
 
 class AssessBatchResult(BaseModel):
@@ -105,9 +108,12 @@ _ASSESS_INSTRUCTION = (
     "the first line of the first item you did not judge into `next_from`, character for "
     "character as it is in the pasted text (it is where the next batch starts).\n"
     "- An item named under ALREADY IN THE TABLE is not judged again: leave it out of "
-    "`items` and count it in `already_in_table`.\n"
+    "`items` and count it in `already_in_table` — unless the pasted text revises it (a revised "
+    "bid or offer, an updated profile, a correction, or new terms under the same reference): "
+    "then judge the revision as an item and put that row's id, as listed, in `revises`. "
+    "Leave `revises` empty for anything else.\n"
     "Return JSON only, with shape: "
-    '{ "items": [ { "subject": "", "verdict": "", "rationale": "", "evidence": "", "gaps": "" } ], '
+    '{ "items": [ { "subject": "", "verdict": "", "rationale": "", "evidence": "", "gaps": "", "revises": "" } ], '
     '"not_assessed": 0, "next_from": "", "already_in_table": 0 }'
 )
 
@@ -127,9 +133,12 @@ def build_assess_prompt(
     text: str,
     stage_hint: str = "",
     already: list[str] | None = None,
+    rejudge: bool = False,
 ) -> tuple[str, str]:
     """(system, user) for one batch. Pure, so the prompt can be asserted without a model."""
     parts = [_ASSESS_INSTRUCTION, _scale_block(scale)]
+    if rejudge:
+        parts.append(_REJUDGE_INSTRUCTION)
     if stage_hint.strip():
         parts.append(f"THIS STAGE:\n{stage_hint.strip()}")
     system = _shared_system(inputs, [], "\n\n".join(parts))
@@ -150,12 +159,30 @@ def build_assess_prompt(
         # 15 Nov: a batch carried on from where the last one stopped, or pasted
         # again, would otherwise add the same people twice.
         user += [
-            "ALREADY IN THE TABLE (not judged again):",
+            "ALREADY IN THE TABLE (id | subject | verdict; not judged again unless revised):"
+            if not rejudge else "THE TABLE AS IT STANDS NOW (id | subject | verdict):",
             *(f"- {s}" for s in already[:200]),
             "",
         ]
     user += ["--- BEGIN PASTED ITEMS ---", text.strip(), "--- END PASTED ITEMS ---"]
     return system, "\n".join(user)
+
+
+_REJUDGE_INSTRUCTION = (
+    "RE-JUDGE: the pasted items are rows already in the table, given again because another row "
+    "was revised. Judge each again against THE CRITERIA and the table as it stands now, and put "
+    "its own id (the one in its heading) in `revises`. A rationale that compared it with other "
+    "rows (\"the only bid that…\", \"the lowest…\") compares with the rows as they are now. "
+    "Do not count them in `already_in_table`."
+)
+
+#: A row id as the browser lists it: "a_b573e4131b | V-B Briar | Red".
+_ROW_ID = re.compile(r"^\s*(a_[0-9a-f]{6,})\b")
+
+
+def known_ids(already: list[str] | None) -> set[str]:
+    """The row ids the table holds, from the lines the browser sent."""
+    return {m.group(1) for line in already or [] if (m := _ROW_ID.match(line))}
 
 
 def _match_level(raw: str, scale: AssessScale) -> str:
@@ -175,7 +202,7 @@ def _text(value: object, limit: int) -> str:
     return str(value or "").strip()[:limit]
 
 
-def parse_assessment(raw: object, scale: AssessScale, text: str = "") -> AssessBatchResult:
+def parse_assessment(raw: object, scale: AssessScale, text: str = "", ids: set[str] | None = None) -> AssessBatchResult:
     rows = raw.get("items") if isinstance(raw, dict) else None
     items: list[AssessedItem] = []
     ungraded = 0
@@ -196,6 +223,8 @@ def parse_assessment(raw: object, scale: AssessScale, text: str = "") -> AssessB
             rationale=rationale,
             evidence=_text(row.get("evidence"), 600),
             gaps=_text(row.get("gaps"), 400),
+            # Kept only when the table holds that row: a made-up id revises nothing.
+            revises=revised if (revised := str(row.get("revises") or "").strip()) in (ids or set()) else "",
         ))
     extra = raw.get("not_assessed") if isinstance(raw, dict) else 0
     not_assessed = extra if isinstance(extra, int) and extra > 0 else 0
@@ -232,9 +261,10 @@ async def assess_batch(
     text: str,
     stage_hint: str = "",
     already: list[str] | None = None,
+    rejudge: bool = False,
 ) -> AssessBatchResult:
     """Judge one pasted batch. One LLM call."""
-    system, user = build_assess_prompt(inputs, digest, scale, text, stage_hint, already)
+    system, user = build_assess_prompt(inputs, digest, scale, text, stage_hint, already, rejudge)
     try:
         raw, _usage = await client.generate_json(
             prompt=user, system=system, temperature=0.2, max_tokens=8192, model=model,
@@ -248,4 +278,4 @@ async def assess_batch(
             raise
         logger.warning("assess batch JSON failed: %s", e)
         return AssessBatchResult(finish_reason="error")
-    return parse_assessment(raw, scale, text)
+    return parse_assessment(raw, scale, text, known_ids(already))

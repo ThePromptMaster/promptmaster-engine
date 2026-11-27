@@ -6464,3 +6464,31 @@ Limits:
   approval ticked on a stage is already tied to its version (L-117).
 - Sections are found by Markdown heading; an approval of a passage with no heading of its own is not compared.
 
+
+### L-330 — In Assess, a revised item replaces the row it revises, and rows that compared themselves are judged again (2026-11-28)
+
+Sean, 27 Nov (Morrow Library): "I then recorded a signed revision for existing vendor V-B Briar … I reopened it,
+submitted the revision under V-B, and used Apply and continue. Assess kept both Briar rows active and Cedar's old
+'only eligible bid' explanation, but Shortlist v3 correctly treated old Briar as history."
+
+What happened: an Assess stage only ever appended. Each returned row got a new id, the model was told the rows
+already in the table by subject alone and had no way to say "this revises that row", and a row was dropped as a
+duplicate only on an exact subject match. The revised bid's subject differed, so it was added beside the old one,
+and nothing judged Cedar again after Briar became eligible.
+
+Now (`lib/workflow/assess.ts`, `assess-run.ts`, `backend/promptmaster/assessment.py`):
+- **The table is told with its ids** ("a_b573e4131b | V-B Briar | Red"), and the model may name the row an item
+  revises in `revises`; the server keeps it only for an id the table holds.
+- **A revision replaces its row** (`appendBatch`): the named row, or else the one standing row under the same
+  reference the subject opens with ("V-B"), is marked `superseded_by` and kept as history. It is left out of
+  counts, views and what later stages read (`activeRows`, `assessmentText` lists it under "Replaced by a revision").
+  The table shows a line naming the replaced rows.
+- **Rows that compared themselves are judged again** (`comparativeRows`): after a paste that revised a row, the
+  standing rows whose rationale compares them with others ("the only bid that…", "lowest", "not ranked") are sent
+  once more with `rejudge`, and each new judgment replaces its row, keeping its batch and pasted text.
+
+Limits:
+- The re-judge is one extra call per paste that revised something, and only for rows whose rationale reads as a
+  comparison; a row whose verdict depended on another row without saying so is not re-judged.
+- The reference fallback needs a reference at the start of the subject ("V-B", "C12"); otherwise only the model's
+  `revises` links a revision to its row.

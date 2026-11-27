@@ -977,12 +977,14 @@ export const api = {
       text: string;
       stage_hint?: string;
       already?: string[];
+      /** The rows sent are the table's own, judged again after another row was revised (L-330). */
+      rejudge?: boolean;
       model?: string;
       web_access?: 'on' | 'off';
     },
     signal?: AbortSignal
   ): Promise<import('@/lib/workflow/web-found').WebUse & {
-    items: { id: string; subject: string; verdict: string; rationale: string; evidence: string; gaps: string }[];
+    items: { id: string; subject: string; verdict: string; rationale: string; evidence: string; gaps: string; revises?: string }[];
     ungraded: number;
     not_assessed: number;
     /** The first line of the first item not judged, as pasted; '' when it is not in the paste (15 Nov). */
