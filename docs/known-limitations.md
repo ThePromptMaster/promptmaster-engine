@@ -6478,6 +6478,9 @@ Limits:
 - Only an approval written as a fact or constraint that names the stage and version ("Output v2") is read. An
   approval ticked on a stage is already tied to its version (L-117).
 - Sections are found by Markdown heading; an approval of a passage with no heading of its own is not compared.
+- A line that is only a bold status label ("**Draft: not approved, not sent.**") is a note too (28 Nov: on the
+  production rerun the OUTREACH wording was unchanged and only that label had moved to "Wording approved (D5)", so
+  code reported a difference and left it to the check). A bold line that is part of the text is still compared.
 
 
 ### L-330 — In Assess, a revised item replaces the row it revises, and rows that compared themselves are judged again (2026-11-28)
