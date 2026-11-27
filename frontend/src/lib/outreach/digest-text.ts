@@ -7,6 +7,7 @@ import { parseContacts } from './contacts';
 import { parseDrafts, parseMessage } from './drafts';
 
 const MAX_ROWS = 300;
+const SIGNED = 'Sender and signature: from Settings. The signature, logo, postal address and opt-out line are added under every email when it goes out, so the message and the emails carry no sign-off.';
 
 export function outreachText(part: 'contacts' | 'message' | 'drafts' | undefined, content: string): string {
   if (part === 'message') {
@@ -20,6 +21,11 @@ export function outreachText(part: 'contacts' | 'message' | 'drafts' | undefined
       `Offer (every email): ${m.variables.offer || '(none set)'}`,
       `Link (every email): ${m.variables.link || '(none set)'}`,
       ...(m.followup ? ['', `Follow-up after ${m.followup.after_business_days} business days without a reply:`, m.followup.body] : []),
+      '',
+      // 27 Nov pass: Go asked what signature to put under each email. It is not the message's to say.
+      m.sender_id
+        ? SIGNED
+        : 'Sender and signature: not chosen yet. The user sets them in Settings, under Outreach; nothing in the message names the sender.',
     ].join('\n');
   }
   if (part === 'contacts') {
@@ -39,6 +45,7 @@ export function outreachText(part: 'contacts' | 'message' | 'drafts' | undefined
     return parseDrafts(content)
       .slice(0, MAX_ROWS)
       .map((d, i) => `${i + 1}. To ${d.to || '(no address)'} — ${d.subject} [${d.status === 'approved' ? 'approved' : d.status === 'set_aside' ? `set aside${d.reason ? `: ${d.reason}` : ''}` : 'not decided'}]`)
+      .concat(['', `${SIGNED} Approving and sending each email are the user's, on this stage.`])
       .join('\n');
   }
   return '';

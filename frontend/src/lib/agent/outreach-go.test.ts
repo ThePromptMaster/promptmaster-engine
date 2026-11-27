@@ -107,3 +107,14 @@ describe('Go never approves or sends', () => {
     expect(text).not.toMatch(/outreach-sends|use-sending|outreach-job|outreach-client|outreach-store|outreachTickets|outreachCheckTest|scheduleSends|createApprovals/);
   });
 });
+
+// 27 Nov pass: Go asked "What name … should appear as the signature under each email?"
+describe('what Go reads of the message and the emails', () => {
+  it('says the signature comes from Settings and approving and sending are the user\'s', async () => {
+    const { outreachText } = await import('@/lib/outreach/digest-text');
+    const withSender = outreachText('message', serializeMessage({ ...blankMessage(), subject: 'Hi', body: 'B', sender_id: 's1' }));
+    expect(withSender).toContain('Sender and signature: from Settings.');
+    expect(outreachText('message', serializeMessage({ ...blankMessage(), subject: 'Hi', body: 'B' }))).toContain('not chosen yet');
+    expect(outreachText('drafts', '{"kind":"stage_items","items":[]}')).toContain("Approving and sending each email are the user's");
+  });
+});
