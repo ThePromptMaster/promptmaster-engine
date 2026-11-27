@@ -3816,6 +3816,11 @@ export function WorkflowWorkspace({
                     const says = checkVerdict(evaluations?.[headId ?? ''], headId, stage);
                     return says ? { stageId: stage.id, label: stage.short_label || stage.label, says } : null;
                   })()).map((item) => shownOutstanding(item, locale, outstandingShow)),
+                  // A fix saved after a failed check waits for its own check (L-326).
+                  faultedEarlier: (() => {
+                    const last = [...(stageBundles[stage.id]?.versions ?? [])].reverse().find((v) => evaluations?.[v.id]);
+                    return last && checkVerdict(evaluations?.[last.id], last.id, stage) ? last.version_number : undefined;
+                  })(),
                 })}
               />
             ) : null}

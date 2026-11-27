@@ -71,3 +71,23 @@ describe('a version its own check faults is not ready (28 Nov, Sean, Harborlight
     expect(readinessBlocking([optional], null)).toEqual([]);
   });
 });
+
+describe('a fix saved after a failed check waits for its own check (L-326)', () => {
+  const versions = [{ id: 'v3', version_number: 3 }, { id: 'v4', version_number: 4 }];
+  const input = { versions, evaluatedVersionIds: new Set(['v3']), approvals: [], approvalVersions: {}, blocking: [] as string[] };
+
+  it('the check of v3 found problems and v4 is not checked: not ready, and says why', () => {
+    const rows = deliverableReadiness({ ...input, faultedEarlier: 3 });
+    expect(rows[1]).toMatchObject({ key: 'checked', state: 'open', earlier: 3, version: 4 });
+    expect(rows[3]).toMatchObject({ key: 'ready', state: 'open', recheck: true, earlier: 3, version: 4 });
+  });
+
+  it('once v4 is checked, or when the earlier check passed, it is ready', () => {
+    expect(deliverableReadiness({ ...input, evaluatedVersionIds: new Set(['v3', 'v4']), faultedEarlier: 3 })[3]).toMatchObject({ state: 'done', version: 4 });
+    expect(deliverableReadiness(input)[3]).toMatchObject({ state: 'done', version: 4 });
+  });
+
+  it('what holds finishing is said first', () => {
+    expect(deliverableReadiness({ ...input, faultedEarlier: 3, blocking: ['Answer needs a recheck'] })[3]).toEqual({ key: 'ready', state: 'open', detail: 'Answer needs a recheck' });
+  });
+});

@@ -31,6 +31,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ready.ready': 'جاهز',
   'ready.version': 'الإصدار {n}',
   'ready.earlier': 'على الإصدار {earlier}؛ الحالي هو {current}',
+  'ready.recheck': 'وجد فحص الإصدار {earlier} مشكلات؛ لم يُفحص الإصدار {current} بعد',
   'ready.notYet': 'ليس بعد',
   'ready.notAsked': 'غير مطلوب',
   'ready.yes': 'نعم',

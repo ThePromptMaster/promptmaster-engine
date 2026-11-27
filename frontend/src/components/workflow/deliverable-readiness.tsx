@@ -8,6 +8,7 @@ export function DeliverableReadiness({ rows }: { rows: readonly ReadinessRow[] }
   const t = useT();
   const value = (r: ReadinessRow) => {
     if (r.state === 'none') return t('ready.notAsked');
+    if (r.recheck) return t('ready.recheck', { earlier: r.earlier ?? '', current: r.version ?? '' });
     if (r.earlier !== undefined) return t('ready.earlier', { earlier: r.earlier, current: r.version ?? '' });
     if (r.state === 'open') return r.detail ?? t('ready.notYet');
     return r.key === 'ready' && r.version === undefined ? t('ready.yes') : t('ready.version', { n: r.version ?? '' });
