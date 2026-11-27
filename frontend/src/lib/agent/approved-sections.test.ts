@@ -54,4 +54,17 @@ describe('the section an approval names, compared with the version it names (L-3
     const gone = v4.replace(sectionUnder(v4, 'OUTREACH')!, '');
     expect(approvedComparisons(template, bundles, gone, { id: 'o5', version_number: 5 }, [d5]).find((c) => c.section === 'OUTREACH')).toMatchObject({ identical: false, differences: ['v5: no section named OUTREACH'] });
   });
+
+  it('a bold status label that changed is set aside as a note (28 Nov production rerun)', () => {
+    const was = '## OUTREACH: Candidate outreach draft\n\n**Draft: not approved, not sent.**\n\nDear [Candidate name],\n\nThe role reports to the CEO.';
+    const now = '## OUTREACH: Candidate outreach draft\n\n**Wording approved (D5, Output v3 text). Not authorized to send. Not sent.**\n\nDear [Candidate name],\n\nThe role reports to the CEO.';
+    const b = { output: { versions: [{ id: 'o3', version_number: 3, content: was }, { id: 'o4', version_number: 4, content: now }] } };
+    const [c] = approvedComparisons(template, b, now, { id: 'o4', version_number: 4 }, ['Elise signed approval D5 for the OUTREACH wording as it appears in saved Output v3.']);
+    expect(c).toMatchObject({ section: 'OUTREACH', identical: true });
+    expect(c.notesAside).toHaveLength(2);
+    // A bold line that is part of the message is not a status label.
+    const bodyBold = now.replace('The role reports to the CEO.', '**The role reports to the CEO.**');
+    expect(approvedComparisons(template, b, bodyBold, { id: 'o5', version_number: 5 }, ['Elise signed approval D5 for the OUTREACH wording as it appears in saved Output v3.'])[0].identical).toBe(false);
+  });
 });
+

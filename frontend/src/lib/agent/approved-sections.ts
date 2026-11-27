@@ -77,8 +77,17 @@ const APPROVES = /\b(?:approv(?:al|ed|es|e)|signed|signs? off|sign-off)\b/i;
 /** One that says something is not approved. */
 const NOT_APPROVED = /\b(?:unapproved|not (?:yet )?approved|without approval|excluded|does not cover|do(?:es)? not extend)\b/i;
 
-/** A line that annotates the section rather than being part of it. */
-const isNote = (line: string) => /^>/.test(line) || /\bnot part of (?:the )?(?:message|text|email|letter|wording)\b/i.test(line);
+/**
+ * A line that annotates the section rather than being part of it: a quoted
+ * note, one marked "not part of the message", or a line that is only a bold
+ * status label ("**Draft: not approved, not sent.**" becoming "**Wording
+ * approved (D5, Output v3 text). Not sent.**" — 28 Nov, production rerun of
+ * Northline: the wording was the same and only that label had changed).
+ */
+const isNote = (line: string) =>
+  /^>/.test(line) ||
+  /\bnot part of (?:the )?(?:message|text|email|letter|wording)\b/i.test(line) ||
+  (/^\*\*[^*]+\*\*$/.test(line.trim()) && /\b(?:draft|approv\w*|not (?:yet )?sent|sent|unsent|version \d+|status)\b/i.test(line));
 
 const lineSet = (section: string) =>
   section
