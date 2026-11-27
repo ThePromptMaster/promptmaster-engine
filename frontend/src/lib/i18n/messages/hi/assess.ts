@@ -66,6 +66,7 @@ export const hi: Record<keyof typeof en, string> = {
   "assess.stop": "रोकें",
   "assess.view": "कौन से बैच",
   "assess.viewAll": "सभी बैच ({n})",
+  "assess.replaced": "संशोधन से बदला गया, इतिहास के रूप में रखा गया: {list}",
   "assess.viewLatest": "नवीनतम बैच: बैच {n} ({count})",
   "assess.viewBatch": "बैच {n} ({count})",
   "assess.viewBatchAt": "बैच {n} · {when} ({count})",

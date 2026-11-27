@@ -224,7 +224,10 @@ export const PROFILES_MAX = 60_000;
  * shortlist wrote "Met at batch assessment; profile wording not held" for nine
  * candidates and its repairs could not put the evidence back.
  */
-export function assessmentText(items: readonly StageItem[]): string {
+export function assessmentText(all: readonly StageItem[]): string {
+  // A row a revision replaced is history: said apart, never as a current row (L-330).
+  const items = all.filter((i) => !i.superseded_by?.trim());
+  const replaced = all.filter((i) => i.superseded_by?.trim());
   const one = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
   const lines = (v: unknown) => String(v ?? '').split('\n').map((l) => l.replace(/^\s*[-*]\s*/, '').trim()).filter(Boolean);
   const rows = items.map((item, i) => {
@@ -237,6 +240,10 @@ export function assessmentText(items: readonly StageItem[]): string {
     ].join('\n');
   });
   const out = [`${items.length} assessed:`, ...rows];
+  if (replaced.length) {
+    const by = (id: string | undefined) => one(all.find((i) => i.id === id)?.subject) || id;
+    out.push('', 'REPLACED BY A REVISION (history, not current):', ...replaced.map((r) => `- ${one(r.subject) || r.id} — was ${one(r.verdict) || 'no verdict'}; replaced by "${by(r.superseded_by)}"`));
+  }
   // The rows going forward first (Advance, Shortlist, Strong): the shortlist quotes those.
   const forward = (v: string | undefined) => /\b(?:advance|shortlist|strong|proceed|recommend|yes)\w*/i.test(v ?? '');
   const withProfile = items.filter((i) => (i.profile ?? '').trim()).sort((a, b) => Number(forward(b.verdict)) - Number(forward(a.verdict)));

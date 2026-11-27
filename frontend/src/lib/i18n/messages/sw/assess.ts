@@ -66,6 +66,7 @@ export const sw: Record<keyof typeof en, string> = {
   "assess.stop": "Simamisha",
   "assess.view": "Makundi gani",
   "assess.viewAll": "Makundi yote ({n})",
+  "assess.replaced": "Imebadilishwa na marekebisho, imehifadhiwa kama historia: {list}",
   "assess.viewLatest": "Kundi la mwisho: Kundi {n} ({count})",
   "assess.viewBatch": "Kundi {n} ({count})",
   "assess.viewBatchAt": "Kundi {n} · {when} ({count})",

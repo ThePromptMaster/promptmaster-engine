@@ -1696,7 +1696,7 @@ export function WorkflowWorkspace({
           batch,
           signal: controller.signal,
           onProgress: (judged, left) => reportAssess(key, 'page', judged, left),
-          call: async (chunk, already) => {
+          call: async (chunk, already, opts) => {
             const res = await api.assessBatch(
               {
                 inputs: inputsFrom(project),
@@ -1705,6 +1705,7 @@ export function WorkflowWorkspace({
                 text: chunk,
                 stage_hint: target.entry_prompt_hint ?? '',
                 already,
+                ...(opts?.rejudge ? { rejudge: true } : {}),
                 model: project.model,
                 web_access: webAccessOf(project),
               },

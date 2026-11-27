@@ -1966,7 +1966,7 @@ async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
           batch: fromPending ? saved?.pending?.batch : undefined,
           signal: ctx.signal,
           onProgress: (judged, left) => reportAssess(lockKey, 'go', judged, left),
-          call: async (chunk, already) => {
+          call: async (chunk, already, opts) => {
             const res = await api.assessBatch(
               {
                 inputs: inputsFrom(ctx.project),
@@ -1975,6 +1975,7 @@ async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
                 text: chunk,
                 stage_hint: ctx.stage.entry_prompt_hint ?? '',
                 already,
+                ...(opts?.rejudge ? { rejudge: true } : {}),
                 model: ctx.project.model,
                 web_access: webAccessOf(ctx.project),
               },

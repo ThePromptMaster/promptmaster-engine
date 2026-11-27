@@ -85,3 +85,51 @@ def test_a_scale_needs_two_levels(client_with):
         "inputs": INPUTS, "scale": {"levels": [{"value": "ok", "label": "OK"}]}, "text": "x",
     })
     assert r.status_code == 422
+
+
+# 27 Nov (Sean, Morrow Library; L-330): "I reopened [Assess], submitted the revision
+# under V-B, and used Apply and continue. Assess kept both Briar rows active and
+# Cedar's old 'only eligible bid' explanation."
+MORROW_TABLE = [
+    "a_b573e4131b | V-B Briar Bindery | red",
+    "a_c0ffee1234 | V-C Cedar Conservation | green",
+]
+
+
+def test_a_revision_names_the_row_it_revises():
+    system, user = build_assess_prompt(
+        PMInput(**INPUTS), StageDigest(**DIGEST), AssessScale(**TRAFFIC), "V-B Briar — signed revised bid $40,500, insurance valid", already=MORROW_TABLE,
+    )
+    assert "ALREADY IN THE TABLE (id | subject | verdict; not judged again unless revised):" in user
+    assert "- a_b573e4131b | V-B Briar Bindery | red" in user
+    assert "put that row's id, as listed, in `revises`" in system
+    assert '"revises": ""' in system
+
+
+def test_revises_is_kept_only_for_a_row_the_table_holds():
+    from promptmaster.assessment import known_ids
+    ids = known_ids(MORROW_TABLE)
+    assert ids == {"a_b573e4131b", "a_c0ffee1234"}
+    result = parse_assessment(
+        {"items": [
+            {"subject": "V-B Briar (revised bid)", "verdict": "green", "rationale": "- $40,500 all-in", "revises": "a_b573e4131b"},
+            {"subject": "V-D Dune", "verdict": "red", "rationale": "- late", "revises": "a_made_up_99"},
+        ]},
+        AssessScale(**TRAFFIC), "", ids,
+    )
+    assert [i.revises for i in result.items] == ["a_b573e4131b", ""]
+
+
+def test_a_rejudge_says_the_rows_are_the_tables_own(client_with):
+    stub = AsyncMock()
+    stub.generate_json.return_value = ({"items": [{"subject": "V-C Cedar Conservation", "verdict": "amber", "rationale": "- No longer the only eligible bid", "revises": "a_c0ffee1234"}], "not_assessed": 0, "next_from": ""}, None)
+    c = client_with(stub)
+    r = c.post("/api/assess-batch", json={
+        "inputs": INPUTS, "digest": DIGEST, "scale": TRAFFIC, "text": "### V-C Cedar Conservation (a_c0ffee1234)\nBid $42,500.",
+        "already": MORROW_TABLE, "rejudge": True,
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["revises"] == "a_c0ffee1234"
+    kwargs = stub.generate_json.call_args.kwargs
+    assert "RE-JUDGE: the pasted items are rows already in the table" in kwargs["system"]
+    assert "THE TABLE AS IT STANDS NOW (id | subject | verdict):" in kwargs["prompt"]
