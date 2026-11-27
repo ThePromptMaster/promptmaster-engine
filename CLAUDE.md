@@ -131,6 +131,8 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 
 **Stage state is projected from the `workflow_events` log in exactly one place** (`projectState` in `engine.ts`). Events are the record; `projects.stage` is a denormalised cursor for the list view.
 
+**A round with nothing new moves on** (28 Nov, L-323): outside research, a round's closing stage offers the next round only when the user changed something since it began (`newSinceRoundBegan`); otherwise Go advances to the write-up.
+
 **The latest update and a stage's statuses** (28 Nov, L-321): the Go panel's "Latest update" card (`lib/workflow/latest-update.ts`) reads the change summary, Go's steps and `currentTasks`, and names a blocked check as unsafe to act on; a stage's written / checked / approved / open-in-the-world line shows only when they differ (`stage-status.ts`). A Go step that saved a version after the facts changed reopens its stage (`reopenIfFactsMovedOn`, L-322).
 
 **A version the user approved is left alone** (28 Nov, L-320): Go offers no check, revision or findings on a head the user approved (`approvedHead`); a re-approval is asked of a checked version (`reapprovalDue`); an approval stop names its version (`checkedVersionId`) and ends when a newer version or a newer check of it says otherwise. A finding that only relabels earlier findings is routine (`onlyRecordKeeping`).

@@ -451,7 +451,12 @@ export function allowedActions(
   // — the loop removes it after a proposal.
   if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
   // A round that has produced its question can propose the next one (the user starts it).
-  if (stage.transitions.loop_to && stageHasDraft) keys.push('propose_next_round');
+  // Not in work that keeps records and waits for updates, when nothing new came in since the round
+  // began: another round would redo every stage with nothing to take in. The work moves on to the
+  // write-up instead, and the next update reopens what it concerns (L-323). Research keeps its rounds:
+  // a round there finds things of its own.
+  const idleRound = Boolean(stage.transitions.loop_to) && template.key !== 'research' && !template.inquiry && Boolean(facts.roundNothingNew);
+  if (stage.transitions.loop_to && stageHasDraft && !idleRound) keys.push('propose_next_round');
   // The stage that closes a round does not move on to the write-up by Go's
   // choice: open-ended work "is going to go on forever" (3 Oct call), and on
   // production Go took the write-up after one round. It proposes the next
@@ -466,7 +471,7 @@ export function allowedActions(
   // moves nothing ("It is the last stage; nothing follows it"), and each try set the
   // same question aside again in new words. What is left there is the objective check.
   const lastAndDone = !stage.transitions.default_next && ['complete', 'completed_with_artifact'].includes(state.stages[stage.id]?.status ?? '');
-  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to && !staleRoundDraft && !lastAndDone) keys.push('advance_stage');
+  if (nextSuggestedStage(template, state) && (!stage.transitions.loop_to || (idleRound && stageHasDraft)) && !staleRoundDraft && !lastAndDone) keys.push('advance_stage');
   // Nothing is stuck before it has been tried: a stage that drafts and has no
   // draft yet is drafted first. Offered both, the planner on an empty review
   // stage chose "stuck — no draft text" over drafting the review from the

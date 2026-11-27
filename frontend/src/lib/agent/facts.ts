@@ -176,11 +176,34 @@ export interface StageFacts {
   /** The stage's current version: what a stop raised on it asks about (L-320). */
   headVersionId?: string;
   /**
+   * A stage that closes a round, in a round with nothing new since it began: no change the user made to
+   * the brief or facts (L-323, 27 Nov: on "maintain the records and wait for the next update" projects,
+   * Go started round after round with nothing to take in, redoing every stage each time).
+   */
+  roundNothingNew?: boolean;
+  /**
    * A reserved approval was given on an earlier version and the stage has changed since: before the user
    * is asked again, the current version is checked and its findings applied (L-320: v8, a repair, was put
    * to him unchecked).
    */
   reapprovalDue?: boolean;
+}
+
+/**
+ * Whether the user changed the brief or facts since the current round began (the last "next round", or
+ * the project's start): something for a new round to take in. Go's own reopenings are not new input.
+ */
+export function newSinceRoundBegan(
+  events: readonly Pick<WorkflowEvent, 'type' | 'actor' | 'created_at' | 'payload'>[],
+  /** When the round's closing stage was last written: a change before it has been taken in already. */
+  closedAt?: string
+): boolean {
+  const roundAt = [...events].reverse().find((e) => e.payload?.next_round === true)?.created_at ?? events[0]?.created_at ?? '';
+  const began = closedAt && closedAt > roundAt ? closedAt : roundAt;
+  return events.some(
+    (e) => e.type === 'brief_changed' && e.actor === 'user' && e.created_at > began &&
+      !e.payload?.presentation_only && !e.payload?.proposed && !e.payload?.made_before_change
+  );
 }
 
 /** Whether the user's own approval stands on this stage's current version, or was given on an earlier one. */
@@ -289,6 +312,7 @@ export async function readStageFacts(input: {
     facts.batch = { offered: true, noun: stage.assess?.item_noun?.trim() || null, left: true };
   }
   if (bundles[stage.id]?.versions.at(-1)?.source_operation === PREPARED_OPERATION) facts.prepared = true;
+  if (stage.transitions.loop_to) facts.roundNothingNew = !newSinceRoundBegan(events, bundles[stage.id]?.versions.at(-1)?.created_at);
   const headNow = bundles[stage.id]?.versions.at(-1);
   if (headNow) facts.headVersionId = headNow.id;
   const approval = approvalOnHead(project, stage, bundles[stage.id]?.versions ?? []);
