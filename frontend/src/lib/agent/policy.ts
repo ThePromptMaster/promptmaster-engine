@@ -362,12 +362,54 @@ export function stageHasCurrentDraft(
   template: WorkflowTemplate,
   state: WorkflowState,
   stageId: string,
-  head: { content?: string | null; created_at?: string } | undefined
+  head: { content?: string | null; created_at?: string } | undefined,
+  /**
+   * The stages' versions and when the brief or facts last changed: a draft made
+   * before that change and older than the work before it is not current (L-328).
+   */
+  since?: { bundles: Readonly<Record<string, { versions: readonly { created_at: string }[] } | undefined>>; changedAt?: string }
 ): boolean {
   if (!(head?.content ?? '').trim()) return false;
+  if (since && draftPredatesInputs(template, state, stageId, head, since.bundles, since.changedAt)) return false;
   if (!template.stages.some((s) => s.transitions.loop_to)) return true;
   const entered = state.stages[stageId]?.entered_at;
   return !entered || !head?.created_at || head.created_at >= entered;
+}
+
+/** When the user last changed the brief or the facts: not a wording edit, nor Go's own record (L-322). */
+export function lastBriefChangeAt(events: readonly { type: string; created_at: string; payload?: Record<string, unknown> | null }[]): string | undefined {
+  return [...events].reverse().find((e) => e.type === 'brief_changed' && !e.payload?.presentation_only && !e.payload?.made_before_change)?.created_at;
+}
+
+/**
+ * A draft the stage held before it was entered and before the brief or facts
+ * last changed, older than the latest version of a stage before it (28 Nov,
+ * Sean, Alder Quay; L-328). "Final packet was
+ * still on the original v1 … Go tried to fix it, saw that cutting the packet to
+ * 95 words would drop a required section, and stopped without saving a new
+ * Final version." Final v1 was the quick answer carried into the full process;
+ * Draft and Check were redone after two dated updates, but Final had never been
+ * entered, so nothing reopened it, and Go treated the old answer as Final's
+ * draft and repaired it toward a limit with "add nothing new". Such a draft is
+ * not the stage's own: Go writes the stage from the work before it. With no
+ * change since, a carried answer is still what the later stages build on (L-123)
+ * and stays the draft. A stage the projection reopened, or one finished, is left
+ * to the recheck that handles it.
+ */
+export function draftPredatesInputs(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  stageId: string,
+  head: { created_at?: string } | undefined,
+  bundles: Readonly<Record<string, { versions: readonly { created_at: string }[] } | undefined>>,
+  changedAt: string | undefined
+): boolean {
+  const at = head?.created_at;
+  const st = state.stages[stageId];
+  if (!at || !changedAt || at >= changedAt || !st?.entered_at || at >= st.entered_at) return false;
+  if (st.status !== 'in_progress' && st.status !== 'not_started') return false;
+  const idx = template.stages.findIndex((s) => s.id === stageId);
+  return idx > 0 && template.stages.slice(0, idx).some((s) => (bundles[s.id]?.versions.at(-1)?.created_at ?? '') > at);
 }
 
 export function allowedActions(

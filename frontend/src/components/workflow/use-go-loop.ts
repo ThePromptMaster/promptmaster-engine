@@ -75,7 +75,7 @@ import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurab
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, POLISH_WHEN_READY, isSetupStage, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
+import { MAX_RETURNS, allowedActions, unplannedMove, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, draftPredatesInputs, lastBriefChangeAt, toolsFor, polishSinceDirection, polishCapped, POLISH_WHEN_READY, isSetupStage, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost, levelFor } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -988,7 +988,7 @@ export function useGoLoop(opts: Options) {
           continue;
         }
 
-        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(freshEvents) });
         // One read decides the moves, the requirements and what the planner
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
@@ -1192,7 +1192,8 @@ export function useGoLoop(opts: Options) {
           repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id))),
           extraTriesRef.current
         );
-        const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
+        // A draft older than the work before it, held since before the stage was entered, is written again rather than repaired (L-328).
+        const drafted = new Set(Object.entries(o.bundles).filter(([id, b]) => (b?.versions.length ?? 0) > 0 && !draftPredatesInputs(o.template, o.state, id, b?.versions.at(-1), o.bundles, lastBriefChangeAt(freshEvents))).map(([id]) => id));
         const holder = deliverableDocument(o.template, o.bundles)?.stage;
         // Once the deliverable is written it can't be "stuck" on anything but
         // itself: what's left is the world's, and gets recorded (7 Nov).
@@ -2409,7 +2410,7 @@ export function useGoLoop(opts: Options) {
         });
         const current = runRef.current;
         if (cancelled || abortRef.current || !current || current.id !== liveRunId || current.needs !== need) return;
-        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1), { bundles: o.bundles, changedAt: lastBriefChangeAt(o.events) });
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),

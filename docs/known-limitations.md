@@ -6407,3 +6407,26 @@ Limits:
   guarded again. Lines a model drops for no reason in that revision are not put back.
 - "still uses X instead of Y" is read from the check's own sentence. A check worded another way ("uses X where the
   update says Y") falls to the general rule.
+
+### L-328 — A stage holding text from before a change is written again from the work before it (2026-11-28)
+
+Sean, 27 Nov (Alder Quay, second update): "Draft correctly counted 90 words in the executive update against its
+95-word cap. Final packet was still on the original v1 and counted all 853 words against that same cap. Go tried
+to fix it, saw that cutting the packet to 95 words would drop a required section, and stopped without saving a
+new Final version. … I'd like to rerun this same project and see Final use the revised work."
+
+What happened: Final v1 was the quick answer carried into the full process (`carried_from_quick`). Two dated
+updates reopened and redid Objective, Facts and Draft, but Final had not been entered yet, and the projection only
+reopens stages that are done or in progress, so nothing marked it. When Go reached Final it counted any saved text
+as the stage's draft (`stageHasCurrentDraft`), and the measured-limit repair, told to "add nothing new", worked on
+the old answer. (The 95-word cap measured on the whole packet was a separate bug, L-319.)
+
+Now (`draftPredatesInputs`, `lib/agent/policy.ts`; used for Go's moves and for which stages count as drafted in
+`use-go-loop.ts`): a stage's text is not its current draft when it was saved before the stage was entered and
+before the user last changed the brief or facts (`lastBriefChangeAt`), and a stage before it has a newer version.
+Go then writes the stage from the work before it; the old text stays in the history.
+
+Limits:
+- With no change since, a carried quick answer is still the draft the later stages build on (L-123), and is
+  revised rather than written again.
+- A stage the projection reopened, or one finished, is left to its recheck, as before.
