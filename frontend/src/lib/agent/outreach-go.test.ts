@@ -118,3 +118,17 @@ describe('what Go reads of the message and the emails', () => {
     expect(outreachText('drafts', '{"kind":"stage_items","items":[]}')).toContain("Approving and sending each email are the user's");
   });
 });
+
+describe('what Go is shown of the emails', () => {
+  it('the emails as they would go out, the offer and link filled, and who signs and sends', async () => {
+    const { outreachExcerpt } = await import('@/lib/outreach/go-work');
+    const { serializeDrafts } = await import('@/lib/outreach/drafts');
+    const message = { ...blankMessage(), subject: 'Hello {{company}}', body: 'Hi. Try {{offer}} at {{link}}.', variables: { offer: 'the beta', link: 'https://promptmasterv1.com' }, sender_id: 's1' };
+    const drafts = serializeDrafts([{ id: 'd1', status: '', reason: '', contact_id: 'c1', to: 'ann@acme.example', cc: '', bcc: '', subject: 'Hello Acme', body: 'Hi. Try {{offer}} at {{link}}.', edited: '', overrides: '' }]);
+    const bundles = { [stage('message').id]: bundle(serializeMessage(message)), [stage('drafts').id]: bundle(drafts) };
+    const text = outreachExcerpt(template, stage('drafts'), bundles);
+    expect(text).toContain('Try the beta at https://promptmasterv1.com.');
+    expect(text).not.toContain('{{');
+    expect(text).toContain('Sender and signature: from Settings.');
+  });
+});

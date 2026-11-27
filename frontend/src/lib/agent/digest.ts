@@ -32,6 +32,7 @@ import type { Evaluation } from '@/types/project';
 import type { AgentTools } from './policy';
 import { NO_TOOLS } from './policy';
 import type { StageFacts } from './facts';
+import { outreachExcerpt } from '@/lib/outreach/go-work';
 import { PLACE_WORDS, type StageControl } from '@/lib/workflow/stage-controls';
 import { describeVersionChange, versionChange } from '@/lib/workflow/version-change';
 
@@ -223,7 +224,8 @@ export function buildAgentState(input: {
   const ev = latestEvaluation;
   const renderer = effectiveRenderer(stage);
 
-  let excerpt = head;
+  // An outreach stage is JSON: Go reads the list, the message and the emails as text (27 Nov).
+  let excerpt = stage.renderer === 'outreach' && stage.outreach ? outreachExcerpt(template, stage, bundles) : head;
   let outline: AgentStateDigest['outline'];
   let manuscript: AgentStateDigest['manuscript'];
   let findings: AgentStateDigest['findings'];
