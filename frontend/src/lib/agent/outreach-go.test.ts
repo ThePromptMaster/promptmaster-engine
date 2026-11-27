@@ -149,3 +149,19 @@ describe('what Go is shown of the emails', () => {
     expect(text).toContain('nothing more is needed from the user for it');
   });
 });
+
+describe('what an outreach round delivers (27 Nov pass)', () => {
+  it('is the emails, read as text with their earlier-contact findings, not the Brief and not JSON', async () => {
+    const { deliverableDocument } = await import('@/lib/workflow/deliverable');
+    const { deliverableStage } = await import('@/lib/workflow/engine');
+    const { serializeDrafts } = await import('@/lib/outreach/drafts');
+    expect(deliverableStage(template)?.id).toBe(stage('drafts').id);
+    const message = { ...blankMessage(), subject: 'Hello', body: 'Hi. See {{link}}.', variables: { offer: '', link: 'https://promptmasterv1.com' }, sender_id: 's1' };
+    const drafts = serializeDrafts([{ id: 'd1', status: '', reason: '', contact_id: 'c1', to: 'ann@acme.example', cc: '', bcc: '', subject: 'Hello', body: 'Hi. See {{link}}.', edited: '', overrides: '' }]);
+    const doc = deliverableDocument(template, { [stage('message').id]: bundle(serializeMessage(message)), [stage('drafts').id]: bundle(drafts) } as never)!;
+    expect(doc.stage.id).toBe(stage('drafts').id);
+    expect(doc.text).toContain('1. To ann@acme.example');
+    expect(doc.text).toContain('Hi. See https://promptmasterv1.com.');
+    expect(doc.text).not.toContain('"items"');
+  });
+});
