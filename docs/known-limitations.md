@@ -5630,6 +5630,16 @@ Limits:
 - The list of open work (`outstandingWork`) does not include a newer version that has not been sent. Only the stage
   and the change summary say so.
 
+### L-295 — A table in a Word export is a Word table (2026-11-27)
+Production pass: the walkthrough's plan, exported to Word, had its key-dates, staffing and budget tables as one
+paragraph each of pipes and dashes ("| Step | Date | … |---|---| | Delivery …"). The Word export took tables "as
+text", and the lines of a table were joined into one paragraph. A Markdown table (a header row with a rule row
+under it) is now a Word table: header row bold and repeated on each page, full width, ragged rows padded.
+
+Limits:
+- Alignment set in the rule row (`:---:`) is not carried over, and cells hold plain text: bold or a link inside a
+  cell shows as its words only.
+
 ### L-294 — A fact reworded with every value the same is judged, not matched by its values (2026-11-27)
 Production pass of change 4 in the side-by-side test design: "a fact restated in different words with the same
 meaning (nothing should change)". "Harbor Crew Hire charges $410 per person per day…", restated with the same $410

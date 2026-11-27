@@ -53,6 +53,7 @@ describe('Word export keeps code and equations (M2)', () => {
     expect(blocks.find((b) => b.kind === 'math')?.text).toContain('\\omega_d &= \\sqrt');
     // No "# comment" became a heading, and underscores in inline code survive.
     expect(blocks.filter((b) => b.kind === 'title')).toHaveLength(1);
-    expect(blocks.find((b) => b.kind === 'bullet')?.text).toBe('first a_i');
+    const bullet = blocks.find((b) => b.kind === 'bullet');
+    expect(bullet && 'text' in bullet ? bullet.text : undefined).toBe('first a_i');
   });
 });
