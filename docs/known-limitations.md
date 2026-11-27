@@ -6347,6 +6347,10 @@ Now:
 - **Ready reads the check** (`readinessBlocking`, `lib/workflow/readiness.ts`): the latest check of the
   deliverable's current version, when it faults it, holds Ready and is shown as the reason. "Finish project" is
   unchanged.
+- **A fix waits for its own check** (`faultedEarlier` in `deliverableReadiness`): when the latest check was of an
+  earlier version and found problems, Ready stays open on the newer version until it is checked ("The check of
+  version 3 found problems; version 4 is not checked yet"). Seen by hand on 27 Nov: v3 saved after a failed check
+  of v2 read Ready before it was checked.
 
 Limits:
 - Which stages relied on the reference is a model's judgment, as for a brief edit. When the check cannot be made,

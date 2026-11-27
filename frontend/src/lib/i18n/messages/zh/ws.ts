@@ -31,6 +31,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ready.ready': '就绪',
   'ready.version': '版本 {n}',
   'ready.earlier': '基于版本 {earlier}；当前为 {current}',
+  'ready.recheck': '版本 {earlier} 的检查发现了问题；版本 {current} 尚未检查',
   'ready.notYet': '尚未',
   'ready.notAsked': '无需',
   'ready.yes': '是',

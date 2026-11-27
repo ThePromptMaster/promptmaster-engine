@@ -30,6 +30,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ready.ready': 'Tayari',
   'ready.version': 'Toleo la {n}',
   'ready.earlier': 'Kwenye toleo la {earlier}; la sasa ni {current}',
+  'ready.recheck': 'Ukaguzi wa toleo la {earlier} ulipata matatizo; toleo la {current} bado halijakaguliwa',
   'ready.notYet': 'Bado',
   'ready.notAsked': 'Haihitajiki',
   'ready.yes': 'Ndiyo',

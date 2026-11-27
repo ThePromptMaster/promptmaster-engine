@@ -31,6 +31,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ready.ready': 'तैयार',
   'ready.version': 'संस्करण {n}',
   'ready.earlier': 'संस्करण {earlier} पर; मौजूदा {current} है',
+  'ready.recheck': 'संस्करण {earlier} की जाँच में समस्याएँ मिलीं; संस्करण {current} की अभी जाँच नहीं हुई है',
   'ready.notYet': 'अभी नहीं',
   'ready.notAsked': 'ज़रूरी नहीं',
   'ready.yes': 'हाँ',

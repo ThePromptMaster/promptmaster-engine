@@ -39,6 +39,8 @@ export interface ReadinessRow {
   earlier?: number;
   /** Why it isn't ready, in the words of the outstanding list. */
   detail?: string;
+  /** Ready waits for a check of the current version: the check of `earlier` found problems. */
+  recheck?: boolean;
 }
 
 /**
@@ -70,6 +72,12 @@ export function deliverableReadiness(input: {
   approvalVersions: Readonly<Record<string, string>>;
   /** What still holds finishing up, already in words. */
   blocking: readonly string[];
+  /**
+   * The version whose check found problems, when it is the latest one checked
+   * and the current version is newer (L-326): Ready waits for the current one
+   * to be checked.
+   */
+  faultedEarlier?: number;
 }): ReadinessRow[] {
   const head = input.versions.at(-1);
   const numberOf = (id?: string | null) => input.versions.find((v) => v.id === id)?.version_number;
@@ -95,9 +103,17 @@ export function deliverableReadiness(input: {
       : { key: 'approved', state: 'open', ...(oldest > 0 ? { earlier: oldest } : {}), version: head?.version_number };
   }
 
-  const ready: ReadinessRow = written.state === 'done' && approved.state !== 'open' && input.blocking.length === 0
+  // 28 Nov (Sean, Harborlight): "stay out of Ready once the check finds a
+  // contradiction, until the corrected version is saved and checked". A fix
+  // saved after a failed check is not ready until it is checked itself.
+  const awaitsCheck = checked.state === 'open' && checked.earlier !== undefined && input.faultedEarlier === checked.earlier;
+  const ready: ReadinessRow = written.state === 'done' && approved.state !== 'open' && input.blocking.length === 0 && !awaitsCheck
     ? { key: 'ready', state: 'done', version: head?.version_number }
-    : { key: 'ready', state: 'open', ...(input.blocking[0] ? { detail: input.blocking[0] } : {}) };
+    : input.blocking[0]
+      ? { key: 'ready', state: 'open', detail: input.blocking[0] }
+      : awaitsCheck
+        ? { key: 'ready', state: 'open', recheck: true, earlier: checked.earlier, version: head?.version_number }
+        : { key: 'ready', state: 'open' };
 
   return [written, checked, approved, ready];
 }
