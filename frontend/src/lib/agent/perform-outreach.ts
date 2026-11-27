@@ -151,7 +151,7 @@ export async function recheckOutreach(ctx: PerformContext, target: StageDefiniti
   const part = target.outreach?.part;
   const head = ctx.bundles[target.id]?.versions.at(-1);
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
-  const event = async (type: 'stage_marked_complete' | 'stage_reopened', reason: string, payload: Record<string, unknown> = {}) => {
+  const event = async (type: 'stage_marked_complete', reason: string, payload: Record<string, unknown> = {}) => {
     await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
       type,
       stage_id: target.id,
@@ -181,10 +181,26 @@ export async function recheckOutreach(ctx: PerformContext, target: StageDefiniti
     return written;
   }
   if (part === 'drafts') {
+    // A draft in progress that was reopened is answered by its next version (engine:
+    // `stage_version_saved`); Go may record a version, not reopen a stage (27 Nov pass: "a
+    // autonomous run may not record stage_reopened on its own"). A round the user already signed
+    // off is theirs to look at again.
+    if (ctx.state.stages[target.id]?.stale?.was !== 'in_progress') {
+      return { status: 'failed', toolsUsed: [], versionIds: [], output: `${target.label} was signed off before the change. Look at the emails again and approve the round yourself.` };
+    }
     const made = await performOutreach('draft_outreach', { ...ctx, stage: target }, keep);
-    if (made.status !== 'succeeded') return made;
-    await event('stage_reopened', 'Emails brought in line with the contacts and the message; approving them is yours.');
-    return made;
+    if (made.status !== 'succeeded' || made.versionIds.length || !head?.content) return made;
+    // Already in line: the check itself is the version that answers the change.
+    const created = await ctx.appendStageVersion!(target.id, target.label, {
+      content: head.content,
+      source_operation: 'outreach_drafts',
+      base_content: head.content,
+      model: ctx.project.model,
+      mode: modeForStage(ctx.project, target),
+      change_summary: 'Go mode: checked after the change; the emails already match the contacts and the message.',
+    });
+    const id = (created as { id?: unknown } | null)?.id;
+    return { status: 'succeeded', toolsUsed: [], versionIds: typeof id === 'string' ? [id] : [], output: 'Checked the emails after the change: they already match the contacts and the message. Approving them is yours.' };
   }
   return { status: 'failed', toolsUsed: [], versionIds: [], output: 'This stage is not part of an outreach workflow.' };
 }
