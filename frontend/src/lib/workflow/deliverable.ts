@@ -19,6 +19,7 @@ import { manuscriptArtifactFor } from './context';
 import { formatManuscript, type StageArtifactBundle } from './digest';
 import { deliverableStage } from './engine';
 import type { StageDefinition, WorkflowTemplate } from './types';
+import { outreachExcerpt } from '@/lib/outreach/go-work';
 
 /** A later prose stage holding at least this share of the chapters' words holds the work. */
 export const HOLDS_THE_WORK = 0.8;
@@ -64,6 +65,11 @@ function headWithText(bundles: Record<string, StageArtifactBundle>, stageId: str
 export function deliverableDocument(template: WorkflowTemplate, bundles: Record<string, StageArtifactBundle>): DeliverableDocument | null {
   const base = deliverableStage(template);
   if (!base) return null;
+  if (base.renderer === 'outreach') {
+    // The emails as they would go out, each with its earlier-contact finding: never the saved JSON.
+    const head = bundles[base.id]?.versions.at(-1) ?? null;
+    return { stage: base, version: head, text: head?.content ? outreachExcerpt(template, base, bundles) : '' };
+  }
   if (base.renderer !== 'long_form') {
     const head = bundles[base.id]?.versions.at(-1) ?? null;
     return { stage: base, version: head, text: head?.content ?? '' };

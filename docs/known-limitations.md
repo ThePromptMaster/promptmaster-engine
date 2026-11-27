@@ -6105,4 +6105,7 @@ user says it stopped; the do-not-contact list is matched in the job runner the w
 (Gmail dots and +tags are one address); Go's section wait counts the sections of its own pass, so a
 rewrite no longer reads "3 of 3 sections written" before any is written and the page refreshes as each
 lands; the contacts Go reads say what the earlier-contact check found; a person chosen from two takes
-their own role, not the one found for the first.
+their own role, not the one found for the first. An outreach round now delivers its emails
+(`deliverableStage`, `deliverableDocument`): the objective check had been judging the Brief, said "the
+deliverable is a brief, not drafts", and asked for the Sent mail the Contacts stage had already read. The
+emails are read as text, each with its earlier-contact finding, never as the saved JSON.

@@ -813,7 +813,9 @@ export function tickClosesStage(
 export function deliverableStage(template: WorkflowTemplate): StageDefinition | undefined {
   const longForm = template.stages.find((s) => s.renderer === 'long_form');
   if (longForm) return longForm;
-  return [...template.stages].reverse().find((s) => s.required && s.renderer === 'prose');
+  // An outreach round delivers its emails (27 Nov pass: the Brief was judged as the deliverable,
+  // and the objective check asked for drafts that existed).
+  return [...template.stages].reverse().find((s) => s.required && (s.renderer === 'prose' || (s.renderer === 'outreach' && s.outreach?.part === 'drafts')));
 }
 
 /** Is the deliverable itself done? For a manuscript, every section; otherwise a non-empty draft. */
