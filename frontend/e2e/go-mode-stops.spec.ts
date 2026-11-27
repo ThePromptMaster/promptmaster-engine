@@ -340,7 +340,9 @@ test('the Go buttons stay in view while the page is scrolled, and point back whe
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Guided/ }).click();
-  // Nothing is pinned while the panel's own controls are on screen.
+  // Nothing is pinned while the panel's own controls are on screen. The stage above the
+  // panel has grown (how it thinks, who has which version), so they are brought into view.
+  await panel.getByRole('button', { name: /^Go$/ }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('region', { name: 'Go buttons' })).toHaveCount(0);
 
   await page.keyboard.press('End');

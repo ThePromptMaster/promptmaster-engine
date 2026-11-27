@@ -96,7 +96,16 @@ export function SentRecord({
     'w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40';
 
   return (
-    <section data-sent-record aria-label={t('sent.label')} className="mb-4 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-label text-[var(--on-surface-variant)]">
+    // With nothing recorded yet it is one quiet line, not a panel on every stage.
+    <section
+      data-sent-record
+      aria-label={t('sent.label')}
+      className={
+        !behind && !sent && !form
+          ? 'mb-3 text-label text-[var(--on-surface-variant)]'
+          : 'mb-4 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-label text-[var(--on-surface-variant)]'
+      }
+    >
       {behind ? (
         <div data-sent-behind className="space-y-1.5">
           <p className="flex items-start gap-1.5 text-[var(--on-surface)]">
@@ -158,7 +167,7 @@ export function SentRecord({
             className="flex items-center gap-1.5 font-semibold text-[var(--pm-primary)] hover:underline"
           >
             <span aria-hidden className="material-symbols-outlined text-[18px]">{'outgoing_mail'}</span>
-            {t('sent.record', { n: head.version_number })}
+            {t('sent.record')}
           </button>
         )
       )}

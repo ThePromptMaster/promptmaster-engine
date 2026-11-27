@@ -36,7 +36,7 @@ export const sw: Record<keyof typeof en, string> = {
   "sent.keepOld": "Waache na v{n}",
   "sent.keepNote": "Wanabaki na v{n}.",
   "sent.undo": "Tendua",
-  "sent.record": "Ulituma v{n} kwa mtu? Rekodi",
+  "sent.record": "Ulituma hii kwa mtu? Rekodi",
   "sent.formTitle": "Rekodi nani ana v{n}",
   "sent.to": "Imetumwa kwa",
   "sent.toHint": "mf. Bayview Grocers, Dana Ruiz",
