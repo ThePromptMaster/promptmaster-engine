@@ -84,6 +84,13 @@ describe('sending one approved email', () => {
     expect(s.records[0].patch.status_reason).toContain('do-not-contact');
   });
 
+  // Sean, 26 Nov: a client update moved a milestone; an email still stating the old one must not go.
+  it('holds an email that states a fact the project has since replaced', async () => {
+    const s = setup({ blockers: { replaced: 'It still states what "Go-live is on 14 March" said, since replaced by "Go-live moved to 21 March".' } });
+    expect(await s.run()).toBe('held');
+    expect(s.records[0].patch.status_reason).toContain('since replaced by');
+  });
+
   it('waits while outreach is paused, and until the daily limit frees up', async () => {
     const paused = setup({ blockers: { paused: true } });
     expect(await paused.run()).toBe('released');

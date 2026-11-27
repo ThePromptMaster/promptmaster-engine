@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { parseContacts } from '@/lib/outreach/contacts';
 import { blankMessage, changedBySync, draftText, editedFields, parseDrafts, parseMessage, serializeDrafts, syncDrafts, type DraftRow, type OutreachMessage } from '@/lib/outreach/drafts';
+import { findChanged, identityFor } from '@/lib/outreach/hold-changed';
+import { replacedIn } from '@/lib/outreach/holds';
 import { unresolvedPlaceholders } from '@/lib/outreach/placeholders';
 import { renderEmail, type RenderedEmail } from '@/lib/outreach/render';
 import { isWaiting, localTimes } from '@/lib/outreach/send-words';
@@ -55,7 +57,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
   const contacts = useMemo(() => parseContacts(context.parts.contacts?.content).items, [context.parts.contacts?.content]);
   const message = useMemo(() => parseMessage(context.parts.message?.content) ?? blankMessage(), [context.parts.message?.content]);
   const drafts = useMemo(() => parseDrafts(context.parts.drafts?.content), [context.parts.drafts?.content]);
-  const [identity, setIdentity] = useState<{ senders: OutreachSender[]; signatures: OutreachSignature[]; logos: OutreachLogo[]; spacing: number }>({ senders: [], signatures: [], logos: [], spacing: 45 });
+  const [identity, setIdentity] = useState<{ senders: OutreachSender[]; signatures: OutreachSignature[]; logos: OutreachLogo[]; spacing: number; loaded: boolean }>({ senders: [], signatures: [], logos: [], spacing: 45, loaded: false });
   const [open, setOpen] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
   useEffect(() => {
     let live = true;
     Promise.all([listSenders(), listSignatures(), listLogos(), loadOutreachSettings(context.project.user_id)])
-      .then(([senders, signatures, logos, settings]) => live && setIdentity({ senders, signatures, logos, spacing: settings.spacing_seconds }))
+      .then(([senders, signatures, logos, settings]) => live && setIdentity({ senders, signatures, logos, spacing: settings.spacing_seconds, loaded: true }))
       .catch(() => undefined);
     return () => {
       live = false;
@@ -80,9 +82,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
   const removed = drafts.filter((d) => !synced.some((x) => x.id === d.id)).length;
   const outOfDate = added + changed + removed > 0;
 
-  const sender = identity.senders.find((s) => s.id === message.sender_id) ?? identity.senders[0] ?? null;
-  const signature = identity.signatures.find((s) => s.id === message.signature_id) ?? identity.signatures.find((s) => s.sender_id === sender?.id && s.kind === 'first') ?? null;
-  const logo = signature?.logo_id ? identity.logos.find((l) => l.id === signature.logo_id) ?? null : null;
+  const { sender, signature, logo } = identityFor(message, identity.senders, identity.signatures, identity.logos);
 
   const save = useCallback((items: DraftRow[], operation: string, summary: string) => context.save(stageId, serializeDrafts(items), operation, summary), [context, stageId]);
   const sending = useSending({
@@ -103,7 +103,28 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
   };
   const update = (id: string, patch: Partial<DraftRow>, summary: string) => act(`d:${id}`, () => save(drafts.map((d) => (d.id === id ? { ...d, ...patch } : d)), 'outreach_edit', summary));
 
-  const approvable = (d: DraftRow) => !readOnly && !d.status && heldBy(d, message).length === 0 && Boolean(sender) && Boolean(d.to.trim());
+  // A replaced fact the email still states holds it like a placeholder does (Sean, 26 Nov: the client-update milestone).
+  const facts = context.project.facts;
+  const replacedOf = useCallback((d: DraftRow) => {
+    const text = draftText(d, message);
+    return replacedIn(`${text.subject}\n${text.body}`, facts);
+  }, [message, facts]);
+  const approvable = (d: DraftRow) => !readOnly && !d.status && heldBy(d, message).length === 0 && !replacedOf(d) && Boolean(sender) && Boolean(d.to.trim());
+
+  // An approved email that changed since its approval goes back for review now, not only when the
+  // job runner reaches it (`hold-changed.ts`). Only once who it goes out as has loaded.
+  const watching = useRef(false);
+  const { approvals, sends, holdChanged } = sending;
+  useEffect(() => {
+    if (readOnly || !identity.loaded || watching.current || !drafts.some((d) => d.status === 'approved')) return;
+    watching.current = true;
+    findChanged({ drafts, message, identity: { sender, signature, logo }, approvals, sends, facts })
+      .then((changed) => holdChanged(drafts, changed))
+      .catch(() => undefined)
+      .finally(() => {
+        watching.current = false;
+      });
+  }, [readOnly, identity.loaded, drafts, message, sender, signature, logo, approvals, sends, facts, holdChanged]);
   const readyToSend = drafts.filter((d) => d.status === 'approved' && d.approval_id && !sending.liveSendOf(d.approval_id));
 
   if (!contacts.some((c) => c.status === 'ready')) return <p data-outreach-part="drafts" className="text-body text-[var(--on-surface-variant)]">{t('outreach.noReadyContacts')}</p>;
@@ -187,6 +208,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
               readOnly={readOnly}
               busy={busy !== null}
               selectable={approvable(d)}
+              replaced={replacedOf(d)}
               selected={selected.has(d.id)}
               onSelect={(on) => setSelected((s) => {
                 const next = new Set(s);
@@ -294,8 +316,10 @@ function DraftLine(props: {
   from: string;
   replyTo: string | null;
   signatureName: string | null;
+  /** A replaced fact the email still states, holding it. */
+  replaced: string | null;
 }) {
-  const { draft, message, open, onToggle, readOnly, busy, selectable, selected, onSelect, problems, send, approved, test, canTest } = props;
+  const { draft, message, open, onToggle, readOnly, busy, selectable, selected, onSelect, problems, send, approved, test, canTest, replaced } = props;
   const t = useT();
   const words = useSendWords();
   const [form, setForm] = useState({ to: draft.to, subject: draft.subject, body: draft.body });
@@ -308,10 +332,10 @@ function DraftLine(props: {
   const preview = props.preview;
   const render = useCallback((off: boolean) => preview(off), [preview]);
   const approvedRender = useCallback(() => fromSnapshot(approved!), [approved]);
-  const state = send ? words(send) : draft.status === 'approved' ? t('outreach.draftApproved') : draft.status === 'set_aside' ? t('outreach.draftSetAside') : held.length ? t('outreach.draftHeld') : t('outreach.draftToReview');
+  const state = send ? words(send) : draft.status === 'approved' ? t('outreach.draftApproved') : draft.status === 'set_aside' ? t('outreach.draftSetAside') : held.length || replaced ? t('outreach.draftHeld') : t('outreach.draftToReview');
   const locked = draft.status === 'approved';
   return (
-    <li data-draft={draft.id} data-held={held.length > 0 || undefined} data-send-status={send?.status} className="rounded-xl bg-[var(--surface-container-low)]">
+    <li data-draft={draft.id} data-held={held.length > 0 || Boolean(replaced) || undefined} data-send-status={send?.status} className="rounded-xl bg-[var(--surface-container-low)]">
       <div className="flex items-start gap-2 px-3 py-2.5">
         {selectable && (
           <input type="checkbox" className="mt-1.5" checked={selected} onChange={(e) => onSelect(e.target.checked)} aria-label={t('outreach.selectEmail', { to: draft.to })} data-select-draft />
@@ -321,6 +345,8 @@ function DraftLine(props: {
             <span className="block truncate text-body font-medium text-[var(--on-surface)]">{draft.to || t('outreach.noAddress')}</span>
             <span className="block truncate text-label text-[var(--on-surface-variant)]">{text.subject || t('outreach.noSubject')}</span>
             {held.length > 0 && <span className="block text-label text-[var(--pm-tertiary)]">{t('outreach.heldBecause', { list: held.join(', ') })}</span>}
+            {replaced && <span className="block text-label text-[var(--pm-tertiary)]" data-held-replaced>{t('outreach.heldFor', { reason: replaced })}</span>}
+            {!draft.status && draft.reason && <span className="block text-label text-[var(--pm-tertiary)]" data-back-for-review>{t('outreach.backForReview', { reason: draft.reason })}</span>}
             {draft.status === 'set_aside' && draft.reason && <span className="block text-label text-[var(--on-surface-variant)]">{draft.reason}</span>}
             {problems.length > 0 && <span role="alert" className="block text-label text-[var(--pm-error)]">{problems.join(' ')}</span>}
           </span>

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { drainOnce } from '@/lib/jobs/client-drain';
 import type { DraftRow, OutreachMessage } from '@/lib/outreach/drafts';
+import { backForReview, type Changed } from '@/lib/outreach/hold-changed';
 import { buildSnapshot, type Snapshot, type SnapshotPurpose } from '@/lib/outreach/snapshot';
 import { createApprovals, listApprovals, listSends, moveSends, revokeApproval, scheduleSends, type ApprovalRecord, type SendRecord } from '@/lib/supabase/outreach-sends';
 import type { OutreachLogo, OutreachSender, OutreachSignature } from '@/types/outreach';
@@ -176,6 +177,20 @@ export function useSending(input: {
     [refresh, projectId]
   );
 
+  /** Approved emails that changed go back for review: their sends held, their approvals withdrawn (`hold-changed.ts`). */
+  const holdChanged = useCallback(
+    async (drafts: DraftRow[], changed: readonly Changed[]) => {
+      if (!changed.length) return;
+      for (const c of changed) {
+        if (c.sendId && c.movable) await moveSends([c.sendId], 'held', c.reason, true);
+        else await revokeApproval(c.approvalId, c.reason);
+      }
+      await saveDrafts(backForReview(drafts, changed), `Sent ${changed.length} approved email${changed.length === 1 ? '' : 's'} back for review: changed after approval.`);
+      await refresh();
+    },
+    [saveDrafts, refresh]
+  );
+
   const approvalById = useMemo(() => new Map(approvals.map((a) => [a.id, a])), [approvals]);
   /** The latest test of each draft, with its send. */
   const testOf = useCallback(
@@ -186,5 +201,5 @@ export function useSending(input: {
     [approvals, sends]
   );
 
-  return { sends, approvals, approvalById, liveSendOf, testOf, approve, send, sendTest, withdraw, move, refresh, canSend: Boolean(identity.sender) };
+  return { sends, approvals, approvalById, liveSendOf, testOf, approve, send, sendTest, withdraw, move, holdChanged, refresh, canSend: Boolean(identity.sender) };
 }

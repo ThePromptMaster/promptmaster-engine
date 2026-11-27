@@ -4,6 +4,8 @@
  * signature and logo), what blocks it, and the record of what happened, which only
  * `record_outreach_send` writes, and only while this drain holds the job's lease.
  */
+import { replacedIn } from '@/lib/outreach/holds';
+import type { ProjectFact } from '@/types/project';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { parseDrafts, parseMessage } from '@/lib/outreach/drafts';
@@ -45,6 +47,9 @@ export class SupabaseOutreachStore implements OutreachStore {
     const draft = parseDrafts(draftsContent).find((d) => d.id === approval.draft_id);
     const message = parseMessage(messageContent);
     if (!draft || !message) return null;
+    // A real send goes only while its draft is still approved under this approval: one set aside
+    // (its contact no longer ready) or approved again is not sent on the old approval (27 Nov).
+    if (approval.purpose !== 'test' && (draft.status !== 'approved' || draft.approval_id !== approval.id)) return null;
     const { data: sender } = await this.db.from('outreach_senders').select('*').eq('id', approval.snapshot.sender_id).eq('user_id', approval.user_id).maybeSingle();
     if (!sender) return null;
     let signature: OutreachSignature | null = null;
@@ -63,11 +68,13 @@ export class SupabaseOutreachStore implements OutreachStore {
     return buildSnapshot({ draft, message, sender: sender as OutreachSender, signature, logo, purpose: approval.purpose });
   }
 
-  async blockers(send: SendRow): Promise<Blockers> {
-    const [{ data: settings }, { data: suppressed }, { count }] = await Promise.all([
+  async blockers(send: SendRow, text?: string): Promise<Blockers> {
+    const [{ data: settings }, { data: suppressed }, { count }, { data: facts }] = await Promise.all([
       this.db.from('outreach_settings').select('paused, daily_cap').eq('user_id', send.user_id).maybeSingle(),
       this.db.from('outreach_suppressions').select('address, domain').eq('user_id', send.user_id).is('lifted_at', null),
       this.db.from('outreach_sends').select('id', { count: 'exact', head: true }).eq('user_id', send.user_id).in('status', ['submitted', 'confirmed']).neq('purpose', 'test').gte('submitted_at', new Date(Date.now() - DAY_MS).toISOString()),
+      // The project's facts, current and replaced: a test goes to the sender, and is held for nothing here.
+      send.purpose === 'test' || !text ? Promise.resolve({ data: [] }) : this.db.from('project_facts').select('*').eq('project_id', send.project_id),
     ]);
     const s = (settings as { paused?: boolean; daily_cap?: number } | null) ?? {};
     const to = send.to_address.toLowerCase();
@@ -80,7 +87,8 @@ export class SupabaseOutreachStore implements OutreachStore {
       const at = Date.parse((oldest as { submitted_at?: string } | null)?.submitted_at ?? '');
       capUntil = (Number.isFinite(at) ? at : Date.now()) + DAY_MS;
     }
-    return { paused: Boolean(s.paused) && send.purpose !== 'test', capUntil, suppressed: hit ? hit.address ?? hit.domain : null };
+    const replaced = text ? replacedIn(text, (facts ?? []) as ProjectFact[]) : null;
+    return { paused: Boolean(s.paused) && send.purpose !== 'test', capUntil, suppressed: hit ? hit.address ?? hit.domain : null, replaced };
   }
 
   async record(jobId: string, worker: string, sendId: string, patch: SendPatch, event: string, detail: Record<string, unknown> = {}): Promise<boolean> {

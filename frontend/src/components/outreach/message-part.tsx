@@ -5,9 +5,12 @@ import Link from 'next/link';
 
 import { api } from '@/lib/api/client';
 import { useT } from '@/lib/i18n/i18n-provider';
-import { blankMessage, parseMessage, serializeMessage, type OutreachMessage } from '@/lib/outreach/drafts';
+import { blankMessage, parseDrafts, parseMessage, serializeDrafts, serializeMessage, type OutreachMessage } from '@/lib/outreach/drafts';
+import { backForReview, findChanged, identityFor } from '@/lib/outreach/hold-changed';
+import { previewChange, replaceInDrafts } from '@/lib/outreach/variable-change';
+import { listApprovals, listSends, moveSends, revokeApproval } from '@/lib/supabase/outreach-sends';
 import { unresolvedPlaceholders } from '@/lib/outreach/placeholders';
-import { listSenders, listSignatures } from '@/lib/supabase/outreach-identity';
+import { listLogos, listSenders, listSignatures } from '@/lib/supabase/outreach-identity';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { keepFound } from '@/lib/workflow/web-found';
 import type { OutreachContext } from '@/components/workflow/renderers/types';
@@ -96,11 +99,41 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
       await context.save(stageId, serializeMessage(next), 'outreach_edit', 'Saved the standard message.');
       setM(next);
       setDirty(false);
-      setSaid(t('outreach.saved'));
+      // Approved emails the change reaches go back for review now (`hold-changed.ts`).
+      const back = await holdApprovedChanged(next);
+      setSaid(back ? t('outreach.sentBack', { count: back }) : t('outreach.saved'));
     } catch (e) {
       setError(t('outreach.saveError', { message: errorText(e) }));
     } finally {
       setBusy(null);
+    }
+  };
+
+  /** The approved emails this message changes: held and withdrawn, back on Drafts for review. */
+  const holdApprovedChanged = async (next: OutreachMessage): Promise<number> => {
+    const draftsPart = context.parts.drafts;
+    const current = parseDrafts(draftsPart?.content);
+    if (!draftsPart || !current.some((d) => d.status === 'approved')) return 0;
+    const [allSenders, allSignatures, logos, approvals, sends] = await Promise.all([listSenders(), listSignatures(), listLogos(), listApprovals(context.project.id), listSends(context.project.id)]);
+    const changed = await findChanged({ drafts: current, message: next, identity: identityFor(next, allSenders, allSignatures, logos), approvals, sends, facts: context.project.facts });
+    for (const c of changed) {
+      if (c.sendId && c.movable) await moveSends([c.sendId], 'held', c.reason, true);
+      else await revokeApproval(c.approvalId, c.reason);
+    }
+    if (changed.length) await context.save(draftsPart.stageId, serializeDrafts(backForReview(current, changed)), 'outreach_edit', `Sent ${changed.length} approved email${changed.length === 1 ? '' : 's'} back for review: the message changed.`);
+    return changed.length;
+  };
+
+  // What saving would change, shown before it is saved (Sean, 26 Nov).
+  const drafts = parseDrafts(context.parts.drafts?.content);
+  const preview = dirty && drafts.length ? previewChange(saved, m, drafts) : null;
+  const replaceThere = async () => {
+    if (!preview?.kept.length || !context.parts.drafts) return;
+    setError(null);
+    try {
+      await context.save(context.parts.drafts.stageId, serializeDrafts(replaceInDrafts(drafts, preview.kept, saved, m)), 'outreach_edit', `Replaced the old offer or link in ${preview.kept.length} email${preview.kept.length === 1 ? '' : 's'} you had edited.`);
+    } catch (e) {
+      setError(t('outreach.saveError', { message: errorText(e) }));
     }
   };
 
@@ -170,6 +203,19 @@ export function MessagePart({ context, stageId, readOnly }: { context: OutreachC
       {left.length > 0 && <p role="status" className="text-label text-[var(--pm-tertiary)]">{t('outreach.placeholdersLeft', { list: left.join(', ') })}</p>}
       {said && <p role="status" className="text-label text-[var(--pm-primary)]">{said}</p>}
       {error && <p role="alert" className="text-label text-[var(--pm-error)]">{error}</p>}
+      {!readOnly && preview && (preview.follow > 0 || preview.kept.length > 0) && (
+        <div data-change-preview className="space-y-1 rounded-xl bg-[var(--surface-container-low)] p-3 text-label text-[var(--on-surface)]">
+          <p className="font-semibold">{t('outreach.change.lead')}</p>
+          <p>{t('outreach.change.follow', { count: preview.follow })}</p>
+          {preview.approved > 0 && <p className="text-[var(--pm-tertiary)]" data-change-approved>{t('outreach.change.approved', { count: preview.approved })}</p>}
+          {preview.kept.length > 0 && (
+            <p className="flex flex-wrap items-center gap-2" data-change-kept>
+              <span>{t('outreach.change.kept', { count: preview.kept.length })}</span>
+              <button type="button" className={quiet} onClick={() => void replaceThere()} data-replace-there>{t('outreach.change.replaceThere')}</button>
+            </p>
+          )}
+        </div>
+      )}
       {!readOnly && (
         <button type="button" className={primary} disabled={busy !== null || !dirty || !m.body.trim()} onClick={() => void save()} data-save-message>
           {t('outreach.saveMessage')}

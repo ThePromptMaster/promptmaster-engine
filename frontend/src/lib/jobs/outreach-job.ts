@@ -65,13 +65,16 @@ export interface Blockers {
   capUntil: number | null;
   /** The address or domain on the do-not-contact list, else null. */
   suppressed: string | null;
+  /** The email states a fact the project has since replaced ("It still says …"), else null (27 Nov). */
+  replaced?: string | null;
 }
 
 export interface OutreachStore {
   load(sendId: string): Promise<{ send: SendRow; approval: ApprovalRow } | null>;
   /** The email as it would go now, from what is saved now; null when its draft is gone. */
   current(approval: ApprovalRow): Promise<Snapshot | null>;
-  blockers(send: SendRow): Promise<Blockers>;
+  /** `text` is the email as it would go now, read for facts the project has replaced. */
+  blockers(send: SendRow, text?: string): Promise<Blockers>;
   record(jobId: string, worker: string, sendId: string, patch: SendPatch, event: string, detail?: Record<string, unknown>): Promise<boolean>;
 }
 
@@ -162,13 +165,14 @@ export async function runOutreachJob(args: { job: Job; store: JobStore; worker: 
     if (!cp.step) {
       if (approval.revoked_at) return await hold('The approval was withdrawn.');
       const current = await outreach.current(approval);
-      if (!current) return await hold('The email is no longer among the drafts.');
+      if (!current) return await hold('The email is no longer an approved draft: it was set aside, removed or approved again.');
       if ((await hashSnapshot(current)) !== (await hashSnapshot(approval.snapshot))) {
         const what = changedSince(approval.snapshot, current);
         return await hold(`Changed after it was approved${what.length ? `: ${what.join(', ')}` : ''}. Approve it again to send it.`);
       }
-      const blockers = await outreach.blockers(send);
+      const blockers = await outreach.blockers(send, `${current.subject}\n${current.text}`);
       if (blockers.suppressed) return await hold(`${blockers.suppressed} is on your do-not-contact list.`);
+      if (blockers.replaced) return await hold(`${blockers.replaced} Approve it again once it is right.`);
       if (blockers.paused) {
         await record({ status_reason: 'Waiting: all outreach is paused in Settings. It goes within 15 minutes of turning that off.' }, 'waiting', { why: 'paused' });
         await store.releaseJob(job.id, worker, PAUSED_RETRY_SECONDS);

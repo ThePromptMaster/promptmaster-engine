@@ -394,6 +394,56 @@ export function markDuplicates(existing: ContactRow[], incoming: ContactRow[]): 
   return { rows: [...existing, ...added], duplicates };
 }
 
+/** The fields a re-import may say differently, compared by value. */
+const COMPARED = ['name', 'role', 'email', 'company'] as const;
+export const IMPORT_CHANGE_PREFIX = 'The new import says ';
+
+/**
+ * Bringing a list in again (Sean, 26 Nov: re-importing must not duplicate anyone or undo what was
+ * decided). A row already on the list is not added again: when it says the same, it is counted
+ * and left; when it says something different, the row on the list keeps everything it has (status,
+ * research, its email and approval) and waits on the user with what the new import says
+ * (`incoming`), answered under "Needs you". Repeats within the new list are marked as before.
+ */
+export function mergeImport(existing: ContactRow[], incoming: ContactRow[]): { rows: ContactRow[]; added: number; repeated: number; changed: number; duplicates: number } {
+  const byKey = new Map<string, string>();
+  for (const row of existing) for (const key of contactKeys(row)) if (!byKey.has(key)) byKey.set(key, row.duplicate_of || row.id);
+  const rows = existing.map((r) => ({ ...r }));
+  const fresh: ContactRow[] = [];
+  let repeated = 0;
+  let changed = 0;
+  for (const row of incoming) {
+    const match = contactKeys(row).map((k) => byKey.get(k)).find((id): id is string => !!id);
+    const at = match ? rows.findIndex((r) => r.id === match) : -1;
+    if (at < 0) {
+      fresh.push(row);
+      continue;
+    }
+    const mine = rows[at];
+    const diff: Partial<Record<(typeof COMPARED)[number], string>> = {};
+    for (const f of COMPARED) {
+      const theirs = String(row[f] ?? '').trim();
+      if (theirs && theirs.toLowerCase() !== String(mine[f] ?? '').trim().toLowerCase()) diff[f] = theirs;
+    }
+    if (!Object.keys(diff).length) {
+      repeated += 1;
+      continue;
+    }
+    changed += 1;
+    const said = Object.entries(diff).map(([f, v]) => `${f} ${v}`).join(', ');
+    rows[at] = {
+      ...mine,
+      incoming: JSON.stringify(diff),
+      kept_status: mine.kept_status ?? mine.status ?? '',
+      kept_reason: mine.kept_reason ?? mine.reason ?? '',
+      status: 'decide',
+      reason: `${IMPORT_CHANGE_PREFIX}${said}.`,
+    };
+  }
+  const marked = markDuplicates(rows, fresh);
+  return { rows: marked.rows, added: fresh.length, repeated, changed, duplicates: marked.duplicates };
+}
+
 export const SUPPRESSED_REASON = 'On your do-not-contact list.';
 
 /** Later first; an undated contact counts as the oldest. */
