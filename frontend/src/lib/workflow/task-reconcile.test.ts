@@ -185,3 +185,11 @@ describe('the change a closed task is about (27 Nov, production pass)', () => {
     expect(changeFor(changes.slice(1), 'anything')?.seq).toBe(41);
   });
 });
+
+describe('one task said twice (27 Nov, production pass)', () => {
+  it('reads a leading "Step:" as no part of the task', async () => {
+    const { taskKey } = await import('./task-reconcile');
+    expect(taskKey("Step: send Morgan Lee's reference contact sheet to Calder Motion.")).toBe(taskKey("send Morgan Lee's reference contact sheet to Calder Motion."));
+    expect(taskKey('Next action: Run N8 on the new system.')).toBe(taskKey('Run N8 on the new system.'));
+  });
+});

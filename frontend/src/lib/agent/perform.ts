@@ -74,7 +74,7 @@ import { delegationSentences } from './delegation';
 import { touchesObjective } from './stop-audit';
 import { createTask, listTasks } from '@/lib/supabase/tasks';
 import { retireMovedPastTasks } from './retire-tasks';
-import { stageHeads, taskKey } from '@/lib/workflow/task-reconcile';
+import { changeBetween, stageHeads, taskKey } from '@/lib/workflow/task-reconcile';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -817,6 +817,44 @@ function carryingApprovedCopies(ctx: PerformContext): PerformContext {
 }
 
 export async function performStep(raw: PerformContext): Promise<StepOutcome> {
+  return reopenIfFactsMovedOn(raw, await performStepOnce(raw));
+}
+
+/**
+ * A version written from the brief and facts as they were when the step began, saved after they changed
+ * (L-322, 27 Nov; a peer's trace of Sean's Morrow run: a fact arrived while Go applied findings, the
+ * shortlist was saved without it, and "Approve and resume" asked for the old one). The version stands;
+ * its stage is reopened, saying so, and is updated with what the project says now. Only a change that
+ * reopened that stage, or one that reopened nothing (an added fact judged before the stage was finished).
+ */
+export async function reopenIfFactsMovedOn(ctx: PerformContext, out: StepOutcome): Promise<StepOutcome> {
+  const saved = out.changes?.version_ids ?? [];
+  if (!saved.length || !ctx.loadEvents || !ctx.step.started_at) return out;
+  try {
+    const stageId = String((ctx.step.params?.stage_id as string | undefined) || ctx.stage.id);
+    const affectedBy = (e: WorkflowEvent) => (Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: unknown }[]).map((a) => String(a.stage_id ?? '')) : []);
+    const changed = (await ctx.loadEvents()).filter(
+      (e) => e.type === 'brief_changed' && e.created_at > ctx.step.started_at && !e.payload?.presentation_only && !e.payload?.made_before_change && !e.payload?.proposed &&
+        (affectedBy(e).length === 0 || affectedBy(e).includes(stageId))
+    );
+    if (!changed.length) return out;
+    const label = ctx.template.stages.find((s) => s.id === stageId)?.label ?? 'This stage';
+    const what = changeBetween(changed, ctx.step.started_at, new Date(Date.now() + 60_000).toISOString())?.what ?? 'the brief changed';
+    await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+      type: 'brief_changed', stage_id: stageId, actor: 'system', agent_run_id: ctx.run.id,
+      payload: {
+        kind: 'fact', field: String(changed.at(-1)!.payload?.field ?? 'facts'), presentation_only: false, made_before_change: true,
+        affected: [{ stage_id: stageId, reason: `${label} was saved from what the project said before this change: ${what}. It is updated with what the project says now.`.slice(0, 1_000) }],
+      },
+    });
+    await ctx.afterStageEvent();
+    return { ...out, output: `${out.output}\n\nThe project changed while this was being written (${what.slice(0, 200)}), so ${label} stays open and is updated with what the project says now.` };
+  } catch {
+    return out;
+  }
+}
+
+async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
   const ctx = refusingWorkingText(carryingApprovedCopies(raw));
   const key = ctx.step.action_key;
   const params = ctx.step.params ?? {};

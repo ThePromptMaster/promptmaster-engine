@@ -6281,6 +6281,50 @@ Limits:
   Go no longer makes a new version of approved work for wording.
 - "What it changes for the people doing the work" is a planner instruction, not checked in code.
 
+### L-321 — The latest update in the Go panel, and a stage's statuses on one line when they differ (2026-11-28)
+Sean, 27 Nov: "What did my change affect, and where did Go stop? … Show affected records and tasks, with links to
+open them. Start with a clickable summary in the existing Go panel." He corrected his own mockup: "Showing Alex's
+next step as ready would overstate what happened. A better message would be 'Alex's exception recorded. Draft
+check blocked. Confirm the current handoff before acting.' If an unrelated check is blocked, the UI can show
+that separately."
+
+**Latest update** (`lib/workflow/latest-update.ts`, `components/workflow/agent/latest-update.tsx`), in the Go
+panel, for the user's latest change:
+- what was recorded, in its new words;
+- each record it touched, with a link: redone (and to which version), checked and kept, being redone, waiting,
+  to be checked;
+- the task list since: done, retired, added, on hold (the same counts the task list shows);
+- a check or repair that failed since the change and has not been done since, on a record the change touched:
+  "{stage}: check blocked. Confirm the current {stage} before acting on it.", with its reason. Others are
+  listed apart, as not from this update.
+It is read from the change summary (`changeSummary`), Go's steps and the task list, so it cannot disagree with
+them.
+
+**A stage's statuses** (`lib/workflow/stage-status.ts`), under its header, only when they differ: "Written v9 ·
+checked v8 · approved v8 · still open in the world: Deliver carton B2…". Checked is the newest version a stage
+check or Go's re-confirmation covered; approved is the version the user's own approval is on; open in the world
+is the stage's open tasks.
+
+Limits:
+- The card shows the latest change the user made, not every change since they were last here (that is "Since
+  your last visit", L-290).
+- "Done in the world" is the task list's word: PromptMaster knows an action happened only when a fact reports
+  it (L-315).
+
+### L-322 — A version written from facts that changed meanwhile is not left looking current (2026-11-28)
+A peer's trace of Sean's 27 Nov Morrow run: a fact (D2) was recorded while Go applied findings to the shortlist.
+The change reopened nothing (the shortlist was still being written), the version saved without D2, and Go asked
+for its approval.
+
+Now, after any Go step that saved a version, if the brief or facts changed after the step began, and that change
+reopened the stage or reopened nothing, the stage is reopened with why: "{stage} was saved from what the project
+said before this change: {change}. It is updated with what the project says now." The version is kept
+(`reopenIfFactsMovedOn`, `lib/agent/perform.ts`; the event is a system `brief_changed` marked
+`made_before_change`).
+
+Limits:
+- A change judged to concern only other stages does not reopen it.
+- A page save or a chapter job is not covered: only Go's steps.
 
 ### L-326 — A linked project updated from its original reopens what used it; a faulted version is not "Ready" (2026-11-28)
 

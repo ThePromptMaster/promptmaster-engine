@@ -24,6 +24,8 @@ import { showsQueue, stillWaiting, type QueueEntry, type QueueItem } from '@/lib
 import { QuestionQueue, type QueueAnswer } from './question-queue';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
+import { LatestUpdateCard } from './latest-update';
+import type { LatestUpdate } from '@/lib/workflow/latest-update';
 import { TransparencyPanel } from './transparency-panel';
 import { doingNow } from '@/lib/agent/doing';
 import { failingChoices } from '@/lib/workflow/decision-options';
@@ -88,6 +90,8 @@ export function GoPanel({
   routine,
   stageModes,
   latestChange = null,
+  latestUpdate = null,
+  onOpenStage,
   onApplyAnyway,
   stageName,
   stageByEnglish,
@@ -154,6 +158,10 @@ export function GoPanel({
   meanwhileFor?: (stageId: string) => { ready: string; waiting: string } | null;
   /** The latest version of the stage Go asks about, when it came from applied findings. */
   latestChange?: LatestChange | null;
+  /** The latest update to the project: what it touched, the tasks since, and any blocked check (L-321). */
+  latestUpdate?: LatestUpdate | null;
+  /** Opens a stage from the latest update. */
+  onOpenStage?: (stageId: string) => void;
   /** The mismatch card for a stop on a folder rule and a note (L-280), by its conflict id; null once chosen. */
   folderChoice?: (conflictId: string) => ReactNode;
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
@@ -614,6 +622,7 @@ export function GoPanel({
             <QuestionQueue entries={queue.entries} offers={queue.offers} onAnswer={queue.onAnswer} />
           )}
           {/* "Use my mode on every stage" was here; how PromptMaster thinks is now chosen on the stage itself (26 Nov). */}
+          <LatestUpdateCard update={latestUpdate} stageName={shownStage} onOpenStage={onOpenStage} />
           <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} choosing={choosesOnCard} left={leftForGo ? { forGo: leftForGo, forYou: queue?.entries.length ?? 0 } : undefined} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
