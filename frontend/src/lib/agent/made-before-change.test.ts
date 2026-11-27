@@ -32,7 +32,8 @@ describe('a version saved from facts that changed while it was written (L-322)',
     expect(appendWorkflowEvent).toHaveBeenCalledTimes(1);
     const [, , ev] = appendWorkflowEvent.mock.calls[0] as unknown as [string, string, { type: string; actor: string; payload: { made_before_change: boolean; affected: { stage_id: string; reason: string }[] } }];
     expect(ev).toMatchObject({ type: 'version_predates_change', actor: 'system', payload: { made_before_change: true, affected: [{ stage_id: 'shortlist' }] } });
-    expect(ev.payload.affected[0].reason).toContain('D2: No award has been approved.');
+    expect(ev.payload.affected[0].reason).toContain('D2: No award has been approved. It is updated');
+    expect(ev.payload.affected[0].reason).not.toContain('..');
     expect(out.output).toContain('stays open');
   });
 

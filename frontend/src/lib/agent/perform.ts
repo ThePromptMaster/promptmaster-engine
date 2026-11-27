@@ -841,7 +841,8 @@ export async function reopenIfFactsMovedOn(ctx: PerformContext, out: StepOutcome
     );
     if (!changed.length) return out;
     const label = ctx.template.stages.find((s) => s.id === stageId)?.label ?? 'This stage';
-    const what = changeBetween(changed, ctx.step.started_at, new Date(Date.now() + 60_000).toISOString())?.what ?? 'the brief changed';
+    // Without its own full stop: "… notice MO-3).. It is updated" (28 Nov, production pass).
+    const what = (changeBetween(changed, ctx.step.started_at, new Date(Date.now() + 60_000).toISOString())?.what ?? 'the brief changed').replace(/[.\s]+$/, '');
     // Its own event: a brief_changed is the user's alone (we_brief_change_user_chk), and the database
     // refused this one when it was written as one (27 Nov, found by hand on production).
     await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
