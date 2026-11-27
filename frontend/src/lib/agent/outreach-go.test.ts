@@ -8,7 +8,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import { blankContact, serializeContacts } from '@/lib/outreach/contacts';
 import { blankMessage, serializeMessage } from '@/lib/outreach/drafts';
 import { outreachFacts, withWrittenMessage } from '@/lib/outreach/go-work';
-import { describeNeed, needStillHolds, needsUser, requiredWork } from './needs';
+import { describeNeed, needStillHolds, needsUser, requiredWork, staleRepair, unrepairableStale } from './needs';
 import { allowedActions } from './policy';
 
 const template = EMAIL_OUTREACH_V1;
@@ -68,6 +68,27 @@ describe('Go on an outreach round', () => {
     const before = { ...blankMessage(), variables: { offer: 'the beta', link: 'https://promptmasterv1.com' }, sender_id: 's1' };
     const next = withWrittenMessage(before, { subject: 'Hi', body: 'B', followup_body: 'F', offer: '', link: '' }, { sender_id: 's2', signature_id: 'g', reply_signature_id: null });
     expect(next).toMatchObject({ subject: 'Hi', variables: { offer: 'the beta', link: 'https://promptmasterv1.com' }, sender_id: 's1', signature_id: 'g', followup: { body: 'F', after_business_days: 3 } });
+  });
+});
+
+// 27 Nov pass: a change to Contacts reopened Message and Drafts, and Go stopped with "a repair failed".
+describe('a reopened outreach stage', () => {
+  it('is Go\'s to settle, not a stop', () => {
+    const state = initialState(template);
+    const message = stage('message');
+    const drafts = stage('drafts');
+    const reopened = {
+      ...state,
+      current_stage_id: drafts.id,
+      stages: {
+        ...state.stages,
+        [stage('contacts').id]: { ...state.stages[stage('contacts').id], status: 'complete' as const },
+        [message.id]: { ...state.stages[message.id], status: 'stale' as const, stale: { reason: 'Contacts was changed.', since: '2026-11-27T00:00:00Z', was: 'complete' as const } },
+        [drafts.id]: { ...state.stages[drafts.id], status: 'stale' as const, stale: { reason: 'Contacts was changed.', since: '2026-11-27T00:00:00Z', was: 'in_progress' as const } },
+      },
+    };
+    expect(staleRepair(template, reopened)).toMatchObject({ key: 'recheck_stage', params: { stage_id: message.id } });
+    expect(unrepairableStale(template, reopened)).toBeNull();
   });
 });
 

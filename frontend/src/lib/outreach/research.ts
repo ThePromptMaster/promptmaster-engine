@@ -57,14 +57,25 @@ export const RESEARCH_REASONS = {
   notFound: (why: string) => why || REASONS.noAddress,
 } as const;
 
-/** Rows worth a search: not skipped or a repeat, not searched before, and missing a person, an address or a detail. */
+/** A general inbox PromptMaster found, which a named person's own address may replace; one the list or the user gave stays. */
+function replaceableInbox(row: ContactRow): boolean {
+  return row.email_kind === 'general' && row.src_email !== 'import' && row.src_email !== 'you' && row.email_status !== 'given';
+}
+
+/**
+ * Rows worth a search: not skipped or a repeat, not searched before, and missing a person, an
+ * address or a detail, or a named person with only a general inbox PromptMaster found (Sean: a
+ * named person before a general inbox).
+ */
 export function needsResearch(row: ContactRow): boolean {
   if (row.status === 'skip' || row.duplicate_of || row.researched) return false;
-  return !row.name.trim() || !row.email.trim() || !row.personal_line.trim();
+  return !row.name.trim() || !row.email.trim() || !row.personal_line.trim() || (Boolean(row.name.trim()) && replaceableInbox(row));
 }
 
 export function researchRow(row: ContactRow): ResearchRow {
-  return { id: row.id, company: row.company, website: row.website, domain: row.domain, name: row.name, role: row.role, email: row.email, detail: row.detail };
+  // A replaceable general inbox is sent as no address, so the search looks for the person's own.
+  const email = replaceableInbox(row) ? '' : row.email;
+  return { id: row.id, company: row.company, website: row.website, domain: row.domain, name: row.name, role: row.role, email, detail: row.detail };
 }
 
 const cite = (s: string) => s.replace(/^\[|\]$/g, '').trim();
@@ -86,7 +97,8 @@ export function mergeResearch(row: ContactRow, found: ResearchedRow | undefined,
     Object.assign(next, { role: found.role, src_role: cite(found.src_role) });
     added.add('role');
   }
-  if (!row.email.trim() && found.email) {
+  const inbox = replaceableInbox(row);
+  if (found.email && (!row.email.trim() || (inbox && inboxKind(found.email) === 'named'))) {
     Object.assign(next, { email: found.email, email_status: found.email_status, email_kind: inboxKind(found.email), src_email: cite(found.src_email) });
     added.add('email');
   } else if (!row.email.trim() && found.email_status === 'none') {
@@ -108,5 +120,7 @@ export function mergeResearch(row: ContactRow, found: ResearchedRow | undefined,
   if (next.email_status === 'guess') return { ...next, status: 'decide', reason: RESEARCH_REASONS.guess(found.guessed_from) };
   if (!next.name.trim() && found.candidates.length >= 2) return { ...next, status: 'decide', reason: RESEARCH_REASONS.twoPeople };
   if (!next.email.trim()) return { ...next, status: 'decide', reason: RESEARCH_REASONS.notFound(found.reason) };
+  // A general inbox kept after a search for the person's own: the user's call, as in the group.
+  if (inbox && next.email_kind === 'general') return { ...next, status: 'decide', reason: REASONS.generalInbox };
   return initialStatus({ ...next, status: '', reason: '' });
 }

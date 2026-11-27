@@ -489,7 +489,8 @@ function carriedWhy(rows: unknown): string {
 }
 
 /** The renderers whose reopened stages Go repairs (`staleRepair`). */
-const REPAIRABLE: ReadonlySet<string> = new Set(['prose', 'list', 'review', 'long_form']);
+// 27 Nov: a reopened outreach stage is settled in code (`perform-outreach.ts::recheckOutreach`).
+const REPAIRABLE: ReadonlySet<string> = new Set(['prose', 'list', 'review', 'long_form', 'outreach']);
 
 /**
  * A reopened stage Go does not revise itself — a chapter plan, an assessment

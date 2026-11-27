@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { blankContact, REASONS, type ContactRow } from './contacts';
 import { chooseCandidate, decideGroup, groupDecisions } from './decisions';
+import { needsResearch, researchRow } from './research';
 
 const row = (id: string, patch: Partial<ContactRow>): ContactRow => ({ ...blankContact(id), status: 'decide', ...patch });
 
@@ -43,5 +44,12 @@ describe('grouped decisions', () => {
     expect(chooseCandidate(two, 0)).toMatchObject({ name: 'Ann Lee', role: 'COO', email: 'ann@acme.example', email_status: 'verified', src_email: 'S3', status: 'ready' });
     // No address yet: searched again for that person.
     expect(chooseCandidate(two, 1)).toMatchObject({ name: 'Bo Ray', email: '', researched: '', reason: REASONS.noAddress });
+    // 27 Nov pass: chosen on a general inbox PromptMaster found, it is not ready by itself, and the
+    // person's own address is searched for.
+    const inbox = { ...two, email: 'hello@acme.example', email_kind: 'general' as const, email_status: 'verified' as const, src_email: 'S2', researched: 'T' };
+    const chosen = chooseCandidate(inbox, 1);
+    expect(chosen).toMatchObject({ name: 'Bo Ray', email: 'hello@acme.example', status: 'decide', reason: REASONS.generalInbox, researched: '' });
+    expect(needsResearch(chosen)).toBe(true);
+    expect(researchRow(chosen).email).toBe('');
   });
 });

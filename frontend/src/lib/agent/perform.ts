@@ -56,7 +56,7 @@ import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage, decidedWords, isTriageTable, recordedDecisions, splitUntriaged } from '@/lib/workflow/triage';
 import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
-import { performOutreach, type OutreachActionKey } from '@/lib/agent/perform-outreach';
+import { performOutreach, recheckOutreach, type OutreachActionKey } from '@/lib/agent/perform-outreach';
 import { restoreDecided } from '@/lib/workflow/commit-check';
 import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict';
 import { proposeTargets } from '@/lib/workflow/proposals';
@@ -1424,6 +1424,11 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
       const userNote = typeof params.user_note === 'string' ? params.user_note.trim() : '';
       const withUserNote = (reason: string) => (userNote ? `${reason.replace(/[.\s]+$/, '')}. The user says what to fix: ${userNote}` : reason);
       if (target?.renderer === 'outline' && st?.status === 'stale') return repairOutline(ctx, key, target, withUserNote(st.stale?.reason ?? 'something it relied on changed'));
+      // 27 Nov: a reopened outreach stage is settled in code (`recheckOutreach`); approving and sending stay the user's.
+      if (target?.renderer === 'outreach' && st?.status === 'stale') {
+        const r = await recheckOutreach(ctx, target, (res) => keepWeb(ctx, res, target));
+        return done(key, { status: r.status, output: r.output, toolsUsed: r.toolsUsed, changes: r.versionIds.length ? { version_ids: r.versionIds } : {} });
+      }
       // L-63 (9 Oct): a finished stage whose measured requirement fails
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
