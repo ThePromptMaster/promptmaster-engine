@@ -11,7 +11,7 @@
 import { mismatchOutstanding } from '@/lib/folders/holds';
 import { assessPaste } from '@/lib/workflow/assess-run';
 import { assessKey, claimAssess, releaseAssess, reportAssess, whenAssessFree } from '@/lib/workflow/assess-lock';
-import { onlyGoWorkLeft } from './other-work';
+import { GO_DOES_UNDER_HANDLE, onlyGoWorkLeft } from './other-work';
 import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
@@ -74,7 +74,7 @@ import { delegationSentences } from './delegation';
 import { touchesObjective } from './stop-audit';
 import { createTask, listTasks } from '@/lib/supabase/tasks';
 import { retireMovedPastTasks } from './retire-tasks';
-import { changeBetween, stageHeads, taskKey } from '@/lib/workflow/task-reconcile';
+import { changeBetween, checkBorn, hasSameTask, stageHeads, taskKey, taskWords } from '@/lib/workflow/task-reconcile';
 import { describeWorkingText, strayWorkingText, WorkingTextInSave } from '@/lib/workflow/working-text';
 import { arithmeticSlips } from '@/lib/workflow/arithmetic';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -835,7 +835,8 @@ export async function reopenIfFactsMovedOn(ctx: PerformContext, out: StepOutcome
     const stageId = String((ctx.step.params?.stage_id as string | undefined) || ctx.stage.id);
     const affectedBy = (e: WorkflowEvent) => (Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: unknown }[]).map((a) => String(a.stage_id ?? '')) : []);
     const changed = (await ctx.loadEvents()).filter(
-      (e) => e.type === 'brief_changed' && e.created_at > ctx.step.started_at && !e.payload?.presentation_only && !e.payload?.made_before_change && !e.payload?.proposed &&
+      // A fact offered from the side chat changes nothing until the user takes it (L-168).
+      (e) => e.type === 'brief_changed' && e.created_at > ctx.step.started_at && !e.payload?.presentation_only && !e.payload?.made_before_change && !e.payload?.proposed && !e.payload?.offered &&
         (affectedBy(e).length === 0 || affectedBy(e).includes(stageId))
     );
     if (!changed.length) return out;
@@ -2576,10 +2577,13 @@ async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
         // Once: the same check again straight after means carrying on did not reach the work.
         const last = ctx.digest?.recent_steps?.at(-1);
         const triedOnce = last?.action_key === 'declare_objective_complete' && (last.output ?? '').startsWith('The deliverable is written, but the work is not finished');
-        if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle' && onlyGoWorkLeft(open) && !triedOnce) {
+        if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle' && onlyGoWorkLeft(open, GO_DOES_UNDER_HANDLE) && !triedOnce) {
+          const findings = open.some((i) => i.kind === 'open_findings');
           return done(key, {
             status: 'succeeded', toolsUsed: [], changes: {},
-            output: `${reason} It is all work I do myself, so I carry on with it under your routine-decision policy before calling the objective met.`,
+            output: findings
+              ? `${reason} I go on to decide the findings under your routine-decision policy, and put to you only any that are yours, before calling the objective met.`
+              : `${reason} It is all work I do myself, so I carry on with it under your routine-decision policy before calling the objective met.`,
           });
         }
         return done(key, {
@@ -3298,17 +3302,21 @@ async function recordOpenActions(
 ): Promise<void> {
   if (!actions.length) return;
   try {
-    const have = new Set((await listTasks(ctx.project.id)).filter((t) => t.status !== 'dismissed').map((t) => taskKey(t.title)));
+    // One task per action (27 Nov, museum pass: "Dispatch carton B2" eleven times, in other words each
+    // time). A check's sentence gives way only to another the check drew from the work, which follows
+    // its sentence; a task in a model's words gives way to any, and a repeat of it is closed on the page.
+    const have = (await listTasks(ctx.project.id)).filter((t) => t.status !== 'dismissed');
     for (const action of actions) {
-      if (have.has(taskKey(action))) continue;
-      have.add(taskKey(action));
-      await createTask(ctx.project.id, ctx.project.user_id, {
-        title: action.slice(0, 240),
+      if (have.some((t) => taskKey(t.title) === taskKey(action))) continue;
+      if (hasSameTask(from === 'objective_check' ? have.filter(checkBorn) : have, action)) continue;
+      const created = await createTask(ctx.project.id, ctx.project.user_id, {
+        title: taskWords(action).slice(0, 240),
         stage: stageId,
         origin: 'system',
         basis: { from, ...(versionId ? { version_id: versionId } : {}) },
         ...(versionId ? { origin_version_id: versionId } : {}),
       });
+      have.push(created);
     }
     await ctx.refresh?.();
   } catch {

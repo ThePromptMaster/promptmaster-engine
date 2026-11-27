@@ -193,3 +193,45 @@ describe('one task said twice (27 Nov, production pass)', () => {
     expect(taskKey('Next action: Run N8 on the new system.')).toBe(taskKey('Run N8 on the new system.'));
   });
 });
+
+describe('one action, one task (27 Nov, production passes)', () => {
+  // The museum job: Go put "dispatch carton B2" aside as real-world work eleven times, in other words each time.
+  const B2 = [
+    "Dispatch carton B2, obtain its delivery reference and date, and get the museum coordinator's acceptance before the project can be closed.",
+    "Dispatch carton B2 and record its shipment reference, receipt number, delivery date and the museum's acceptance.",
+    'Dispatch carton B2 from the dispatch shelf, deliver it to the museum, and obtain the courier receipt and museum acceptance.',
+  ];
+
+  it('reads a list marker as no part of the task', async () => {
+    const { taskKey, taskWords } = await import('./task-reconcile');
+    expect(taskKey('1. Run North payroll from file N7 on the new payroll system.')).toBe(taskKey('Run North payroll from file N7 on the new payroll system.'));
+    expect(taskWords('2) Step 3: Produce the completion report for North.')).toBe('Produce the completion report for North.');
+    expect(taskWords('- Send the receipt.')).toBe('Send the receipt.');
+  });
+
+  it('the same verb about the same identifiers is one action; another person, file or verb is not', async () => {
+    const { sameAction } = await import('./task-reconcile');
+    expect(sameAction(B2[0], B2[1])).toBe(true);
+    expect(sameAction(B2[1], B2[2])).toBe(true);
+    expect(sameAction('Run North payroll from file N7 on the new payroll system.', 'Run West payroll from file W4 on the new payroll system.')).toBe(false);
+    expect(sameAction('Run North payroll from file N7 on the new payroll system.', 'Produce the completion report for North, file N7, new payroll system.')).toBe(false);
+    expect(sameAction("Send Morgan Lee's reference contact sheet to Calder under CAL-01.", "Send Alex Rivera's written summary to Calder under CAL-01.")).toBe(false);
+    expect(sameAction('Dispatch carton B2 to the Hartwell Museum.', 'Dispatch carton B2 to the museum and record the courier.')).toBe(true);
+    // No identifier: only the same words.
+    expect(sameAction('Confirm the venue booking.', 'Confirm the catering booking.')).toBe(false);
+  });
+
+  it('keeps one per action, preferring the one the check drew from the work, and leaves the rest to close', async () => {
+    const { duplicateTasks, hasSameTask } = await import('./task-reconcile');
+    const tasks = [
+      task(B2[0], '2026-11-27T20:56:53Z', { basis: { from: 'screen' }, detail: 'q' }),
+      task(B2[1], '2026-11-27T20:57:29Z', { basis: { from: 'screen' }, detail: 'q' }),
+      task(B2[2], '2026-11-27T21:14:07Z', { basis: { from: 'objective_check' } }),
+      task('Confirm the museum coordinator has the B2 tracking number.', '2026-11-27T21:15:00Z', { basis: { from: 'screen' }, detail: 'q' }),
+    ];
+    const dups = duplicateTasks(tasks);
+    expect(dups.map((d) => [d.task.title, d.keeps.title])).toEqual([[B2[0], B2[2]], [B2[1], B2[2]]]);
+    expect(hasSameTask(tasks, 'Dispatch carton B2 to the museum and record the courier.')).toBe(true);
+    expect(hasSameTask(tasks.map((t) => ({ ...t, status: 'dismissed' as const })), B2[0])).toBe(false);
+  });
+});

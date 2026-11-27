@@ -11,7 +11,7 @@ import { api } from '@/lib/api/client';
 import { closeTaskBySystem, createTask, type ProjectTask } from '@/lib/supabase/tasks';
 import { statesAsCurrent } from '@/lib/workflow/fact-values';
 import { currentFacts, factLine } from '@/lib/workflow/facts';
-import { closing, taskKey, tasksMovedPast, type StageHeads, type TaskOutcome } from '@/lib/workflow/task-reconcile';
+import { closing, duplicateTasks, hasSameTask, taskWords, tasksMovedPast, type StageHeads, type TaskOutcome } from '@/lib/workflow/task-reconcile';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { ProjectFact } from '@/types/project';
 
@@ -38,7 +38,7 @@ export interface RetireResult {
 
 export async function retireMovedPastTasks({ project, heads, events, tasks, signal }: RetireInput): Promise<RetireResult> {
   const due = tasksMovedPast(tasks, heads, events);
-  if (!due.length) return { closed: [], created: [] };
+  if (!due.length) return closeDuplicates(tasks, signal);
 
   // Why: only for tasks whose sentence left the work; the date rule says its own why.
   const labels = new Map<string, TaskOutcome>();
@@ -62,8 +62,9 @@ export async function retireMovedPastTasks({ project, heads, events, tasks, sign
     }
   }
 
-  // A reworded task carries on under its new words, once.
-  const have = new Set(tasks.filter((t) => t.status !== 'dismissed').map((t) => taskKey(t.title)));
+  // A reworded task carries on under its new words, once: not when the list already holds that action.
+  const retiring = new Set(due.map((r) => r.task.id));
+  const have = tasks.filter((t) => !retiring.has(t.id));
   const closed: ProjectTask[] = [];
   const created: ProjectTask[] = [];
   for (const r of due) {
@@ -77,16 +78,16 @@ export async function retireMovedPastTasks({ project, heads, events, tasks, sign
     if (carriesOn !== undefined) {
       const now = carriesOn.trim();
       if (!now || !statesAsCurrent(r.head.text, now)) o = o.outcome === 'reworded' ? { outcome: 'gone' } : o;
-      else if (!have.has(taskKey(now))) {
+      else if (!hasSameTask(have, now)) {
         try {
           replacement = await createTask(project.id, project.user_id, {
-            title: now.slice(0, 240),
+            title: taskWords(now).slice(0, 240),
             stage: r.stageId,
             origin: 'system',
             basis: { from: 'reworded', version_id: r.head.versionId, replaces: r.task.id },
             origin_version_id: r.head.versionId,
           });
-          have.add(taskKey(now));
+          have.push(replacement);
           created.push(replacement);
         } catch {
           // The old one still closes as reworded; the next check records the new words.
@@ -101,5 +102,30 @@ export async function retireMovedPastTasks({ project, heads, events, tasks, sign
       // Left open: the next pass tries again.
     }
   }
-  return { closed, created };
+  const after = [...tasks.map((t) => closed.find((c) => c.id === t.id) ?? t), ...created];
+  const dup = await closeDuplicates(after, signal);
+  return { closed: [...closed, ...dup.closed], created };
+}
+
+/**
+ * Closes the open tasks that repeat another open one, with the one they repeat (27 Nov, museum
+ * pass: eleven wordings of "Dispatch carton B2"). Written only where still open, so a repeat
+ * changes nothing.
+ */
+async function closeDuplicates(tasks: readonly ProjectTask[], signal?: AbortSignal): Promise<RetireResult> {
+  const closed: ProjectTask[] = [];
+  for (const { task, keeps } of duplicateTasks(tasks)) {
+    if (signal?.aborted) break;
+    try {
+      const saved = await closeTaskBySystem(task, {
+        status: 'dismissed',
+        resolution: `The same action as "${keeps.title.slice(0, 200)}"`,
+        basis: { outcome: 'duplicate', quote: keeps.title.slice(0, 240), replaced_by: keeps.id, ...(keeps.stage ? { stage_id: keeps.stage } : {}) },
+      });
+      if (saved) closed.push(saved);
+    } catch {
+      // Left open: the next pass tries again.
+    }
+  }
+  return { closed, created: [] };
 }

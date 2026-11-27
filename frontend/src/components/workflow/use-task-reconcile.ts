@@ -6,12 +6,13 @@
  * applied finding, the tasks that version no longer says are closed with why.
  * Opening a project whose list fell behind before this existed does the same
  * once (Sean's payroll project: 16 open tasks against a pack that left one run).
+ * An open task that repeats another in other words is closed as the same action.
  */
 
 import { useEffect, useMemo, useRef } from 'react';
 import { retireMovedPastTasks } from '@/lib/agent/retire-tasks';
 import type { ProjectTask } from '@/lib/supabase/tasks';
-import { stageHeads, tasksMovedPast } from '@/lib/workflow/task-reconcile';
+import { duplicateTasks, stageHeads, tasksMovedPast } from '@/lib/workflow/task-reconcile';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Project } from '@/types/project';
 import type { StageBundle } from '@/stores/project-store';
@@ -30,7 +31,9 @@ export function useTaskReconcile({ project, template, bundles, events, tasks, up
   const heads = useMemo(() => stageHeads(template, bundles ?? {}), [template, bundles]);
   // What is due now, as a key: a task and the version that moved past it. Each is tried once per page.
   const due = useMemo(() => tasksMovedPast(tasks, heads, events ?? []), [tasks, heads, events]);
-  const key = due.map((r) => `${r.task.id}@${r.head.versionId}`).join(',');
+  // …and an open task that repeats another, in other words (27 Nov, museum: eleven "Dispatch carton B2").
+  const repeats = useMemo(() => duplicateTasks(tasks), [tasks]);
+  const key = [...due.map((r) => `${r.task.id}@${r.head.versionId}`), ...repeats.map((d) => `${d.task.id}=${d.keeps.id}`)].join(',');
   const tried = useRef(new Set<string>());
   const running = useRef(false);
   const latest = useRef({ project, heads, events, tasks, upsertTask });

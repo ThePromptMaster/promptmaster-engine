@@ -69,7 +69,8 @@ import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/exper
 import { creditStop, isOutOfCredits } from '@/lib/agent/credit-stop';
 import { findingAsQuestion, MAX_FINDINGS_SCREENED, planFromScreen, shouldScreen, type ScreenPlan } from '@/lib/agent/question-screen';
 import { approvalTheQuestionIsAbout, LEFT_TO_GO } from '@/lib/workflow/left-to-go-approvals';
-import { createTask } from '@/lib/supabase/tasks';
+import { createTask, listTasks } from '@/lib/supabase/tasks';
+import { hasSameTask, taskWords } from '@/lib/workflow/task-reconcile';
 import { approvalStandsThroughRepairs } from '@/lib/workflow/approvals';
 import { describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
 import { latestObjectiveAssessment } from '@/lib/workflow/objective';
@@ -816,7 +817,9 @@ export function useGoLoop(opts: Options) {
       upsertStep(step);
       let output = `Recorded as still to do in the real world: ${plan.action}`;
       try {
-        await createTask(o.project.id, o.project.user_id, { title: plan.action.slice(0, 240), detail: question.slice(0, 1000), stage: stage.id, origin: 'system', basis: { from: 'go_record' } });
+        // Once: the list may already hold it in other words (27 Nov, museum pass).
+        if (hasSameTask(await listTasks(o.project.id), plan.action)) output = `Already on the task list as still to do in the real world: ${plan.action}`;
+        else await createTask(o.project.id, o.project.user_id, { title: taskWords(plan.action).slice(0, 240), detail: question.slice(0, 1000), stage: stage.id, origin: 'system', basis: { from: 'go_record' } });
       } catch (e) {
         output = `Could not record it (${(e as Error).message}), so it is asked instead.`;
       }

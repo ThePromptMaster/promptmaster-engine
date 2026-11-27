@@ -40,6 +40,8 @@ describe('a version saved from facts that changed while it was written (L-322)',
     await reopenIfFactsMovedOn(ctx([fact({ created_at: '2026-11-27T15:30:00Z' })]), saved);
     await reopenIfFactsMovedOn(ctx([fact({ payload: { ...fact().payload, affected: [{ stage_id: 'brief', reason: 'x' }] } })]), saved);
     await reopenIfFactsMovedOn(ctx([fact({ payload: { ...fact().payload, proposed: [{ stage_id: 'shortlist' }] } })]), saved);
+    // Offered from the side chat with nothing finished: no proposal list, still only offered (L-168).
+    await reopenIfFactsMovedOn(ctx([fact({ payload: { ...fact().payload, offered: true } })]), saved);
     await reopenIfFactsMovedOn(ctx([fact()]), { ...saved, changes: {} });
     expect(appendWorkflowEvent).not.toHaveBeenCalled();
   });

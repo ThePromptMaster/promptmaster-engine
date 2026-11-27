@@ -234,7 +234,7 @@ export function answered(statement: string): string {
 // "Corrected", "first reported as": a vendor correction recorded beside what it replaced (20 Nov,
 // inventory-selection pass: "first reported as nightly export confirmed by the vendor, corrected by
 // the vendor to weekly export only" failed a repair as still saying "Confirmed by the vendor").
-const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|not (?:adopted|approved|authori[sz]ed|taken up)|propos(?:al|als|ed|es)|correct(?:ed|ion|ions)|first (?:reported|stated|quoted|given)|v\d+)\b/i;
+const ATTRIBUTED = /\b(original\b[\w\s,'’-]{0,40}?\b(?:was|were|had been)|sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|not (?:adopted|approved|authori[sz]ed|taken up)|propos(?:al|als|ed|es)|correct(?:ed|ion|ions)|first (?:reported|stated|quoted|given)|v\d+)\b/i;
 
 /**
  * A section that records history: a change log, a decision log, superseded
@@ -707,6 +707,7 @@ export function leftoverMentions(
     for (const raw of piecesFor(s)) {
       const p = withoutEmphasis(raw);
       if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p) || reported.has(raw)) continue;
+      if (rowSetsAside(kept, raw, s)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
       if (!found.includes(s.value) || now.some((v) => found.includes(v))) continue;
       // A figure the document works out is its own; only beside the fact's
@@ -719,6 +720,21 @@ export function leftoverMentions(
     }
   }
   return out;
+}
+
+/**
+ * Whether the table row a sentence sits in has a cell that sets this value aside: "| F12 | … The
+ * current target is Week 7 Tuesday (D6). … | Week 6 Friday is **Superseded** by D6 |" (27 Nov, a
+ * peer's Alder rerun). The row is history for that value, whatever its other cells say.
+ */
+function rowSetsAside(lines: readonly string[], sentence: string, s: SupersededValue): boolean {
+  const piece = sentence.trim().replace(/^\|\s*/, '').slice(0, 60);
+  const row = lines.find((l) => l.trim().startsWith('|') && l.includes(piece));
+  if (!row) return false;
+  return row.split('|').some((cell) => {
+    const c = withoutEmphasis(cell);
+    return /\b(?:supersed\w*|replaced|withdrawn|retired|no longer (?:applies|current|in force)|historical)\b/i.test(c) && factValues(c)[s.kind].includes(s.value);
+  });
 }
 
 /**

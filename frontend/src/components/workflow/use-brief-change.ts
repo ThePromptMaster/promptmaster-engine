@@ -167,7 +167,17 @@ export function useBriefChange({
               continue;
             }
           }
-          if (!stages.length) continue;
+          if (!stages.length) {
+            // A fact is recorded even when nothing is finished yet (27 Nov, Alder rerun on production:
+            // one added while Go drafted the first stage left no event, so the version Go saved from
+            // the facts before it could not be told apart, L-322). Nothing reopens: there is nothing
+            // finished, and a draft saved from before it is caught by what Go saves next.
+            if (field === 'facts') {
+              const onlyOffered = onlyFromTheChat(before, p.facts);
+              await append({ type: 'brief_changed', stage_id: at, payload: { field, kind: 'fact', presentation_only: false, affected: [], ...(onlyOffered ? { offered: true } : {}), ...texts } });
+            }
+            continue;
+          }
           try {
             const impact = await api.assessChange({ field, ...changeWindow(before, after), stages, model: p.model });
             // An answer given to Go is judged against every finished stage, and
@@ -179,7 +189,7 @@ export function useBriefChange({
             await append({
               type: 'brief_changed', stage_id: at,
               payload: {
-                field, kind: impact.kind, presentation_only: false, affected: onlyOffered ? [] : affected, ...(onlyOffered && affected.length ? { proposed: affected } : {}),
+                field, kind: impact.kind, presentation_only: false, affected: onlyOffered ? [] : affected, ...(onlyOffered && affected.length ? { proposed: affected } : {}), ...(onlyOffered ? { offered: true } : {}),
                 ...(left.length ? { left_to_go: left } : {}),
                 calculations_hold: impact.calculations_hold, had_computed: stages.some((st) => st.computed),
                 ...texts,
