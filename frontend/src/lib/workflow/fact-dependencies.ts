@@ -12,7 +12,8 @@
  * work that never mentioned it is still a judgment (`assess-change`).
  */
 
-import { factValues } from './fact-values';
+import type { ProjectFact } from '@/types/project';
+import { factValues, type FactValues } from './fact-values';
 
 const NUMBER = /\d[\d,]*(?:\.\d+)?/g;
 const WORD = /[a-z]{5,}/g;
@@ -91,4 +92,31 @@ export function statementsOf(factsText: string): string[] {
     .split('\n')
     .map((l) => l.replace(/^- (Requirement: )?/, '').trim())
     .filter(Boolean);
+}
+
+/**
+ * Whether a changed fact only rewords the one it replaced: every date, amount,
+ * weekday, time, limit and number the same (27 Nov, production pass of Sean's
+ * test design, change 4: "a fact restated in different words with the same
+ * meaning; nothing should change"). The old fact's values are still true, so
+ * finding them in the work says nothing about it: "$410 per person per day",
+ * restated, reopened the Budget and the plan, and the plan was rewritten.
+ * Whether the new words matter is judged, as for an added fact. A fact with no
+ * values is never only reworded: its words are what the work uses.
+ */
+export function rewordedOnly(was: string, now: string | undefined): boolean {
+  if (!now) return false;
+  const a = factValues(was);
+  const b = factValues(now);
+  const kinds = Object.keys(a) as (keyof FactValues)[];
+  if (!kinds.some((k) => a[k].length)) return false;
+  return kinds.every((k) => a[k].length === b[k].length && a[k].every((v) => b[k].includes(v)));
+}
+
+/** The statement that replaced `was` (a line of `statementsOf`), found by `supersedes`; undefined when none. */
+export function replacementOf(was: string, facts: readonly ProjectFact[]): string | undefined {
+  const line = (f: ProjectFact) => `${f.subject ? `${f.subject}: ` : ''}${f.statement}`;
+  const old = [...facts].reverse().find((f) => f.retired_at && line(f) === was);
+  const now = old ? facts.find((f) => f.supersedes === old.id && !f.retired_at) : undefined;
+  return now ? line(now) : undefined;
 }

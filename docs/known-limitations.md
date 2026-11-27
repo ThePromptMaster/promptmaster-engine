@@ -5630,6 +5630,20 @@ Limits:
 - The list of open work (`outstandingWork`) does not include a newer version that has not been sent. Only the stage
   and the change summary say so.
 
+### L-294 — A fact reworded with every value the same is judged, not matched by its values (2026-11-27)
+Production pass of change 4 in the side-by-side test design: "a fact restated in different words with the same
+meaning (nothing should change)". "Harbor Crew Hire charges $410 per person per day…", restated with the same $410
+and 7 days, reopened the Budget and the plan, because both state $410. The Budget was checked and kept. Nothing
+before the plan had changed since its last version, so there was nothing to check it against, and it was rewritten.
+
+Now a changed fact whose dates, amounts, weekdays, times, limits and numbers are all the same as the one it
+replaced does not reopen anything by value. It goes to the same judgment as an added fact (`assess-change`), which
+reopens only what the new words matter to (`rewordedOnly`).
+
+Limits:
+- A fact with no values is still matched by its words, as before.
+- A rewording that changes the meaning without changing a value is caught only by that judgment.
+
 ### L-293 — A task an earlier check recorded is dismissed once the work has moved past it (2026-11-27)
 Production pass, ops plan example. Each objective check adds the real-world actions it finds as tasks, and nothing
 took one back. After three delivery date changes, "Carried forward" held "confirm a receiving contact before

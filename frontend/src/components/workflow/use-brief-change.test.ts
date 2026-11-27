@@ -76,3 +76,31 @@ describe('the retired decision is not read as another change; later work is told
     expect(affected.find((a) => a.stage_id === 'review')?.reason).toContain('was made when the record said');
   });
 });
+
+describe('a fact only reworded is judged, not matched by its values (27 Nov, production pass)', () => {
+  it('nothing reopens by value; the change goes to the judgment like an added fact', async () => {
+    vi.useFakeTimers();
+    const { api } = await import('@/lib/api/client');
+    const assess = vi.mocked(api.assessChange);
+    assess.mockClear();
+    const old = fact('r', "Harbor Crew Hire charges $410 per person per day and moves a booking free with 7 days' notice.");
+    const base = { id: 'p', user_id: 'u', status: 'active', objective: 'Plan', constraints: '', output_format: '', audience: '' } as unknown as Project;
+    const done = (id: string, seq: number) => ({ seq, type: 'stage_marked_complete', stage_id: id, payload: {}, created_at: `2026-11-27T09:0${seq}:00Z`, actor: 'system' });
+    const state = projectState(SINGLE_OUTPUT_V1, [done('input', 1), done('review', 2), done('output', 3)] as never);
+    const bundle = (content: string) => ({ versions: [{ id: 'v', version_number: 1, content }] });
+    const appendEvent = vi.fn(async (e: unknown) => e);
+    const props = { template: SINGLE_OUTPUT_V1, state, bundles: { output: bundle('Installation crew: 4 people x 6 days x $410 per person per day = $9,840.') } as never, stageId: 'output', appendEvent, enabled: true };
+    const { rerender } = renderHook((p: { project: Project }) => useBriefChange({ ...props, project: p.project }), {
+      initialProps: { project: { ...base, facts: [old] } as Project },
+    });
+    const reworded = fact('r2', "Harbor Crew Hire's rate is $410 per person per day, and a booking can be moved at no charge with 7 days' notice.", {}, { supersedes: 'r' });
+    rerender({ project: { ...base, facts: [{ ...old, retired_at: '2026-11-27T09:35:00Z' }, reworded] } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(assess).toHaveBeenCalledTimes(1);
+    const payload = (appendEvent.mock.calls[0][0] as { payload: { method?: string; affected: unknown[] } }).payload;
+    expect(payload.method).toBeUndefined();
+    expect(payload.affected).toEqual([]);
+  });
+});
