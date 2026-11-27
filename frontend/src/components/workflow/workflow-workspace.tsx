@@ -148,6 +148,10 @@ import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { useTaskReconcile } from './use-task-reconcile';
+import { StageStatusLine } from './stage-status-line';
+import { latestUpdate } from '@/lib/workflow/latest-update';
+import { changeDetail } from '@/lib/workflow/timeline';
+import { stageStatusSummary } from '@/lib/workflow/stage-status';
 import { currentTasks, openSystemTasks } from '@/lib/workflow/task-reconcile';
 import { openBriefChange, proposedChange, settledChange, SETTLED_SHOWN_MS, type ProposedChange } from '@/lib/workflow/brief-change';
 import { replaceDocumentInContext, contextFromDocuments, documentInContext } from '@/lib/data/extract-text';
@@ -1450,6 +1454,18 @@ export function WorkflowWorkspace({
   });
   // What is still to do, one reading for every view of it: the panel, the finished screen, the status (L-315).
   const taskView = useMemo(() => currentTasks(recommendations.tasks, state), [recommendations.tasks, state]);
+  // Written, checked, approved and still open in the world, when they differ (L-321).
+  const stageStatus = useMemo(
+    () =>
+      stage
+        ? stageStatusSummary({
+            stage, versions: stageVersionList,
+            checkedVersionIds: new Set(Object.entries(evaluations ?? {}).filter(([, e]) => !isFailedEvaluation(e)).map(([id]) => id)),
+            events: events ?? [], manualChecks: project.manual_checks, manualCheckVersions: project.manual_check_versions, actionable: taskView.actionable,
+          })
+        : null,
+    [stage, stageVersionList, evaluations, events, project.manual_checks, project.manual_check_versions, taskView.actionable]
+  );
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
   const heldHereNow = useMemo(() => heldStages(project.inherited, events).get(stageId), [project.inherited, events, stageId]);
   // A commitments sign-off on a version that proposes none is recorded as not
@@ -2309,6 +2325,18 @@ export function WorkflowWorkspace({
     },
     [template, state, events, reapprove, stageBundles, evaluations, context, project.status, project.manual_checks, project.routine_decisions, outstanding, keptNow, sentBehind]
   );
+  // The latest update, in the Go panel (L-321): what it touched, the tasks since, any blocked check.
+  const latestUpdateNow = useMemo(() => {
+    const change = [...(events ?? [])].reverse().find((e) => e.type === 'brief_changed' && e.actor === 'user' && changeDetail(e));
+    if (!change) return null;
+    const touched = (Array.isArray(change.payload?.affected) ? (change.payload!.affected as { stage_id?: unknown }[]) : [])
+      .map((a) => (typeof a.stage_id === 'string' ? a.stage_id : ''))
+      .filter(Boolean);
+    return latestUpdate({
+      events: events ?? [], state, summary: summariseSince(change.created_at, touched),
+      steps: [...(go.priorSteps ?? []), ...go.steps], tasks: recommendations.tasks, onHold: taskView.onHold.length,
+    });
+  }, [events, state, summariseSince, go.priorSteps, go.steps, recommendations.tasks, taskView.onHold.length]);
   const waitingQueue = useMemo(() => {
     if (!queueStopHere || project.status === 'finalized') return [];
     const asking =
@@ -3317,6 +3345,7 @@ export function WorkflowWorkspace({
             approvalPending={approvalPendingIds.has(stage.id)}
             hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
+          <StageStatusLine line={stageStatus} />
           <WebFoundNotice projectId={project.id} stageId={stage.id} />
           <SentRecord
             head={headVersion ? { id: headVersion.id, version_number: headVersion.version_number } : null}
@@ -3369,6 +3398,8 @@ export function WorkflowWorkspace({
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
               latestChange={goLatestChange}
+              latestUpdate={latestUpdateNow}
+              onOpenStage={(id) => setViewingStageId(id === state.current_stage_id ? null : id)}
               onApplyAnyway={applyAnyway}
               otherWork={(id) => otherWorkFor(outstanding, id)}
               meanwhileFor={(id) => {

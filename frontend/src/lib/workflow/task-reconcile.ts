@@ -248,7 +248,15 @@ export function openSystemTasks(tasks: readonly ProjectTask[], state: Pick<Workf
   return [...c.actionable, ...c.onHold.map((h) => h.task)].filter((t) => t.origin === 'system');
 }
 
-/** The normalised key two tasks share when they say the same thing. */
+/**
+ * The normalised key two tasks share when they say the same thing. A leading label is not part of
+ * it: "Step: send Morgan Lee's contact sheet…" is "send Morgan Lee's contact sheet…" (27 Nov,
+ * production pass of the Calder fix: a second check added it again under "Step:").
+ */
 export function taskKey(title: string): string {
-  return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return title
+    .replace(/^\s*(?:\d+[.)]\s*)?(?:step|next action|action|next step|then|to do)\s*\d*\s*[:.)–—-]\s*/i, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
