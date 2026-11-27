@@ -178,6 +178,8 @@ export const hi: Record<keyof typeof en, string> = {
   "outreach.whoShouldItBe": "किसे चुनें?",
   "outreach.chooseThem": "{name} चुनें",
   "outreach.useStartFile": "शुरुआत में जोड़ी गई {name} इस्तेमाल करें",
+  "outreach.linkForThis": "इस ईमेल का लिंक",
+  "outreach.editSendsBack": "स्वीकृत ईमेल बदलने पर वह भेजे जाने से पहले समीक्षा के लिए आपको लौट आता है।",
   "outreach.group.import_change": "{count} जहाँ नया इम्पोर्ट कुछ अलग कहता है।",
   "outreach.use.import_change": "नए मान इस्तेमाल करें",
   "outreach.keepMine": "जो था वही रखें",

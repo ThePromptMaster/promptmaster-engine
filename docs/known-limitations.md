@@ -5966,7 +5966,10 @@ domain) is not added again:
 web, emails to approve, held or sent back, not sent, scheduled and sent.
 
 Limits:
-- No per-email offer or link override on the page: an approved email is locked; withdraw it to change it.
+- An email can be edited until it goes, approved or not, including a link for that email alone ("Link for
+  this email", stored as its override). Editing an approved one sends it back for review: its send is held
+  and its approval withdrawn, as Sean's first test asks ("change the link on one queued email"). There is no
+  per-email offer.
 - No attachments yet (L-305).
 - The page's early check runs when the Message is saved or the Drafts stage is open. Otherwise the job runner
   is the check, at send time.

@@ -178,6 +178,8 @@ export const zh: Record<keyof typeof en, string> = {
   "outreach.whoShouldItBe": "应该选谁？",
   "outreach.chooseThem": "选择 {name}",
   "outreach.useStartFile": "使用开始时附上的 {name}",
+  "outreach.linkForThis": "此邮件的链接",
+  "outreach.editSendsBack": "修改已批准的邮件会把它退回给你审核，之后才能发送。",
   "outreach.group.import_change": "新导入与名单不同的有 {count} 个。",
   "outreach.use.import_change": "使用新的值",
   "outreach.keepMine": "保留原来的",

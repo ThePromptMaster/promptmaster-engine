@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { parseContacts } from '@/lib/outreach/contacts';
-import { blankMessage, changedBySync, draftText, editedFields, parseDrafts, parseMessage, serializeDrafts, syncDrafts, type DraftRow, type OutreachMessage } from '@/lib/outreach/drafts';
+import { blankMessage, changedBySync, draftText, draftVariables, editedFields, parseDrafts, parseMessage, serializeDrafts, syncDrafts, type DraftRow, type OutreachMessage } from '@/lib/outreach/drafts';
 import { findChanged, identityFor } from '@/lib/outreach/hold-changed';
 import { replacedIn } from '@/lib/outreach/holds';
 import { unresolvedPlaceholders } from '@/lib/outreach/placeholders';
@@ -351,7 +351,8 @@ function DraftLine(props: {
   const { draft, message, open, onToggle, readOnly, busy, selectable, selected, onSelect, problems, send, approved, test, canTest, replaced } = props;
   const t = useT();
   const words = useSendWords();
-  const [form, setForm] = useState({ to: draft.to, subject: draft.subject, body: draft.body });
+  const ownLink = draftVariables(draft, message).link;
+  const [form, setForm] = useState({ to: draft.to, subject: draft.subject, body: draft.body, link: ownLink });
   const [why, setWhy] = useState('');
   const [checks, setChecks] = useState<{ key: string; ok: boolean; detail: string }[] | null>(null);
   const [checking, setChecking] = useState(false);
@@ -363,6 +364,9 @@ function DraftLine(props: {
   const approvedRender = useCallback(() => fromSnapshot(approved!), [approved]);
   const state = send ? words(send) : draft.status === 'approved' ? t('outreach.draftApproved') : draft.status === 'set_aside' ? t('outreach.draftSetAside') : held.length || replaced ? t('outreach.draftHeld') : t('outreach.draftToReview');
   const locked = draft.status === 'approved';
+  // Approved but not gone: still editable, and any change sends it back for review (Sean, 26 Nov:
+  // "change the link on one queued email … the old-link message held for review").
+  const gone = Boolean(send && ['submitting', 'submitted', 'confirmed', 'bounced'].includes(send.status));
   const at = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '');
   const f = props.followup;
   const followLine = f
@@ -458,26 +462,40 @@ function DraftLine(props: {
               )}
             </div>
           )}
-          {!readOnly && !locked && (
+          {!readOnly && !gone && (
             <>
+              {locked && <p className="text-label text-[var(--on-surface-variant)]" data-edit-sends-back>{t('outreach.editSendsBack')}</p>}
               <form
                 data-draft-form
                 className="space-y-2"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const fields = (['to', 'subject', 'body'] as const).filter((k) => form[k] !== draft[k]);
-                  if (fields.length) props.onEdit(form, fields);
+                  const fields: string[] = (['to', 'subject', 'body'] as const).filter((k) => form[k] !== draft[k]);
+                  const patch: Partial<DraftRow> = { to: form.to, subject: form.subject, body: form.body };
+                  if (form.link.trim() !== ownLink) {
+                    // This email's own link; the batch's again when it is set back to it.
+                    const own = JSON.parse(draft.overrides || '{}') as Record<string, string>;
+                    if (form.link.trim() && form.link.trim() !== message.variables.link) own.link = form.link.trim();
+                    else delete own.link;
+                    patch.overrides = Object.keys(own).length ? JSON.stringify(own) : '';
+                    fields.push('link');
+                  }
+                  if (fields.length) props.onEdit(patch, fields);
                 }}
               >
                 <input className={field} value={form.to} aria-label={t('outreach.hTo')} onChange={(e) => setForm({ ...form, to: e.target.value })} data-draft-to />
                 <input className={field} value={form.subject} aria-label={t('outreach.hSubject')} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-draft-subject />
                 <textarea className={`${field} min-h-[160px]`} value={form.body} aria-label={t('outreach.body')} onChange={(e) => setForm({ ...form, body: e.target.value })} data-draft-body />
+                <label className="block text-label text-[var(--on-surface-variant)]">
+                  {t('outreach.linkForThis')}
+                  <input className={field} value={form.link} inputMode="url" onChange={(e) => setForm({ ...form, link: e.target.value })} data-draft-link />
+                </label>
                 <div className="flex flex-wrap gap-2">
                   <button type="submit" className={quiet} disabled={busy} data-draft-save>{t('outreach.saveEmail')}</button>
                   {edited.size > 0 && <button type="button" className={quiet} disabled={busy} onClick={props.onReset} data-draft-reset>{t('outreach.useMessageAgain')}</button>}
                 </div>
               </form>
-              {draft.status === 'set_aside' ? (
+              {locked ? null : draft.status === 'set_aside' ? (
                 <button type="button" className={quiet} disabled={busy} onClick={props.onRestore}>{t('outreach.bringBack')}</button>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">

@@ -210,3 +210,36 @@ Two things worth deciding at the same time:
   the limitations register).
 - Whether a periodic `pg_dump` to storage outside Supabase is wanted. There is none
   today.
+
+## Outreach email (26–27 Nov)
+
+**Stop all sending at once.** Set `OUTREACH_SENDING=off` on promptmaster-api. It is read per call: tickets and
+sends answer 503, queued emails wait ("Waiting: sending is turned off on the server"), and nothing is lost.
+Remove it to resume. One person can stop their own with "Pause all my outreach" in Settings.
+
+**A send that is stuck or unclear.** Read its record:
+
+```sql
+select s.status, s.status_reason, s.provider_draft_id, s.provider_message_id, s.thread_url, j.status as job, j.attempts, j.error_message
+from outreach_sends s left join jobs j on j.id = s.job_id where s.id = '<send id>';
+select kind, detail, created_at from outreach_send_events where send_id = '<send id>' order by id;
+```
+
+- **`submitting`**: Gmail may or may not have it. The job searches Sent before anything else, and after two
+  empty searches 150 s apart marks it failed ("Not found in your Sent mail… Not sent again
+  automatically"). Never resend by hand without looking in the person's Sent mail first.
+- **`submitted`**: Gmail took it and Sent has not shown it yet. It stays submitted; the thread link is
+  already on it.
+- **`held`**: read `status_reason`. Withdrawn, changed since approval, do-not-contact, a replaced fact, or no
+  longer an approved draft. The person approves it again from Drafts.
+- **A Gmail draft left behind** by a failed attempt never sends by itself. It stays in the person's
+  Drafts.
+
+**Rotating `OUTREACH_TICKET_SECRET`** voids every ticket not yet used. Those emails are held at send time and
+need approving again. Rotate only with sending off, or after telling the people with scheduled emails.
+
+**Follow-ups and replies.**
+- A follow-up is queued only when its first email is confirmed, and reads the thread before it goes.
+- Replies, bounces and opt-outs are in `outreach_inbound`.
+- The watch job (`outreach_watch`) runs for 14 days after a project's latest email. Re-queue one by opening the
+  project's Drafts stage (at most once per ten minutes).
