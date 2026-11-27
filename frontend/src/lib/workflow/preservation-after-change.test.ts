@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { askedOfStage, briefChangedSince, correctedValues, keepUnasked, restoreLines } from './preservation';
+import { askedOfStage, asksForRemovals, briefChangedSince, correctedValues, keepUnasked, restoreLines } from './preservation';
 import { statesValue } from './fact-values';
 
 const fixture = (name: string) => readFileSync(join(__dirname, '__fixtures__', name), 'utf8');
@@ -96,3 +96,24 @@ describe('a line put back goes after its own neighbour, not the first copy of it
     expect(restoreLines(before, after, ['Slots: 4 of 5 used.'])).toBe(['Intro.', '$$', 'a = 1', '$$', 'Middle.', '$$', 'b = 3', '$$', 'Slots: 4 of 5 used.', 'End.'].join('\n'));
   });
 });
+
+// 28 Nov hand pass (L-332): Go was asked to "Replace the Alder Quay rollout
+// text with the Birch Lane book swap notice", and the guard put three Alder
+// lines back into the new notice.
+describe('replacing the text is a rewrite (L-332)', () => {
+  it.each([
+    'Replace the Alder Quay rollout text with the Birch Lane book swap notice: one page, with Summary (max 40 words), Details and Open questions.',
+    'Replace the entire current text with the Birch Lane book swap notice.',
+    'Do not keep any Alder Quay material.',
+    'Replace this section by the new FAQ.',
+  ])('%s', (instruction) => {
+    expect(asksForRemovals(instruction)).toBe(true);
+  });
+
+  it('a change that only replaces a value is not a rewrite', () => {
+    expect(asksForRemovals('Change the date to Sunday.')).toBe(false);
+    expect(asksForRemovals('Replace the $40 ticket price with $30.')).toBe(false);
+    expect(asksForRemovals('Keep everything else exactly as it is.')).toBe(false);
+  });
+});
+
