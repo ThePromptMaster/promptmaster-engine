@@ -5630,6 +5630,21 @@ Limits:
 - The list of open work (`outstandingWork`) does not include a newer version that has not been sent. Only the stage
   and the change summary say so.
 
+### L-293 — A task an earlier check recorded is dismissed once the work has moved past it (2026-11-27)
+Production pass, ops plan example. Each objective check adds the real-world actions it finds as tasks, and nothing
+took one back. After three delivery date changes, "Carried forward" held "confirm a receiving contact before
+Tuesday, March 30" next to "…before Tuesday, April 6", and a placeholder address the user had already ruled out.
+Now each fresh check dismisses an open task it or an earlier check recorded (`staleTasks`) when the stage it came
+from has changed since, and either:
+- that stage no longer states a date the task names, or
+- no stage holds a [placeholder] the task names.
+
+Limits:
+- A task with neither, such as "tell Harbor at least 7 days before its booking starts", is kept. Nothing in the
+  text can show it has passed.
+- A manuscript stage is never judged: its chapters are not in its version text.
+- Dismissed is the task list's own state: the timeline does not record it.
+
 ### L-292 — A stage that still states a replaced value is always rewritten, and work after one still waiting is not "usable" yet (2026-11-26)
 Two gaps found while designing L-288:
 - **Rewriting.** A repair saved on an earlier stage reopens every finished stage after it. Go then checks each one
