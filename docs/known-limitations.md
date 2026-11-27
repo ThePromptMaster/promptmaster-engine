@@ -6217,6 +6217,11 @@ Limits:
 - A scope is a capitalised name of up to four words. "For the North division only" is not read as a scope.
 - An id is capital letters then digits; "q3" or "v2" are not ids.
 
+**Addition, 28 Nov (a peer's quick-answer rerun).** "45 staff now attend instead of 30, and the approved budget is
+now $2,000" read "30, and the approved budget is now $2,000" as the replaced clause, so every repair "still gave
+$2000". A second clause that says what something is now (", and … is now / has / becomes …") ends the replaced
+one. A list ("the $30, $40, and $50 tiers") has no verb after its "and" and stays whole.
+
 ### L-319 — A word limit is measured on the part it names (2026-11-28)
 Sean, 27 Nov, Cedar Street Bridge: the brief said "Keep the newsletter under 70 words". Go held the release
 checklist to it, saved three repair versions and paused. After Sean told Go which draft the limit was for, the
