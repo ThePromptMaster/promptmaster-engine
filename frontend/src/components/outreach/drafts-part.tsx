@@ -370,7 +370,7 @@ function DraftLine(props: {
       ? t('outreach.followupScheduled', { when: at(f.scheduled_for) })
       : f.status === 'confirmed' || f.status === 'submitted'
         ? t('outreach.followupSent', { when: at(f.confirmed_at ?? f.submitted_at) })
-        : t('outreach.followupStopped', { reason: f.status_reason || f.status })
+        : t('outreach.followupStopped', { reason: (f.status_reason || f.status).replace(/^Follow-up not sent:\s*/i, '') })
     : props.followupApproved && draft.status === 'approved'
       ? t('outreach.followupApproved', { days: props.followupDays })
       : '';

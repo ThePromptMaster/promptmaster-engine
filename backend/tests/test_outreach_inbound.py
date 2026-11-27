@@ -35,6 +35,11 @@ class TestRules:
         # So a quoted footer saying "unsubscribe" is not an opt-out.
         assert classify(from_address=TO, subject="Re: hi", text=text, recipient=TO, ours=ME) == "reply"
 
+    def test_gmails_wrapped_attribution_is_cut_too(self):
+        # 27 Nov production pass: Gmail wraps "On … wrote:" over two lines.
+        text = "Talk to Sarah Test (\njohn+sarah@hexagontechnologies.io), she runs implementations.\n\nOn Fri, Nov 27, 2026 03:16 AM, John Maheswaran <\njohn@hexagontechnologies.io> wrote:\n> Hi"
+        assert clean_reply(text) == "Talk to Sarah Test (\njohn+sarah@hexagontechnologies.io), she runs implementations."
+
     def test_company_stop_only_for_the_company_domain(self):
         assert company_domain(TO, TO) == "harbourline.example"
         assert company_domain("morgan@gmail.com", "morgan@gmail.com") == ""
@@ -98,6 +103,12 @@ class TestNextContact:
             {"name": "Sarah Lee", "email": "made.up@harbourline.example", "quote": "she runs implementations"},
         ], reply)
         assert [(p.name, p.email) for p in people] == [("Sarah Lee", "sarah@harbourline.example"), ("Sarah Lee", "")]
+
+    def test_a_quote_matches_across_wrapped_lines(self):
+        # 27 Nov production pass: "( john+sarah@…)" in the mail, "(john+sarah@…)" in the model's quote.
+        reply = "talk to Sarah Test (\njohn+sarah@hexagontechnologies.io), she runs implementations here"
+        people = checked([{"name": "Sarah Test", "email": "john+sarah@hexagontechnologies.io", "quote": "talk to Sarah Test (john+sarah@hexagontechnologies.io), she runs implementations here"}], reply)
+        assert [(p.name, p.email) for p in people] == [("Sarah Test", "john+sarah@hexagontechnologies.io")]
 
     def test_route_fences_the_reply_and_returns_checked_people(self):
         stub = AsyncMock()

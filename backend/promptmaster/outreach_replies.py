@@ -44,7 +44,8 @@ def build_prompt(reply: str, contact: str, company: str) -> str:
 
 
 def _norm(text: str) -> str:
-    return " ".join((text or "").lower().split())
+    """Compared without spaces: mail wraps lines inside a sentence ("( john+sarah@…)", 27 Nov pass)."""
+    return re.sub(r"\s+", "", (text or "").lower())
 
 
 def checked(people: list[Any], reply: str) -> list[SuggestedPerson]:
