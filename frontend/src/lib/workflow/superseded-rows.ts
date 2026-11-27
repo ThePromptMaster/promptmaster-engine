@@ -10,7 +10,7 @@
  * Pure.
  */
 
-import { currentFacts, REPLACING, replacedClause, replacesADecision } from './facts';
+import { answerOf, currentFacts, REPLACING, replacedClause, replacesADecision } from './facts';
 import { factValues, supersededValues, type SupersededValue } from './fact-values';
 import type { StageItem } from './stage-artifact';
 import type { ProjectFact } from '@/types/project';
@@ -34,8 +34,10 @@ export function replacedValues(facts: readonly ProjectFact[] | undefined): Super
     if (clause) out.push(...supersededValues(clause.was, clause.now).map((v) => ({ ...v, now: f.statement })));
   }
   // Still true where another current fact states it.
-  const live = current.map((f) => factValues(f.statement));
-  return out.filter((v) => !live.some((l, i) => l[v.kind].includes(v.value) && !REPLACING.test(current[i].statement)));
+  // An answer is read without the question it quotes (`answerOf`).
+  const said = current.map((f) => answerOf(f.statement));
+  const live = said.map((s) => factValues(s));
+  return out.filter((v) => !live.some((l, i) => l[v.kind].includes(v.value) && !REPLACING.test(said[i])));
 }
 
 /**

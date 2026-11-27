@@ -48,3 +48,15 @@ describe('an undecided finding on a retired figure is superseded (19 Nov, Invent
     expect(markSuperseded(undecided, replaced)[0].superseded_by).toBeUndefined();
   });
 });
+
+describe('a row is not marked by a figure only an answer\'s question mentions (27 Nov, ops plan)', () => {
+  it('"instead of the 10% used now" in Go\'s question replaces nothing', () => {
+    const chosen = fact({
+      kind: 'fact',
+      statement: 'Chosen by Go when you left it to Go — asked "The contract costs leave $4,860 for contingency (about 9.7% of the subtotal, instead of the 10% used now). What contingency should the budget use?": the contingency is $4,860, which brings the total to exactly $55,000.',
+    });
+    const decided: StageItem[] = [{ id: 'i1', finding: 'A 10% contingency would not fit under the cap.', status: 'accepted' }];
+    expect(replacedValues([chosen])).toEqual([]);
+    expect(markSuperseded(decided, replacedValues([chosen]))).toEqual(decided);
+  });
+});
