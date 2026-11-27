@@ -1110,7 +1110,8 @@ export function useGoLoop(opts: Options) {
           polishedHere,
           stageEvaluation.canAdvance,
           Boolean(unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id)),
-          isSetupStage(o.stage)
+          isSetupStage(o.stage),
+          Boolean(facts.draft && !facts.draft.checked)
         ), facts.review);
 
         // Runs the data could carry out are tried before the table is handed

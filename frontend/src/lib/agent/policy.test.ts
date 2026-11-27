@@ -548,6 +548,10 @@ describe('Go stops polishing a stage that is good enough (production Research pa
   it('never polishes one stage more than four times in a run', () => {
     expect(withoutEndlessPolish(allowed, 4, false)).toEqual(['advance_stage', 'request_user_decision']);
   });
+
+  it('still checks a version nothing has checked: that is not polish (28 Nov, production pass, L-320)', () => {
+    expect(withoutEndlessPolish(allowed, 4, false, false, false, true)).toEqual(['evaluate_stage', 'advance_stage', 'request_user_decision']);
+  });
 });
 
 describe('a computation that settled every run is not run again (production Research pass, 3 Oct)', () => {

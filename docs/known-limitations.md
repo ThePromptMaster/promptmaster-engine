@@ -6284,7 +6284,9 @@ Limits:
 **Addition, 28 Nov (a peer's Morrow rerun).** Once Go has stopped polishing a stage, an approval can still be asked
 on a version whose own check missed the objective (alignment Low or drift High). The card now says so, with the
 check's first finding, before the approval is given (`checkFailed`, `need.approvalCheckFailed`). Go does not
-revise past its polishing cap to avoid the question.
+revise past its polishing cap to avoid the question. A check of a version nothing has checked is exempt from the
+cap, since each version is checked at most once. Before this, a repair after a change was put to the user for
+approval unchecked once earlier checks had used the cap up (production pass, 28 Nov).
 
 ### L-321 — The latest update in the Go panel, and a stage's statuses on one line when they differ (2026-11-28)
 Sean, 27 Nov: "What did my change affect, and where did Go stop? … Show affected records and tasks, with links to

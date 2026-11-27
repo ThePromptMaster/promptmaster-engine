@@ -328,10 +328,16 @@ export function withoutEndlessPolish(
    * chose "Derive" again and again with nothing reaching the document.
    */
   unsavedReasoning = false,
-  setup = false
+  setup = false,
+  /**
+   * The current version has not been checked. Checking it is not polish: each version is checked at most once,
+   * so this cannot loop (28 Nov, production pass: after a change, Final pack's repair was put to the user for
+   * approval unchecked, because earlier checks of earlier versions had used up the cap; L-320).
+   */
+  headUnchecked = false
 ): string[] {
   if (!polishCapped(polishedHere, canAdvance, setup)) return [...allowed];
-  return allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k) || (unsavedReasoning && k === 'revise_stage'));
+  return allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k) || (unsavedReasoning && k === 'revise_stage') || (headUnchecked && k === 'evaluate_stage'));
 }
 
 /** Which tools a run can actually call. */

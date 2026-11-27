@@ -41,7 +41,7 @@
 
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { ProjectTask } from '@/lib/supabase/tasks';
-import { currentTasks, type CurrentTasks } from '@/lib/workflow/task-reconcile';
+import { currentTasks, taskWords, type CurrentTasks } from '@/lib/workflow/task-reconcile';
 
 interface Props {
   /** The list as every view reads it (`currentTasks`); built from `tasks` when not given. */
@@ -107,7 +107,7 @@ export function TasksPanel({ view, tasks = [], onResolve, busy = false, readOnly
               className="flex items-start gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-body text-[var(--on-surface)]">{task.title}</p>
+                <p className="text-body text-[var(--on-surface)]">{taskWords(task.title)}</p>
                 {task.detail && (
                   <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{task.detail}</p>
                 )}
@@ -152,7 +152,7 @@ export function TasksPanel({ view, tasks = [], onResolve, busy = false, readOnly
           </p>
           <ul className="mt-2 space-y-1 pl-7">
             {items.map(({ task }) => (
-              <li key={task.id} className="text-body text-[var(--on-surface-variant)]">{task.title}</li>
+              <li key={task.id} className="text-body text-[var(--on-surface-variant)]">{taskWords(task.title)}</li>
             ))}
           </ul>
           {onOpenStage && (
@@ -171,7 +171,7 @@ export function TasksPanel({ view, tasks = [], onResolve, busy = false, readOnly
           <ul className="mt-2 space-y-2">
             {history.map((task) => (
               <li key={task.id} data-task-closed={task.status} className="rounded-lg bg-[var(--surface-container-lowest)] px-4 py-2">
-                <p className="text-body text-[var(--on-surface-variant)] line-through decoration-[var(--outline-variant)]">{task.title}</p>
+                <p className="text-body text-[var(--on-surface-variant)] line-through decoration-[var(--outline-variant)]">{taskWords(task.title)}</p>
                 <p className="mt-0.5 text-label text-[var(--on-surface)]">
                   <span className="font-semibold">{task.status === 'done' ? t('pnl.done') : t('pnl.retired')}</span>
                   {' · '}
