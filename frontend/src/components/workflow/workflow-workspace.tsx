@@ -5,6 +5,7 @@ import { HeldStageNotice } from '@/components/folders/held-stage-notice';
 import { MismatchChoice } from '@/components/folders/mismatch-choice';
 import { useInheritedChecks } from './use-inherited-checks';
 import { useRequirementsRecheck } from './use-requirements-recheck';
+import { useReferenceChange } from './use-reference-change';
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { translate } from '@/lib/i18n/translate';
@@ -40,7 +41,7 @@ import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/wo
 import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { describeNeed, unsettledRepairs } from '@/lib/agent/needs';
 import { recordDecision } from '@/lib/supabase/recommendations';
-import { deliverableReadiness, overallStatus } from '@/lib/workflow/readiness';
+import { deliverableReadiness, overallStatus, readinessBlocking } from '@/lib/workflow/readiness';
 import { DeliverableReadiness } from './deliverable-readiness';
 import { goIsWorking, useGoAlerts } from './agent/use-go-alerts';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
@@ -1428,6 +1429,8 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null, revisedWith,
     onDecisionSetAside: setDecisionAside,
   });
+  // A linked project updated from its original reopens what used the old copy (L-326).
+  const referenceUpdated = useReferenceChange({ project, template, state, bundles: stageBundles, stageId, appendEvent });
   // A fact read against the folders' rules, and the stages a mismatch holds (L-280).
   useInheritedChecks({
     project, template, events, stageId: state.current_stage_id, appendEvent,
@@ -3536,7 +3539,7 @@ export function WorkflowWorkspace({
               onUseStandard={(text, source) => onPatchProject({ sample_output: text, sample_source: source })}
             />
             {/* On every stage: the other projects this one draws on (client, 21 Oct, email 5). */}
-            <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} onOpenBeside={openBeside} />
+            <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} onOpenBeside={openBeside} onUpdated={referenceUpdated} />
             {/* On every stage: what the project holds from the person's accounts (7 Nov). */}
             <ProjectThirdParty
               project={project}
@@ -3780,7 +3783,12 @@ export function WorkflowWorkspace({
                   evaluatedVersionIds: new Set(Object.keys(evaluations ?? {})),
                   approvals: evaluation.criteria.filter((c) => (c.manual ?? manualIds.has(c.id)) && c.authority !== 'delegable'),
                   approvalVersions: project.manual_check_versions ?? {},
-                  blocking: completion.outstanding.filter(blocksCompletion).map((item) => shownOutstanding(item, locale, outstandingShow)),
+                  // Its own check's verdict on the version shown holds "Ready" too (L-326).
+                  blocking: readinessBlocking(completion.outstanding, (() => {
+                    const headId = stageBundles[stage.id]?.versions.at(-1)?.id;
+                    const says = checkVerdict(evaluations?.[headId ?? ''], headId, stage);
+                    return says ? { stageId: stage.id, label: stage.short_label || stage.label, says } : null;
+                  })()).map((item) => shownOutstanding(item, locale, outstandingShow)),
                 })}
               />
             ) : null}

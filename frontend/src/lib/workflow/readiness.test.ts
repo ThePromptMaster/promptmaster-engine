@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OutstandingItem } from './engine';
-import { deliverableReadiness, overallStatus } from './readiness';
+import { deliverableReadiness, overallStatus, readinessBlocking } from './readiness';
 
 const stale = { kind: 'stale_stage', stageId: 'plan', label: 'Plan', reason: 'x' } as OutstandingItem;
 const base = { outstanding: [], finalized: false, repairFailed: false, waitingOnUser: false, openActions: 0, allStagesDone: false };
@@ -50,5 +50,24 @@ describe('the deliverable’s four states, each with its version', () => {
     const rows = deliverableReadiness({ ...input, approvals: [], assessment: { outcome: 'met', versionId: 'b' } });
     expect(rows[2].state).toBe('none');
     expect(rows[3].state).toBe('done');
+  });
+});
+
+describe('a version its own check faults is not ready (28 Nov, Sean, Harborlight; L-326)', () => {
+  const versions = [{ id: 'v3', version_number: 3 }];
+  const says = { stageId: 'answer', label: 'Answer', says: 'it computes 48 seats; 18 × 2 = 36, a shortfall of 4' };
+
+  it('the check on the head holds Ready, first, though it holds no finish', () => {
+    const blocking = readinessBlocking([], says);
+    expect(blocking).toEqual([{ kind: 'check_says', ...says }]);
+    const rows = deliverableReadiness({ versions, evaluatedVersionIds: new Set(['v3']), approvals: [], approvalVersions: {}, blocking: blocking.map((b) => (b.kind === 'check_says' ? b.says : '')) });
+    expect(rows[1]).toMatchObject({ key: 'checked', state: 'done', version: 3 });
+    expect(rows[3]).toMatchObject({ key: 'ready', state: 'open', detail: says.says });
+  });
+
+  it('with no verdict, only what holds finishing counts', () => {
+    expect(readinessBlocking([stale], null)).toEqual([stale]);
+    const optional = { kind: 'approval_on_earlier_version', stageId: 'x', label: 'X', version: 1, current: 2 } as unknown as OutstandingItem;
+    expect(readinessBlocking([optional], null)).toEqual([]);
   });
 });

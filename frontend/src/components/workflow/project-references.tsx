@@ -8,7 +8,7 @@ import { listFolders } from '@/lib/supabase/folders';
 import { listProjects } from '@/lib/supabase/projects';
 import { MAX_REFERENCES, type ReferenceMaterial } from '@/lib/workflow/references';
 import { useProjectStore } from '@/stores/project-store';
-import type { Project, ProjectFolder, ProjectReference, ProjectSummary } from '@/types/project';
+import type { Project, ProjectFolder, ProjectReference, ProjectSummary, ReferenceSnapshot } from '@/types/project';
 
 /**
  * Other projects this one draws on (client, 21 Oct, email 5: "the project you
@@ -21,11 +21,17 @@ export function ProjectReferences({
   project,
   readOnly = false,
   onOpenBeside,
+  onUpdated,
 }: {
   project: Pick<Project, 'id' | 'user_id' | 'references'>;
   readOnly?: boolean;
   /** Open a referenced project beside this one (the split view, when it exists). */
   onOpenBeside?: (projectId: string) => void;
+  /**
+   * A reference was updated from its original: the copy before and after, so
+   * the work that used the old one can be marked for a recheck (L-326).
+   */
+  onUpdated?: (ref: ProjectReference, before: ReferenceSnapshot | null | undefined, after: ReferenceSnapshot | null | undefined, index: number) => Promise<void>;
 }) {
   const t = useT();
   const rows = useProjectStore((s) => s.references);
@@ -104,7 +110,10 @@ export function ProjectReferences({
                   onRemove={() => void run(() => removeReference(r.id), t('refs.removeError'))}
                   onUpdate={() =>
                     void run(async () => {
-                      if (!(await takeSnapshot(r))) throw new Error(t('refs.updateGone'));
+                      const saved = await takeSnapshot(r);
+                      if (!saved) throw new Error(t('refs.updateGone'));
+                      // 28 Nov (Sean, Harborlight): the new copy is a change to what the work used.
+                      await onUpdated?.(r, r.snapshot, saved.snapshot, i);
                     }, t('refs.updateError'))
                   }
                   onOpenBeside={onOpenBeside}
