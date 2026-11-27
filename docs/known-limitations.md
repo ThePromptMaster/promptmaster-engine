@@ -6374,3 +6374,36 @@ Limits:
 - Research keeps its rounds: a round there finds things of its own.
 - A change Go made itself (a repair, a "made before the change" reopening) is not new input.
 
+### L-327 — A revision after the work changed is a rewrite; a value the check calls old is not put back (2026-11-28)
+
+Sean, 27 Nov:
+- Redwood Member Center: "After Output v1 saved an internal operations memo, I changed the objective, audience,
+  constraints, and format to a customer-facing FAQ … The revision record says Go kept lines the rewrite had
+  dropped, including the memo header, Pavel's staffing tasks, and the $1,200 contingency."
+- Alder Quay: "the revision record said it restored the obsolete line 'Slots: 5 of 5 used, none spare,' and I
+  confirmed that line was in Objective v3."
+
+What happened: the guard that puts back short lines a revision dropped without being asked (`keepUnasked`, 14 Oct)
+was told only Go's instruction or the reopen reason ("Review the plan was changed (now v3) after this stage used
+it"). The brief the user had changed, including "Omit internal staffing, Pavel, the $1,200 contingency", never
+reached it, so 13 memo lines went back into the FAQ. In Alder, the approval check said the version "still use[s]
+five slots … instead of three slots"; the guard reads what follows "instead of" as the wrong value, so it took
+three slots as old and five as fine, and Go's revise path passed no replaced values at all. The line also went
+back inside the wrong formula, after the first "$$" in the document.
+
+Now (`lib/workflow/preservation.ts`, both `keptAndSupplied` call sites in `perform.ts`):
+- **What was asked includes the brief as changed since the version** (`briefChangedSince`, `askedOfStage`): the
+  new text of the objective, audience, constraints and output format edited after the stage's current version,
+  with the facts recorded since (`askedOfRecheck`). A folder rule or a linked project is not counted here.
+- **A change to what the work is makes the revision a rewrite**: an objective, audience or format change judged
+  an intent change, made after the current version, means nothing of that version is put back. It stays in the
+  version history.
+- **"still uses X instead of Y"** reads X as the old value and Y as the new one, with counts in words read as
+  numbers ("five slots" is 5). Go's revise path also passes the values facts replaced, as the recheck path does.
+- **A line put back goes after its own neighbour**: a line that recurs ("$$") is matched in order.
+
+Limits:
+- A rewrite turns the guard off for that one revision of each stage made before the change; the next revision is
+  guarded again. Lines a model drops for no reason in that revision are not put back.
+- "still uses X instead of Y" is read from the check's own sentence. A check worded another way ("uses X where the
+  update says Y") falls to the general rule.

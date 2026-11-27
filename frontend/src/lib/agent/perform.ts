@@ -36,7 +36,7 @@ import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, projectRequirements, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, countWords, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement, describeLengthTarget, wholeLengthTarget } from '@/lib/workflow/measurable';
-import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
+import { askedOfStage, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
@@ -1150,7 +1150,14 @@ async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
       // a draft continued after a cut-off.
       const split = rendererHoldsItems(ctx.stage.renderer) ? { body: whole.content, note: '' } : splitUserNote(whole.content);
       const noteLine = userNoteLine([res.note_to_user, split.note].filter(Boolean).join(' '));
-      const checked = revising && !before ? await keptAndSupplied(ctx, head, split.body, instruction, []) : { content: split.body, notes: [] };
+      // What the revision was asked includes the brief as changed since, and a
+      // value a fact replaced is never put back (28 Nov, Sean, Alder and Redwood; L-327).
+      const asked = revising && !before
+        ? askedOfStage(instruction, ctx.project.facts, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.created_at, ctx.loadEvents ? await ctx.loadEvents() : [])
+        : null;
+      const checked = asked
+        ? await keptAndSupplied(ctx, head, split.body, asked.asked, supersededFactValues(ctx.project.facts, (ctx.project.inherited?.inForce ?? []).filter((r) => !r.exceptedBy).map((r) => r.fact.statement)), asked.rewrite)
+        : { content: split.body, notes: [] };
       let content = checked.content;
       // The user's own latest version outranks an older fact it changed: a
       // revision that would put the fact's value back is not saved, and the
@@ -1719,7 +1726,8 @@ async function performStepOnce(raw: PerformContext): Promise<StepOutcome> {
       // workshop: the recheck after a time change dropped "Confirm 12 attendees",
       // the greeting and the sign-off) — never a line stating a replaced value.
       // Not when it was shortening to meet a limit: what went is what was asked.
-      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, askedOfRecheck(why, ctx.project.facts, headVersion?.created_at), superseded);
+      const asked = before || measuredFails.length ? null : askedOfStage(why, ctx.project.facts, headVersion?.created_at, ctx.loadEvents ? await ctx.loadEvents() : []);
+      const checked = asked ? await keptAndSupplied(ctx, head, content, asked.asked, superseded, asked.rewrite) : { content, notes: [] as string[] };
       content = checked.content;
       if (whole.continued || checked.notes.length) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),
@@ -2939,7 +2947,9 @@ async function keptAndSupplied(
   head: string,
   content: string,
   asked: string,
-  superseded: readonly SupersededValue[]
+  superseded: readonly SupersededValue[],
+  /** The work itself changed since `head` (L-327): nothing of it is put back. */
+  rewrite = false
 ): Promise<{ content: string; notes: string[] }> {
   if (!head.trim() || !content.trim()) return { content, notes: [] };
   const removed = notRemovedByUser(ctx.project.removed_text);
@@ -2947,7 +2957,7 @@ async function keptAndSupplied(
   // out there is its own, whatever value a fact replaced.
   // A note to the user at the end of the earlier version is not a line of it
   // to keep (4 Nov, Lakeside: each removal brought a note back).
-  const kept = keepUnasked(splitUserNote(head).body, content, asked, (line) => leftoverValues(line, superseded, { derivedIn: head }).length === 0 && removed(line) && !isChangeNote(line));
+  const kept = keepUnasked(splitUserNote(head).body, content, asked, (line) => leftoverValues(line, superseded, { derivedIn: head }).length === 0 && removed(line) && !isChangeNote(line), rewrite);
   const notes: string[] = [];
   if (kept.restored.length) notes.push(`Kept ${describeLines(kept.restored)}, which the revision dropped without being asked.`);
   if (kept.reported.length) notes.push(`No longer there: ${describeLines(kept.reported, 2)}.`);
