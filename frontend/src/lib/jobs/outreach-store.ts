@@ -5,6 +5,7 @@
  * `record_outreach_send` writes, and only while this drain holds the job's lease.
  */
 import { replacedIn } from '@/lib/outreach/holds';
+import { suppressedBy } from '@/lib/outreach/import';
 import type { ProjectFact } from '@/types/project';
 import { addBusinessDays } from '@/lib/outreach/business-days';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -133,9 +134,7 @@ export class SupabaseOutreachStore implements OutreachStore {
       send.purpose === 'test' || !text ? Promise.resolve({ data: [] }) : this.db.from('project_facts').select('*').eq('project_id', send.project_id),
     ]);
     const s = (settings as { paused?: boolean; daily_cap?: number } | null) ?? {};
-    const to = send.to_address.toLowerCase();
-    const domain = to.split('@')[1] ?? '';
-    const hit = ((suppressed ?? []) as { address: string | null; domain: string | null }[]).find((r) => (r.address && r.address === to) || (r.domain && r.domain === domain));
+    const hit = suppressedBy(send.to_address, (suppressed ?? []) as { address: string | null; domain: string | null }[]);
     const cap = s.daily_cap ?? 50;
     let capUntil: number | null = null;
     if (send.purpose !== 'test' && (count ?? 0) >= cap) {
@@ -144,7 +143,7 @@ export class SupabaseOutreachStore implements OutreachStore {
       capUntil = (Number.isFinite(at) ? at : Date.now()) + DAY_MS;
     }
     const replaced = text ? replacedIn(text, (facts ?? []) as ProjectFact[]) : null;
-    return { paused: Boolean(s.paused) && send.purpose !== 'test', capUntil, suppressed: hit ? hit.address ?? hit.domain : null, replaced };
+    return { paused: Boolean(s.paused) && send.purpose !== 'test', capUntil, suppressed: hit, replaced };
   }
 
   async record(jobId: string, worker: string, sendId: string, patch: SendPatch, event: string, detail: Record<string, unknown> = {}): Promise<boolean> {

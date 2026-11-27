@@ -6086,3 +6086,23 @@ reply for the user to read.
 An opt-out puts the address on the do-not-contact list and holds every queued email to it. It is never
 lifted by PromptMaster (`opted_out` cannot be lifted, L-304). A softer refusal ("maybe next quarter") is a
 reply: its follow-up is cancelled, and nothing else changes.
+
+### L-314 — An outreach list saved from an older page is refused, not merged (2026-11-27)
+Each outreach part (contacts, message, emails) saves its whole list as a new version. A page loaded before
+another tab or window changed that list used to save its older copy over the change: in the 27 Nov hand
+pass, setting one email aside in a stale tab withdrew the approval of another made in a fresh tab. Nothing
+wrong went out (the job runner holds an email whose draft is no longer approved under its approval), but
+the approval was lost without a word.
+
+Now a part checks the stage's head version before saving, and before approving or withdrawing, and refuses
+when the page has not seen it: "These were changed in another tab or window since this page loaded, so
+nothing was saved. Reload the page to see the latest, then try again." Nothing is merged: the user reloads
+and does it again. If the head cannot be read, the save goes ahead as before.
+
+The same pass also changed, with no trade-off to record: "Get a first draft" on a request to email a list
+opens the Outreach workflow (the request's words decide it, with no model call); research stopped by the
+user says it stopped; the do-not-contact list is matched in the job runner the way the import matches it
+(Gmail dots and +tags are one address); Go's section wait counts the sections of its own pass, so a
+rewrite no longer reads "3 of 3 sections written" before any is written and the page refreshes as each
+lands; the contacts Go reads say what the earlier-contact check found; a person chosen from two takes
+their own role, not the one found for the first.

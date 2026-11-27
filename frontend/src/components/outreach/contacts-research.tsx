@@ -82,8 +82,9 @@ export function ResearchBar({ context, stageId, content, readOnly }: { context: 
           <button type="button" className={primary} disabled={!webOn || Boolean(run)} onClick={() => void start()} data-research-start>{t('outreach.research')}</button>
         </div>
       ) : null}
-      {said && <p role="status" className="text-label text-[var(--on-surface-variant)]" data-research-said>{said}</p>}
-      {error && <p role="alert" className="text-label text-[var(--pm-error)]">{error}</p>}
+      {/* What the page's own last run said stays until the next one, but not under Go's run. */}
+      {said && !goRunning && <p role="status" className="text-label text-[var(--on-surface-variant)]" data-research-said>{said}</p>}
+      {error && !goRunning && <p role="alert" className="text-label text-[var(--pm-error)]">{error}</p>}
     </div>
   );
 }

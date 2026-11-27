@@ -71,6 +71,8 @@ export interface OutreachContext {
   /** The text of the stage before the first outreach part (the brief), for writing the message. */
   briefText: string;
   save: (stageId: string, content: string, operation: string, summary: string) => Promise<void>;
+  /** Throws when the part was saved elsewhere since this page loaded (`save` checks it too). */
+  ensureCurrent?: (stageId: string) => Promise<void>;
 }
 
 /**

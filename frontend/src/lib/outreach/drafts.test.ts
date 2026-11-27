@@ -87,7 +87,19 @@ describe('where a contact stands once imported', () => {
 describe('an outreach stage as later stages read it', () => {
   it('a contact per line, never the raw data', () => {
     const text = outreachText('contacts', JSON.stringify({ kind: 'stage_items', items: [contact('c1', { given: '{"secret":"x"}' })], imports: [] }));
-    expect(text).toBe('1. Acme — Jane Smith | jane@acme.com (named) [ready]');
+    expect(text.split('\n')[0]).toBe('1. Acme — Jane Smith | jane@acme.com (named) | not contacted before [ready]');
+    expect(text).not.toContain('secret');
+  });
+
+  it('says what the earlier-contact check found, so Go does not ask for Sent mail (27 Nov pass)', () => {
+    const items = [
+      contact('c1', { contacted: JSON.stringify({ address: 'jane@acme.com', on: '2026-11-27T10:50:00Z', source: 'mailbox' }), status: 'decide' }),
+      contact('c2', { name: 'Sam Lee', email: 'sam@acme.com', colleague: JSON.stringify({ address: 'jane@acme.com', source: 'promptmaster' }) }),
+    ];
+    const text = outreachText('contacts', JSON.stringify({ kind: 'stage_items', items, imports: [] }));
+    expect(text).toContain('jane@acme.com (named) | contacted before on 2026-11-27 (found in the Gmail Sent folder) [needs the user]');
+    expect(text).toContain('sam@acme.com (named) | not contacted before; a colleague (jane@acme.com) was [ready]');
+    expect(text).toContain('nothing more is needed from the user for it');
   });
 
   it('the message as written, with its values', () => {

@@ -16,3 +16,8 @@ export function localTimes(reason: string, format: (d: Date) => string = (d) => 
 export function isWaiting(reason: string): boolean {
   return reason.startsWith('Waiting:');
 }
+
+/** A send that stopped where it may have reached the mailbox: its reason says to check Sent. */
+export function isUnsure(reason: string): boolean {
+  return reason.startsWith('It may or may not have gone out');
+}

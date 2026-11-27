@@ -10,7 +10,7 @@ import { findChanged, identityFor } from '@/lib/outreach/hold-changed';
 import { replacedIn } from '@/lib/outreach/holds';
 import { unresolvedPlaceholders } from '@/lib/outreach/placeholders';
 import { renderEmail, type RenderedEmail } from '@/lib/outreach/render';
-import { isWaiting, localTimes } from '@/lib/outreach/send-words';
+import { isUnsure, isWaiting, localTimes } from '@/lib/outreach/send-words';
 import type { Snapshot } from '@/lib/outreach/snapshot';
 import { listLogos, listSenders, listSignatures, loadOutreachSettings } from '@/lib/supabase/outreach-identity';
 import type { SendRecord } from '@/lib/supabase/outreach-sends';
@@ -98,6 +98,7 @@ export function DraftsPart({ context, stageId, readOnly }: { context: OutreachCo
     message,
     identity: { sender, signature, replySignature, logo, spacingSeconds: identity.spacing },
     saveDrafts: (items, summary) => save(items, 'outreach_edit', summary),
+    ensureCurrent: context.ensureCurrent ? () => context.ensureCurrent!(stageId) : undefined,
   });
 
   const act = (key: string, run: () => Promise<void>) => {
@@ -295,12 +296,16 @@ function useSendWords() {
       case 'held':
         return t('outreach.sendHeld', { reason: localTimes(s.status_reason) });
       case 'submitting':
+        // Sending is off on the server, or Pause all: it waits, and says so (27 Nov pass: "Sending…").
+        if (isWaiting(s.status_reason)) return localTimes(s.status_reason);
         return t('outreach.sendSubmitting');
       case 'submitted':
         return t('outreach.sendSubmitted');
       case 'confirmed':
         return t('outreach.sendConfirmed', { when: at(s.confirmed_at) });
       case 'failed':
+        // Unsure whether it went: the reason says so itself; "Not sent:" before it contradicted it.
+        if (isUnsure(s.status_reason)) return localTimes(s.status_reason);
         return t('outreach.sendFailed', { reason: localTimes(s.status_reason) });
       case 'cancelled':
         return t('outreach.sendCancelled');

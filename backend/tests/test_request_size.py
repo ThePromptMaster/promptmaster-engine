@@ -132,6 +132,12 @@ def test_a_reading_that_says_concise_is_raised_for_a_full_process_request(client
     ("Write an email to my landlord about the leak", False),
     ("A memo on Q3 leads conversion", False),
     ("Write a 300-word email to all the customers about the outage", False),
+    # 27 Nov pass: Sean's own request, and a test request, were read as one email.
+    ("Find the right person at each of these companies to show the PromptMaster beta to. Check whether I've already contacted them.", True),
+    ("Fill in the missing information you can verify, personalize each email with one real detail about their work", True),
+    ("Email these six test contacts in the attached sheet to show them the PromptMaster beta", True),
+    ("Summarise the emails these contacts sent me last week", False),
+    ("Write one email to each of my two landlords about the leak", False),
 ])
 def test_emails_to_a_list_are_never_the_one_stage_workflow(request_text, outreach):
     """26 Nov (Sean): each email is short, but the work is the list, the research, the approval and the send."""
@@ -140,7 +146,9 @@ def test_emails_to_a_list_are_never_the_one_stage_workflow(request_text, outreac
     read = at_least_standard(SizeResponse(depth="concise", reason="An email.", by="model"), request_text)
     assert (read.depth == "standard") is outreach
     if outreach:
-        assert size_by_rule(request_text + " About 120 words each.") is None
+        # Settled by the words, with no reading, whatever length each email is.
+        ruled = size_by_rule(request_text + " About 120 words each.")
+        assert ruled is not None and ruled.depth == "standard" and ruled.by == "rule"
 
 
 def test_the_size_says_when_a_request_is_emails_to_a_list():
@@ -153,5 +161,22 @@ def test_the_size_says_when_a_request_is_emails_to_a_list():
         assert r.json()["outreach"] is True and r.json()["depth"] == "standard"
         r = c.post("/api/size-request", json={"description": "Write an email to my landlord about the leak"})
         assert r.json()["outreach"] is False
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+def test_rule_only_sizing_reads_nothing():
+    """"Get a first draft" asks for the words' verdict alone (27 Nov): outreach is known at once, and
+    anything else comes back unsized rather than waiting on a model."""
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"depth": "concise", "reason": "An email."}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        c = TestClient(app)
+        r = c.post("/api/size-request", json={"description": "Email these 25 prospects about the beta", "rule_only": True})
+        assert r.json()["outreach"] is True and r.json()["by"] == "rule"
+        r = c.post("/api/size-request", json={"description": "A note to the team about Friday", "rule_only": True})
+        assert r.json()["outreach"] is False and r.json()["by"] == "default"
+        stub.generate_json.assert_not_called()
     finally:
         app.dependency_overrides.pop(get_client, None)

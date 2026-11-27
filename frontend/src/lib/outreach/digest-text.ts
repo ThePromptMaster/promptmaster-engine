@@ -3,10 +3,12 @@
  * line each, the message as written, the drafts by recipient. Never the raw data, which carries
  * the imported rows and ids. Pure.
  */
-import { parseContacts } from './contacts';
+import { parseContacts, parseJson, type EarlierContact } from './contacts';
 import { parseDrafts, parseMessage } from './drafts';
 
 const MAX_ROWS = 300;
+const SOURCE: Record<string, string> = { promptmaster: 'sent from PromptMaster', mailbox: 'found in the Gmail Sent folder', manual: 'recorded by the user' };
+const CHECKED = 'Earlier contact: every contact is checked when it is added, against what PromptMaster sent, what the user recorded, the do-not-contact list and, while Gmail is connected, the Gmail Sent folder. "Contacted before" above is that check\'s finding; nothing more is needed from the user for it.';
 const SIGNED = 'Sender and signature: from Settings. The signature, logo, postal address and opt-out line are added under every email when it goes out, so the message and the emails carry no sign-off.';
 
 export function outreachText(part: 'contacts' | 'message' | 'drafts' | undefined, content: string): string {
@@ -36,10 +38,18 @@ export function outreachText(part: 'contacts' | 'message' | 'drafts' | undefined
       const address = r.email ? `${r.email} (${r.email_kind || 'address'}${r.email_status && r.email_status !== 'given' ? `, ${r.email_status}` : ''})` : 'no address';
       const why = r.reason ? `: ${r.reason}` : '';
       const detail = r.detail ? ` | about their work: ${r.detail}${r.src_detail ? ` [${r.src_detail}]` : ''}` : '';
-      return `${i + 1}. ${r.company || r.domain || '(no company)'}${who ? ` — ${who}` : ''} | ${address}${detail} [${word(r.status)}${why}]`;
+      const earlier = parseJson<EarlierContact>(r.contacted);
+      const colleague = parseJson<EarlierContact>(r.colleague);
+      const before = earlier
+        ? ` | contacted before${earlier.on ? ` on ${earlier.on.slice(0, 10)}` : ''} (${SOURCE[earlier.source] ?? earlier.source})`
+        : colleague
+          ? ` | not contacted before; a colleague (${colleague.address}) was`
+          : ' | not contacted before';
+      return `${i + 1}. ${r.company || r.domain || '(no company)'}${who ? ` — ${who}` : ''} | ${address}${detail}${before} [${word(r.status)}${why}]`;
     });
     const more = rows.length > MAX_ROWS ? [`(${rows.length - MAX_ROWS} more contacts not shown here.)`] : [];
-    return [...lines, ...more].join('\n');
+    // 27 Nov pass: Go paused the objective for "your sent-mail history", which PromptMaster had read.
+    return [...lines, ...more, '', CHECKED].join('\n');
   }
   if (part === 'drafts') {
     return parseDrafts(content)

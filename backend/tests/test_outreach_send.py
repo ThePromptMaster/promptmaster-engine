@@ -161,6 +161,8 @@ class TestSending:
         fake.fail_tools.add("GMAIL_GET_PROFILE")
         r = self._send(t, step="draft")
         assert r.status_code == 409 and r.json()["detail"]["code"] == "mailbox_changed"
+        # 27 Nov pass: no mailbox to read is said as that, not as a different mailbox.
+        assert r.json()["detail"]["message"].startswith("Gmail is not connected")
 
     def test_connections_still_refuse_the_worker(self, fake):
         as_user(WORKER)
