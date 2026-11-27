@@ -5,7 +5,7 @@ export const ar: Record<keyof typeof en, string> = {
   'conn.headerItem': 'الحسابات المتصلة',
   'conn.settingsTitle': 'الحسابات المتصلة',
   'conn.settingsLead': 'صِل بريدك وتقويمك وملفاتك ونظام CRM ليتمكن PromptMaster من الاطلاع عليها من تلقاء نفسه: عند فتح "اقترح عملًا من حساباتي"، وفي محادثة المشروع، وعند صياغة مرحلة. كل ما يقرؤه يظهر في قائمة لتتمكن من إزالته. ويمكنك أيضًا إيقاف البحث داخل المشروع.',
-  'conn.composioNote': 'تعرض Google وMicrosoft اسم "Composio" على شاشتيهما: Composio هي الخدمة التي تحتفظ بالاتصال لصالح PromptMaster. تطلب شاشة Gmail وصولًا كاملًا إلى بريدك. PromptMaster يقرأ فقط: لا يرسل شيئًا ولا يغيّره ولا يحذفه أبدًا.',
+  'conn.composioNote': 'تعرض Google وMicrosoft اسم "Composio" على شاشتيهما: Composio هي الخدمة التي تحتفظ بالاتصال لصالح PromptMaster. تطلب شاشة Gmail وصولًا كاملًا إلى بريدك. PromptMaster يقرأ، ولا يرسل إلا الرسائل التي توافق عليها. ولا يغيّر شيئًا ولا يحذفه أبدًا.',
   'conn.reads.gmail': 'يبحث في بريدك كله ويقرأ الرسائل المطابقة.',
   'conn.reads.googlecalendar': 'يبحث في كل اجتماعاتك ويقرأ المطابق منها.',
   'conn.reads.googledrive': 'يبحث في كل ملفاتك ويقرأ المطابق منها.',

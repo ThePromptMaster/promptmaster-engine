@@ -342,3 +342,14 @@ Per user, kept apart from any project, so deleting a project or importing the sa
 
 The Outreach workflow's stage data lives in its stage versions like any stage's: Contacts and Drafts as `stage_items`
 documents (`lib/outreach/contacts.ts`, `drafts.ts`), the Message as `{kind:'outreach_message', …}`.
+
+
+## Outreach email: approvals and sends (26 Nov, migration `20261222000000_outreach_sends.sql`)
+
+| Table | What it holds | Writes |
+|---|---|---|
+| `outreach_approvals` | The user's approval of one exact email: `snapshot` (the rendered email), `message_hash` (computed by the backend), `ticket`, `purpose` (send, test, followup), `draft_id`, the drafts and message stage ids, `batch_id` | The user inserts; the only update allowed is revoking (trigger) |
+| `outreach_sends` | One approval's way out: `status` (scheduled, paused, held, submitting, submitted, confirmed, bounced, failed, cancelled), reason, when, the Gmail draft, message and thread ids, `thread_url`, `sent_copy_matches` | **Select only for users.** The user's moves go through `schedule_outreach_sends` and `move_outreach_sends`; the server's through `record_outreach_send`, lease-checked |
+| `outreach_send_events` | What happened to each send, in order | Functions only |
+
+A confirmed send adds a `promptmaster` row to `outreach_history`, so the next import knows the person was written to.

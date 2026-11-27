@@ -32,6 +32,8 @@ import { createClient } from '@supabase/supabase-js';
 import { runDrain } from '@/lib/jobs/drain';
 import { HttpSectionGenerator } from '@/lib/jobs/generator';
 import { SupabaseJobStore, createServiceClient } from '@/lib/jobs/supabase-store';
+import { SupabaseOutreachStore } from '@/lib/jobs/outreach-store';
+import { HttpOutreachClient } from '@/lib/jobs/outreach-client';
 
 // Never prerender, never cache: this mutates on every call.
 export const dynamic = 'force-dynamic';
@@ -154,6 +156,8 @@ export async function POST(request: NextRequest) {
       budgetMs: BUDGET_MS,
       leaseSeconds: LEASE_SECONDS,
       projectId: caller.kind === 'user' ? caller.projectId : null,
+      // Outreach email goes out through the same queue, recorded by the server (26 Nov).
+      outreach: { store: new SupabaseOutreachStore(createServiceClient()), client: new HttpOutreachClient(workerSecret) },
     });
     // FR-18: the drain spends after the tab is closed, so its usage has to be
     // recorded here — the browser is not around to do it. Written with the

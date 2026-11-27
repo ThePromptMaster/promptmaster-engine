@@ -23,6 +23,7 @@
 import { continuationTail, endsMidSentence, joinContinuation, MAX_CONTINUE_ROUNDS, rewriteToCarryOn, splitUnfinished } from './continuation';
 import { classifyDrainError, classified, withPreserved } from './errors';
 import { drainLog } from './log';
+import { OUTREACH_KINDS, runOutreachJob, type OutreachClient, type OutreachStore } from './outreach-job';
 import { withoutRemoved } from '@/lib/workflow/removed-text';
 import {
   DRAFT_SECTION,
@@ -50,6 +51,8 @@ export interface DrainOptions {
   now?: () => number;
   /** Max jobs one drain will touch, as a backstop against a runaway queue. */
   maxJobs?: number;
+  /** Sending outreach email (26 Nov): absent, an outreach job fails rather than guessing. */
+  outreach?: { store: OutreachStore; client: OutreachClient };
 }
 
 export interface DrainReport {
@@ -136,6 +139,10 @@ export async function runDrain(options: DrainOptions): Promise<DrainReport> {
 
     handled += 1;
     report.claimed += 1;
+    if (OUTREACH_KINDS.has(job.kind)) {
+      await runOutreach({ job, store, worker, report, outreach: options.outreach });
+      continue;
+    }
     await runJob({ job, store, generator, worker, remaining, report });
   }
 
@@ -151,6 +158,21 @@ export async function runDrain(options: DrainOptions): Promise<DrainReport> {
   });
 
   return report;
+}
+
+/** One outreach email's job (26 Nov, `outreach-job.ts`), counted on the drain's report. */
+async function runOutreach(args: { job: Job; store: JobStore; worker: string; report: DrainReport; outreach: DrainOptions['outreach'] }): Promise<void> {
+  const { job, store, worker, report, outreach } = args;
+  if (!outreach) {
+    await store.failJob(job.id, worker, 'invalid_request', 'This drain cannot send email.', {}, true);
+    report.failed += 1;
+    return;
+  }
+  const outcome = await runOutreachJob({ job, store, worker, outreach: outreach.store, client: outreach.client });
+  if (outcome === 'released') report.released += 1;
+  else if (outcome === 'failed') report.failed += 1;
+  else report.completed += 1;
+  drainLog('info', { event: 'outreach_job', jobId: job.id, kind: job.kind, outcome, worker });
 }
 
 interface RunJobArgs {

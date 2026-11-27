@@ -112,9 +112,47 @@ SENT = {
 
 
 def _sent_matches(query: str, m: dict[str, Any]) -> bool:
-    terms = [t.strip().lower() for t in re.findall(r"to:\(([^)]*)\)", query)[0].split(" OR ")] if "to:(" in query else []
+    if "to:(" in query:
+        terms = [t.strip().lower() for t in re.findall(r"to:\(([^)]*)\)", query)[0].split(" OR ")]
+    else:
+        terms = [t.lower() for t in re.findall(r"to:(\S+)", query)]
     to = (m.get("to", "") + " " + m.get("cc", "")).lower()
-    return any(t and t in to for t in terms)
+    if not any(t and t in to for t in terms):
+        return False
+    subject = re.search(r'subject:"([^"]*)"', query)
+    return not subject or subject.group(1).strip() == m.get("subject", "").strip()
+
+
+# Mock sending (outreach): drafts made, then sent into SENT, one process's memory.
+DRAFTS: dict[str, dict[str, Any]] = {}
+_SEQ = {"n": 0}
+
+
+def _next(prefix: str) -> str:
+    _SEQ["n"] += 1
+    return f"{prefix}-{_SEQ['n']}"
+
+
+def _create_draft(arguments: dict[str, Any]) -> dict[str, Any]:
+    draft_id = _next("dr")
+    DRAFTS[draft_id] = dict(arguments)
+    return {"id": draft_id, "message": {"id": _next("md"), "threadId": _next("td")}}
+
+
+def _send_draft(arguments: dict[str, Any]) -> dict[str, Any]:
+    from promptmaster.composio_client import ComposioError
+
+    draft = DRAFTS.pop(str(arguments.get("draft_id") or ""), None)
+    if draft is None:
+        raise ComposioError("GMAIL_SEND_DRAFT failed: draft not found", 404)
+    mid, tid = _next("ms"), _next("t")
+    html = str(draft.get("body") or "")
+    SENT[mid] = {
+        "messageId": mid, "threadId": tid, "sender": MOCK_GMAIL_ADDRESS, "to": str(draft.get("recipient_email") or ""),
+        "subject": str(draft.get("subject") or ""), "messageTimestamp": _day(0, 12), "labelIds": ["SENT"],
+        "payload": {"mimeType": "text/html", "body": {"data": _b64(html)}},
+    }
+    return {"id": mid, "threadId": tid, "labelIds": ["SENT"]}
 
 
 def _mail_matches(query: str, m: dict[str, Any]) -> bool:
@@ -211,6 +249,12 @@ def result(tool: str, arguments: dict[str, Any]) -> Any:
         return {"emailAddress": MOCK_GMAIL_ADDRESS, "messagesTotal": len(MESSAGES), "threadsTotal": len(MESSAGES), "historyId": "1"}
     if tool == "OUTLOOK_GET_PROFILE":
         return {"displayName": "You", "mail": MOCK_OUTLOOK_ADDRESS, "userPrincipalName": MOCK_OUTLOOK_ADDRESS}
+    if tool == "GMAIL_CREATE_EMAIL_DRAFT":
+        return _create_draft(arguments)
+    if tool == "GMAIL_SEND_DRAFT":
+        return _send_draft(arguments)
+    if tool == "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID" and str(arguments.get("message_id")) in SENT:
+        return SENT[str(arguments.get("message_id"))]
     if tool == "GMAIL_FETCH_EMAILS" and "in:sent" in str(arguments.get("query") or ""):
         return {"messages": [m for m in SENT.values() if _sent_matches(str(arguments.get("query")), m)]}
     if tool == "GMAIL_FETCH_EMAILS":

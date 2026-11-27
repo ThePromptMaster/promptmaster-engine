@@ -13,7 +13,9 @@ connector does, and nothing is ticked:
 
 What was read reaches the prompt fenced as other people's words, and the browser
 saves it to the project, where the person can see it and remove it. Only read
-tools are called: nothing here can send or change anything in an account.
+tools are called here: nothing in this module can send or change anything in an
+account. Sending outreach email the person approved is `outreach_mail.py`'s, and
+only through the job runner with a ticket (L-305).
 """
 
 from __future__ import annotations
