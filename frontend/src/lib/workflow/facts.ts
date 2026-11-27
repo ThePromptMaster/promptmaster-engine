@@ -114,9 +114,12 @@ export function scopeOf(text: string): { scope: string; phrase: string } | null 
 /**
  * "…with 18", "…to 12", "…, now Monday": the value a replacement brings in, after the
  * one it replaces (27 Nov, a seat limit: "supersedes the 24-seat limit with 18" read 18
- * as the old value, and every repair "still gave 18").
+ * as the old value, and every repair "still gave 18"). A second clause that says what something is now ends
+ * the replaced one: "45 staff now attend instead of 30, and the approved budget is now $2,000" replaces 30 only
+ * (28 Nov, a peer's quick-answer rerun: every repair "still gave $2000"). A list ("$30, $40, and $50 tiers")
+ * has no verb after its "and", and stays whole.
  */
-const NEW_VALUE = /\s+(?:with|to)\s+(?=(?:the\s+|a\s+|an\s+)?(?:[$€£]?\d|[A-Z]{1,8}-?\d))|,\s*now\b/;
+const NEW_VALUE = /\s+(?:with|to)\s+(?=(?:the\s+|a\s+|an\s+)?(?:[$€£]?\d|[A-Z]{1,8}-?\d))|,\s*now\b|,\s*(?:and|but|while|whereas)\s+(?=[^.;]*\b(?:now|becomes?|is|are|was|were|has|have|holds?)\b)/;
 
 /**
  * A fact that names what it replaces, split: what it says now, and the clause

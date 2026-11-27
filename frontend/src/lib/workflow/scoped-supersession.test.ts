@@ -138,3 +138,28 @@ describe('a replaced date in a decision, and the row that records it (Alder reru
     expect(supersededFactValues([CAL03]).map((s) => s.value)).toEqual(['CAL-01']);
   });
 });
+
+/** 28 Nov, a peer's quick-answer → full-process rerun (john@ 46cb3672): "still gives $2000" on every repair. */
+describe('a second clause after the replaced one is what is true now', () => {
+  const UPDATE = fact(
+    'Tuesday update from the branch manager: 45 staff now attend instead of 30, and the approved budget is now $2,000. The branch meeting room still holds 30, so the day needs a second room or two sittings; no second room has been booked.',
+    { kind: 'fact' }
+  );
+
+  it('replaces 30 only, and $2,000 is what the budget is now', () => {
+    const c = replacedClause(UPDATE.statement)!;
+    expect(c.was.trim()).toBe('instead of 30');
+    expect(c.now).toContain('the approved budget is now $2,000');
+    expect(supersededFactValues([UPDATE]).map((s) => s.value)).not.toContain('2000');
+  });
+
+  it('passes a repair that keeps the $2,000 budget', () => {
+    const text = 'Everything else is kept as written, including the $2,000 budget, which the current fact still states.\n\n| F2 | Approved budget | $2,000 | Supplied |';
+    expect(leftoverMentions(text, supersededFactValues([UPDATE])).filter((m) => m.value.kind === 'money')).toEqual([]);
+  });
+
+  it('keeps a list whole: "$30, $40, and $50 tiers" are all replaced', () => {
+    const c = replacedClause('The new flat fee of $35 replaces the $30, $40, and $50 tiers.')!;
+    expect(c.was).toContain('$50');
+  });
+});
