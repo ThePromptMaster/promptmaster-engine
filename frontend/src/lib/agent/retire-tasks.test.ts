@@ -68,3 +68,21 @@ describe('retireMovedPastTasks (L-315)', () => {
     expect(closeTaskBySystem.mock.calls[0][1].basis.outcome).toBe('reworded');
   });
 });
+
+describe('a replacement the work now asks for is a task at once (27 Nov, production pass)', () => {
+  it('adds "Run W4 on the new system" in place of the W3 task, once', async () => {
+    const pack = '## Steps\n\n1. Run West payroll from file W4 on the new payroll system.\n2. Run North payroll from file N7 on the new payroll system.\n';
+    const h = { pack: { ...heads.pack, text: pack } };
+    agentTaskOutcomes.mockResolvedValue({ outcomes: [{ id: 't1', outcome: 'replaced', quote: 'Run West payroll from file W4 on the new payroll system.' }] });
+    await retireMovedPastTasks({ project, heads: h, events: [], tasks: [task('t1', 'Run West payroll from file W3 on the old payroll system.')] });
+    expect(createTask).toHaveBeenCalledTimes(1);
+    expect(createTask.mock.calls[0][2]).toMatchObject({ title: 'Run West payroll from file W4 on the new payroll system.', basis: { replaces: 't1' } });
+    expect(closeTaskBySystem.mock.calls[0][1]).toMatchObject({ status: 'dismissed', basis: { outcome: 'replaced', replaced_by: 'new' } });
+  });
+
+  it('adds nothing for a replacement quoted from a fact, or one that is not an action', async () => {
+    agentTaskOutcomes.mockResolvedValue({ outcomes: [{ id: 't1', outcome: 'replaced', quote: 'South S4 ran successfully on the new system at 3:10 p.m. (OPS-02)' }] });
+    await retireMovedPastTasks({ project, heads, events: [], tasks: [task('t1', 'Run S4 on the old system.')] });
+    expect(createTask).not.toHaveBeenCalled();
+  });
+});

@@ -6133,7 +6133,10 @@ says they are:
   (OPS-02)"). The task is marked done, not dropped.
 - **Replaced**, with the instruction that took its place.
 - **Reworded**: the work still asks for it in other words. The old task closes and one in the new words opens,
-  once.
+  once. A **replacement** the work now asks for word for word ("Run West payroll from file W4 on the new
+  payroll system" in place of the W3 run) opens as a task at once too, rather than after the next check.
+- The change shown beside it is the one it is about: the one holding the quote, else the one naming the same
+  files and ids (a production pass showed South's run "after" West's file change saved a moment later).
 - Otherwise "no longer in {stage} v{n}". A failed call labels nothing; the task is still closed.
 
 Each closed task keeps `resolution`, `resolved_by` and `basis` (stage, version, the change before that version,

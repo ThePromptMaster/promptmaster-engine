@@ -79,6 +79,8 @@ export interface Retirement {
   why: 'gone' | 'moved_past';
   /** The change to the brief or facts before that version, when there was one. */
   change?: { seq: number; at: string; what: string };
+  /** Every change between the task and that version, when there was more than one: `closing` picks the one its quote is about. */
+  changes?: { seq: number; at: string; what: string }[];
 }
 
 const after = (a: string, b: string) => Date.parse(a) > Date.parse(b);
@@ -107,10 +109,29 @@ export function tasksMovedPast(
     if (head.prose && checkBorn(task) && !statesAsCurrent(head.text, task.title)) why = 'gone';
     else if (byDate.has(task.id)) why = 'moved_past';
     if (!why) continue;
-    const change = changeBetween(events, task.created_at, head.at);
-    out.push({ task, stageId: task.stage, head, why, ...(change ? { change } : {}) });
+    const changes = changesBetween(events, task.created_at, head.at);
+    const change = changeFor(changes, task.title);
+    out.push({ task, stageId: task.stage, head, why, ...(change ? { change } : {}), ...(changes.length > 1 ? { changes } : {}) });
   }
   return out;
+}
+
+/** Every change to the brief or facts recorded after `from` and no later than `to`, oldest first. */
+export function changesBetween(
+  events: readonly WorkflowEvent[],
+  from: string,
+  to: string
+): { seq: number; at: string; what: string }[] {
+  return events
+    .filter((e) => e.type === 'brief_changed' && after(e.created_at, from) && !after(e.created_at, to) && changeDetail(e))
+    .map((found) => {
+      const d = changeDetail(found)!;
+      const said = d.pairs.length ? d.pairs.map((p) => p.to) : d.added.length ? d.added : d.removed.map((r) => `no longer: ${r}`);
+      const field = typeof found.payload?.field === 'string' ? found.payload.field : '';
+      const what = (said.join(' ') || (field ? `the ${field.replace(/_/g, ' ')} changed` : 'the brief changed')).slice(0, 300);
+      const seq = (found as unknown as { seq?: number }).seq ?? 0;
+      return { seq, at: found.created_at, what };
+    });
 }
 
 /** The last change to the brief or facts recorded after `from` and no later than `to`. */
@@ -119,16 +140,41 @@ export function changeBetween(
   from: string,
   to: string
 ): { seq: number; at: string; what: string } | undefined {
-  const found = [...events]
-    .reverse()
-    .find((e) => e.type === 'brief_changed' && after(e.created_at, from) && !after(e.created_at, to) && changeDetail(e));
-  if (!found) return undefined;
-  const d = changeDetail(found)!;
-  const said = d.pairs.length ? d.pairs.map((p) => p.to) : d.added.length ? d.added : d.removed.map((r) => `no longer: ${r}`);
-  const field = typeof found.payload?.field === 'string' ? found.payload.field : '';
-  const what = (said.join(' ') || (field ? `the ${field.replace(/_/g, ' ')} changed` : 'the brief changed')).slice(0, 300);
-  const seq = (found as unknown as { seq?: number }).seq ?? 0;
-  return { seq, at: found.created_at, what };
+  return changesBetween(events, from, to).at(-1);
+}
+
+/** What two lines share that names something: ids (W4, OPS-02) count most, then longer words. */
+const IDS = /(?<![\p{L}\p{N}-])[A-Z]{1,8}-?\d{1,4}[A-Za-z]?(?![\p{L}\p{N}])/gu;
+const COMMON = new Set(['with', 'from', 'that', 'this', 'have', 'been', 'will', 'into', 'their', 'there', 'they', 'when', 'what', 'which', 'were', 'also', 'only', 'system', 'file']);
+const wordsOf = (t: string) => new Set((t.toLowerCase().match(/\p{L}{4,}/gu) ?? []).filter((w) => !COMMON.has(w)));
+const idsOf = (t: string) => new Set(t.match(IDS) ?? []);
+
+/**
+ * Of several changes before a version, the one a closed task is about (27 Nov, production pass: South's
+ * run, closed by its completion report, was shown "after" West's file change, saved a moment later): the
+ * change that holds the quote, else the one sharing most words with the task and its quote, else the last.
+ */
+export function changeFor(
+  changes: readonly { seq: number; at: string; what: string }[],
+  task: string,
+  quote = ''
+): { seq: number; at: string; what: string } | undefined {
+  if (changes.length <= 1) return changes[0];
+  const q = quote.toLowerCase().replace(/\s+/g, ' ').trim();
+  const holding = q ? changes.find((c) => c.what.toLowerCase().replace(/\s+/g, ' ').includes(q)) : undefined;
+  if (holding) return holding;
+  const want = wordsOf(`${task} ${quote}`);
+  const ids = idsOf(`${task} ${quote}`);
+  let best = changes.at(-1)!;
+  let score = -1;
+  for (const c of changes) {
+    const n = [...idsOf(c.what)].filter((w) => ids.has(w)).length * 10 + [...wordsOf(c.what)].filter((w) => want.has(w)).length;
+    if (n > score) {
+      score = n;
+      best = c;
+    }
+  }
+  return best;
 }
 
 /** Why a task closed, as the model labelled it; `gone` when nothing was found. */
@@ -142,6 +188,8 @@ export interface TaskOutcome {
 /** The closing written onto a task: its status, its reason in words, and what it rested on. */
 export function closing(r: Retirement, o: TaskOutcome): { status: 'done' | 'dismissed'; resolution: string; basis: TaskBasis } {
   const at = `${r.head.label} v${r.head.versionNumber}`;
+  // The change this closing is about, now that its quote is known.
+  if (r.changes?.length) r = { ...r, change: changeFor(r.changes, r.task.title, o.quote ?? o.now ?? '') };
   const resolution =
     o.outcome === 'done' && o.quote ? `Done: "${o.quote}"`
     : o.outcome === 'replaced' && o.quote ? `Replaced: "${o.quote}"`
