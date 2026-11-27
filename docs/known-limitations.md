@@ -5636,6 +5636,11 @@ Two gaps found while designing L-288:
   against that earlier stage's change before rewriting it (`keptAfterCheck`). A stage the fact match had also
   reopened could be closed by that check while it still stated the old date, because the check saw only the
   earlier stage's diff. It is now always rewritten (`leftoverValues` on its text).
+- **An answer's question is not a replaced value** (27 Nov, production pass). A recorded answer quotes the question
+  it answers. Go's question "…about 9.7% of the subtotal, instead of the 10% used now…" made 10 a replaced value.
+  A later delivery date change then rewrote the Budget, which no date touches, and the rewrite took out the 10%
+  working that explained the contingency. Replaced values are now read from the answer only (`answerOf`): for the
+  rewrite rule above, for review rows marked superseded, and for outreach holds.
 - **The summary.** Right after a change, a finished stage after the first stage still waiting read "Still usable".
   The first update reopens it to be checked. It now reads "will be checked once Timeline is updated", but not after
   "Keep them as they are".

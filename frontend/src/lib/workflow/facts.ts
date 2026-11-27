@@ -77,16 +77,36 @@ export const REPLACING =
   /\b(?:replacing|replaces|replaced|instead of|rather than|no longer|previously|formerly|changed from|down from|up from|supersed(?:ing|es|ed)|corrected from|(?<=,\s?)not(?=\s+(?:the\s+)?[$€£]?\d))\b/i;
 
 /**
+ * What an answer recorded as a fact states: the answer, without the question it
+ * quotes (`Chosen by Go when you left it to Go — asked "…": …`, `Decided by the
+ * user — asked "…", answered: …`, `… — on "…" (Stage): …`). Any other fact whole.
+ *
+ * 27 Nov, production (ops plan): Go's own question "…about 9.7% of the subtotal,
+ * instead of the 10% used now…" was read as the answer replacing 10, so every
+ * stage that said 10% counted as stating a replaced value. A delivery date
+ * change then rewrote the Budget, which the date never touched, and took out
+ * the 10% working that explained the contingency.
+ */
+export function answerOf(statement: string): string {
+  const open = statement.match(/^(?:Decision:\s*)?(?:Chosen by Go when you left it to Go|Decided by the user) — (?:asked|on(?: the finding)?) "/);
+  if (!open) return statement;
+  const rest = statement.slice(open[0].length);
+  const close = rest.match(/"(?: \([^)]*\))?(?:, answered)?: /);
+  return close?.index !== undefined ? rest.slice(close.index + close[0].length) : statement;
+}
+
+/**
  * A fact that names what it replaces, split: what it says now, and the clause
  * that names the earlier value, up to the end of that sentence. Null when it
- * names nothing.
+ * names nothing. An answer is read without its question (`answerOf`).
  */
 export function replacedClause(statement: string): { now: string; was: string } | null {
-  const at = statement.search(REPLACING);
+  const said = answerOf(statement);
+  const at = said.search(REPLACING);
   if (at <= 0) return null;
-  const rest = statement.slice(at);
+  const rest = said.slice(at);
   const end = rest.search(/[.;](?=\s|$)/);
-  return end > 0 ? { now: statement.slice(0, at) + rest.slice(end), was: rest.slice(0, end) } : { now: statement.slice(0, at), was: rest };
+  return end > 0 ? { now: said.slice(0, at) + rest.slice(end), was: rest.slice(0, end) } : { now: said.slice(0, at), was: rest };
 }
 
 /**
@@ -172,7 +192,8 @@ export function supersededFactValues(facts: readonly ProjectFact[] | undefined):
   // finished November 7" stands, and every repair of Output failed on it
   // (15 Oct, HARBOR: "the new version still states November 7").
   // What each fact states now: not the earlier value it names as replaced.
-  const live = current.map((f) => factValues(replacedClause(f.statement)?.now ?? f.statement));
+  // An answer's question is not what it states: an old value it mentions is not kept alive by it.
+  const live = current.map((f) => factValues(replacedClause(f.statement)?.now ?? answerOf(f.statement)));
   return current.flatMap((f) => {
     // A choice between options changes no value: the other option's figures are still true.
     if (replacesADecision(f, byId)) return [];
@@ -187,7 +208,7 @@ export function supersededFactValues(facts: readonly ProjectFact[] | undefined):
 
 /** "the earlier $30 million for the same quarter": the clause a fact says it replaces, without its leading word. */
 function namedReplaced(statement: string): string | undefined {
-  const word = statement.match(REPLACING)?.[0] ?? '';
+  const word = answerOf(statement).match(REPLACING)?.[0] ?? '';
   const was = replacedClause(statement)?.was.slice(word.length).replace(/^[\s,:]+/, '').trim();
   return was && /\d/.test(was) ? was : undefined;
 }

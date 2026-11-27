@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assumedByModel, currentFacts, factSource, factsForRequest, factsText, replacedClause, retiredFacts, supersededFactValues } from './facts';
+import { answerOf, assumedByModel, currentFacts, factSource, factsForRequest, factsText, replacedClause, retiredFacts, supersededFactValues } from './facts';
 import { factValues } from './fact-values';
 import { figureFindings, figureSources } from './figure-support';
 import type { ProjectFact } from '@/types/project';
@@ -123,3 +123,37 @@ describe('a decision made again changes no value (12 Nov, production pass)', () 
   });
 });
 
+
+describe('an answer recorded as a fact is read without the question it quotes (27 Nov, ops plan)', () => {
+  // Production, 27 Nov: the question's "instead of the 10% used now" made 10 a replaced value,
+  // so a delivery date change rewrote a Budget that only said why 10% did not fit.
+  const chosen = fact({
+    id: 'c',
+    statement: 'Chosen by Go when you left it to Go — asked "The contract costs are $50,140, which leaves $4,860 for contingency under the $55,000 cap (about 9.7% of the subtotal, instead of the 10% used now). What contingency should the budget and the plan use?": the contingency is $4,860, the full amount left under the cap after the $50,140 contract costs, which brings the total to exactly $55,000.',
+  });
+
+  it('a question that says "instead of" replaces nothing', () => {
+    expect(answerOf(chosen.statement)).toBe('the contingency is $4,860, the full amount left under the cap after the $50,140 contract costs, which brings the total to exactly $55,000.');
+    expect(replacedClause(chosen.statement)).toBeNull();
+    expect(supersededFactValues([chosen])).toEqual([]);
+    expect(factsForRequest([chosen])[0].replaces).toBeUndefined();
+  });
+
+  it('an answer that names what it replaces still does', () => {
+    const user = fact({ id: 'u', statement: 'Decided by the user — asked "Which day rate applies?", answered: Harbor charges $410 a day, replacing $360.' });
+    expect(answerOf(user.statement)).toBe('Harbor charges $410 a day, replacing $360.');
+    expect(supersededFactValues([user]).map((v) => v.value)).toEqual(factValues('$360').money);
+  });
+
+  it('an old value the question mentions is not kept alive by it', () => {
+    const was = fact({ id: 'd1', statement: 'Northwind delivers the two cooling units on March 3, 2027.', retired_at: '2026-11-26T22:18:00Z', retired_reason: 'superseded' });
+    const now = fact({ id: 'd2', statement: 'Northwind delivers the two cooling units on March 17, 2027.', supersedes: 'd1' });
+    const asked = fact({ id: 'q', statement: 'Chosen by Go when you left it to Go — asked "Delivery moved from March 3 to March 17. Should the note to Bayview say so?": yes, it gives the new switch date only.' });
+    expect(supersededFactValues([was, now, asked]).map((v) => v.value)).toEqual(['3-3']);
+  });
+
+  it('any other fact is read whole', () => {
+    expect(answerOf('Harbor charges $410 a day.')).toBe('Harbor charges $410 a day.');
+    expect(answerOf('Chosen by Go when you left it to Go: the 10% contingency stands.')).toBe('Chosen by Go when you left it to Go: the 10% contingency stands.');
+  });
+});
