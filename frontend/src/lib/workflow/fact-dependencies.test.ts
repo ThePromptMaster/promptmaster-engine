@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { sentenceUsingFact, stagesUsingFacts, statementsOf } from './fact-dependencies';
+import { replacementOf, rewordedOnly, sentenceUsingFact, stagesUsingFacts, statementsOf } from './fact-dependencies';
+import type { ProjectFact } from '@/types/project';
 
 describe('which finished work used a fact (L-52)', () => {
   const memo = 'Candidate A is recommended. Candidate B has managed 100 or more employees for 4 years, against 7 for A. Both interviewed well.';
@@ -36,5 +37,34 @@ describe('which finished work used a fact (L-52)', () => {
     expect(sentenceUsingFact('TeamNotes launches on Nov. 12th for every team.', 'Launch date: November 12, 2026')).toBe('TeamNotes launches on Nov. 12th for every team.');
     expect(sentenceUsingFact('It costs $12.00 per seat each month.', 'Price: $12 per user per month')).toBe('It costs $12.00 per seat each month.');
     expect(sentenceUsingFact('It launches on November 19.', 'Launch date: November 12, 2026')).toBeNull();
+  });
+});
+
+describe('a fact only reworded, every value the same (27 Nov, production pass of change 4)', () => {
+  const was = "Harbor Crew Hire charges $410 per person per day and moves a booking free with 7 days' notice.";
+
+  it('same amounts and numbers in other words is only reworded', () => {
+    expect(rewordedOnly(was, "Harbor Crew Hire's rate is $410 per person per day, and a booking can be moved at no charge with 7 days' notice.")).toBe(true);
+  });
+
+  it('a value that moved, went or came is a change', () => {
+    expect(rewordedOnly(was, "Harbor Crew Hire charges $420 per person per day and moves a booking free with 7 days' notice.")).toBe(false);
+    expect(rewordedOnly(was, "Harbor Crew Hire charges $410 per person per day and moves a booking free with 10 days' notice.")).toBe(false);
+    expect(rewordedOnly(was, 'Harbor Crew Hire charges $410 per person per day.')).toBe(false);
+    expect(rewordedOnly(was, undefined)).toBe(false);
+  });
+
+  it('a fact with no values is never only reworded', () => {
+    expect(rewordedOnly('The room is in the existing warehouse.', 'The new room sits inside the current warehouse.')).toBe(false);
+  });
+
+  it('the replacement is found by supersedes, with its subject', () => {
+    const f = (over: Partial<ProjectFact>) => ({ id: 'x', statement: '', subject: null, retired_at: null, supersedes: null, ...over }) as unknown as ProjectFact;
+    const facts = [
+      f({ id: 'a', statement: 'Rate is $410 a day.', subject: 'Crew', retired_at: '2026-11-27T09:35:00Z' }),
+      f({ id: 'b', statement: 'The day rate is $410.', subject: 'Crew', supersedes: 'a' }),
+    ];
+    expect(replacementOf('Crew: Rate is $410 a day.', facts)).toBe('Crew: The day rate is $410.');
+    expect(replacementOf('Rate is $410 a day.', facts)).toBeUndefined();
   });
 });

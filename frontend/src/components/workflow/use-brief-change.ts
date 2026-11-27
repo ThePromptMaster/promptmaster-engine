@@ -7,7 +7,7 @@ import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, onlyFromTheChat, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
 import { decisionsSetAside, setAsideLater, setAsideReason, type SetAsideDecision } from '@/lib/workflow/approvals';
 import { factsText } from '@/lib/workflow/facts';
-import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
+import { replacementOf, rewordedOnly, stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { NewWorkflowEvent } from '@/lib/supabase/workflow';
 import type { WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -120,7 +120,8 @@ export function useBriefChange({
           // change is recorded even when nothing is finished yet.
           if (field === 'facts') {
             const after = new Set(statementsOf(is.facts));
-            const removed = statementsOf(was.facts).filter((f) => !after.has(f));
+            // A fact only reworded, every value the same, is judged below like an added one (27 Nov).
+            const removed = statementsOf(was.facts).filter((f) => !after.has(f) && !rewordedOnly(f, replacementOf(f, p.facts ?? [])));
             if (removed.length) {
               const affected = stagesUsingFacts(
                 removed,
