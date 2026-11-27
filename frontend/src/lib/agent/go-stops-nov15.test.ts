@@ -155,4 +155,27 @@ describe('only rechecks Go does itself are open: under "handle them for me" it c
     const out = await performStep(done('autonomous', 'ask'));
     expect(out.needs).toMatchObject({ kind: 'objective_check', finding: 'work_open' });
   });
+
+  // 27 Nov, production passes: payroll i9 ("Treat i1 to i3 … as superseded") and museum i8 (already
+  // carried out by the records) each stopped the run as "the work is not finished" under Handle.
+  function findingsOpen(routine: 'handle' | 'ask', recent: unknown[] = []) {
+    const c = done('autonomous', routine, recent);
+    // The middle stage holds a findings table every row of which must be decided.
+    c.template = { ...T, stages: T.stages.map((s) => (s.id === middle.id ? { ...s, exit_criteria: [...s.exit_criteria, { id: 'm.triaged', label: 'Every finding decided', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: true }] } : s)) } as never;
+    c.state = { ...c.state, stages: Object.fromEntries(T.stages.map((s) => [s.id, { status: 'completed_with_artifact' }])) } as never;
+    c.context = { ...c.context, findings: { [middle.id]: { total: 2, triaged: 1 } } } as never;
+    return c;
+  }
+
+  it('open findings: it goes on to decide them, and puts to the user only what is theirs', async () => {
+    const out = await performStep(findingsOpen('handle'));
+    expect(out.stop).toBeUndefined();
+    expect(out.output).toMatch(/not yet accepted or rejected.*I go on to decide the findings under your routine-decision policy/);
+  });
+
+  it('open findings under "ask me", or a second time straight after, stop as before', async () => {
+    expect((await performStep(findingsOpen('ask'))).needs).toMatchObject({ kind: 'objective_check', finding: 'work_open' });
+    const recent = [{ action_key: 'declare_objective_complete', status: 'succeeded', execution_label: null, output: 'The deliverable is written, but the work is not finished: x.' }];
+    expect((await performStep(findingsOpen('handle', recent))).needs).toMatchObject({ kind: 'objective_check', finding: 'work_open' });
+  });
 });

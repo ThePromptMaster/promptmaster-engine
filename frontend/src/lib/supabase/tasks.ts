@@ -46,8 +46,8 @@ export interface TaskBasis {
   stage_id?: string;
   retired_version_id?: string;
   retired_version_number?: number;
-  /** Why: reported done by a fact, replaced, reworded, no longer in the work, or the date/placeholder rule. */
-  outcome?: 'done' | 'replaced' | 'reworded' | 'gone' | 'moved_past';
+  /** Why: reported done by a fact, replaced, reworded, no longer in the work, the date/placeholder rule, or another task saying the same. */
+  outcome?: 'done' | 'replaced' | 'reworded' | 'gone' | 'moved_past' | 'duplicate';
   /** The words that show it: a fact reporting it done, or what replaced it. */
   quote?: string;
   /** The change to the brief or facts before that version, when there was one. */

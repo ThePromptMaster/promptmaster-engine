@@ -76,6 +76,7 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.closedByYou': '由您关闭',
   'pnl.closedDone': '已报告完成：“{quote}”',
   'pnl.closedReplaced': '已被替换：“{quote}”',
+  'pnl.closedDuplicate': '与“{quote}”是同一件事',
   'pnl.closedReworded': '在 {stage} v{n} 中以新的措辞继续',
   'pnl.closedMovedPast': '{stage} v{n} 已不再需要它',
   'pnl.closedGone': '已不在 {stage} v{n} 中',

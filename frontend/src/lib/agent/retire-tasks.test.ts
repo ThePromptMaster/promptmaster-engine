@@ -86,3 +86,27 @@ describe('a replacement the work now asks for is a task at once (27 Nov, product
     expect(createTask).not.toHaveBeenCalled();
   });
 });
+
+describe('one action, one task (27 Nov, museum pass)', () => {
+  it('closes the open tasks that repeat another in other words, naming the one kept, with nothing else due', async () => {
+    const tasks = [
+      // Put aside by Go as work for the real world, in its own words each time.
+      { ...task('d1', 'Dispatch carton B2 and record its shipment reference and the museum acceptance.'), detail: 'q', basis: { from: 'screen' as const } },
+      { ...task('d2', "Dispatch carton B2 to the museum and obtain the coordinator's acceptance."), detail: 'q', basis: { from: 'screen' as const } },
+      task('t4', 'Confirm the loaded file is N8.'),
+    ];
+    const out = await retireMovedPastTasks({ project, heads, events: [], tasks });
+    expect(agentTaskOutcomes).not.toHaveBeenCalled();
+    expect(closeTaskBySystem.mock.calls.map(([t, c]) => [t.id, c.status, c.basis.outcome, c.basis.replaced_by])).toEqual([['d2', 'dismissed', 'duplicate', 'd1']]);
+    expect(closeTaskBySystem.mock.calls[0][1].resolution).toBe('The same action as "Dispatch carton B2 and record its shipment reference and the museum acceptance."');
+    expect(out.closed.map((t) => t.id)).toEqual(['d2']);
+  });
+
+  it('does not open a reworded task the list already holds in other words', async () => {
+    agentTaskOutcomes.mockResolvedValue({ outcomes: [{ id: 't2', outcome: 'reworded', now: 'Run N8 on the new system once BANK-05 is recorded.' }] });
+    const tasks = [task('t2', 'Run N8 on the new system today.'), { ...task('t5', '2. Run N8 on the new system after BANK-05.'), detail: 'q', basis: { from: 'go_record' as const } }, task('t4', 'Confirm the loaded file is N8.')];
+    const out = await retireMovedPastTasks({ project, heads, events: [], tasks });
+    expect(createTask).not.toHaveBeenCalled();
+    expect(out.created).toEqual([]);
+  });
+});

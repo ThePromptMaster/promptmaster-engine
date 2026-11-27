@@ -249,14 +249,72 @@ export function openSystemTasks(tasks: readonly ProjectTask[], state: Pick<Workf
 }
 
 /**
- * The normalised key two tasks share when they say the same thing. A leading label is not part of
- * it: "Step: send Morgan Lee's contact sheet…" is "send Morgan Lee's contact sheet…" (27 Nov,
- * production pass of the Calder fix: a second check added it again under "Step:").
+ * A task's own words, without a list marker or a label in front: "1. Run North payroll…" and
+ * "Step: send Morgan Lee's contact sheet…" are "Run North payroll…" and "send Morgan Lee's…"
+ * (27 Nov, production passes: a second check added "Step: …", and a reworded line kept its "1.").
  */
-export function taskKey(title: string): string {
+export function taskWords(title: string): string {
   return title
-    .replace(/^\s*(?:\d+[.)]\s*)?(?:step|next action|action|next step|then|to do)\s*\d*\s*[:.)–—-]\s*/i, '')
+    .replace(/^\s*(?:(?:\d{1,3}[.)]|[a-z]\))\s+|[-*•]\s+)?/i, '')
+    .replace(/^(?:step|next action|action|next step|then|to do)\s*\d*\s*[:.)–—-]\s*/i, '')
+    .trim();
+}
+
+/** The normalised key two tasks share when they say the same thing in the same words. */
+export function taskKey(title: string): string {
+  return taskWords(title)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
+}
+
+const TASK_ID = /(?<![\p{L}\p{N}-])[A-Z]{1,8}-?\d{1,4}[A-Za-z]?(?![\p{L}\p{N}]|-[\p{L}\p{N}])/gu;
+
+/**
+ * Whether two tasks are one real-world action in other words (27 Nov, production pass of the museum
+ * job: "Dispatch carton B2 …" was recorded eleven times, once each time Go put it aside as work for
+ * the real world, each time worded differently). Read in code: the same first verb about the same
+ * identifiers (B2, N7, CAL-01), and no name in one that the other leaves out on both sides, so
+ * "Send Morgan Lee's sheet under CAL-01" and "Send Alex Rivera's summary under CAL-01" stay two.
+ * Without an identifier, only the same words are the same task.
+ */
+export function sameAction(a: string, b: string): boolean {
+  const wa = taskWords(a);
+  const wb = taskWords(b);
+  if (taskKey(wa) === taskKey(wb)) return true;
+  const verb = (s: string) => (s.match(/^\p{L}+/u)?.[0] ?? '').toLowerCase();
+  if (!verb(wa) || verb(wa) !== verb(wb)) return false;
+  const ids = (s: string) => [...new Set(s.match(TASK_ID) ?? [])].sort().join(' ');
+  if (!ids(wa) || ids(wa) !== ids(wb)) return false;
+  // Capitalised words after the first: the people, places and organisations the action is about.
+  const names = (s: string) => new Set((s.slice(1).match(/\b\p{Lu}\p{Ll}+/gu) ?? []).map((n) => n.toLowerCase()));
+  const na = names(wa);
+  const nb = names(wb);
+  const within = (x: Set<string>, y: Set<string>) => [...x].every((n) => y.has(n));
+  return within(na, nb) || within(nb, na);
+}
+
+/** Whether the list already holds this action, open or done (a dismissed task does not count). */
+export function hasSameTask(tasks: readonly Pick<ProjectTask, 'title' | 'status'>[], title: string): boolean {
+  return tasks.some((t) => t.status !== 'dismissed' && sameAction(t.title, title));
+}
+
+/**
+ * Open tasks that repeat another open one, each with the one it repeats. The one kept is a task the
+ * check drew from the work, if there is one, since it follows its sentence there; otherwise the
+ * oldest. The page closes the rest with that reason, so a list recorded before `hasSameTask` existed
+ * reads as one task per action.
+ */
+export function duplicateTasks(tasks: readonly ProjectTask[]): { task: ProjectTask; keeps: ProjectTask }[] {
+  const open = tasks
+    .filter((t) => t.status === 'open')
+    .sort((a, b) => Number(checkBorn(b)) - Number(checkBorn(a)) || Date.parse(a.created_at) - Date.parse(b.created_at));
+  const kept: ProjectTask[] = [];
+  const out: { task: ProjectTask; keeps: ProjectTask }[] = [];
+  for (const t of open) {
+    const first = kept.find((k) => sameAction(k.title, t.title));
+    if (first) out.push({ task: t, keeps: first });
+    else kept.push(t);
+  }
+  return out;
 }

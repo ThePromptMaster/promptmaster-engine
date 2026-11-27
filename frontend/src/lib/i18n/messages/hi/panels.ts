@@ -76,6 +76,7 @@ export const hi: Record<keyof typeof en, string> = {
   'pnl.closedByYou': 'आपने बंद किया',
   'pnl.closedDone': 'पूरा होने की सूचना: “{quote}”',
   'pnl.closedReplaced': 'बदला गया: “{quote}”',
+  'pnl.closedDuplicate': '“{quote}” वाला ही काम',
   'pnl.closedReworded': '{stage} v{n} में नए शब्दों में जारी',
   'pnl.closedMovedPast': '{stage} v{n} इससे आगे बढ़ चुका है',
   'pnl.closedGone': 'अब {stage} v{n} में नहीं',

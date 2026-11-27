@@ -76,6 +76,7 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.closedByYou': 'imefungwa na wewe',
   'pnl.closedDone': 'imeripotiwa kukamilika: “{quote}”',
   'pnl.closedReplaced': 'imebadilishwa: “{quote}”',
+  'pnl.closedDuplicate': 'kitendo kilekile kama “{quote}”',
   'pnl.closedReworded': 'inaendelea kwa maneno mapya katika {stage} v{n}',
   'pnl.closedMovedPast': '{stage} v{n} imeipita',
   'pnl.closedGone': 'haipo tena katika {stage} v{n}',

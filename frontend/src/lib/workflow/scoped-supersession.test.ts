@@ -101,3 +101,40 @@ describe('a line naming both finalists is read sentence by sentence (27 Nov, pro
   });
 });
 
+
+/**
+ * 27 Nov, a peer's rerun of Sean's Alder Quay test on production (john@ 0989f619): Go stopped,
+ * unable to repair Objective v5, for "Friday" in a history row and for every current mention of D1.
+ */
+describe('a replaced date in a decision, and the row that records it (Alder rerun)', () => {
+  const D6 = fact(
+    'Sponsor Mira records D6: Week 7 Tuesday replaces the Week 6 Friday launch target in D1. The original training and QA prerequisites still apply.',
+    { kind: 'fact', created_at: '2026-11-27T21:20:00Z' }
+  );
+  const V5 = [
+    '| Id | Statement | Status |',
+    '| --- | --- | --- |',
+    '| F12 | Go-live target. The current target is Week 7 Tuesday (D6). The original brief target was Week 6 Friday. | Week 6 Friday is **Superseded** by D6 (F22) |',
+    '| F14 | Decision D1: Mira approved the go-live target on the condition that training and QA are complete. | Current |',
+    '| S11 | **Decision log accuracy** | The log records D1 with its condition, applied now to the Week 7 Tuesday target. |',
+  ].join('\n');
+
+  it('reads D1 as where the date sat, not as what was replaced', () => {
+    const superseded = supersededFactValues([D6]);
+    // Week 6 and Friday were replaced; D1, where they sat, stands.
+    expect(superseded.map((s) => [s.kind, s.value])).toEqual([['weekdays', 'friday'], ['numbers', '6']]);
+  });
+
+  it('passes v5: the row that sets Friday aside, and "the original … was", are history', () => {
+    expect(leftoverMentions(V5, supersededFactValues([D6]))).toEqual([]);
+  });
+
+  it('still catches Friday stated as the target', () => {
+    const left = leftoverMentions(`${V5}\n\nGo-live is on Week 6 Friday.`, supersededFactValues([D6]));
+    expect([...new Set(left.map((m) => m.sentence))]).toEqual(['Go-live is on Week 6 Friday.']);
+  });
+
+  it('"supersedes CAL-01" still replaces CAL-01', () => {
+    expect(supersededFactValues([CAL03]).map((s) => s.value)).toEqual(['CAL-01']);
+  });
+});

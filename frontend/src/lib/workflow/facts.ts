@@ -255,7 +255,7 @@ export function supersededFactValues(
     // $30 million is what a repair must not leave (18 Oct, Ridgeway).
     const clause = replacedClause(f.statement);
     if (!clause) return [];
-    return supersededValues(clause.was, clause.now)
+    return supersededValues(withoutPlaces(clause.was), clause.now)
       .map((v) => ({ ...v, now: f.statement, ...(clause.scope ? { scope: clause.scope } : {}) }))
       // A scoped replacement leaves the old value true for everyone else; it is checked only where the text is
       // about the one person. An earlier fact about the same thing is what the clause replaces: "Studio A holds
@@ -266,6 +266,19 @@ export function supersededFactValues(
 }
 
 const earlier = (a: Pick<ProjectFact, 'created_at'>, b: Pick<ProjectFact, 'created_at'>) => Date.parse(a.created_at) < Date.parse(b.created_at);
+
+/**
+ * A replaced clause without the ids that say where the old value sat: "the Week 6 Friday launch target
+ * in D1" replaces a date, and D1 stands (27 Nov, a peer's Alder rerun: every current mention of D1 was
+ * read as left behind and the repair stopped). An id after "in", "of", "under", "from" or "within" is
+ * the record holding the value; "supersedes CAL-01 for Alex" still replaces CAL-01.
+ */
+export function withoutPlaces(was: string): string {
+  return was.replace(
+    /\b(?:in|of|under|from|within|per)\s+(?:(?:the|decision|rule|fact|record|item|section|row|clause)\s+){0,2}[A-Z]{1,8}-?\d{1,4}[A-Za-z]?(?![\p{L}\p{N}]|-[\p{L}\p{N}])/gu,
+    ' '
+  );
+}
 
 /** Words that name what a clause is about, not that it replaces something or how. */
 const NOT_A_SUBJECT = new Set(['earlier', 'previous', 'previously', 'former', 'formerly', 'replacing', 'replaces', 'replaced', 'superseding', 'supersedes', 'superseded', 'instead', 'rather', 'longer', 'changed', 'from', 'with', 'that', 'this', 'than', 'were', 'limit', 'total', 'value', 'figure', 'number']);

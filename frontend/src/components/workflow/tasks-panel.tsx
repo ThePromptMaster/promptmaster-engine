@@ -66,6 +66,7 @@ function useWhyClosed() {
     const n = b.retired_version_number ?? 0;
     if (b.outcome === 'done' && b.quote) return t('pnl.closedDone', { quote: b.quote });
     if (b.outcome === 'replaced' && b.quote) return t('pnl.closedReplaced', { quote: b.quote });
+    if (b.outcome === 'duplicate' && b.quote) return t('pnl.closedDuplicate', { quote: b.quote });
     if (b.outcome === 'reworded' && where) return t('pnl.closedReworded', { stage: where, n });
     if (b.outcome === 'moved_past' && where) return t('pnl.closedMovedPast', { stage: where, n });
     if (where) return t('pnl.closedGone', { stage: where, n });

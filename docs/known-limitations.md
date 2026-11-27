@@ -6492,3 +6492,42 @@ Limits:
   comparison; a row whose verdict depended on another row without saying so is not re-judged.
 - The reference fallback needs a reference at the start of the subject ("V-B", "C12"); otherwise only the model's
   `revises` links a revision to its row.
+
+### L-331 — One action is one task; findings under "Handle them for me" are Go's to decide before the objective check stops (2026-11-28)
+
+Found in the second production pass of this round (museum 10adf75b and payroll 3650176b rebuilds, john@):
+- The museum job's task list held "Dispatch carton B2 …" eleven times. Each time Go put the question
+  aside as work for the real world, it recorded the action in new words, and the list matched only
+  identical titles. The payroll list held "1. Run North payroll from file N7 …" beside "Run North payroll
+  from file N7 …": the list marker counted as part of the task.
+- Under "Handle them for me", the objective check stopped the run as "the work is not finished" on payroll
+  i9 ("Treat i1 to i3 and i5 to i8 as superseded") and museum i8 (a change the records already carried
+  out). Triage decides the first as record-keeping (L-320), and the decision question records the second
+  as carried out. Neither was reached, because the objective check treated any open finding as the
+  user's.
+- A fact added while no stage was finished wrote no `brief_changed` (a peer's Alder rerun), so a version
+  Go saved from the facts before it could not be caught (L-322).
+- The same Alder rerun stopped on two false leftovers (L-318). One was "Friday" in a row reading "The
+  original brief target was Week 6 Friday. | Week 6 Friday is **Superseded** by D6". The other was every
+  current mention of D1, because "replaces the Week 6 Friday launch target in D1" read D1 as replaced.
+
+Now:
+- A task's words are read without a list marker or label (`taskWords`).
+- Two tasks are one action when they have the same first verb about the same identifiers and no name in
+  one that the other leaves out (`sameAction`). Every path that records a task checks the list first
+  (`hasSameTask`), and the page closes an open repeat as "the same action as …" (`duplicateTasks`). It
+  keeps the task the check drew from the work, since that one follows its sentence.
+- Under Autonomous with "Handle them for me", open findings, like rechecks, are work Go goes on to once
+  before calling the objective met (`GO_DOES_UNDER_HANDLE`). Triage puts only what is the user's to them.
+  The same stop a second time in a row still stops.
+- A fact with nothing finished is recorded with `affected: []`. One offered from the side chat carries
+  `offered` and reopens nothing (L-168).
+- "The original … was …" reports history. So does a table row with a cell that sets the value aside
+  ("superseded", "replaced", "withdrawn") (`rowSetsAside`). An id after "in", "of", "under", "from" or
+  "within" in a replaced clause names where the value sat, not the value (`withoutPlaces`).
+
+Limits:
+- Without an identifier (B2, N7, CAL-01), only identical words count as one task. "Confirm the venue
+  booking" and "Book the venue" stay two.
+- When a task in a model's words is kept and the check's own sentence is not recorded, that task does not
+  close when the work drops the sentence. It closes by the date/placeholder rule (L-293) or by the user.

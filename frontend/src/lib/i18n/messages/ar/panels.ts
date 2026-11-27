@@ -76,6 +76,7 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.closedByYou': 'أغلقتها أنت',
   'pnl.closedDone': 'أُبلغ عن إنجازها: «{quote}»',
   'pnl.closedReplaced': 'استُبدلت: «{quote}»',
+  'pnl.closedDuplicate': 'الإجراء نفسه: «{quote}»',
   'pnl.closedReworded': 'مستمرة بكلمات جديدة في {stage} v{n}',
   'pnl.closedMovedPast': 'تجاوزها {stage} v{n}',
   'pnl.closedGone': 'لم تعد في {stage} v{n}',
