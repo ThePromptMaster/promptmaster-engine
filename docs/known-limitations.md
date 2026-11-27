@@ -6562,3 +6562,18 @@ Limits:
   booking" and "Book the venue" stay two.
 - When a task in a model's words is kept and the check's own sentence is not recorded, that task does not
   close when the work drops the sentence. It closes by the date/placeholder rule (L-293) or by the user.
+
+### L-332 — An instruction to replace the text with something else is a rewrite (2026-11-28)
+
+Found on the 28 Nov hand pass (john@ 61aef963). Go was asked to "Replace the Alder Quay rollout text with the Birch
+Lane book swap notice", and the revision's record said it "Kept "Slots: 5 of 5 used, none spare." … which the
+revision dropped without being asked": the guard that puts back short dropped lines (L-327) read the instruction as
+a targeted change, because its rewrite wording knew only "replace the text/draft/whole", not "replace the … text
+with …".
+
+Now `asksForRemovals` also reads "replace [the] … {text, draft, document, notice, memo, packet, content, version,
+section, page, letter, email, report, plan, material} with/by …", "entire/whole (current) text/draft/document", and
+"do not keep" as asking for what was there to go. "Replace the $40 ticket price with $30" is still a targeted change.
+
+Limits: a wholesale replacement worded another way ("swap the memo for an FAQ") still reads as targeted; the next
+revision is guarded as before.
