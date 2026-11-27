@@ -103,6 +103,20 @@ describe('changes entered one after another are one update (27 Nov, production p
     ];
     const u = latestUpdate({ events, state: { stages: {} }, summary: null, steps: [], tasks: [], onHold: 0 })!;
     expect(u.at).toBe('2026-11-27T19:44:20Z');
-    expect(u.what).toEqual(['One-time exception for Alex Rivera only.', "Alex Rivera's contact sheet stays internal.", 'For Alex Rivera, nothing has been sent.']);
+    // Newest first (28 Nov): the change just made leads.
+    expect(u.what).toEqual(['For Alex Rivera, nothing has been sent.', "Alex Rivera's contact sheet stays internal.", 'One-time exception for Alex Rivera only.']);
+  });
+
+  it('leads with a fact that reopened nothing, made minutes after another (a peer\'s Morrow rerun)', () => {
+    const fact = (at: string, line: string, prev: string, affected: unknown[]) => ({
+      type: 'brief_changed', stage_id: 'shortlist', actor: 'user', created_at: at,
+      payload: { kind: 'fact', field: 'facts', before: prev, after: `${prev}\n- ${line}`, affected },
+    }) as WorkflowEvent;
+    const events = [
+      fact('2026-11-27T21:39:00Z', 'Revised bids arrive Week 2 Tuesday.', '- A.', [{ stage_id: 'assess', reason: 'x' }]),
+      fact('2026-11-27T21:42:34Z', 'D2: Elena approves the award to V-B Briar for $40,500 all-in.', '- A.\n- Revised bids arrive Week 2 Tuesday.', []),
+    ];
+    const u = latestUpdate({ events, state: { stages: {} }, summary: null, steps: [], tasks: [], onHold: 0 })!;
+    expect(u.what[0]).toBe('D2: Elena approves the award to V-B Briar for $40,500 all-in.');
   });
 });

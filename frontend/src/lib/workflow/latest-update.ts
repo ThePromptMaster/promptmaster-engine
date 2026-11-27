@@ -75,7 +75,9 @@ export function latestUpdate(input: {
   const fieldWords: Record<string, string> = { objective: 'The objective changed', constraints: 'The constraints changed', audience: 'The audience changed', output_format: 'The format changed', context: 'The project material changed', facts: 'The facts changed' };
   const said: string[] = [];
   const touched = new Set(group.touched);
-  for (const change of group.events) {
+  // Newest first: the change just made leads, and an earlier one in the same update follows (28 Nov, a
+  // peer's Morrow rerun: D2, added three minutes after another fact, fell past the three lines shown).
+  for (const change of [...group.events].reverse()) {
     const d = changeDetail(change)!;
     const ref = change.payload?.reference as { name?: unknown } | undefined;
     const field = typeof change.payload?.field === 'string' ? change.payload.field : '';

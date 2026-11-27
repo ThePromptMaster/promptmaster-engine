@@ -31,7 +31,7 @@ describe('a version saved from facts that changed while it was written (L-322)',
     const out = await reopenIfFactsMovedOn(ctx([fact()]), saved);
     expect(appendWorkflowEvent).toHaveBeenCalledTimes(1);
     const [, , ev] = appendWorkflowEvent.mock.calls[0] as unknown as [string, string, { type: string; actor: string; payload: { made_before_change: boolean; affected: { stage_id: string; reason: string }[] } }];
-    expect(ev).toMatchObject({ type: 'brief_changed', actor: 'system', payload: { made_before_change: true, affected: [{ stage_id: 'shortlist' }] } });
+    expect(ev).toMatchObject({ type: 'version_predates_change', actor: 'system', payload: { made_before_change: true, affected: [{ stage_id: 'shortlist' }] } });
     expect(ev.payload.affected[0].reason).toContain('D2: No award has been approved.');
     expect(out.output).toContain('stays open');
   });
@@ -44,5 +44,23 @@ describe('a version saved from facts that changed while it was written (L-322)',
     await reopenIfFactsMovedOn(ctx([fact({ payload: { ...fact().payload, offered: true } })]), saved);
     await reopenIfFactsMovedOn(ctx([fact()]), { ...saved, changes: {} });
     expect(appendWorkflowEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('the event that records it (L-322, 28 Nov)', () => {
+  it('is not a brief change, which only the user writes, and the projection reopens the stage it names', async () => {
+    const { projectState } = await import('@/lib/workflow/engine');
+    const { SINGLE_OUTPUT_V1 } = await import('@/lib/workflow/templates/single-output.v1');
+    const first = SINGLE_OUTPUT_V1.stages[0].id;
+    const ev = (type: string, over: Partial<WorkflowEvent> = {}): WorkflowEvent =>
+      ({ type, stage_id: first, actor: 'user', created_at: '2026-11-27T21:46:00Z', payload: {}, ...over }) as WorkflowEvent;
+    const state = projectState(SINGLE_OUTPUT_V1, [
+      ev('project_created'),
+      ev('version_predates_change', {
+        actor: 'system', created_at: '2026-11-27T21:46:28Z',
+        payload: { made_before_change: true, affected: [{ stage_id: first, reason: 'Brief was saved from what the project said before this change.' }] },
+      }),
+    ]);
+    expect(state.stages[first]).toMatchObject({ status: 'stale', stale: { was: 'in_progress', reason: 'Brief was saved from what the project said before this change.' } });
   });
 });

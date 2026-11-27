@@ -435,6 +435,12 @@ export type WorkflowEventType =
   /** The user's record that a stage's version went to someone (26 Nov, L-289). Not stage state. */
   | 'version_shared'
   /**
+   * A version a run saved from the brief and facts as they were when its step began, after the user
+   * changed them (L-322). payload: made_before_change, affected [{stage_id, reason}] naming that stage
+   * alone. Reopens it as a brief change would; written only by that run, and never a brief change.
+   */
+  | 'version_predates_change'
+  /**
    * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
    * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only
    * the affected done stages for recheck.

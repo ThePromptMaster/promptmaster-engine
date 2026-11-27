@@ -11,6 +11,7 @@
  */
 export const en = {
   "tw:Recorded who has a version": "Recorded who has a version",
+  "tw:Saved from the project before a change; reopened": "Saved from the project before a change; reopened",
   "tw:Took back a record of who has a version": "Took back a record of who has a version",
   "tw:Your change reopened later stages": "Your change reopened later stages",
   "tw:Checked after a change and kept": "Checked after a change and kept",
@@ -272,6 +273,7 @@ type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
   "tw:Recorded who has a version": "Se registró quién tiene una versión",
+  "tw:Saved from the project before a change; reopened": "Guardada con el proyecto anterior a un cambio; reabierta",
   "tw:Took back a record of who has a version": "Se retiró un registro de quién tiene una versión",
   "tw:Your change reopened later stages": "Tu cambio reabrió etapas posteriores",
   "tw:Checked after a change and kept": "Revisado tras un cambio y mantenido",
@@ -531,6 +533,7 @@ export const es: Keys = {
 
 export const fr: Keys = {
   "tw:Recorded who has a version": "Enregistré qui a une version",
+  "tw:Saved from the project before a change; reopened": "Enregistrée d’après le projet d’avant un changement ; rouverte",
   "tw:Took back a record of who has a version": "Annulé un enregistrement de qui a une version",
   "tw:Your change reopened later stages": "Votre modification a rouvert des étapes suivantes",
   "tw:Checked after a change and kept": "Vérifié après un changement et conservé",
@@ -790,6 +793,7 @@ export const fr: Keys = {
 
 export const pt: Keys = {
   "tw:Recorded who has a version": "Registrado quem tem uma versão",
+  "tw:Saved from the project before a change; reopened": "Salva com o projeto de antes de uma alteração; reaberta",
   "tw:Took back a record of who has a version": "Desfeito um registro de quem tem uma versão",
   "tw:Your change reopened later stages": "Sua mudança reabriu etapas posteriores",
   "tw:Checked after a change and kept": "Verificado após uma mudança e mantido",

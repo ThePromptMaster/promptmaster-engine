@@ -541,7 +541,8 @@ export function projectState(
       // 5 Oct (Sean): a change to an authoritative input reopens what relied
       // on it, and only that. Which stages relied on it was judged when the
       // change was saved (lib/workflow/brief-change.ts) and is on the event.
-      case 'brief_changed': {
+      case 'brief_changed':
+      case 'version_predates_change': {
         const affected = Array.isArray(event.payload?.affected) ? (event.payload.affected as { stage_id?: unknown; reason?: unknown }[]) : [];
         // A stage whose decision the change took back (L-272) is no longer done: its
         // approval is the user's to give again. Reopened as a draft in progress, so the

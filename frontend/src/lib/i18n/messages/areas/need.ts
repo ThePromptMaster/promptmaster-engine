@@ -6,6 +6,7 @@
  */
 export const en = {
   "need.reservedOutgoing": "This one is yours alone: it sends something to people outside this project, and only you decide what goes out.",
+  "need.approvalCheckFailed": "The check of this version says it does not meet the objective yet: {finding} Go has stopped revising it. Approving accepts it as it stands; to change it first, say what to change.",
   'need.setObjective': 'I need an objective before I can choose a move. Set one above.',
   'need.stuckWhy': '{stage} is marked stuck.',
   'need.stuckWhyReason': '{stage} is marked stuck: {reason}.',
@@ -106,6 +107,7 @@ type Keys = Record<keyof typeof en, string>;
 
 export const es: Keys = {
   "need.reservedOutgoing": "Esta te corresponde solo a ti: envía algo a personas de fuera de este proyecto, y solo tú decides qué sale.",
+  "need.approvalCheckFailed": "La comprobación de esta versión dice que todavía no cumple el objetivo: {finding} Go ha dejado de revisarla. Aprobarla la acepta tal como está; para cambiarla antes, di qué cambiar.",
   'need.setObjective': 'Necesito un objetivo antes de poder elegir un paso. Fíjalo arriba.',
   'need.stuckWhy': '{stage} está marcada como atascada.',
   'need.stuckWhyReason': '{stage} está marcada como atascada: {reason}.',
@@ -204,6 +206,7 @@ export const es: Keys = {
 
 export const fr: Keys = {
   "need.reservedOutgoing": "Celle-ci vous revient à vous seul : elle envoie quelque chose à des personnes hors de ce projet, et vous seul décidez de ce qui part.",
+  "need.approvalCheckFailed": "La vérification de cette version indique qu’elle ne répond pas encore à l’objectif : {finding} Go a cessé de la réviser. L’approuver l’accepte telle quelle ; pour la modifier d’abord, dites quoi changer.",
   'need.setObjective': 'Il me faut un objectif avant de pouvoir choisir une étape. Définissez-le ci-dessus.',
   'need.stuckWhy': '{stage} est marquée comme bloquée.',
   'need.stuckWhyReason': '{stage} est marquée comme bloquée : {reason}.',
@@ -302,6 +305,7 @@ export const fr: Keys = {
 
 export const pt: Keys = {
   "need.reservedOutgoing": "Esta é só sua: envia algo a pessoas de fora deste projeto, e só você decide o que sai.",
+  "need.approvalCheckFailed": "A verificação desta versão diz que ela ainda não atende ao objetivo: {finding} O Go parou de revisá-la. Aprová-la a aceita como está; para mudá-la antes, diga o que mudar.",
   'need.setObjective': 'Preciso de um objetivo antes de escolher um passo. Defina-o acima.',
   'need.stuckWhy': '{stage} está marcada como travada.',
   'need.stuckWhyReason': '{stage} está marcada como travada: {reason}.',

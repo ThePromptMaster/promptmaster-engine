@@ -3,6 +3,7 @@ import type { en } from '../areas/words';
 /** Hindi for `areas/words.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
 export const hi: Record<keyof typeof en, string> = {
   "tw:Recorded who has a version": "दर्ज किया कि किसके पास कौन-सा संस्करण है",
+  "tw:Saved from the project before a change; reopened": "बदलाव से पहले के प्रोजेक्ट से सहेजा गया; फिर से खोला गया",
   "tw:Took back a record of who has a version": "किसके पास संस्करण है, यह रिकॉर्ड वापस लिया",
   "tw:Your change reopened later stages": "आपके बदलाव ने बाद के चरण फिर से खोले",
   "tw:Checked after a change and kept": "बदलाव के बाद जाँचा गया और रखा गया",

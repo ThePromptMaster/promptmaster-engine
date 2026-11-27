@@ -6281,6 +6281,11 @@ Limits:
   Go no longer makes a new version of approved work for wording.
 - "What it changes for the people doing the work" is a planner instruction, not checked in code.
 
+**Addition, 28 Nov (a peer's Morrow rerun).** Once Go has stopped polishing a stage, an approval can still be asked
+on a version whose own check missed the objective (alignment Low or drift High). The card now says so, with the
+check's first finding, before the approval is given (`checkFailed`, `need.approvalCheckFailed`). Go does not
+revise past its polishing cap to avoid the question.
+
 ### L-321 — The latest update in the Go panel, and a stage's statuses on one line when they differ (2026-11-28)
 Sean, 27 Nov: "What did my change affect, and where did Go stop? … Show affected records and tasks, with links to
 open them. Start with a clickable summary in the existing Go panel." He corrected his own mockup: "Showing Alex's
@@ -6311,6 +6316,9 @@ Limits:
 - "Done in the world" is the task list's word: PromptMaster knows an action happened only when a fact reports
   it (L-315).
 
+**Addition, 28 Nov.** Within one update (changes five minutes apart or less), the card lists the newest change
+first. A fact added three minutes after another, which reopened nothing, had fallen past the three lines shown.
+
 ### L-322 — A version written from facts that changed meanwhile is not left looking current (2026-11-28)
 A peer's trace of Sean's 27 Nov Morrow run: a fact (D2) was recorded while Go applied findings to the shortlist.
 The change reopened nothing (the shortlist was still being written), the version saved without D2, and Go asked
@@ -6325,6 +6333,13 @@ said before this change: {change}. It is updated with what the project says now.
 Limits:
 - A change judged to concern only other stages does not reopen it.
 - A page save or a chapter job is not covered: only Go's steps.
+
+**Correction, 28 Nov (found by hand on production).** The reopening never reached the database. It was written
+as a system `brief_changed`, which `we_brief_change_user_chk` refuses (a brief change is the user's), and the
+refusal was swallowed. The unit test mocked the write. It is now its own event, `version_predates_change`
+(migration 20261225000000). Only the run that saved the version may write it, naming that one stage and why, and
+the projection reopens the stage as a brief change would. A fact added while nothing is finished is recorded too
+(L-331), so a first-stage draft is caught.
 
 ### L-326 — A linked project updated from its original reopens what used it; a faulted version is not "Ready" (2026-11-28)
 
