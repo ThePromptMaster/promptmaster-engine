@@ -1807,7 +1807,7 @@ export async function performStep(raw: PerformContext): Promise<StepOutcome> {
         return stillUnmet.length
           ? done(key, {
               status: 'failed', toolsUsed: ['model'], changes,
-              output: `Couldn't meet the measured requirement on ${target.label}: the new version measures ${stillUnmet.join('; ')}. It is saved, so you can see it; edit it, or ask Go to try again.`,
+              output: `Couldn't meet the measured requirement on ${target.label}: the new version measures ${stillUnmet.join('; ')}. It is saved, so you can see it; edit it, or ask Go to try again.${wholeLimitMayBeAPart(stillUnmet) ? ' If this limit is for one part of the work rather than all of it, say which part, and only that part is counted (L-319).' : ''}`,
             })
           : done(key, {
               status: 'succeeded', toolsUsed: ['model'], changes,
@@ -2981,6 +2981,18 @@ export async function reconfirmApprovals(
 }
 
 /** The same requirements measured on new text, before it is saved. */
+/**
+ * A whole-text word limit missed by a wide margin may be one part's limit read as the whole's: what
+ * Go could not establish is said, so the stop can be answered (Sean, 27 Nov, Cedar Street: 70 words
+ * held against a 247-word checklist through five repairs).
+ */
+export function wholeLimitMayBeAPart(unmet: readonly string[]): boolean {
+  return unmet.some((u) => {
+    const m = /^The deliverable: at most (\d[\d,]*) words — measured (\d[\d,]*) words/.exec(u);
+    return Boolean(m) && Number(m![2].replace(/,/g, '')) >= 2 * Number(m![1].replace(/,/g, ''));
+  });
+}
+
 function unmetMeasurementsOf(ctx: Pick<PerformContext, 'project' | 'template'>, stage: StageDefinition, content: string): string[] {
   return measureStageContent(ctx.project, ctx.template, stage, content)
     .filter((m) => !m.satisfied)

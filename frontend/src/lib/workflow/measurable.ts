@@ -117,7 +117,7 @@ const NOT_A_NAME = /^(?:a|an|the|it|this|that|them|each|every|keep|write|make|be
  * Only a short noun phrase opening its own clause counts; anything with a
  * verb or an article in it falls back to `subjectNear`.
  */
-function partBefore(text: string, start: number): string {
+function partBefore(text: string, start: number, all = ''): string {
   const before = text.slice(Math.max(0, start - 80), start);
   // "Section 1 (executive update) must be…", "Section 2, the tracker, is…",
   // "Section 1 is limited to…": the section it names, by name when one is
@@ -131,6 +131,14 @@ function partBefore(text: string, start: number): string {
   // "1. Executive update: no more than 100 words" — the name is the label
   // before the colon (14 Oct, Sean's ASPEN brief).
   if (!clause.trim() && /:\s*$/.test(before)) clause = (before.replace(/:\s*$/, '').split(/[;,(.\n]|\band\b|\b\d+[.)]\s/).at(-1) ?? '');
+  // "Executive update (maximum 95 words)": the name before the bracket (27 Nov, Alder Quay: the
+  // 95-word cap on the update was held against the whole 853-word packet).
+  // Only a name standing alone: an item of a list ("…, sample summary, and facilitator notes (≤900 words)")
+  // is read by `itemBefore`, which knows where a list item starts.
+  if (!clause.trim() && /\(\s*$/.test(before)) {
+    const opening = before.replace(/\(\s*$/, '').split(/[.:;\n]/).at(-1) ?? '';
+    if (!opening.includes(',')) clause = opening.split(/\band\b|\b\d+[.)]\s/).at(-1) ?? '';
+  }
   // 14 Oct (Sean, ASPEN): "Executive update must be no more than 100 words"
   // was read as the whole pack's, because "must be" stopped the phrase being
   // a name. The verb is dropped from the end, and "the" from the front.
@@ -145,7 +153,8 @@ function partBefore(text: string, start: number): string {
   // "Whole document under 600 words, including headings": the whole, not a
   // part named "whole document" (2 Nov, production pass: the requirement a
   // generated setup recorded was measured nowhere, and its headings rule lost).
-  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!) || phrase === 'note') return '';
+  // Unless the brief lists it as one of several parts (L-319).
+  if (namesTheWhole(phrase, all) || phrase === 'note') return '';
   // "executive summary" is the summary every other check already knows.
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);
@@ -171,7 +180,7 @@ function partBefore(text: string, start: number): string {
  */
 const ITEM_HAS_PARTS = /\s(?:with|that|which|distinguishing|including|covering|containing|listing)\b/i;
 
-function itemBefore(text: string, start: number): string {
+function itemBefore(text: string, start: number, all = ''): string {
   let seg = text.slice(Math.max(0, start - 240), start);
   if (!/[(,]\s*$/.test(seg) || (text.match(new RegExp(`\\b${NUM}[\\s-]*words?\\b`, 'gi')) ?? []).length < 2) return '';
   const cut = Math.max(
@@ -197,7 +206,7 @@ function itemBefore(text: string, start: number): string {
   if (!words.length || words.length > 4) return '';
   if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
   const phrase = words.slice(-2).join(' ').toLowerCase();
-  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!) || phrase === 'note') return '';
+  if (namesTheWhole(phrase, all) || phrase === 'note') return '';
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);
   return phrase.replace(/(?<!s)s$/, '');
@@ -239,6 +248,37 @@ const APPROXIMATE = /(?:\b(?:roughly|about|around|approximately|approx\.?|some|c
 // "essay", found none, and the length was never counted.
 const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it|essay|article|paper|proposal|speech|story|newsletter|write-?up)$/i;
 
+/**
+ * Whether the brief lists `word` as one of several parts: inside a bracket or a
+ * list with at least two other items ("three separately reviewable drafts (web
+ * brief, photo caption, newsletter blurb)"). Then a name that would otherwise mean
+ * the whole ("newsletter") is that part (L-319, 27 Nov; Sean, Cedar Street: "Keep
+ * the newsletter under 70 words" was held against the release checklist, 247 words).
+ */
+export function listedAmongParts(word: string, text: string): boolean {
+  if (!word || !text) return false;
+  const re = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+  for (const m of text.matchAll(re)) {
+    const at = m.index!;
+    const open = text.lastIndexOf('(', at);
+    const close = text.indexOf(')', at);
+    // "(web brief, photo caption, newsletter blurb)".
+    if (open >= 0 && close > at && !text.slice(open, at).includes(')') && /,/.test(text.slice(open + 1, close))) return true;
+    // "…a web brief, a newsletter and a flyer": a list comma within two words before it, or after it.
+    const before = text.slice(Math.max(0, at - 40), at);
+    const after = text.slice(at + m[0].length, at + m[0].length + 40);
+    if (/,\s*(?:(?:and|or)\s+)?(?:(?:a|an|the)\s+)?(?:[\p{L}-]+\s+){0,2}$/u.test(before)) return true;
+    if (/^(?:\s+[\p{L}-]+){0,2}\s*,\s*(?!(?:which|who|that|if|when|but|so|not|because|as)\b)(?:(?:a|an|the)\s+)?\p{L}/u.test(after) && /,[^,]*\b(?:and|or)\b/.test(text.slice(at, at + 160))) return true;
+  }
+  return false;
+}
+
+/** Whether a phrase names the whole deliverable here: a whole-word name the brief does not list among parts. */
+function namesTheWhole(phrase: string, all: string): boolean {
+  const last = phrase.split(/\s+/).at(-1) ?? '';
+  return (WHOLE.test(phrase) || WHOLE.test(last)) && !listedAmongParts(last, all);
+}
+
 /** What a limit can apply to each of. */
 const UNITS = 'chapter|section|part|slide|lesson|module|scene|episode';
 /** "per chapter", "for each section", "each". */
@@ -268,8 +308,12 @@ function unitOfLimit(before: string, after: string): string {
 }
 
 /** The measurable requirements stated in these texts, de-duplicated. */
-export function parseRequirements(texts: readonly string[]): MeasurableRequirement[] {
+export function parseRequirements(texts: readonly string[], context = ''): MeasurableRequirement[] {
   const out = new Map<string, MeasurableRequirement>();
+  // Everything the brief says, to tell a part from the whole by (L-319).
+  const all = `${texts.join('\n')}\n${context}`;
+  // An unnamed limit the sentence says is on the whole ("in total"): never another part's, misread.
+  const wholeSaid = new Set<string>();
   const add = (r: Omit<MeasurableRequirement, 'id'>) => {
     const id = `${r.kind}:${r.per ? `each ${r.per}` : r.subject || 'all'}`;
     const had = out.get(id);
@@ -333,7 +377,15 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         if (hedged) continue;
         // "Keep the summary to 250 words" names its subject inside the match.
         const inside = m[0].match(SUBJECT_RE);
-        const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || itemBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
+        // "Keep the newsletter under 70 words": the part it names, unless that is the whole (L-319).
+        const kept = /\bkeep the ([a-z][a-z -]{0,29}?) (?:to|under|within|below)\b/i.exec(m[0]);
+        const keptName = kept ? kept[1].trim().toLowerCase().split(/\s+/).slice(-2).join(' ') : '';
+        const keptPart = kept && !namesTheWhole(keptName, all) && !WHOLE_CONTEXT.test(keptName) && !keptName.split(/\s+/).some((w) => NOT_A_NAME.test(w)) ? keptName.replace(/(?<!s)s$/, '') : '';
+        // "…limit applies only to the newsletter blurb", "…belongs to the web brief" (Sean's correction, L-319).
+        const owner = /^\s*(?:\w+\s+){0,2}?(?:applies|belongs|is)\s+(?:only\s+)?(?:to|for)\s+(?:the\s+)?([a-z][a-z -]{1,30}?)(?=[.,;:)]|\s+(?:only|alone)\b|$)/i.exec(t.slice(m.index! + m[0].length, m.index! + m[0].length + 60));
+        const ownerName = owner ? owner[1].trim().toLowerCase().split(/\s+/).slice(-2).join(' ') : '';
+        const owned = ownerName && !namesTheWhole(ownerName, all) && !ownerName.split(/\s+/).some((w) => NOT_A_NAME.test(w)) ? ownerName.replace(/(?<!s)s$/, '') : '';
+        const subject = inside ? canonical(inside[1]) : keptPart || owned || partBefore(t, m.index!, all) || itemBefore(t, m.index!, all) || subjectNear(t, m.index!, m.index! + m[0].length);
         if (NEGATED.test(t.slice(Math.max(0, m.index! - 40), m.index!))) {
           out.set(`retire:words:${subject || 'all'}`, { id: `words:${subject || 'all'}`, kind: 'words', subject, source: m[0].trim(), retires: true, ...r });
           continue;
@@ -341,6 +393,7 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         const sentence = t.slice(Math.max(0, t.lastIndexOf('.', m.index!) + 1), t.indexOf('.', m.index! + m[0].length) + 1 || t.length);
         if (subject) named += 1;
         else if (!out.has('words:all')) unnamed.push({ id: 'words:all', whole: WHOLE_CONTEXT.test(sentence) });
+        if (!subject && WHOLE_CONTEXT.test(sentence)) wholeSaid.add('words:all');
         add({ kind: 'words', subject, source: m[0].trim(), ...r, ...(HEADINGS_COUNTED.test(sentence) ? { headings: true } : {}) });
       }
     }
@@ -423,6 +476,19 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         add({ kind: 'questions', subject: 'faq', min: n, max: n, answered: true, source: m[0].trim() });
       }
     }
+  }
+  // One limit said twice, once with its part's name and once without ("Executive update (maximum 95
+  // words)" in the objective, "Executive update maximum 95 words." in the constraints): the part's
+  // (27 Nov, Alder Quay). Not when the unnamed one says it is the total.
+  const whole = out.get('words:all');
+  if (whole && !whole.retires && !wholeSaid.has('words:all') && [...out.values()].some((r) => r.kind === 'words' && r.subject && !r.per && !r.retires && r.max !== undefined && r.max === whole.max)) {
+    out.delete('words:all');
+  }
+  // "newsletter" and "newsletter blurb" with the same limit are one part: the fuller name is kept.
+  for (const r of [...out.values()]) {
+    if (r.kind !== 'words' || !r.subject || r.per || r.retires) continue;
+    const fuller = [...out.values()].find((o) => o !== r && o.kind === 'words' && !o.per && !o.retires && o.subject.length > r.subject.length && o.subject.includes(r.subject) && o.max === r.max && o.min === r.min);
+    if (fuller) out.delete(r.id);
   }
   return [...out.values()];
 }
@@ -884,7 +950,15 @@ export function requirementsForStage(
   deliverableId: string | undefined,
   requirements: readonly MeasurableRequirement[],
   /** The stage holds several documents: a named limit is only ever that part, under its heading. */
-  partsOnly = false
+  partsOnly = false,
+  /**
+   * What the brief says about its parts (L-319): `listed` when the brief lists a part among
+   * several, and `writtenElsewhere` when another written stage is about it. A part listed among
+   * several is measured under its heading, never as the whole of a stage that holds several; and
+   * on the deliverable only when no other stage writes it (Sean, Cedar Street: the release
+   * checklist's history label "Newsletter blurb" was counted as the blurb).
+   */
+  parts: { listed?: (subject: string) => boolean; writtenElsewhere?: (subject: string) => boolean } = {}
 ): { requirement: MeasurableRequirement; whole: boolean }[] {
   if (stage.renderer !== 'prose') return [];
   // The prompt a deliverable is made from, and a statement of the objective,
@@ -911,7 +985,11 @@ export function requirementsForStage(
     }
     const aboutIt = Boolean(r.subject) && !preparesFor(stage.label, r.subject) &&
       (r.subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(about) : about.includes(r.subject));
-    if (aboutIt) out.push({ requirement: r, whole: true });
+    const listed = Boolean(r.subject) && Boolean(parts.listed?.(r.subject));
+    // A part the brief lists among several, in a stage that does not name it in its label: under its heading.
+    if (aboutIt) out.push({ requirement: r, whole: !(listed && !stage.label.toLowerCase().includes(r.subject)) });
+    // Written by another stage: the deliverable only lists it (a checklist, a register).
+    else if (stage.id === deliverableId && listed && parts.writtenElsewhere?.(r.subject)) continue;
     // On the deliverable, a named part is looked for under its heading; the
     // whole text stands for it only when it is the one thing asked for.
     // A part of it ("executive update", "section 1") is only ever that part:
